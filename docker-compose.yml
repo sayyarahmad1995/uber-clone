@@ -43,3 +43,12 @@ services:
 
 volumes:
   postgres_data:
+
+
+  # Ory Kratos identity service is introduced behind the provider-neutral boundary.
+  kratos:
+    image: oryd/kratos:v1.3.1
+    command: ["serve", "--dev"]
+    ports:
+      - "4433:4433"
+      - "4434:4434"
