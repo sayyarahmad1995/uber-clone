@@ -12,7 +12,7 @@ Update this file after every meaningful work session.
 
 **Current engineering milestone:** User Entry and Rider Foundation — In Progress
 
-**Current work item:** Implement the Ory adapter behind the completed provider-neutral external OIDC boundary.
+**Current work item:** Complete the Ory login/consent bridge and mobile Authorization Code + PKCE integration, then verify the full authentication path.
 
 **Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until we learn from completed work.
 
@@ -115,7 +115,7 @@ Implemented so far:
 - API readiness endpoint.
 - Temporary integration endpoint for exercising user provisioning.
 
-The application now has a provider-neutral identity boundary. The next implementation is the Ory adapter behind that boundary; Ory-specific code must not enter the User domain.
+The provider-neutral OIDC adapter is implemented. Ory Kratos and Hydra infrastructure foundations are defined. The remaining authentication work is the login/consent bridge, OAuth client registration, mobile Authorization Code + PKCE flow, and end-to-end verification.
 
 ---
 
