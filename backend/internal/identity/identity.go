@@ -1,10 +1,21 @@
 package identity
 
-import "context"
+import (
+	"context"
+	"errors"
+)
 
-type Principal struct{ Subject string }
+var (
+	ErrUnauthenticated = errors.New("identity is unauthenticated")
+	ErrInvalidToken    = errors.New("identity token is invalid")
+)
 
-// Provider is the application boundary to the selected external OIDC provider.
+type Principal struct {
+	Issuer  string
+	Subject string
+}
+
+// Provider is the provider-neutral application boundary for external OIDC identity.
 type Provider interface {
 	Authenticate(ctx context.Context, bearerToken string) (Principal, error)
 }
