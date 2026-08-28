@@ -10,9 +10,9 @@ Update this file after every meaningful work session.
 
 ## Current Status
 
-**Current engineering milestone:** Deployment Foundation
+**Current engineering milestone:** Deployment Foundation — Complete
 
-**Current work item:** Verify the completed Deployment Foundation with Docker Compose.
+**Current work item:** Prepare the next business vertical slice: User Entry and Rider Foundation.
 
 **Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until we learn from completed work.
 
@@ -48,6 +48,12 @@ Update this file after every meaningful work session.
 - [x] Administrative operations deferred
 - [x] Initial decision and scope documentation created
 - [x] Work tracking added
+- [x] Deployment Foundation implemented
+- [x] Deployment Foundation runtime-verified locally with Docker Compose
+- [x] PostgreSQL container verified healthy
+- [x] API container verified running
+- [x] `GET /health` verified successfully
+- [x] Deployment Foundation merged into `main`
 
 ---
 
@@ -92,6 +98,26 @@ The exact boundaries, order, and scope of these later slices remain intentionall
 
 ## In Progress
 
+No implementation work is currently in progress. The next milestone must be prepared as a new feature branch after its scope is defined.
+
+---
+
+## Completed Deployment Verification
+
+Verified successfully using:
+
+`docker compose up -d --build`
+
+Observed result:
+
+- PostgreSQL became healthy.
+- API started successfully.
+- `curl http://localhost:8080/health` returned `{"status":"ok"}`.
+
+---
+
+## In Progress
+
 - [x] Define the minimal repository structure for the Deployment Foundation
 - [x] Create the minimal Go backend
 - [x] Add the health endpoint
@@ -104,7 +130,7 @@ The exact boundaries, order, and scope of these later slices remain intentionall
 
 ## Immediate Next Step
 
-Run and verify the completed stack with Docker Compose, then merge the feature branch into `main` and delete the branch.
+Architect and define the smallest implementable scope for the User Entry and Rider Foundation, then begin it on a new feature branch.
 
 ---
 
