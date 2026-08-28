@@ -21,15 +21,15 @@ services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-uber_clone}
+      POSTGRES_USER: ${POSTGRES_USER:-uber_clone}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-uber_clone_local}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-uber_clone} -d ${POSTGRES_DB:-uber_clone}"]
       interval: 5s
       timeout: 5s
       retries: 10
