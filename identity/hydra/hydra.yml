@@ -1,0 +1,25 @@
+dsn: postgres://uber_clone:uber_clone_local@postgres:5432/ory_hydra?sslmode=disable
+urls:
+  self:
+    issuer: http://localhost:4444/
+  login: http://localhost:8081/oauth2/login
+  consent: http://localhost:8081/oauth2/consent
+secrets:
+  system:
+    - change-this-before-production
+serve:
+  public:
+    port: 4444
+  admin:
+    port: 4445
+ttl:
+  access_token: 1h
+  id_token: 1h
+  auth_code: 10m
+  refresh_token: 720h
+oauth2:
+  expose_internal_errors: false
+oidc:
+  subject_identifiers:
+    supported_types:
+      - public
