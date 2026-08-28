@@ -1,0 +1,15 @@
+.env
+*.log
+.DS_Store
+
+# Go
+backend/bin/
+backend/coverage.out
+
+# IDE
+.idea/
+.vscode/
+
+# Flutter
+**/.dart_tool/
+**/build/
