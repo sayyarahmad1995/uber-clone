@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -82,8 +81,6 @@ func (app application) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", health)
 	mux.HandleFunc("GET /ready", app.ready)
-	// Authentication middleware is intentionally not added until the OIDC provider configuration is implemented.
-	mux.HandleFunc("GET /v1/me", app.me)
 	return mux
 }
 
@@ -99,22 +96,6 @@ func (app application) ready(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
-}
-
-func (app application) me(w http.ResponseWriter, r *http.Request) {
-	subject := strings.TrimSpace(r.Header.Get("X-External-Subject"))
-	if subject == "" {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "authentication required"})
-		return
-	}
-	u, err := app.users.GetOrCreate(r.Context(), subject)
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "unable to load user"})
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"id": u.ID, "capabilities": u.Capabilities,
-	})
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {
