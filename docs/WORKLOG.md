@@ -12,7 +12,7 @@ Update this file after every meaningful work session.
 
 **Current engineering milestone:** Deployment Foundation
 
-**Current work item:** Define and implement the minimal deployable project structure.
+**Current work item:** Verify the completed Deployment Foundation with Docker Compose.
 
 **Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until we learn from completed work.
 
@@ -92,20 +92,19 @@ The exact boundaries, order, and scope of these later slices remain intentionall
 
 ## In Progress
 
-- [ ] Define the minimal repository structure for the Deployment Foundation
-- [ ] Create the minimal Go backend
-- [ ] Add the health endpoint
-- [ ] Containerize the backend
-- [ ] Add Docker Compose configuration
-- [ ] Start PostgreSQL through Docker Compose
-- [ ] Start Redis through Docker Compose
-- [ ] Verify the project starts with `docker compose up -d --build`
+- [x] Define the minimal repository structure for the Deployment Foundation
+- [x] Create the minimal Go backend
+- [x] Add the health endpoint
+- [x] Containerize the backend
+- [x] Add Docker Compose configuration
+- [ ] Verify PostgreSQL starts through Docker Compose
+- [ ] Verify the project starts with `docker compose up -d --build` in a Docker-capable environment
 
 ---
 
 ## Immediate Next Step
 
-Define the minimal Deployment Foundation implementation before creating application code.
+Run and verify the completed stack with Docker Compose, then merge the feature branch into `main` and delete the branch.
 
 ---
 
@@ -121,7 +120,6 @@ The initial deployment must start:
 
 - Go backend
 - PostgreSQL
-- Redis
 
 The backend must expose a minimal health endpoint.
 
