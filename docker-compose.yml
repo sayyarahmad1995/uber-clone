@@ -56,5 +56,31 @@ services:
       kratos-migrate:
         condition: service_completed_successfully
 
+  hydra-migrate:
+    image: oryd/hydra:v2.2.0
+    environment:
+      DSN: postgres://${POSTGRES_USER:-uber_clone}:${POSTGRES_PASSWORD:-uber_clone_local}@postgres:5432/${ORY_HYDRA_DB:-ory_hydra}?sslmode=disable
+    command: ["migrate", "sql", "-e", "--yes"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  hydra:
+    image: oryd/hydra:v2.2.0
+    environment:
+      DSN: postgres://${POSTGRES_USER:-uber_clone}:${POSTGRES_PASSWORD:-uber_clone_local}@postgres:5432/${ORY_HYDRA_DB:-ory_hydra}?sslmode=disable
+      URLS_SELF_ISSUER: ${HYDRA_ISSUER_URL:-http://localhost:4444/}
+      URLS_LOGIN: ${HYDRA_LOGIN_URL:-http://host.docker.internal:8081/oauth2/login}
+      URLS_CONSENT: ${HYDRA_CONSENT_URL:-http://host.docker.internal:8081/oauth2/consent}
+      SECRETS_SYSTEM: ${HYDRA_SYSTEM_SECRET:-change-this-before-production}
+    command: ["serve", "all", "--dev"]
+    ports:
+      - "${HYDRA_PUBLIC_PORT:-4444}:4444"
+      - "${HYDRA_ADMIN_PORT:-4445}:4445"
+    depends_on:
+      hydra-migrate:
+        condition: service_completed_successfully
+
 volumes:
   postgres_data:
