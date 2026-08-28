@@ -6,18 +6,13 @@ services:
     environment:
       APP_PORT: ${APP_PORT:-8080}
       DATABASE_URL: postgres://${POSTGRES_USER:-uber_clone}:${POSTGRES_PASSWORD:-uber_clone_local}@postgres:5432/${POSTGRES_DB:-uber_clone}?sslmode=disable
+      OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:?OIDC_ISSUER_URL is required}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?OIDC_CLIENT_ID is required}
     ports:
       - "${APP_PORT:-8080}:8080"
     depends_on:
       postgres:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health >/dev/null 2>&1"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 5s
-    restart: unless-stopped
 
   postgres:
     image: postgres:17-alpine
@@ -30,25 +25,36 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}",
-        ]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
-      start_period: 5s
-    restart: unless-stopped
+
+  kratos-migrate:
+    image: oryd/kratos:v1.3.1
+    environment:
+      DSN: postgres://${POSTGRES_USER:-uber_clone}:${POSTGRES_PASSWORD:-uber_clone_local}@postgres:5432/${ORY_KRATOS_DB:-ory_kratos}?sslmode=disable
+    volumes:
+      - ./identity/kratos:/etc/config/kratos:ro
+    command: ["migrate", "sql", "-e", "--yes", "-c", "/etc/config/kratos/kratos.yml"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  kratos:
+    image: oryd/kratos:v1.3.1
+    environment:
+      DSN: postgres://${POSTGRES_USER:-uber_clone}:${POSTGRES_PASSWORD:-uber_clone_local}@postgres:5432/${ORY_KRATOS_DB:-ory_kratos}?sslmode=disable
+    volumes:
+      - ./identity/kratos:/etc/config/kratos:ro
+    command: ["serve", "-c", "/etc/config/kratos/kratos.yml", "--dev"]
+    ports:
+      - "${KRATOS_PUBLIC_PORT:-4433}:4433"
+      - "${KRATOS_ADMIN_PORT:-4434}:4434"
+    depends_on:
+      kratos-migrate:
+        condition: service_completed_successfully
 
 volumes:
   postgres_data:
-
-
-  # Ory Kratos identity service is introduced behind the provider-neutral boundary.
-  kratos:
-    image: oryd/kratos:v1.3.1
-    command: ["serve", "--dev"]
-    ports:
-      - "4433:4433"
-      - "4434:4434"
