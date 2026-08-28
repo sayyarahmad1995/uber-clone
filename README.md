@@ -8,19 +8,13 @@ The project is currently implementing its Deployment Foundation.
 
 ## Run locally
 
-1. Create the environment file:
-
-   ```bash
-   cp .env.example .env
-   ```
-
-2. Start the stack:
+1. Start the stack:
 
    ```bash
    docker compose up -d --build
    ```
 
-3. Verify the API:
+2. Verify the API:
 
    ```bash
    curl http://localhost:8080/health
@@ -32,10 +26,10 @@ The project is currently implementing its Deployment Foundation.
    {"status":"ok"}
    ```
 
-4. Verify database readiness through the API:
+3. Check the running services:
 
    ```bash
-   curl http://localhost:8080/ready
+   docker compose ps
    ```
 
 ## Stop the stack
