@@ -1,0 +1,39 @@
+version: v1.3.1
+dsn: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+serve:
+  public:
+    base_url: http://localhost:4433/
+    cors:
+      enabled: true
+      allowed_origins:
+        - uberclone://callback
+        - http://localhost:*
+  admin:
+    base_url: http://kratos:4434/
+selfservice:
+  default_browser_return_url: uberclone://callback
+  allowed_return_urls:
+    - uberclone://callback
+  methods:
+    password:
+      enabled: true
+  flows:
+    error:
+      ui_url: http://localhost:4455/error
+    settings:
+      ui_url: http://localhost:4455/settings
+    recovery:
+      enabled: true
+      ui_url: http://localhost:4455/recovery
+    verification:
+      enabled: true
+      ui_url: http://localhost:4455/verification
+    logout:
+      after:
+        default_browser_return_url: uberclone://callback
+  ui_url: http://localhost:4455/login
+identity:
+  default_schema_id: default
+  schemas:
+    - id: default
+      url: file:///etc/config/kratos/identity.schema.json
