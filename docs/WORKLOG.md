@@ -10,9 +10,9 @@ Update this file after every meaningful work session.
 
 ## Current Status
 
-**Current engineering milestone:** Deployment Foundation — Complete
+**Current engineering milestone:** User Entry and Rider Foundation — In Progress
 
-**Current work item:** Prepare the next business vertical slice: User Entry and Rider Foundation.
+**Current work item:** Implement external OIDC authentication and connect it to the completed user provisioning foundation.
 
 **Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until we learn from completed work.
 
@@ -98,7 +98,19 @@ The exact boundaries, order, and scope of these later slices remain intentionall
 
 ## In Progress
 
-No implementation work is currently in progress. The next milestone must be prepared as a new feature branch after its scope is defined.
+Active branch: `feature/user-entry-rider-foundation`.
+
+Implemented so far:
+
+- PostgreSQL-backed user domain.
+- One user record per external identity subject.
+- Default Rider capability created idempotently.
+- Capability storage designed to support future capabilities without separate accounts.
+- Database migration runner.
+- API readiness endpoint.
+- Temporary integration endpoint for exercising user provisioning.
+
+The temporary identity header is not production authentication and must be replaced by the selected external OIDC implementation before this slice is considered complete.
 
 ---
 
@@ -130,7 +142,7 @@ Observed result:
 
 ## Immediate Next Step
 
-Architect and define the smallest implementable scope for the User Entry and Rider Foundation, then begin it on a new feature branch.
+Implement real external OIDC authentication, replace the temporary identity boundary in the HTTP request path, and then add the minimum Android client flow required to complete the vertical slice.
 
 ---
 
