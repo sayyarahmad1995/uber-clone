@@ -12,7 +12,7 @@ Update this file after every meaningful work session.
 
 **Current engineering milestone:** User Entry and Rider Foundation — In Progress
 
-**Current work item:** Implement external OIDC authentication and connect it to the completed user provisioning foundation.
+**Current work item:** Implement the Ory adapter behind the completed provider-neutral external OIDC boundary.
 
 **Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until we learn from completed work.
 
@@ -37,6 +37,8 @@ Update this file after every meaningful work session.
 - [x] PostgreSQL selected as the primary database
 - [x] Redis selected for required fast/transient data needs
 - [x] External OIDC selected for authentication
+- [x] Self-hosted Ory selected as the initial OIDC provider
+- [x] Provider-neutral external OIDC boundary selected
 - [x] Modular monolith selected as the initial backend architecture
 - [x] Docker Compose selected as the current deployment mechanism
 - [x] CI/CD explicitly deferred
@@ -103,14 +105,17 @@ Active branch: `feature/user-entry-rider-foundation`.
 Implemented so far:
 
 - PostgreSQL-backed user domain.
-- One user record per external identity subject.
+- User domain separated from external identity records.
+- External identity keyed by OIDC issuer + subject.
+- Provider-neutral identity provider interface and HTTP authentication boundary.
+- Temporary identity header endpoint removed.
 - Default Rider capability created idempotently.
 - Capability storage designed to support future capabilities without separate accounts.
 - Database migration runner.
 - API readiness endpoint.
 - Temporary integration endpoint for exercising user provisioning.
 
-The temporary identity header is not production authentication and must be replaced by the selected external OIDC implementation before this slice is considered complete.
+The application now has a provider-neutral identity boundary. The next implementation is the Ory adapter behind that boundary; Ory-specific code must not enter the User domain.
 
 ---
 
@@ -142,7 +147,7 @@ Observed result:
 
 ## Immediate Next Step
 
-Implement real external OIDC authentication, replace the temporary identity boundary in the HTTP request path, and then add the minimum Android client flow required to complete the vertical slice.
+Implement the minimum self-hosted Ory components and adapter behind the provider-neutral identity boundary, then connect authenticated principals to user provisioning.
 
 ---
 
