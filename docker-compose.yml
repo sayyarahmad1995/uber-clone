@@ -5,6 +5,7 @@ services:
       dockerfile: Dockerfile
     environment:
       APP_PORT: ${APP_PORT:-8080}
+      DATABASE_URL: postgres://${POSTGRES_USER:-uber_clone}:${POSTGRES_PASSWORD:-uber_clone_local}@postgres:5432/${POSTGRES_DB:-uber_clone}?sslmode=disable
     ports:
       - "${APP_PORT:-8080}:8080"
     depends_on:
