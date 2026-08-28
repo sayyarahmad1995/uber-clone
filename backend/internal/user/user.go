@@ -9,25 +9,27 @@ import (
 
 type Capability string
 
-const (
-	CapabilityRider Capability = "rider"
-)
+const CapabilityRider Capability = "rider"
+
+type ExternalIdentity struct {
+	Issuer  string
+	Subject string
+}
 
 type User struct {
-	ID              uuid.UUID
-	ExternalSubject string
-	Capabilities    []Capability
-	CreatedAt       time.Time
+	ID           uuid.UUID
+	Capabilities []Capability
+	CreatedAt    time.Time
 }
 
 type Repository interface {
-	CreateWithDefaultRider(ctx context.Context, subject string) (User, error)
+	CreateWithDefaultRider(ctx context.Context, identity ExternalIdentity) (User, error)
 }
 
 type Service struct{ repository Repository }
 
 func NewService(repository Repository) Service { return Service{repository: repository} }
 
-func (s Service) GetOrCreate(ctx context.Context, externalSubject string) (User, error) {
-	return s.repository.CreateWithDefaultRider(ctx, externalSubject)
+func (s Service) GetOrCreate(ctx context.Context, identity ExternalIdentity) (User, error) {
+	return s.repository.CreateWithDefaultRider(ctx, identity)
 }
