@@ -20,8 +20,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-uber_clone}
       POSTGRES_USER: ${POSTGRES_USER:-uber_clone}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-uber_clone_local}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+    # Database stays on the internal Compose network.
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -49,9 +48,6 @@ services:
     volumes:
       - ./identity/kratos:/etc/config/kratos:ro
     command: ["serve", "-c", "/etc/config/kratos/kratos.yml", "--dev"]
-    ports:
-      - "${KRATOS_PUBLIC_PORT:-4433}:4433"
-      - "${KRATOS_ADMIN_PORT:-4434}:4434"
     depends_on:
       kratos-migrate:
         condition: service_completed_successfully
@@ -64,8 +60,6 @@ services:
       PORT: 8081
       HYDRA_ADMIN_URL: http://hydra:4445
       KRATOS_PUBLIC_URL: http://kratos:4433
-    ports:
-      - "8081:8081"
     depends_on:
       kratos:
         condition: service_started
@@ -91,9 +85,6 @@ services:
       URLS_CONSENT: ${HYDRA_CONSENT_URL:-http://identity-gateway:8081/oauth2/consent}
       SECRETS_SYSTEM: ${HYDRA_SYSTEM_SECRET:-change-this-before-production}
     command: ["serve", "all", "--dev"]
-    ports:
-      - "${HYDRA_PUBLIC_PORT:-4444}:4444"
-      - "${HYDRA_ADMIN_PORT:-4445}:4445"
     depends_on:
       hydra-migrate:
         condition: service_completed_successfully
