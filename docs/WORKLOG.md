@@ -10,9 +10,9 @@ Update this file after every meaningful work session.
 
 ## Current Status
 
-**Current engineering milestone:** Deployment Foundation — Complete
+**Current engineering milestone:** User Entry and Rider Foundation — In Progress
 
-**Current work item:** Prepare the next business vertical slice: User Entry and Rider Foundation.
+**Current work item:** Implement the application-owned Authentication domain and API contract, with Ory isolated behind internal provider adapters.
 
 **Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until we learn from completed work.
 
@@ -37,6 +37,12 @@ Update this file after every meaningful work session.
 - [x] PostgreSQL selected as the primary database
 - [x] Redis selected for required fast/transient data needs
 - [x] External OIDC selected for authentication
+- [x] Self-hosted Ory selected as the initial identity infrastructure
+- [x] Client talks only to application APIs
+- [x] Authentication UI is owned by the product
+- [x] Database and identity infrastructure remain internal
+- [x] MVP authentication abuse protection will be pragmatic, not enterprise-grade
+- [x] Provider-neutral external OIDC boundary selected
 - [x] Modular monolith selected as the initial backend architecture
 - [x] Docker Compose selected as the current deployment mechanism
 - [x] CI/CD explicitly deferred
@@ -98,7 +104,22 @@ The exact boundaries, order, and scope of these later slices remain intentionall
 
 ## In Progress
 
-No implementation work is currently in progress. The next milestone must be prepared as a new feature branch after its scope is defined.
+Active branch: `feature/user-entry-rider-foundation`.
+
+Implemented so far:
+
+- PostgreSQL-backed user domain.
+- User domain separated from external identity records.
+- External identity keyed by OIDC issuer + subject.
+- Provider-neutral identity provider interface and HTTP authentication boundary.
+- Temporary identity header endpoint removed.
+- Default Rider capability created idempotently.
+- Capability storage designed to support future capabilities without separate accounts.
+- Database migration runner.
+- API readiness endpoint.
+- Temporary integration endpoint for exercising user provisioning.
+
+The earlier direct OIDC client flow is superseded. The client must call only application-owned authentication APIs and show only product-owned UI. The remaining work is to implement the Authentication domain/API, provider adapters, session/token strategy, and end-to-end verification.
 
 ---
 
@@ -130,7 +151,7 @@ Observed result:
 
 ## Immediate Next Step
 
-Architect and define the smallest implementable scope for the User Entry and Rider Foundation, then begin it on a new feature branch.
+Implement the application-owned Authentication domain and API first. Keep Ory behind internal provider adapters. Do not expose database or identity-provider ports publicly.
 
 ---
 
@@ -185,3 +206,45 @@ This milestone is a deployable technical foundation, not a business vertical sli
 - Maintain boundaries for future capabilities without implementing unused functionality.
 - Challenge architectural and technical decisions when they are weak, premature, or inconsistent with the project goals.
 - Record meaningful progress and the current stopping point in this file.
+
+
+---
+
+## Authentication Architecture Decision
+
+The authentication slice was corrected before completion:
+
+`Client → Application Authentication API → Authentication domain → Identity provider adapter → Ory infrastructure`
+
+The client must not call Ory directly and must not render Ory-owned UI.
+
+The public MVP surface is the application API. PostgreSQL, Kratos, Hydra, and internal integration services remain on the internal deployment network.
+
+The previous assumption of a client-side Authorization Code + PKCE flow directly against the OIDC provider is superseded.
+
+
+---
+
+## Authentication Implementation Update
+
+The MVP authentication architecture was simplified to match the application-owned API decision.
+
+- Ory Kratos remains the internal identity implementation.
+- The mobile client calls only application-owned authentication APIs.
+- The API uses provider-neutral Authentication and Identity boundaries.
+- Kratos adapters implement those boundaries internally.
+- Direct client OIDC flows are not part of this MVP.
+- Hydra is deferred because OAuth authorization-server functionality is not required for the current application-owned login/session flow.
+
+Current verification work:
+
+1. validate Kratos API registration flow
+2. validate Kratos API login flow
+3. validate authenticated `GET /v1/me`
+4. correct refresh/logout behavior according to the selected Kratos session strategy
+5. run the complete Docker deployment and automated tests
+
+
+## MVP Session Decision
+
+ADR-0005 records the MVP session strategy. The client receives the authenticated session token from the application login API and uses it only with application APIs. Refresh tokens are intentionally deferred; the reserved refresh endpoint returns HTTP 501 rather than pretending to support an incomplete strategy.

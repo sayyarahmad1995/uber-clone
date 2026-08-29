@@ -5,18 +5,16 @@ services:
       dockerfile: Dockerfile
     environment:
       APP_PORT: ${APP_PORT:-8080}
+      DATABASE_URL: postgres://${POSTGRES_USER:-uber_clone}:${POSTGRES_PASSWORD:-uber_clone_local}@postgres:5432/${POSTGRES_DB:-uber_clone}?sslmode=disable
+      KRATOS_PUBLIC_URL: http://kratos:4433
+      KRATOS_ADMIN_URL: http://kratos:4434
     ports:
       - "${APP_PORT:-8080}:8080"
     depends_on:
       postgres:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health >/dev/null 2>&1"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 5s
-    restart: unless-stopped
+      kratos:
+        condition: service_started
 
   postgres:
     image: postgres:17-alpine
@@ -24,21 +22,50 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-uber_clone}
       POSTGRES_USER: ${POSTGRES_USER:-uber_clone}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-uber_clone_local}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      ORY_KRATOS_DB: ${ORY_KRATOS_DB:-ory_kratos}
+    # Database stays on the internal Compose network.
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./identity/postgres/init-ory-db.sh:/docker-entrypoint-initdb.d/10-init-ory-db.sh:ro
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}",
-        ]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
-      start_period: 5s
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025"
     restart: unless-stopped
+
+  kratos-migrate:
+    image: oryd/kratos:v1.3.1
+    environment:
+      DSN: postgres://${POSTGRES_USER:-uber_clone}:${POSTGRES_PASSWORD:-uber_clone_local}@postgres:5432/${ORY_KRATOS_DB:-ory_kratos}?sslmode=disable
+      POSTGRES_USER: ${POSTGRES_USER:-uber_clone}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-uber_clone_local}
+      ORY_KRATOS_DB: ${ORY_KRATOS_DB:-ory_kratos}
+    volumes:
+      - ./identity/kratos:/etc/config/kratos:ro
+    command: ["migrate", "sql", "-e", "--yes", "-c", "/etc/config/kratos/kratos.yml"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  kratos:
+    image: oryd/kratos:v1.3.1
+    environment:
+      DSN: postgres://${POSTGRES_USER:-uber_clone}:${POSTGRES_PASSWORD:-uber_clone_local}@postgres:5432/${ORY_KRATOS_DB:-ory_kratos}?sslmode=disable
+    volumes:
+      - ./identity/kratos:/etc/config/kratos:ro
+    command: ["serve", "-c", "/etc/config/kratos/kratos.yml", "--dev", "--watch-courier"]
+    depends_on:
+      kratos-migrate:
+        condition: service_completed_successfully
+      mailpit:
+        condition: service_started
 
 volumes:
   postgres_data:
