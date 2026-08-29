@@ -14,6 +14,13 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/auth"
 )
 
+type ProviderError struct {
+	Status int
+	Message string
+}
+
+func (e *ProviderError) Error() string { return e.Message }
+
 type Provider struct {
 	baseURL string
 	client  *http.Client
@@ -74,7 +81,7 @@ func (p *Provider) Login(ctx context.Context, c auth.Credentials) (auth.Session,
 	}
 
 	if err := p.submitFlow(ctx, "/self-service/login", flow.ID, body, &result); err != nil {
-		return auth.Session{}, auth.ErrInvalidCredentials
+		return auth.Session{}, err
 	}
 	if result.SessionToken == "" {
 		return auth.Session{}, auth.ErrInvalidCredentials
@@ -176,9 +183,25 @@ func (p *Provider) submitFlow(ctx context.Context, path, flowID string, body any
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 300 {
-		var problem any
+		var problem struct {
+			Error struct {
+				Message string `json:"message"`
+			} `json:"error"`
+			UI struct {
+				Messages []struct {
+					Text string `json:"text"`
+				} `json:"messages"`
+			} `json:"ui"`
+		}
 		_ = json.NewDecoder(resp.Body).Decode(&problem)
-		return fmt.Errorf("Kratos flow submission failed: %s: %v", resp.Status, problem)
+		message := problem.Error.Message
+		if message == "" && len(problem.UI.Messages) > 0 {
+			message = problem.UI.Messages[0].Text
+		}
+		if message == "" {
+			message = "authentication request failed"
+		}
+		return &ProviderError{Status: resp.StatusCode, Message: message}
 	}
 
 	if out != nil {
