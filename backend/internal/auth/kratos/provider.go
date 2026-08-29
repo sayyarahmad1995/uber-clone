@@ -24,6 +24,7 @@ func (e *ProviderError) ClientError() (int, string) { return e.Status, e.Message
 
 type Provider struct {
 	baseURL string
+	adminURL string
 	client  *http.Client
 }
 
@@ -35,12 +36,13 @@ type flow struct {
 	} `json:"ui"`
 }
 
-func New(baseURL string) (*Provider, error) {
-	if strings.TrimSpace(baseURL) == "" {
-		return nil, errors.New("Kratos URL is required")
+func New(baseURL, adminURL string) (*Provider, error) {
+	if strings.TrimSpace(baseURL) == "" || strings.TrimSpace(adminURL) == "" {
+		return nil, errors.New("Kratos public and admin URLs are required")
 	}
 	return &Provider{
 		baseURL: strings.TrimRight(baseURL, "/"),
+		adminURL: strings.TrimRight(adminURL, "/"),
 		client:  &http.Client{Timeout: 10 * time.Second},
 	}, nil
 }
@@ -121,6 +123,84 @@ func (p *Provider) StartVerification(ctx context.Context, email string) (auth.Ve
 
 func (p *Provider) CompleteVerification(ctx context.Context, flowID, code string) error {
 	return p.submitFlow(ctx, "/self-service/verification", flowID, map[string]any{"method":"code","code":code}, nil)
+}
+
+func (p *Provider) ExtendSession(ctx context.Context, token string) (auth.Session, error) {
+	token = strings.TrimSpace(strings.TrimPrefix(token, "Bearer "))
+	if token == "" {
+		return auth.Session{}, auth.ErrInvalidCredentials
+	}
+
+	current, err := p.session(ctx, token)
+	if err != nil {
+		return auth.Session{}, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, p.adminURL+"/sessions/"+url.PathEscape(current.ID)+"/extend", nil)
+	if err != nil {
+		return auth.Session{}, err
+	}
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return auth.Session{}, err
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode >= 300 && resp.StatusCode != http.StatusNotFound {
+		return auth.Session{}, fmt.Errorf("Kratos session extension failed: %s", resp.Status)
+	}
+
+	// A 404 after a successful whoami can mean the session is not yet eligible
+	// for extension (or was already extended). In either case, return its current
+	// expiry instead of treating an already-valid session as unauthenticated.
+	updated := current
+	if resp.StatusCode < 300 {
+		updated, err = p.session(ctx, token)
+		if err != nil {
+			return auth.Session{}, err
+		}
+	}
+
+	return auth.Session{
+		AccessToken: token,
+		ExpiresIn: max(1, int64(time.Until(updated.ExpiresAt).Seconds())),
+	}, nil
+}
+
+type kratosSession struct {
+	ID string `json:"id"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+func (p *Provider) session(ctx context.Context, token string) (kratosSession, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, p.baseURL+"/sessions/whoami", nil)
+	if err != nil {
+		return kratosSession{}, err
+	}
+	req.Header.Set("X-Session-Token", token)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return kratosSession{}, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		return kratosSession{}, auth.ErrInvalidCredentials
+	}
+	if resp.StatusCode >= 300 {
+		return kratosSession{}, fmt.Errorf("Kratos session lookup failed: %s", resp.Status)
+	}
+
+	var session kratosSession
+	if err := json.NewDecoder(resp.Body).Decode(&session); err != nil {
+		return kratosSession{}, err
+	}
+	if session.ID == "" || session.ExpiresAt.IsZero() {
+		return kratosSession{}, errors.New("Kratos returned an incomplete session")
+	}
+	return session, nil
 }
 
 func (p *Provider) Logout(ctx context.Context, token string) error {
