@@ -26,6 +26,7 @@ type IdentityProvider interface {
 	Login(context.Context, Credentials) (Session, error)
 	Refresh(context.Context, string) (Session, error)
 	Logout(context.Context, string) error
+	Verify(context.Context, string) error
 }
 
 type Service struct { provider IdentityProvider }
@@ -35,3 +36,4 @@ func (s Service) Register(ctx context.Context, c Credentials) error { return s.p
 func (s Service) Login(ctx context.Context, c Credentials) (Session,error) { return s.provider.Login(ctx,c) }
 func (s Service) Refresh(ctx context.Context, token string) (Session,error) { return s.provider.Refresh(ctx,token) }
 func (s Service) Logout(ctx context.Context, token string) error { return s.provider.Logout(ctx,token) }
+func (s Service) Verify(ctx context.Context, email string) error { return s.provider.Verify(ctx,email) }
