@@ -32,16 +32,14 @@ func decode(r *http.Request,v any)error{defer r.Body.Close();d:=json.NewDecoder(
 func write(w http.ResponseWriter,status int,v any){w.Header().Set("Content-Type","application/json");w.WriteHeader(status);_=json.NewEncoder(w).Encode(v)}
 func failure(w http.ResponseWriter,status int,message string){write(w,status,map[string]string{"error":message})}
 func providerFailure(w http.ResponseWriter, err error, general string) {
-	var providerErr interface{ error; StatusCode() int }
-	_ = providerErr
-	var statusErr interface{ error }
-	if errors.As(err, &statusErr) {
-		type clientError interface { ClientError() (int, string) }
-		var ce clientError
-		if errors.As(err, &ce) {
-			status, message := ce.ClientError()
-			if status >= 400 && status < 500 { failure(w,status,message); return }
+	type clientError interface { ClientError() (int, string) }
+	var ce clientError
+	if errors.As(err, &ce) {
+		status, message := ce.ClientError()
+		if status >= 400 && status < 500 {
+			failure(w, status, message)
+			return
 		}
 	}
-	failure(w,http.StatusInternalServerError,general)
+	failure(w, http.StatusInternalServerError, general)
 }
