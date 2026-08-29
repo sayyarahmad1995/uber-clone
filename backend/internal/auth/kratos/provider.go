@@ -94,6 +94,15 @@ func (p *Provider) Login(ctx context.Context, c auth.Credentials) (auth.Session,
 	}, nil
 }
 
+func (p *Provider) Verify(ctx context.Context, email string) error {
+	flow, err := p.createFlow(ctx, "/self-service/verification/api")
+	if err != nil { return err }
+	return p.submitFlow(ctx, "/self-service/verification", flow.ID, map[string]any{
+		"method": "code",
+		"email": email,
+	}, nil)
+}
+
 func (p *Provider) Refresh(context.Context, string) (auth.Session, error) {
 	return auth.Session{}, auth.ErrUnavailable
 }
