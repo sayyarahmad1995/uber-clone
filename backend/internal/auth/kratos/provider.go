@@ -20,6 +20,7 @@ type ProviderError struct {
 }
 
 func (e *ProviderError) Error() string { return e.Message }
+func (e *ProviderError) ClientError() (int, string) { return e.Status, e.Message }
 
 type Provider struct {
 	baseURL string
