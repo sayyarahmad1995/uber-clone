@@ -129,11 +129,22 @@ func (p *Provider) Logout(ctx context.Context, token string) error {
 		return nil
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, p.baseURL+"/self-service/logout/api", nil)
+	payload, err := json.Marshal(map[string]string{"session_token": token})
 	if err != nil {
 		return err
 	}
-	req.Header.Set("X-Session-Token", token)
+
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodDelete,
+		p.baseURL+"/self-service/logout/api",
+		bytes.NewReader(payload),
+	)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
 
 	resp, err := p.client.Do(req)
 	if err != nil {
@@ -141,7 +152,7 @@ func (p *Provider) Logout(ctx context.Context, token string) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusUnauthorized {
+	if resp.StatusCode == http.StatusNoContent {
 		return nil
 	}
 	if resp.StatusCode >= 300 {
