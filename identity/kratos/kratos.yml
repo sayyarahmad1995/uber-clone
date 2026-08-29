@@ -6,6 +6,7 @@ serve:
   admin:
     base_url: http://kratos:4434/
 selfservice:
+  default_browser_return_url: http://invalid.local/
   methods:
     password:
       enabled: true
