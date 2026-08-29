@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/identity"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/auth"
 	oidcidentity "github.com/sayyarahmad1995/uber-clone/backend/internal/identity/oidc"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/database"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/migrations"
@@ -30,6 +31,7 @@ type application struct {
 	users    user.Service
 	db       *sql.DB
 	identity identity.Provider
+	auth auth.Handler
 }
 
 func main() {
@@ -84,6 +86,11 @@ func (app application) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", health)
 	mux.HandleFunc("GET /ready", app.ready)
+	// Authentication routes are application-owned. Provider details remain internal.
+	mux.HandleFunc("POST /v1/auth/register", app.auth.Register)
+	mux.HandleFunc("POST /v1/auth/login", app.auth.Login)
+	mux.HandleFunc("POST /v1/auth/refresh", app.auth.Refresh)
+	mux.HandleFunc("POST /v1/auth/logout", app.auth.Logout)
 	mux.Handle("GET /v1/me", identity.Middleware(app.identity, http.HandlerFunc(app.me)))
 	return mux
 }
