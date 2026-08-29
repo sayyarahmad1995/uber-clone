@@ -21,9 +21,11 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-uber_clone}
       POSTGRES_USER: ${POSTGRES_USER:-uber_clone}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-uber_clone_local}
+      ORY_KRATOS_DB: ${ORY_KRATOS_DB:-ory_kratos}
     # Database stays on the internal Compose network.
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./identity/postgres/init-ory-db.sh:/docker-entrypoint-initdb.d/10-init-ory-db.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
