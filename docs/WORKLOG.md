@@ -221,3 +221,25 @@ The client must not call Ory directly and must not render Ory-owned UI.
 The public MVP surface is the application API. PostgreSQL, Kratos, Hydra, and internal integration services remain on the internal deployment network.
 
 The previous assumption of a client-side Authorization Code + PKCE flow directly against the OIDC provider is superseded.
+
+
+---
+
+## Authentication Implementation Update
+
+The MVP authentication architecture was simplified to match the application-owned API decision.
+
+- Ory Kratos remains the internal identity implementation.
+- The mobile client calls only application-owned authentication APIs.
+- The API uses provider-neutral Authentication and Identity boundaries.
+- Kratos adapters implement those boundaries internally.
+- Direct client OIDC flows are not part of this MVP.
+- Hydra is deferred because OAuth authorization-server functionality is not required for the current application-owned login/session flow.
+
+Current verification work:
+
+1. validate Kratos API registration flow
+2. validate Kratos API login flow
+3. validate authenticated `GET /v1/me`
+4. correct refresh/logout behavior according to the selected Kratos session strategy
+5. run the complete Docker deployment and automated tests
