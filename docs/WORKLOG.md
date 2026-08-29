@@ -243,3 +243,8 @@ Current verification work:
 3. validate authenticated `GET /v1/me`
 4. correct refresh/logout behavior according to the selected Kratos session strategy
 5. run the complete Docker deployment and automated tests
+
+
+## MVP Session Decision
+
+ADR-0005 records the MVP session strategy. The client receives the authenticated session token from the application login API and uses it only with application APIs. Refresh tokens are intentionally deferred; the reserved refresh endpoint returns HTTP 501 rather than pretending to support an incomplete strategy.
