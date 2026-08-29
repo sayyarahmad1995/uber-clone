@@ -32,6 +32,12 @@ services:
       timeout: 5s
       retries: 10
 
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025"
+    restart: unless-stopped
+
   kratos-migrate:
     image: oryd/kratos:v1.3.1
     environment:
@@ -53,10 +59,12 @@ services:
       DSN: postgres://${POSTGRES_USER:-uber_clone}:${POSTGRES_PASSWORD:-uber_clone_local}@postgres:5432/${ORY_KRATOS_DB:-ory_kratos}?sslmode=disable
     volumes:
       - ./identity/kratos:/etc/config/kratos:ro
-    command: ["serve", "-c", "/etc/config/kratos/kratos.yml", "--dev"]
+    command: ["serve", "-c", "/etc/config/kratos/kratos.yml", "--dev", "--watch-courier"]
     depends_on:
       kratos-migrate:
         condition: service_completed_successfully
+      mailpit:
+        condition: service_started
 
 volumes:
   postgres_data:
