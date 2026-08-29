@@ -12,6 +12,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      kratos:
+        condition: service_started
 
   postgres:
     image: postgres:17-alpine
@@ -32,6 +34,9 @@ services:
     image: oryd/kratos:v1.3.1
     environment:
       DSN: postgres://${POSTGRES_USER:-uber_clone}:${POSTGRES_PASSWORD:-uber_clone_local}@postgres:5432/${ORY_KRATOS_DB:-ory_kratos}?sslmode=disable
+      POSTGRES_USER: ${POSTGRES_USER:-uber_clone}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-uber_clone_local}
+      ORY_KRATOS_DB: ${ORY_KRATOS_DB:-ory_kratos}
     volumes:
       - ./identity/kratos:/etc/config/kratos:ro
     command: ["migrate", "sql", "-e", "--yes", "-c", "/etc/config/kratos/kratos.yml"]
