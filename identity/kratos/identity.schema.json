@@ -15,14 +15,21 @@
               "password": {
                 "identifier": true
               }
+            },
+            "verification": {
+              "via": "email"
             }
           }
         }
       },
-      "required": ["email"],
+      "required": [
+        "email"
+      ],
       "additionalProperties": false
     }
   },
-  "required": ["traits"],
+  "required": [
+    "traits"
+  ],
   "additionalProperties": false
 }
