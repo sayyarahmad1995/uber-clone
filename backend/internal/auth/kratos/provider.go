@@ -59,8 +59,23 @@ func (p *Provider) Register(ctx context.Context, c auth.Credentials) (auth.Verif
 		},
 	}
 
-	if err := p.submitFlow(ctx, "/self-service/registration", flow.ID, body, nil); err != nil { return auth.Verification{}, err }
-	return p.StartVerification(ctx, c.Identifier)
+	var result struct {
+		ContinueWith []struct {
+			Action string `json:"action"`
+			Flow *struct {
+				ID string `json:"id"`
+			} `json:"flow"`
+		} `json:"continue_with"`
+	}
+	if err := p.submitFlow(ctx, "/self-service/registration", flow.ID, body, &result); err != nil {
+		return auth.Verification{}, err
+	}
+	for _, item := range result.ContinueWith {
+		if item.Action == "show_verification_ui" && item.Flow != nil && item.Flow.ID != "" {
+			return auth.Verification{FlowID: item.Flow.ID}, nil
+		}
+	}
+	return auth.Verification{}, errors.New("Kratos registration completed without a verification flow")
 }
 
 func (p *Provider) Login(ctx context.Context, c auth.Credentials) (auth.Session, error) {
