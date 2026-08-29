@@ -6,8 +6,7 @@ services:
     environment:
       APP_PORT: ${APP_PORT:-8080}
       DATABASE_URL: postgres://${POSTGRES_USER:-uber_clone}:${POSTGRES_PASSWORD:-uber_clone_local}@postgres:5432/${POSTGRES_DB:-uber_clone}?sslmode=disable
-      OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:?OIDC_ISSUER_URL is required}
-      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?OIDC_CLIENT_ID is required}
+      KRATOS_PUBLIC_URL: http://kratos:4433
     ports:
       - "${APP_PORT:-8080}:8080"
     depends_on:
@@ -50,43 +49,6 @@ services:
     command: ["serve", "-c", "/etc/config/kratos/kratos.yml", "--dev"]
     depends_on:
       kratos-migrate:
-        condition: service_completed_successfully
-
-  identity-gateway:
-    build:
-      context: ./identity/gateway
-      dockerfile: Dockerfile
-    environment:
-      PORT: 8081
-      HYDRA_ADMIN_URL: http://hydra:4445
-      KRATOS_PUBLIC_URL: http://kratos:4433
-    depends_on:
-      kratos:
-        condition: service_started
-      hydra:
-        condition: service_started
-
-  hydra-migrate:
-    image: oryd/hydra:v2.2.0
-    environment:
-      DSN: postgres://${POSTGRES_USER:-uber_clone}:${POSTGRES_PASSWORD:-uber_clone_local}@postgres:5432/${ORY_HYDRA_DB:-ory_hydra}?sslmode=disable
-    command: ["migrate", "sql", "-e", "--yes"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: "no"
-
-  hydra:
-    image: oryd/hydra:v2.2.0
-    environment:
-      DSN: postgres://${POSTGRES_USER:-uber_clone}:${POSTGRES_PASSWORD:-uber_clone_local}@postgres:5432/${ORY_HYDRA_DB:-ory_hydra}?sslmode=disable
-      URLS_SELF_ISSUER: ${HYDRA_ISSUER_URL:-http://localhost:4444/}
-      URLS_LOGIN: ${HYDRA_LOGIN_URL:-http://identity-gateway:8081/oauth2/login}
-      URLS_CONSENT: ${HYDRA_CONSENT_URL:-http://identity-gateway:8081/oauth2/consent}
-      SECRETS_SYSTEM: ${HYDRA_SYSTEM_SECRET:-change-this-before-production}
-    command: ["serve", "all", "--dev"]
-    depends_on:
-      hydra-migrate:
         condition: service_completed_successfully
 
 volumes:
