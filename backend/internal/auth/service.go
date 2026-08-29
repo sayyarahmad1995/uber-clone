@@ -18,8 +18,8 @@ type Credentials struct {
 type Verification struct { FlowID string }
 
 type Session struct {
-	AccessToken string
-	ExpiresIn int64
+	AccessToken string `json:"access_token"`
+	ExpiresIn int64 `json:"expires_in"`
 }
 
 type IdentityProvider interface {
