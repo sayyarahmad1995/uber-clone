@@ -25,6 +25,7 @@ type config struct {
 	Port string
 	DatabaseURL string
 	KratosPublicURL string
+	KratosAdminURL string
 }
 
 type application struct {
@@ -35,13 +36,13 @@ type application struct {
 }
 
 func main() {
-	cfg:=config{Port:getenv("APP_PORT","8080"),DatabaseURL:os.Getenv("DATABASE_URL"),KratosPublicURL:getenv("KRATOS_PUBLIC_URL","http://kratos:4433")}
+	cfg:=config{Port:getenv("APP_PORT","8080"),DatabaseURL:os.Getenv("DATABASE_URL"),KratosPublicURL:getenv("KRATOS_PUBLIC_URL","http://kratos:4433"),KratosAdminURL:getenv("KRATOS_ADMIN_URL","http://kratos:4434")}
 	logger:=slog.New(slog.NewJSONHandler(os.Stdout,nil))
 	db,err:=database.Open(cfg.DatabaseURL); if err!=nil{logger.Error("database connection failed","error",err);os.Exit(1)}
 	defer db.Close()
 	if err:=migrations.Apply(db);err!=nil{logger.Error("database migration failed","error",err);os.Exit(1)}
 
-	authProvider,err:=authkratos.New(cfg.KratosPublicURL); if err!=nil{logger.Error("authentication provider initialization failed","error",err);os.Exit(1)}
+	authProvider,err:=authkratos.New(cfg.KratosPublicURL,cfg.KratosAdminURL); if err!=nil{logger.Error("authentication provider initialization failed","error",err);os.Exit(1)}
 	identityProvider,err:=identitykratos.New(cfg.KratosPublicURL); if err!=nil{logger.Error("identity provider initialization failed","error",err);os.Exit(1)}
 
 	app:=application{users:user.NewService(user.NewPostgresRepository(db)),db:db,identity:identityProvider,auth:auth.NewHandler(auth.NewService(authProvider))}
@@ -62,6 +63,7 @@ func(app application)routes()http.Handler{
 	mux.HandleFunc("POST /v1/auth/login",app.auth.Login)
 	mux.HandleFunc("POST /v1/auth/verify",app.auth.Verify)
 	mux.HandleFunc("POST /v1/auth/verify/complete",app.auth.CompleteVerification)
+	mux.HandleFunc("POST /v1/auth/session/extend",app.auth.ExtendSession)
 	mux.HandleFunc("POST /v1/auth/logout",app.auth.Logout)
 	mux.Handle("GET /v1/me",identity.Middleware(app.identity,http.HandlerFunc(app.me)))
 	return mux
