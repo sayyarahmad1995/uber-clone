@@ -26,7 +26,7 @@ selfservice:
         default_browser_return_url: http://invalid.local/
 courier:
   smtp:
-    connection_uri: smtp://mailpit:1025
+    connection_uri: smtp://mailpit:1025/?disable_starttls=true
     from_address: no-reply@uber-clone.local
     from_name: Uber Clone
 
