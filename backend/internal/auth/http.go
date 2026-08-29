@@ -37,7 +37,6 @@ func(h Handler)CompleteVerification(w http.ResponseWriter,r *http.Request){
 	if err:=h.service.CompleteVerification(r.Context(),strings.TrimSpace(req.FlowID),strings.TrimSpace(req.Code));err!=nil{providerFailure(w,err,"unable to process your request. Please try again later.");return}
 	w.WriteHeader(http.StatusNoContent)
 }
-func(h Handler)Refresh(w http.ResponseWriter,r *http.Request){failure(w,http.StatusNotImplemented,"session refresh is not available")}
 func(h Handler)Logout(w http.ResponseWriter,r *http.Request){
 	token:=strings.TrimSpace(r.Header.Get("Authorization"));if token==""{failure(w,http.StatusBadRequest,"invalid request");return}
 	if err:=h.service.Logout(r.Context(),token);err!=nil&&!errors.Is(err,ErrInvalidCredentials){failure(w,http.StatusServiceUnavailable,"unable to logout");return};w.WriteHeader(http.StatusNoContent)
