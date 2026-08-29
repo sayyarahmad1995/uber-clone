@@ -1,6 +1,0 @@
-github.com/coreos/go-oidc/v3 v3.12.0 h1:BbI1M7p2e6JpAGZJm+S8nL3K0eEJZfD1M4s4M9Hc3f8=
-github.com/coreos/go-oidc/v3 v3.12.0/go.mod h1:AF6K2wG2mK3WQ4B1kQmQ3lZP8K1gN7bWQ7r9R9oZQ0I=
-github.com/google/uuid v1.6.0 h1:NIvaJDMOsj6QY0K1J4D0b9m9u6Yw0V1q4l+K8J6WmJ4=
-github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEwC4Yq7aM6YJjZ7pY+o=
-github.com/jackc/pgx/v5 v5.7.6 h1:4c4jZJ0qHkG6nHfN0R2tYyXj6oS3j3eXl3m0vV2o+JQ=
-github.com/jackc/pgx/v5 v5.7.6/go.mod h1:0QW3A7qL4G7v7P1M3p5x3V9j5s1rY0nH7v7H7d6w+2E=
