@@ -23,6 +23,12 @@ func(h Handler)Login(w http.ResponseWriter,r *http.Request){
 	session,err:=h.service.Login(r.Context(),Credentials{Identifier:strings.TrimSpace(req.Identifier),Password:req.Password})
 	if err!=nil{providerFailure(w,err,"unable to process your request. Please try again later.");return};write(w,http.StatusOK,session)
 }
+func(h Handler)Verify(w http.ResponseWriter,r *http.Request){
+	var req struct{Email string `json:"email"`}
+	if err:=decode(r,&req);err!=nil||strings.TrimSpace(req.Email)==""{failure(w,http.StatusBadRequest,"invalid request");return}
+	if err:=h.service.Verify(r.Context(),strings.TrimSpace(req.Email));err!=nil{providerFailure(w,err,"unable to process your request. Please try again later.");return}
+	w.WriteHeader(http.StatusNoContent)
+}
 func(h Handler)Refresh(w http.ResponseWriter,r *http.Request){failure(w,http.StatusNotImplemented,"session refresh is not available")}
 func(h Handler)Logout(w http.ResponseWriter,r *http.Request){
 	token:=strings.TrimSpace(r.Header.Get("Authorization"));if token==""{failure(w,http.StatusBadRequest,"invalid request");return}
