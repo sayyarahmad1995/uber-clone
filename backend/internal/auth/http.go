@@ -14,8 +14,9 @@ func NewHandler(service Service)Handler{return Handler{service:service}}
 func(h Handler)Register(w http.ResponseWriter,r *http.Request){
 	var req struct{Identifier string `json:"identifier"`;Password string `json:"password"`}
 	if err:=decode(r,&req);err!=nil||strings.TrimSpace(req.Identifier)==""||req.Password==""{failure(w,http.StatusBadRequest,"invalid request");return}
-	if err:=h.service.Register(r.Context(),Credentials{Identifier:strings.TrimSpace(req.Identifier),Password:req.Password});err!=nil{providerFailure(w,err,"unable to process your request. Please try again later.");return}
-	w.WriteHeader(http.StatusCreated)
+	verification,err:=h.service.Register(r.Context(),Credentials{Identifier:strings.TrimSpace(req.Identifier),Password:req.Password})
+	if err!=nil{providerFailure(w,err,"unable to process your request. Please try again later.");return}
+	write(w,http.StatusCreated,map[string]string{"verification_flow_id":verification.FlowID})
 }
 func(h Handler)Login(w http.ResponseWriter,r *http.Request){
 	var req struct{Identifier string `json:"identifier"`;Password string `json:"password"`}
@@ -26,7 +27,14 @@ func(h Handler)Login(w http.ResponseWriter,r *http.Request){
 func(h Handler)Verify(w http.ResponseWriter,r *http.Request){
 	var req struct{Email string `json:"email"`}
 	if err:=decode(r,&req);err!=nil||strings.TrimSpace(req.Email)==""{failure(w,http.StatusBadRequest,"invalid request");return}
-	if err:=h.service.Verify(r.Context(),strings.TrimSpace(req.Email));err!=nil{providerFailure(w,err,"unable to process your request. Please try again later.");return}
+	verification,err:=h.service.StartVerification(r.Context(),strings.TrimSpace(req.Email))
+	if err!=nil{providerFailure(w,err,"unable to process your request. Please try again later.");return}
+	write(w,http.StatusOK,map[string]string{"verification_flow_id":verification.FlowID})
+}
+func(h Handler)CompleteVerification(w http.ResponseWriter,r *http.Request){
+	var req struct{FlowID string `json:"flow_id"`;Code string `json:"code"`}
+	if err:=decode(r,&req);err!=nil||strings.TrimSpace(req.FlowID)==""||strings.TrimSpace(req.Code)==""{failure(w,http.StatusBadRequest,"invalid request");return}
+	if err:=h.service.CompleteVerification(r.Context(),strings.TrimSpace(req.FlowID),strings.TrimSpace(req.Code));err!=nil{providerFailure(w,err,"unable to process your request. Please try again later.");return}
 	w.WriteHeader(http.StatusNoContent)
 }
 func(h Handler)Refresh(w http.ResponseWriter,r *http.Request){failure(w,http.StatusNotImplemented,"session refresh is not available")}
