@@ -12,7 +12,7 @@ Update this file after every meaningful work session.
 
 **Current engineering milestone:** User Entry and Rider Foundation — In Progress
 
-**Current work item:** Complete the Ory login/consent bridge and mobile Authorization Code + PKCE integration, then verify the full authentication path.
+**Current work item:** Implement the application-owned Authentication domain and API contract, with Ory isolated behind internal provider adapters.
 
 **Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until we learn from completed work.
 
@@ -37,7 +37,11 @@ Update this file after every meaningful work session.
 - [x] PostgreSQL selected as the primary database
 - [x] Redis selected for required fast/transient data needs
 - [x] External OIDC selected for authentication
-- [x] Self-hosted Ory selected as the initial OIDC provider
+- [x] Self-hosted Ory selected as the initial identity infrastructure
+- [x] Client talks only to application APIs
+- [x] Authentication UI is owned by the product
+- [x] Database and identity infrastructure remain internal
+- [x] MVP authentication abuse protection will be pragmatic, not enterprise-grade
 - [x] Provider-neutral external OIDC boundary selected
 - [x] Modular monolith selected as the initial backend architecture
 - [x] Docker Compose selected as the current deployment mechanism
@@ -115,7 +119,7 @@ Implemented so far:
 - API readiness endpoint.
 - Temporary integration endpoint for exercising user provisioning.
 
-The provider-neutral OIDC adapter is implemented. Ory Kratos and Hydra infrastructure foundations are defined. The remaining authentication work is the login/consent bridge, OAuth client registration, mobile Authorization Code + PKCE flow, and end-to-end verification.
+The earlier direct OIDC client flow is superseded. The client must call only application-owned authentication APIs and show only product-owned UI. The remaining work is to implement the Authentication domain/API, provider adapters, session/token strategy, and end-to-end verification.
 
 ---
 
@@ -147,7 +151,7 @@ Observed result:
 
 ## Immediate Next Step
 
-Implement the minimum self-hosted Ory components and adapter behind the provider-neutral identity boundary, then connect authenticated principals to user provisioning.
+Implement the application-owned Authentication domain and API first. Keep Ory behind internal provider adapters. Do not expose database or identity-provider ports publicly.
 
 ---
 
@@ -202,3 +206,18 @@ This milestone is a deployable technical foundation, not a business vertical sli
 - Maintain boundaries for future capabilities without implementing unused functionality.
 - Challenge architectural and technical decisions when they are weak, premature, or inconsistent with the project goals.
 - Record meaningful progress and the current stopping point in this file.
+
+
+---
+
+## Authentication Architecture Decision
+
+The authentication slice was corrected before completion:
+
+`Client → Application Authentication API → Authentication domain → Identity provider adapter → Ory infrastructure`
+
+The client must not call Ory directly and must not render Ory-owned UI.
+
+The public MVP surface is the application API. PostgreSQL, Kratos, Hydra, and internal integration services remain on the internal deployment network.
+
+The previous assumption of a client-side Authorization Code + PKCE flow directly against the OIDC provider is superseded.
