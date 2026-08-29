@@ -123,10 +123,6 @@ func (p *Provider) CompleteVerification(ctx context.Context, flowID, code string
 	return p.submitFlow(ctx, "/self-service/verification", flowID, map[string]any{"method":"code","code":code}, nil)
 }
 
-func (p *Provider) Refresh(context.Context, string) (auth.Session, error) {
-	return auth.Session{}, auth.ErrUnavailable
-}
-
 func (p *Provider) Logout(ctx context.Context, token string) error {
 	token = strings.TrimSpace(strings.TrimPrefix(token, "Bearer "))
 	if token == "" {
