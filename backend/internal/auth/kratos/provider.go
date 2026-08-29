@@ -70,7 +70,7 @@ func(p *Provider)submit(ctx context.Context,action string,body any,out any)error
 	req,err:=http.NewRequestWithContext(ctx,http.MethodPost,action,bytes.NewReader(payload));if err!=nil{return err}
 	req.Header.Set("Content-Type","application/json");req.Header.Set("Accept","application/json")
 	resp,err:=p.client.Do(req);if err!=nil{return err};defer resp.Body.Close()
-	if resp.StatusCode>=300{return fmt.Errorf("Kratos request failed: %s",resp.Status)}
+	if resp.StatusCode>=300{var problem any;_ = json.NewDecoder(resp.Body).Decode(&problem);return fmt.Errorf("Kratos request failed: %s: %v",resp.Status,problem)}
 	if out!=nil{return json.NewDecoder(resp.Body).Decode(out)};return nil
 }
 func max(a,b int64)int64{if a>b{return a};return b}
