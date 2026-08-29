@@ -60,6 +60,7 @@ func(app application)routes()http.Handler{
 	mux.HandleFunc("GET /ready",app.ready)
 	mux.HandleFunc("POST /v1/auth/register",app.auth.Register)
 	mux.HandleFunc("POST /v1/auth/login",app.auth.Login)
+	mux.HandleFunc("POST /v1/auth/verify",app.auth.Verify)
 	mux.HandleFunc("POST /v1/auth/refresh",app.auth.Refresh)
 	mux.HandleFunc("POST /v1/auth/logout",app.auth.Logout)
 	mux.Handle("GET /v1/me",identity.Middleware(app.identity,http.HandlerFunc(app.me)))
