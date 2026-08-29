@@ -11,6 +11,12 @@ selfservice:
     password:
       enabled: true
   flows:
+    registration:
+      after:
+        password:
+          hooks:
+            - hook: verifier
+
     error:
       ui_url: http://invalid.local/error
     settings:
