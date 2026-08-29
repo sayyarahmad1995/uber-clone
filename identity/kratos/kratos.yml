@@ -18,10 +18,17 @@ selfservice:
     recovery:
       enabled: false
     verification:
-      enabled: false
+      enabled: true
+      use: code
     logout:
       after:
         default_browser_return_url: http://invalid.local/
+courier:
+  smtp:
+    connection_uri: smtp://mailpit:1025
+    from_address: no-reply@uber-clone.local
+    from_name: Uber Clone
+
 identity:
   default_schema_id: default
   schemas:
