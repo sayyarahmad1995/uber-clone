@@ -56,6 +56,22 @@ services:
       kratos-migrate:
         condition: service_completed_successfully
 
+  identity-gateway:
+    build:
+      context: ./identity/gateway
+      dockerfile: Dockerfile
+    environment:
+      PORT: 8081
+      HYDRA_ADMIN_URL: http://hydra:4445
+      KRATOS_PUBLIC_URL: http://kratos:4433
+    ports:
+      - "8081:8081"
+    depends_on:
+      kratos:
+        condition: service_started
+      hydra:
+        condition: service_started
+
   hydra-migrate:
     image: oryd/hydra:v2.2.0
     environment:
@@ -71,8 +87,8 @@ services:
     environment:
       DSN: postgres://${POSTGRES_USER:-uber_clone}:${POSTGRES_PASSWORD:-uber_clone_local}@postgres:5432/${ORY_HYDRA_DB:-ory_hydra}?sslmode=disable
       URLS_SELF_ISSUER: ${HYDRA_ISSUER_URL:-http://localhost:4444/}
-      URLS_LOGIN: ${HYDRA_LOGIN_URL:-http://host.docker.internal:8081/oauth2/login}
-      URLS_CONSENT: ${HYDRA_CONSENT_URL:-http://host.docker.internal:8081/oauth2/consent}
+      URLS_LOGIN: ${HYDRA_LOGIN_URL:-http://identity-gateway:8081/oauth2/login}
+      URLS_CONSENT: ${HYDRA_CONSENT_URL:-http://identity-gateway:8081/oauth2/consent}
       SECRETS_SYSTEM: ${HYDRA_SYSTEM_SECRET:-change-this-before-production}
     command: ["serve", "all", "--dev"]
     ports:
