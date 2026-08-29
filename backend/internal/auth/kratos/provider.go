@@ -45,10 +45,10 @@ func New(baseURL string) (*Provider, error) {
 	}, nil
 }
 
-func (p *Provider) Register(ctx context.Context, c auth.Credentials) error {
+func (p *Provider) Register(ctx context.Context, c auth.Credentials) (auth.Verification, error) {
 	flow, err := p.createFlow(ctx, "/self-service/registration/api")
 	if err != nil {
-		return err
+		return auth.Verification{}, err
 	}
 
 	body := map[string]any{
@@ -59,7 +59,8 @@ func (p *Provider) Register(ctx context.Context, c auth.Credentials) error {
 		},
 	}
 
-	return p.submitFlow(ctx, "/self-service/registration", flow.ID, body, nil)
+	if err := p.submitFlow(ctx, "/self-service/registration", flow.ID, body, nil); err != nil { return auth.Verification{}, err }
+	return p.StartVerification(ctx, c.Identifier)
 }
 
 func (p *Provider) Login(ctx context.Context, c auth.Credentials) (auth.Session, error) {
@@ -94,13 +95,17 @@ func (p *Provider) Login(ctx context.Context, c auth.Credentials) (auth.Session,
 	}, nil
 }
 
-func (p *Provider) Verify(ctx context.Context, email string) error {
+func (p *Provider) StartVerification(ctx context.Context, email string) (auth.Verification, error) {
 	flow, err := p.createFlow(ctx, "/self-service/verification/api")
-	if err != nil { return err }
-	return p.submitFlow(ctx, "/self-service/verification", flow.ID, map[string]any{
-		"method": "code",
-		"email": email,
-	}, nil)
+	if err != nil { return auth.Verification{}, err }
+	if err := p.submitFlow(ctx, "/self-service/verification", flow.ID, map[string]any{"method":"code","email":email}, nil); err != nil {
+		return auth.Verification{}, err
+	}
+	return auth.Verification{FlowID: flow.ID}, nil
+}
+
+func (p *Provider) CompleteVerification(ctx context.Context, flowID, code string) error {
+	return p.submitFlow(ctx, "/self-service/verification", flowID, map[string]any{"method":"code","code":code}, nil)
 }
 
 func (p *Provider) Refresh(context.Context, string) (auth.Session, error) {
