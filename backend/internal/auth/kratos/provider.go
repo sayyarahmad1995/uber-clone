@@ -192,12 +192,25 @@ func (p *Provider) submitFlow(ctx context.Context, path, flowID string, body any
 				Messages []struct {
 					Text string `json:"text"`
 				} `json:"messages"`
+				Nodes []struct {
+					Messages []struct {
+						Text string `json:"text"`
+					} `json:"messages"`
+				} `json:"nodes"`
 			} `json:"ui"`
 		}
 		_ = json.NewDecoder(resp.Body).Decode(&problem)
 		message := problem.Error.Message
 		if message == "" && len(problem.UI.Messages) > 0 {
 			message = problem.UI.Messages[0].Text
+		}
+		if message == "" {
+			for _, node := range problem.UI.Nodes {
+				if len(node.Messages) > 0 && node.Messages[0].Text != "" {
+					message = node.Messages[0].Text
+					break
+				}
+			}
 		}
 		if message == "" {
 			message = "authentication request failed"
