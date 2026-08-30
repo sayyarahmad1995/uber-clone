@@ -3,19 +3,28 @@ package kratos
 import (
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/auth"
 )
 
-func TestClassifyRegistrationErrorPasswordField(t *testing.T) {
+func TestClassifyRegistrationErrorPasswordFieldPreservesMessage(t *testing.T) {
 	err := providerResponseError{
 		status:   http.StatusBadRequest,
 		fields:   []string{"password"},
-		messages: []string{"The password was found in data breaches."},
+		messages: []string{"The password was found in data breaches and must not be used."},
 	}
-	if got := classifyRegistrationError(err); !errors.Is(got, auth.ErrPasswordRejected) {
+	got := classifyRegistrationError(err)
+	if !errors.Is(got, auth.ErrPasswordRejected) {
 		t.Fatalf("got %v, want password rejection", got)
+	}
+	var publicErr *auth.PublicError
+	if !errors.As(got, &publicErr) {
+		t.Fatal("expected public error")
+	}
+	if publicErr.Code != "password_rejected" || !strings.Contains(strings.ToLower(publicErr.Message), "breach") {
+		t.Fatalf("unexpected public error: %+v", publicErr)
 	}
 }
 
@@ -24,17 +33,27 @@ func TestClassifyRegistrationErrorIdentifierConflict(t *testing.T) {
 		status:   http.StatusBadRequest,
 		messages: []string{"An account with the same identifier exists already."},
 	}
-	if got := classifyRegistrationError(err); !errors.Is(got, auth.ErrIdentifierConflict) {
+	got := classifyRegistrationError(err)
+	if !errors.Is(got, auth.ErrIdentifierConflict) {
 		t.Fatalf("got %v, want identifier conflict", got)
+	}
+	var publicErr *auth.PublicError
+	if !errors.As(got, &publicErr) || publicErr.Code != "identifier_already_exists" {
+		t.Fatalf("unexpected public error: %+v", publicErr)
 	}
 }
 
 func TestClassifyRegistrationErrorUnknownClientFailure(t *testing.T) {
 	err := providerResponseError{
 		status:   http.StatusBadRequest,
-		messages: []string{"registration rejected"},
+		messages: []string{"Registration rejected for the supplied values."},
 	}
-	if got := classifyRegistrationError(err); !errors.Is(got, auth.ErrRegistrationInvalid) {
+	got := classifyRegistrationError(err)
+	if !errors.Is(got, auth.ErrRegistrationInvalid) {
 		t.Fatalf("got %v, want invalid registration", got)
+	}
+	var publicErr *auth.PublicError
+	if !errors.As(got, &publicErr) || publicErr.Code != "registration_invalid" {
+		t.Fatalf("unexpected public error: %+v", publicErr)
 	}
 }
