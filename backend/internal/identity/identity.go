@@ -6,8 +6,9 @@ import (
 )
 
 var (
-	ErrUnauthenticated = errors.New("identity is unauthenticated")
-	ErrInvalidToken    = errors.New("identity token is invalid")
+	ErrUnauthenticated      = errors.New("identity is unauthenticated")
+	ErrInvalidToken         = errors.New("identity token is invalid")
+	ErrVerificationRequired = errors.New("identity verification is required")
 )
 
 type Principal struct {
@@ -15,7 +16,9 @@ type Principal struct {
 	Subject string
 }
 
-// Provider is the provider-neutral application boundary for external OIDC identity.
+// Provider is the provider-neutral application boundary for external identity.
+// It returns a principal only when the external credential is valid and the
+// identity satisfies the application's verification policy.
 type Provider interface {
-	Authenticate(ctx context.Context, bearerToken string) (Principal, error)
+	AuthenticateVerified(ctx context.Context, bearerToken string) (Principal, error)
 }

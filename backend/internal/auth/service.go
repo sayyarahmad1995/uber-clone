@@ -6,12 +6,13 @@ import (
 )
 
 var (
-	ErrInvalidCredentials  = errors.New("invalid credentials")
-	ErrIdentifierConflict  = errors.New("identifier already exists")
-	ErrPasswordRejected    = errors.New("password does not meet requirements")
-	ErrRegistrationInvalid = errors.New("registration request is invalid")
-	ErrVerificationInvalid = errors.New("verification is invalid or expired")
-	ErrUnavailable         = errors.New("authentication service unavailable")
+	ErrInvalidCredentials   = errors.New("invalid credentials")
+	ErrIdentifierConflict   = errors.New("identifier already exists")
+	ErrPasswordRejected     = errors.New("password does not meet requirements")
+	ErrRegistrationInvalid  = errors.New("registration request is invalid")
+	ErrVerificationInvalid  = errors.New("verification is invalid or expired")
+	ErrVerificationRequired = errors.New("account verification is required")
+	ErrUnavailable          = errors.New("authentication service unavailable")
 )
 
 type PublicError struct {
@@ -51,6 +52,7 @@ type Provider interface {
 	Login(context.Context, Credentials) (Session, error)
 	Logout(context.Context, string) error
 	ExtendSession(context.Context, string) (Session, error)
+	EnsureVerifiedSession(context.Context, string) error
 	StartVerification(context.Context, string) (VerificationChallenge, error)
 	CompleteVerification(context.Context, string, string) error
 }
@@ -62,12 +64,23 @@ func (s Service) Register(ctx context.Context, c Credentials) (VerificationChall
 	return s.provider.Register(ctx, c)
 }
 func (s Service) Login(ctx context.Context, c Credentials) (Session, error) {
-	return s.provider.Login(ctx, c)
+	session, err := s.provider.Login(ctx, c)
+	if err != nil {
+		return Session{}, err
+	}
+	if err := s.provider.EnsureVerifiedSession(ctx, session.AccessToken); err != nil {
+		_ = s.provider.Logout(ctx, session.AccessToken)
+		return Session{}, err
+	}
+	return session, nil
 }
 func (s Service) Logout(ctx context.Context, token string) error {
 	return s.provider.Logout(ctx, token)
 }
 func (s Service) ExtendSession(ctx context.Context, token string) (Session, error) {
+	if err := s.provider.EnsureVerifiedSession(ctx, token); err != nil {
+		return Session{}, err
+	}
 	return s.provider.ExtendSession(ctx, token)
 }
 func (s Service) StartVerification(ctx context.Context, email string) (VerificationChallenge, error) {

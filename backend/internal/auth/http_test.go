@@ -11,8 +11,9 @@ import (
 )
 
 type fakeProvider struct {
-	registerErr error
-	loginErr    error
+	registerErr     error
+	loginErr        error
+	verificationErr error
 }
 
 func (p fakeProvider) Register(context.Context, Credentials) (VerificationChallenge, error) {
@@ -25,6 +26,7 @@ func (fakeProvider) Logout(context.Context, string) error { return nil }
 func (fakeProvider) ExtendSession(context.Context, string) (Session, error) {
 	return Session{AccessToken: "token", ExpiresIn: 3600}, nil
 }
+func (p fakeProvider) EnsureVerifiedSession(context.Context, string) error { return p.verificationErr }
 func (fakeProvider) StartVerification(context.Context, string) (VerificationChallenge, error) {
 	return VerificationChallenge{ChallengeID: "challenge"}, nil
 }
@@ -47,6 +49,27 @@ func TestLoginUsesStableJSONContract(t *testing.T) {
 	}
 	if response.AccessToken != "token" || response.ExpiresIn != 3600 {
 		t.Fatalf("unexpected response: %+v", response)
+	}
+}
+
+func TestLoginRequiresVerifiedAccount(t *testing.T) {
+	h := NewHandler(NewService(fakeProvider{verificationErr: ErrVerificationRequired}))
+	r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"identifier":"a","password":"b"}`))
+	w := httptest.NewRecorder()
+	h.Login(w, r)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("got %d, want %d", w.Code, http.StatusForbidden)
+	}
+	var response map[string]string
+	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+		t.Fatal(err)
+	}
+	if response["error"] != "verification_required" {
+		t.Fatalf("unexpected response: %+v", response)
+	}
+	if _, leaked := response["access_token"]; leaked {
+		t.Fatal("unverified login returned an access token")
 	}
 }
 
