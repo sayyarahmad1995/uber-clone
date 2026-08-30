@@ -12,7 +12,7 @@ Update this file after every meaningful work session.
 
 **Current engineering milestone:** Driver Capability Foundation — In Progress
 
-**Current work item:** Establish the Driver capability and driver entry/onboarding flow on top of the existing shared authentication and User foundation. Ride Request Foundation remains blocked until both Rider and Driver capabilities are established.
+**Current work item:** Verify the shared-account Driver capability implementation, then runtime-test capability activation and `/v1/me`. Ride Request Foundation remains blocked until Driver Capability Foundation is complete.
 
 **Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until we learn from completed work.
 
@@ -49,6 +49,12 @@ Update this file after every meaningful work session.
 - [x] Static analysis passed locally with `go vet ./...`
 - [x] Provider-boundary hardening merged through PR #3
 - [x] Merged `main` post-merge smoke-tested for registration, verification, login, `/v1/me`, session extension, logout, and invalidated-session behavior
+- [x] Driver capability added as an application-owned User capability alongside Rider
+- [x] Existing `user_capabilities` persistence reused; no Driver-specific identity or migration is required
+- [x] Idempotent authenticated `PUT /v1/me/capabilities/driver` endpoint implemented
+- [x] Driver capability activation reuses the existing shared user/account and authentication session
+- [x] `/v1/me` continues to expose the complete capability set for the account
+- [x] Provider-independent User service test added for Driver capability enablement
 
 ---
 
@@ -64,28 +70,30 @@ The authentication flow remains shared:
 
 `Client → Application Authentication API → Authentication domain → Provider adapter → Identity infrastructure`
 
-After authentication, the application determines which business capabilities the user has. One account may hold multiple capabilities. Rider remains the default capability; Driver is added through application-owned Driver onboarding/activation.
+After authentication, the application determines which business capabilities the user has. One account may hold multiple capabilities. Rider remains the default capability; Driver is added through an application-owned capability activation endpoint.
 
 We should not create driver-specific copies of registration, verification, login, session extension, or logout endpoints unless a concrete business requirement later proves they are necessary.
 
-### Expected end-to-end outcome
+### Current minimal Driver contract
 
-`Authenticated User → Enter/enable Driver capability → Create/load Driver profile → Authenticated identity exposes Driver capability`
+`Authenticated User → PUT /v1/me/capabilities/driver → Same User now has rider + driver → GET /v1/me exposes both`
 
-The exact Driver onboarding data should stay MVP-minimal and be defined from concrete requirements before implementation. Licensing, vehicle details, approval workflows, document verification, background checks, availability, and dispatch behavior should not be added merely because a production ride-hailing system may eventually need them.
+The existing database already permits the `driver` capability, so this slice does not require another migration.
 
-### Completion gate
+A separate Driver profile is intentionally **not** introduced merely to represent capability membership. Driver-specific data such as licensing, vehicle details, approval state, documents, availability, or operational status should be added only when a concrete Driver workflow requires those concepts.
+
+### Remaining completion gate
 
 Before this milestone is considered complete:
 
-1. Driver capability semantics are application-owned and coexist cleanly with Rider on one user account.
-2. Driver persistence/profile boundaries are defined without coupling business models to an external provider.
-3. An authenticated user can obtain/activate the Driver capability through an application API.
-4. Driver capability creation is idempotent and appropriately authorized.
-5. `/v1/me` (or the application-owned identity contract that replaces it) exposes the resulting capabilities consistently.
-6. Provider-independent tests cover the Driver entry/capability contract.
-7. `go test ./...` and `go vet ./...` pass.
-8. The complete Driver entry flow is runtime-verified with Docker Compose.
+1. `go test ./...` passes on the branch.
+2. `go vet ./...` passes on the branch.
+3. Docker Compose starts successfully with the branch.
+4. A Rider-only authenticated account returns only `rider` from `GET /v1/me` before activation.
+5. `PUT /v1/me/capabilities/driver` returns the same user with both `driver` and `rider` capabilities.
+6. Repeating Driver activation is idempotent and does not duplicate capability data.
+7. A subsequent `GET /v1/me` exposes both capabilities consistently.
+8. Unauthenticated Driver activation is rejected.
 
 ---
 
@@ -135,6 +143,11 @@ Exact later boundaries remain intentionally flexible.
 
 ## Deferred
 
+- Driver-specific profile data until a concrete workflow needs it
+- Driver licensing and document verification
+- Driver approval/background-check workflows
+- Driver vehicle details until required by a later slice
+- Driver availability/online status until matching requires it
 - CI/CD
 - Kubernetes
 - iOS implementation
@@ -155,6 +168,7 @@ Exact later boundaries remain intentionally flexible.
 - Keep the current milestone precise and the next milestone reasonably clear.
 - Do not design later slices in detail prematurely.
 - Keep authentication shared across capabilities; do not duplicate identity systems per business role.
+- Represent capability membership separately from future capability-specific profile/operational data.
 - Keep the MVP simple and avoid speculative enterprise complexity.
 - Organize code around business domains with infrastructure behind application-defined boundaries.
 - Maintain future extensibility primarily through clean ports/adapters, not unused implementations.
