@@ -2,21 +2,14 @@ package ride
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/google/uuid"
 )
 
-type queryer interface {
-	QueryRowContext(ctx context.Context, query string, args ...any) rowScanner
-}
+type PostgresRepository struct{ db *sql.DB }
 
-type rowScanner interface {
-	Scan(dest ...any) error
-}
-
-type PostgresRepository struct{ db queryer }
-
-func NewPostgresRepository(db queryer) PostgresRepository { return PostgresRepository{db: db} }
+func NewPostgresRepository(db *sql.DB) PostgresRepository { return PostgresRepository{db: db} }
 
 func (r PostgresRepository) Create(ctx context.Context, riderUserID uuid.UUID, pickup, destination Location) (Request, error) {
 	var request Request
