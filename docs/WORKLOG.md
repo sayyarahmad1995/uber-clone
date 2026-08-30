@@ -10,86 +10,110 @@ Update this file after every meaningful work session.
 
 ## Current Status
 
-**Completed engineering milestone:** Deployment Foundation
+**Current engineering milestone:** User Entry and Rider Foundation — Completed, boundary hardening pending merge
 
-**Completed business slice:** User Entry and Rider Foundation
+**Current work item:** Finish provider-boundary hardening and configurable session lifecycle verification, then start Ride Request Foundation.
 
-**Current hardening task:** Make authentication and identity infrastructure explicitly replaceable before starting the next business slice.
-
-**Next business slice:** Ride Request Foundation
-
-Expected next outcome:
-
-`Authenticated Rider → Set pickup → Set destination → Create persisted ride request`
-
-Driver matching, live trip execution, pricing complexity, maps-provider coupling, and other later concerns remain outside that slice until refinement proves they are needed.
+**Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until we learn from completed work.
 
 ---
 
 ## Completed
 
-- [x] Repository and MVP-first development approach established.
-- [x] Modular monolith selected for the Go backend.
-- [x] PostgreSQL selected as primary persistence.
-- [x] Docker Compose deployment foundation implemented and runtime-verified.
-- [x] `GET /health` and readiness support established.
-- [x] Deployment Foundation merged through PR #1.
-- [x] One application user may have multiple capabilities.
-- [x] Rider is the default capability.
-- [x] User domain is independent from external identity records.
-- [x] External identities map to application users separately from the user domain.
-- [x] Application-owned authentication API implemented.
-- [x] Product-owned authentication UI boundary established.
-- [x] Client-to-Kratos direct authentication flow rejected; providers remain internal.
-- [x] Ory Kratos implemented behind authentication and identity adapters.
-- [x] Registration, verification, login, authenticated `GET /v1/me`, logout, and session extension locally verified.
-- [x] User Entry and Rider Foundation merged through PR #2.
-- [x] MVP session strategy recorded in ADR-0005.
+- [x] Repository created: `sayyarahmad1995/uber-clone`
+- [x] MVP-first development approach established
+- [x] Business-domain-oriented modular monolith selected
+- [x] Shared Flutter mobile application direction established
+- [x] Android selected as the initial client platform
+- [x] Go selected for the backend
+- [x] PostgreSQL selected as the primary database
+- [x] Redis reserved for concrete fast/transient-data needs
+- [x] Docker Compose selected for the current deployment mechanism
+- [x] Deployment Foundation implemented, runtime-verified, and merged
+- [x] Application-owned authentication API established
+- [x] Ory Kratos isolated behind internal authentication/identity adapters
+- [x] Direct client-to-provider authentication flow superseded
+- [x] PostgreSQL-backed User domain implemented
+- [x] External identities separated from application users
+- [x] Rider capability created by default and idempotently
+- [x] Registration, verification, login, authenticated `/v1/me`, logout, and session extension implemented and locally verified
+- [x] User Entry and Rider Foundation merged through PR #2
+- [x] Replaceable-provider architecture defined in ADR-0006
+- [x] Application-owned identity namespace selected (`primary-identity-v1`)
+- [x] Public verification terminology changed from provider `flow` language to application-owned `verification_id`
+- [x] Provider errors translated to application-owned authentication errors
+- [x] Provider selection made explicit at the composition root through `AUTH_PROVIDER`
+- [x] Kratos session lifespan and extension window made configurable through deployment configuration
 
 ---
 
-## Authentication Boundary Hardening
+## Current Boundary-Hardening Branch
 
-Active branch: `refactor/auth-provider-boundaries`
+Active branch: `refactor/auth-provider-boundaries`.
 
-Goals before closing the current slice completely:
+Draft PR: #3 — Harden replaceable authentication provider boundaries.
 
-- [x] Replace provider flow terminology in the public contract with application-owned verification terminology.
-- [x] Prevent provider-defined HTTP statuses/messages from leaking through the application API.
-- [x] Make provider selection explicit at the composition root with `AUTH_PROVIDER`.
-- [x] Make the durable identity-source label configuration-driven instead of hard-coded to a vendor name.
-- [x] Record the replaceable-provider architecture and migration limitations in ADR-0006.
-- [x] Add provider-independent HTTP contract tests using a fake authentication provider.
-- [ ] Run the full Go test suite for the branch.
-- [ ] Runtime-verify the Docker Compose authentication flow after these contract changes.
+This branch combines the provider-boundary cleanup with the work previously developed on `feature/configurable-session-lifecycle`.
 
-### Architectural rule
+Session lifecycle defaults:
 
-External systems implement application-defined ports. External-system concepts must not define business-domain models or public application APIs.
+- `SESSION_LIFESPAN=336h`
+- `SESSION_EARLIEST_POSSIBLE_EXTEND=24h`
+
+The values are deployment configuration for the current Kratos adapter and do not become application-domain concepts.
+
+Remaining verification gate before merge:
+
+1. Run `cd backend && go test ./...`.
+2. Start the complete Docker Compose stack.
+3. Verify registration returns application-owned `verification_id`.
+4. Verify code verification succeeds.
+5. Verify login returns the stable application session contract.
+6. Verify authenticated `GET /v1/me` creates/loads the Rider user using identity source `primary-identity-v1`.
+7. Verify session extension honors the configured lifecycle.
+8. Verify logout invalidates the current session.
+
+---
+
+## Architecture Rule: Replaceable External Providers
+
+External systems implement application-defined ports. Provider-specific concepts must not define business models or public APIs.
 
 For authentication:
 
-`Client → Application Authentication API → Authentication domain/ports → Provider adapters → Ory Kratos (current implementation)`
+`Client → Application Authentication API → Authentication domain → Provider adapter → Identity infrastructure`
 
-A future provider replacement should primarily require a new adapter and composition/configuration change.
+The concrete identity provider is selected at the composition root. Kratos is the current implementation, not a business-domain dependency.
 
-Provider-issued subjects are not guaranteed to remain stable across providers. If a future provider assigns different subjects, account continuity requires an explicit identity migration/linking procedure. Active sessions may also be invalidated during such a migration; preserving them is not an MVP requirement.
+An external identity maps to an application user using an application-owned identity source plus the provider subject. Replacing the provider may still require explicit subject migration/account linking if the new provider assigns different identifiers.
 
----
-
-## MVP Delivery Direction
-
-The core MVP journey remains:
-
-`Open app → Authenticate → Load user → Enter Rider → Set pickup → Set destination → Request ride → Basic matching → Driver accepts/rejects → Trip in progress → Live status/location → Trip completed → Trip history`
-
-Later slice boundaries remain intentionally flexible and are refined only when the current slice is complete.
+The same boundary rule applies to future maps, routing, payments, notifications, storage, messaging, and other external services.
 
 ---
 
-## Immediate Next Step
+## Next Business Vertical Slice
 
-Finish verification of `refactor/auth-provider-boundaries`. Once merged, refine and start `Ride Request Foundation`.
+**Ride Request Foundation**
+
+Expected end-to-end outcome:
+
+`Authenticated Rider → Set pickup → Set destination → Create persisted ride request`
+
+The slice should stay deliberately narrow. Driver matching, live location, pricing, payments, and other later workflow concerns should not enter unless they become concrete dependencies of this slice.
+
+---
+
+## Rough MVP Direction After Ride Request
+
+- Minimum Driver participation required for the ride flow
+- Basic matching
+- Driver accept/reject
+- Trip execution
+- Live location/status updates
+- Trip completion
+- Trip history
+
+Exact later boundaries remain intentionally flexible.
 
 ---
 
@@ -98,25 +122,24 @@ Finish verification of `refactor/auth-provider-boundaries`. Once merged, refine 
 - CI/CD
 - Kubernetes
 - iOS implementation
-- Courier and Freight capabilities
-- Full administrator operations
-- Enterprise dispatch algorithms
-- Advanced surge/pricing
-- Promotions and incentives
-- Advanced fraud/risk systems
-- Sophisticated payment infrastructure until concretely required
-- Multi-region architecture
-- Microservices
-- Advanced analytics/data pipelines
+- Courier capability
+- Freight capability
+- Administrator operations
+- Enterprise-level business logic
+- Advanced matching/dispatch
+- Payments unless concretely required by an MVP slice
+- Promotions
+- Advanced analytics
 
 ---
 
-## Working Principles
+## Important Working Principles
 
-- Build the MVP incrementally as vertical slices.
-- Define the current milestone precisely and keep only the next milestone reasonably clear.
-- Avoid speculative enterprise complexity.
-- Organize code around business domains, not global technical layers.
-- Keep infrastructure dependencies behind application-owned boundaries.
-- Challenge weak or premature architectural decisions.
-- Record meaningful progress and the current stopping point here.
+- Build the MVP incrementally using business vertical slices.
+- Keep the current milestone precise and the next milestone reasonably clear.
+- Do not design later slices in detail prematurely.
+- Keep the MVP simple and avoid speculative enterprise complexity.
+- Organize code around business domains with infrastructure behind application-defined boundaries.
+- Maintain future extensibility primarily through clean ports/adapters, not unused implementations.
+- Challenge architectural decisions that create vendor lock-in or premature complexity.
+- Update this worklog after meaningful work so the repository remains the source of truth for the stopping point.
