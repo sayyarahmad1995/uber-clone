@@ -32,8 +32,7 @@ func (app application) createRideRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	service := ride.NewService(ride.NewPostgresRepository(app.db))
-	request, err := service.Create(r.Context(), u.ID,
+	request, err := app.rides.Create(r.Context(), u.ID,
 		ride.Location{Latitude: body.Pickup.Latitude, Longitude: body.Pickup.Longitude},
 		ride.Location{Latitude: body.Destination.Latitude, Longitude: body.Destination.Longitude},
 	)
