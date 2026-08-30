@@ -10,9 +10,9 @@ Update this file after every meaningful work session.
 
 ## Current Status
 
-**Current engineering milestone:** User Entry and Rider Foundation — Completed, boundary hardening pending merge
+**Current engineering milestone:** User Entry and Rider Foundation — Completed; provider-boundary hardening fully verified and ready for merge
 
-**Current work item:** Finish provider-boundary hardening and configurable session lifecycle runtime verification, then start Ride Request Foundation.
+**Current work item:** Merge PR #3, then start Ride Request Foundation.
 
 **Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until we learn from completed work.
 
@@ -55,6 +55,9 @@ Update this file after every meaningful work session.
 - [x] Verification completion runtime-verified through `POST /v1/auth/verify/complete`
 - [x] Login runtime-verified with stable application session contract
 - [x] Authenticated `GET /v1/me` runtime-verified and returns Rider capability
+- [x] Session extension runtime-verified through `POST /v1/auth/session/extend`; the current token remains valid afterward
+- [x] Logout runtime-verified through `POST /v1/auth/logout`
+- [x] Logged-out token runtime-verified as invalid through `GET /v1/me` returning `401 Unauthorized`
 
 ---
 
@@ -73,10 +76,7 @@ Session lifecycle defaults:
 
 The values are deployment configuration for the current Kratos adapter and do not become application-domain concepts.
 
-Remaining verification gate before merge:
-
-1. Verify session extension honors the configured lifecycle.
-2. Verify logout invalidates the current session.
+Verification gate: **complete**. The branch is ready for final PR status review and merge.
 
 ---
 
