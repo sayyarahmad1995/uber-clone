@@ -70,40 +70,41 @@ func TestRegisterUsesApplicationVerificationContract(t *testing.T) {
 	}
 }
 
-func TestRegisterPasswordPolicyFailureIsNotIdentifierConflict(t *testing.T) {
-	h := NewHandler(NewService(fakeProvider{registerErr: ErrPasswordRejected}))
-	r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"identifier":"a@example.com","password":"breached"}`))
+func TestPublicProviderMessageUsesStableApplicationCode(t *testing.T) {
+	providerErr := NewPublicError(
+		ErrPasswordRejected,
+		"password_rejected",
+		"The password was found in data breaches and must not be used.",
+	)
+	h := NewHandler(NewService(fakeProvider{registerErr: providerErr}))
+	r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"identifier":"a","password":"breached"}`))
 	w := httptest.NewRecorder()
 	h.Register(w, r)
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("got %d", w.Code)
 	}
-	if !strings.Contains(w.Body.String(), "password does not meet requirements") {
-		t.Fatalf("unexpected response: %s", w.Body.String())
+	var response map[string]string
+	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+		t.Fatal(err)
 	}
-	if strings.Contains(w.Body.String(), "identifier already exists") {
-		t.Fatal("password rejection was misclassified as an identifier conflict")
+	if response["error"] != "password_rejected" {
+		t.Fatalf("unexpected error code: %q", response["error"])
+	}
+	if !strings.Contains(strings.ToLower(response["message"]), "breach") {
+		t.Fatalf("expected useful provider-derived message, got %q", response["message"])
 	}
 }
 
-func TestProviderErrorsAreMappedByApplication(t *testing.T) {
-	h := NewHandler(NewService(fakeProvider{loginErr: ErrInvalidCredentials}))
-	r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"identifier":"a","password":"wrong"}`))
+func TestProviderSpecificInternalErrorsDoNotLeak(t *testing.T) {
+	h := NewHandler(NewService(fakeProvider{loginErr: errors.New("kratos internal transport failure")}))
+	r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"identifier":"a","password":"b"}`))
 	w := httptest.NewRecorder()
-	h.Login(w, r)
-	if w.Code != http.StatusUnauthorized {
-		t.Fatalf("got %d", w.Code)
-	}
-
-	h = NewHandler(NewService(fakeProvider{loginErr: errors.New("provider-specific failure")}))
-	r = httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"identifier":"a","password":"b"}`))
-	w = httptest.NewRecorder()
 	h.Login(w, r)
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("got %d", w.Code)
 	}
-	if strings.Contains(w.Body.String(), "provider-specific") {
-		t.Fatal("provider error leaked into public response")
+	if strings.Contains(strings.ToLower(w.Body.String()), "kratos") {
+		t.Fatal("provider implementation detail leaked into public response")
 	}
 }
