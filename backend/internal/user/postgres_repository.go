@@ -61,6 +61,17 @@ func (r PostgresRepository) CreateWithDefaultRider(ctx context.Context, identity
 	return r.find(ctx, userID)
 }
 
+func (r PostgresRepository) AddCapability(ctx context.Context, userID uuid.UUID, capability Capability) (User, error) {
+	if _, err := r.db.ExecContext(ctx, `
+		INSERT INTO user_capabilities (user_id, capability)
+		VALUES ($1, $2)
+		ON CONFLICT DO NOTHING
+	`, userID, capability); err != nil {
+		return User{}, err
+	}
+	return r.find(ctx, userID)
+}
+
 func (r PostgresRepository) find(ctx context.Context, userID uuid.UUID) (User, error) {
 	var u User
 	if err := r.db.QueryRowContext(ctx, `
