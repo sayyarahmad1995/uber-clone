@@ -159,6 +159,7 @@ func (app application) routes() http.Handler {
 	mux.Handle("PUT /v1/driver", identity.Middleware(app.identity, http.HandlerFunc(app.onboardDriver)))
 	mux.Handle("GET /v1/driver", identity.Middleware(app.identity, http.HandlerFunc(app.getDriver)))
 	mux.Handle("PUT /v1/driver/availability", identity.Middleware(app.identity, http.HandlerFunc(app.setDriverAvailability)))
+	mux.Handle("POST /v1/ride-requests", identity.Middleware(app.identity, http.HandlerFunc(app.createRideRequest)))
 	return mux
 }
 
