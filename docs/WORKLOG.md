@@ -12,7 +12,7 @@ Update this file after every meaningful work session.
 
 **Current engineering milestone:** User Entry and Rider Foundation — Completed, boundary hardening pending merge
 
-**Current work item:** Finish provider-boundary hardening and configurable session lifecycle verification, then start Ride Request Foundation.
+**Current work item:** Finish provider-boundary hardening and configurable session lifecycle runtime verification, then start Ride Request Foundation.
 
 **Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until we learn from completed work.
 
@@ -44,6 +44,9 @@ Update this file after every meaningful work session.
 - [x] Provider errors translated to application-owned authentication errors
 - [x] Provider selection made explicit at the composition root through `AUTH_PROVIDER`
 - [x] Kratos session lifespan and extension window made configurable through deployment configuration
+- [x] Go module metadata completed with committed `backend/go.sum`
+- [x] Full backend test suite passed locally with `go test ./...`
+- [x] Static analysis passed locally with `go vet ./...`
 
 ---
 
@@ -64,14 +67,13 @@ The values are deployment configuration for the current Kratos adapter and do no
 
 Remaining verification gate before merge:
 
-1. Run `cd backend && go test ./...`.
-2. Start the complete Docker Compose stack.
-3. Verify registration returns application-owned `verification_id`.
-4. Verify code verification succeeds.
-5. Verify login returns the stable application session contract.
-6. Verify authenticated `GET /v1/me` creates/loads the Rider user using identity source `primary-identity-v1`.
-7. Verify session extension honors the configured lifecycle.
-8. Verify logout invalidates the current session.
+1. Start the complete Docker Compose stack.
+2. Verify registration returns application-owned `verification_id` and stable validation error codes/messages.
+3. Verify code verification succeeds.
+4. Verify login returns the stable application session contract.
+5. Verify authenticated `GET /v1/me` creates/loads the Rider user using identity source `primary-identity-v1`.
+6. Verify session extension honors the configured lifecycle.
+7. Verify logout invalidates the current session.
 
 ---
 
