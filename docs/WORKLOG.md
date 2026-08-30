@@ -65,7 +65,7 @@ Update this file after every meaningful work session.
 
 Active branch: `refactor/auth-provider-boundaries`.
 
-Draft PR: #3 — Harden replaceable authentication provider boundaries.
+PR: #3 — Harden replaceable authentication provider boundaries.
 
 This branch combines the provider-boundary cleanup with the work previously developed on `feature/configurable-session-lifecycle`.
 
@@ -76,7 +76,7 @@ Session lifecycle defaults:
 
 The values are deployment configuration for the current Kratos adapter and do not become application-domain concepts.
 
-Verification gate: **complete**. The branch is ready for final PR status review and merge.
+Verification gate: **complete**. The branch is ready for merge.
 
 ---
 
