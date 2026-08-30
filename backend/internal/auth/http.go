@@ -126,6 +126,10 @@ func authFailure(w http.ResponseWriter, err error) {
 		failure(w, http.StatusUnauthorized, "invalid credentials")
 	case errors.Is(err, ErrIdentifierConflict):
 		failure(w, http.StatusConflict, "identifier already exists")
+	case errors.Is(err, ErrPasswordRejected):
+		failure(w, http.StatusBadRequest, "password does not meet requirements")
+	case errors.Is(err, ErrRegistrationInvalid):
+		failure(w, http.StatusBadRequest, "registration request is invalid")
 	case errors.Is(err, ErrVerificationInvalid):
 		failure(w, http.StatusBadRequest, "verification is invalid or expired")
 	case errors.Is(err, ErrUnavailable):
