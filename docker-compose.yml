@@ -58,6 +58,8 @@ services:
     image: oryd/kratos:v1.3.1
     environment:
       DSN: postgres://${POSTGRES_USER:-uber_clone}:${POSTGRES_PASSWORD:-uber_clone_local}@postgres:5432/${ORY_KRATOS_DB:-ory_kratos}?sslmode=disable
+      SESSION_LIFESPAN: ${SESSION_LIFESPAN:-336h}
+      SESSION_EARLIEST_POSSIBLE_EXTEND: ${SESSION_EARLIEST_POSSIBLE_EXTEND:-24h}
     volumes:
       - ./identity/kratos:/etc/config/kratos:ro
     command: ["serve", "-c", "/etc/config/kratos/kratos.yml", "--dev", "--watch-courier"]
