@@ -40,6 +40,28 @@ type application struct {
 	auth     auth.Handler
 }
 
+type onboardDriverRequest struct {
+	Vehicle struct {
+		Make         string `json:"make"`
+		Model        string `json:"model"`
+		Color        string `json:"color"`
+		LicensePlate string `json:"license_plate"`
+	} `json:"vehicle"`
+}
+
+func (r onboardDriverRequest) vehicleInput() driver.VehicleInput {
+	return driver.VehicleInput{
+		Make:         r.Vehicle.Make,
+		Model:        r.Vehicle.Model,
+		Color:        r.Vehicle.Color,
+		LicensePlate: r.Vehicle.LicensePlate,
+	}
+}
+
+type driverAvailabilityRequest struct {
+	IsOnline bool `json:"is_online"`
+}
+
 func main() {
 	cfg := config{
 		Port:            getenv("APP_PORT", "8080"),
@@ -181,14 +203,12 @@ func (app application) onboardDriver(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var body struct {
-		Vehicle driver.VehicleInput `json:"vehicle"`
-	}
+	var body onboardDriverRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request"})
 		return
 	}
-	profile, err := app.drivers.Onboard(r.Context(), u.ID, body.Vehicle)
+	profile, err := app.drivers.Onboard(r.Context(), u.ID, body.vehicleInput())
 	if errors.Is(err, driver.ErrInvalidProfile) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "vehicle make, model, color, and license_plate are required"})
 		return
@@ -222,14 +242,12 @@ func (app application) setDriverAvailability(w http.ResponseWriter, r *http.Requ
 	if !ok {
 		return
 	}
-	var body struct {
-		Online bool `json:"online"`
-	}
+	var body driverAvailabilityRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request"})
 		return
 	}
-	profile, err := app.drivers.SetOnline(r.Context(), u.ID, body.Online)
+	profile, err := app.drivers.SetOnline(r.Context(), u.ID, body.IsOnline)
 	if errors.Is(err, driver.ErrNotFound) {
 		writeJSON(w, http.StatusConflict, map[string]string{"error": "driver onboarding is required before changing availability"})
 		return
