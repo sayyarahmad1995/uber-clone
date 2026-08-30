@@ -14,6 +14,19 @@ var (
 	ErrUnavailable         = errors.New("authentication service unavailable")
 )
 
+type PublicError struct {
+	Cause   error
+	Code    string
+	Message string
+}
+
+func (e *PublicError) Error() string { return e.Message }
+func (e *PublicError) Unwrap() error { return e.Cause }
+
+func NewPublicError(cause error, code, message string) error {
+	return &PublicError{Cause: cause, Code: code, Message: message}
+}
+
 type Credentials struct {
 	Identifier string
 	Password   string
