@@ -10,9 +10,9 @@ Update this file after every meaningful work session.
 
 ## Current Status
 
-**Current engineering milestone:** Driver Capability Foundation — Completed, fully verified, and merged
+**Current engineering milestone:** Minimal Driver Operational Foundation — In Progress
 
-**Current work item:** Define and begin Ride Request Foundation from the updated `main` branch.
+**Current work item:** Runtime-verify the corrected Driver onboarding and availability JSON contracts, then complete the remaining authorization and persistence checks before merge.
 
 **Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until we learn from completed work.
 
@@ -62,45 +62,79 @@ Update this file after every meaningful work session.
 - [x] Driver branch static analysis passed with `go vet ./...`
 - [x] Driver branch Docker Compose stack verified healthy; Kratos migration exits successfully with code 0
 - [x] Driver Capability Foundation merged through PR #4
+- [x] Minimal Driver domain added separately from authentication and User capability membership
+- [x] One operational Driver profile and one MVP vehicle modeled per Driver user
+- [x] Driver onboarding, retrieval, and online/offline availability APIs implemented
+- [x] Driver operational persistence added through migration `003_driver_operations.sql`
+- [x] Provider-independent Driver service tests added
+- [x] Minimal Driver branch passes `go test ./...` and `go vet ./...`
+- [x] Minimal Driver Docker image builds and Compose stack starts with healthy PostgreSQL/Mailpit and successful Kratos migration
+- [x] Runtime testing caught HTTP JSON contract mismatch for `license_plate` and `is_online`
+- [x] Driver HTTP request DTOs corrected to preserve application-owned nested snake_case contracts
+- [x] API-level regression tests added for onboarding `vehicle.license_plate` and availability `is_online`
+- [x] Unauthenticated Driver operational endpoints runtime-verified as `401 Unauthorized`
+- [x] Availability before onboarding runtime-verified as rejected with `409 Conflict`
 
 ---
 
-## Driver Capability Foundation
+## Minimal Driver Operational Foundation
 
-PR #4 — Add shared-account Driver capability foundation — merged into `main`.
+Active branch: `feature/minimal-driver-operational-foundation`.
+
+Draft PR: #5 — Add minimal Driver operational foundation.
 
 ### Architectural direction
 
-Driver is a capability of the existing application user, not a separate authentication identity or separate authentication system.
+Driver capability membership and Driver operational state are distinct application concepts.
 
-The authentication flow remains shared:
+- Authentication remains shared for the account.
+- `driver` capability means the user may enter Driver workflows.
+- The Driver domain owns operational profile, vehicle, status, and availability data.
+- External authentication/provider concepts do not define Driver business models or public APIs.
 
-`Client → Application Authentication API → Authentication domain → Provider adapter → Identity infrastructure`
+### Current minimal operational contract
 
-After authentication, the application determines which business capabilities the user has. One account may hold multiple capabilities. Rider remains the default capability; Driver is added through an application-owned capability activation endpoint.
+`Authenticated User with Driver capability → provide one MVP vehicle → active Driver starts offline → GET own Driver state → go online/offline`
 
-We should not create driver-specific copies of registration, verification, login, session extension, or logout endpoints unless a concrete business requirement later proves they are necessary.
+The MVP vehicle contains only:
 
-### Current minimal Driver contract
+- make
+- model
+- color
+- license plate
 
-`Authenticated User → PUT /v1/me/capabilities/driver → Same User now has rider + driver → GET /v1/me exposes both`
+A valid MVP onboarding becomes `active` immediately. There is no manual or external compliance approval workflow in this slice.
 
-The existing database already permits the `driver` capability, so this slice does not require another migration.
+Public request contracts use application-owned JSON:
 
-A separate Driver profile is intentionally **not** introduced merely to represent capability membership. Driver-specific data such as licensing, vehicle details, approval state, documents, availability, or operational status should be added only when a concrete Driver workflow requires those concepts.
+- onboarding: `{"vehicle":{"make":"...","model":"...","color":"...","license_plate":"..."}}`
+- availability: `{"is_online":true|false}`
 
-### Completion gate
+### Remaining completion gate
 
-Verification gate: **complete**.
+Before this milestone is considered complete:
 
-- `go test ./...` passes.
-- `go vet ./...` passes.
-- Docker Compose stack starts successfully and required services are healthy.
-- Rider-only `/v1/me` returns only `rider` before activation.
-- Driver activation returns the same user with both `driver` and `rider`.
-- Repeated activation is idempotent.
-- Subsequent `/v1/me` exposes both capabilities.
-- Unauthenticated activation is rejected.
+1. Pull the corrected branch and rerun `go test ./...` plus `go vet ./...`.
+2. Rebuild/restart the Docker Compose stack with the corrected API binary.
+3. A genuinely Rider-only account receives `403 Forbidden` from Driver operational APIs before Driver capability activation.
+4. A Driver-capable account can onboard one vehicle and receives `status=active`, `is_online=false`.
+5. `GET /v1/driver` returns the persisted operational state.
+6. Availability can move online and offline using the public `is_online` contract.
+7. Repeating onboarding reuses/updates the same Driver profile rather than duplicating it.
+8. Unauthenticated Driver operational requests remain rejected.
+
+Note: `test1@example.com` already had the Driver capability from the previous milestone because Docker Compose retained the PostgreSQL volume, so its pre-activation `GET /v1/driver` correctly reached the Driver domain and returned `404 profile not found`; that account cannot prove the Rider-only `403` case.
+
+### Deliberately deferred
+
+- Driver license/document verification
+- Background checks
+- Insurance verification
+- Manual approval queues
+- External compliance providers
+- Multiple vehicles
+- Earnings/tax onboarding
+- Production-grade regulatory onboarding
 
 ---
 
@@ -120,11 +154,9 @@ The same boundary rule applies to future maps, routing, payments, notifications,
 
 ---
 
-## Next Business Vertical Slice
+## Next Business Vertical Slice After Minimal Driver Operational Foundation
 
 **Ride Request Foundation**
-
-Entry condition: Rider and Driver capabilities are both established, runtime-verified, and merged into `main`.
 
 Expected end-to-end outcome:
 
@@ -136,8 +168,7 @@ The slice should stay deliberately narrow. Driver matching, live location, prici
 
 ## Rough MVP Direction After Ride Request
 
-- Minimum Driver participation required for the ride flow
-- Basic matching
+- Basic matching using active online Drivers
 - Driver accept/reject
 - Trip execution
 - Live location/status updates
@@ -150,11 +181,6 @@ Exact later boundaries remain intentionally flexible.
 
 ## Deferred
 
-- Driver-specific profile data until a concrete workflow needs it
-- Driver licensing and document verification
-- Driver approval/background-check workflows
-- Driver vehicle details until required by a later slice
-- Driver availability/online status until matching requires it
 - CI/CD
 - Kubernetes
 - iOS implementation
@@ -175,7 +201,7 @@ Exact later boundaries remain intentionally flexible.
 - Keep the current milestone precise and the next milestone reasonably clear.
 - Do not design later slices in detail prematurely.
 - Keep authentication shared across capabilities; do not duplicate identity systems per business role.
-- Represent capability membership separately from future capability-specific profile/operational data.
+- Represent capability membership separately from capability-specific profile/operational data.
 - Keep the MVP simple and avoid speculative enterprise complexity.
 - Organize code around business domains with infrastructure behind application-defined boundaries.
 - Maintain future extensibility primarily through clean ports/adapters, not unused implementations.
