@@ -44,21 +44,20 @@ func (p *Provider) Register(ctx context.Context, c auth.Credentials) (auth.Verif
 		return auth.VerificationChallenge{}, auth.ErrUnavailable
 	}
 	body := map[string]any{
-		"method": "password",
+		"method":   "password",
 		"password": c.Password,
-		"traits": map[string]string{"email": c.Identifier},
+		"traits":   map[string]string{"email": c.Identifier},
 	}
 	var result struct {
 		ContinueWith []struct {
 			Action string `json:"action"`
-			Flow *struct{ ID string `json:"id"` } `json:"flow"`
+			Flow   *struct {
+				ID string `json:"id"`
+			} `json:"flow"`
 		} `json:"continue_with"`
 	}
 	if err := p.submitFlow(ctx, "/self-service/registration", f.ID, body, &result); err != nil {
-		if isClientFailure(err) {
-			return auth.VerificationChallenge{}, auth.ErrIdentifierConflict
-		}
-		return auth.VerificationChallenge{}, auth.ErrUnavailable
+		return auth.VerificationChallenge{}, classifyRegistrationError(err)
 	}
 	for _, item := range result.ContinueWith {
 		if item.Action == "show_verification_ui" && item.Flow != nil && item.Flow.ID != "" {
@@ -76,7 +75,9 @@ func (p *Provider) Login(ctx context.Context, c auth.Credentials) (auth.Session,
 	body := map[string]any{"method": "password", "identifier": c.Identifier, "password": c.Password}
 	var result struct {
 		SessionToken string `json:"session_token"`
-		Session struct{ ExpiresAt time.Time `json:"expires_at"` } `json:"session"`
+		Session      struct {
+			ExpiresAt time.Time `json:"expires_at"`
+		} `json:"session"`
 	}
 	if err := p.submitFlow(ctx, "/self-service/login", f.ID, body, &result); err != nil {
 		if isClientFailure(err) {
@@ -226,11 +227,55 @@ func (p *Provider) createFlow(ctx context.Context, path string) (flow, error) {
 	return result, nil
 }
 
-type providerResponseError struct{ status int }
-func (e providerResponseError) Error() string { return fmt.Sprintf("provider request failed: %d", e.status) }
+type providerResponseError struct {
+	status   int
+	fields   []string
+	messages []string
+}
+
+func (e providerResponseError) Error() string {
+	return fmt.Sprintf("provider request failed: %d", e.status)
+}
+
 func isClientFailure(err error) bool {
 	var providerErr providerResponseError
 	return errors.As(err, &providerErr) && providerErr.status >= 400 && providerErr.status < 500
+}
+
+func classifyRegistrationError(err error) error {
+	var providerErr providerResponseError
+	if !errors.As(err, &providerErr) {
+		return auth.ErrUnavailable
+	}
+	if providerErr.status < 400 || providerErr.status >= 500 {
+		return auth.ErrUnavailable
+	}
+
+	for _, field := range providerErr.fields {
+		if strings.Contains(strings.ToLower(field), "password") {
+			return auth.ErrPasswordRejected
+		}
+	}
+
+	text := strings.ToLower(strings.Join(providerErr.messages, " "))
+	if strings.Contains(text, "password") && (
+		strings.Contains(text, "breach") ||
+		strings.Contains(text, "pwn") ||
+		strings.Contains(text, "weak") ||
+		strings.Contains(text, "short") ||
+		strings.Contains(text, "minimum") ||
+		strings.Contains(text, "requirement")) {
+		return auth.ErrPasswordRejected
+	}
+	if strings.Contains(text, "already") && (
+		strings.Contains(text, "exist") ||
+		strings.Contains(text, "used") ||
+		strings.Contains(text, "taken") ||
+		strings.Contains(text, "registered")) {
+		return auth.ErrIdentifierConflict
+	}
+
+	return auth.ErrRegistrationInvalid
 }
 
 func (p *Provider) submitFlow(ctx context.Context, path, flowID string, body, out any) error {
@@ -257,7 +302,46 @@ func (p *Provider) submitFlow(ctx context.Context, path, flowID string, body, ou
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
-		return providerResponseError{status: resp.StatusCode}
+		providerErr := providerResponseError{status: resp.StatusCode}
+		var problem struct {
+			Error struct {
+				Message string `json:"message"`
+			} `json:"error"`
+			UI struct {
+				Messages []struct {
+					Text string `json:"text"`
+				} `json:"messages"`
+				Nodes []struct {
+					Attributes struct {
+						Name string `json:"name"`
+					} `json:"attributes"`
+					Messages []struct {
+						Text string `json:"text"`
+					} `json:"messages"`
+				} `json:"nodes"`
+			} `json:"ui"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&problem); err == nil {
+			if strings.TrimSpace(problem.Error.Message) != "" {
+				providerErr.messages = append(providerErr.messages, problem.Error.Message)
+			}
+			for _, message := range problem.UI.Messages {
+				if strings.TrimSpace(message.Text) != "" {
+					providerErr.messages = append(providerErr.messages, message.Text)
+				}
+			}
+			for _, node := range problem.UI.Nodes {
+				if strings.TrimSpace(node.Attributes.Name) != "" && len(node.Messages) > 0 {
+					providerErr.fields = append(providerErr.fields, node.Attributes.Name)
+				}
+				for _, message := range node.Messages {
+					if strings.TrimSpace(message.Text) != "" {
+						providerErr.messages = append(providerErr.messages, message.Text)
+					}
+				}
+			}
+		}
+		return providerErr
 	}
 	if out != nil {
 		return json.NewDecoder(resp.Body).Decode(out)
@@ -270,6 +354,8 @@ func bearer(token string) string {
 }
 
 func max(a, b int64) int64 {
-	if a > b { return a }
+	if a > b {
+		return a
+	}
 	return b
 }
