@@ -47,6 +47,14 @@ Update this file after every meaningful work session.
 - [x] Go module metadata completed with committed `backend/go.sum`
 - [x] Full backend test suite passed locally with `go test ./...`
 - [x] Static analysis passed locally with `go vet ./...`
+- [x] Complete Docker Compose stack starts successfully
+- [x] Registration runtime-verified with application-owned `verification_id`
+- [x] Breached-password runtime-verified as `password_rejected` with useful user-facing message
+- [x] Invalid-email runtime-verified as `registration_invalid`
+- [x] Duplicate identifier runtime-verified as `identifier_already_exists`
+- [x] Verification completion runtime-verified through `POST /v1/auth/verify/complete`
+- [x] Login runtime-verified with stable application session contract
+- [x] Authenticated `GET /v1/me` runtime-verified and returns Rider capability
 
 ---
 
@@ -67,13 +75,8 @@ The values are deployment configuration for the current Kratos adapter and do no
 
 Remaining verification gate before merge:
 
-1. Start the complete Docker Compose stack.
-2. Verify registration returns application-owned `verification_id` and stable validation error codes/messages.
-3. Verify code verification succeeds.
-4. Verify login returns the stable application session contract.
-5. Verify authenticated `GET /v1/me` creates/loads the Rider user using identity source `primary-identity-v1`.
-6. Verify session extension honors the configured lifecycle.
-7. Verify logout invalidates the current session.
+1. Verify session extension honors the configured lifecycle.
+2. Verify logout invalidates the current session.
 
 ---
 
