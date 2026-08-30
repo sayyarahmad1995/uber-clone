@@ -70,6 +70,23 @@ func TestRegisterUsesApplicationVerificationContract(t *testing.T) {
 	}
 }
 
+func TestRegisterPasswordPolicyFailureIsNotIdentifierConflict(t *testing.T) {
+	h := NewHandler(NewService(fakeProvider{registerErr: ErrPasswordRejected}))
+	r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"identifier":"a@example.com","password":"breached"}`))
+	w := httptest.NewRecorder()
+	h.Register(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "password does not meet requirements") {
+		t.Fatalf("unexpected response: %s", w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "identifier already exists") {
+		t.Fatal("password rejection was misclassified as an identifier conflict")
+	}
+}
+
 func TestProviderErrorsAreMappedByApplication(t *testing.T) {
 	h := NewHandler(NewService(fakeProvider{loginErr: ErrInvalidCredentials}))
 	r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"identifier":"a","password":"wrong"}`))
