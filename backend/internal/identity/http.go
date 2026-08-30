@@ -16,7 +16,7 @@ func Middleware(provider Provider, next http.Handler) http.Handler {
 			return
 		}
 
-		principal, err := provider.Authenticate(r.Context(), token)
+		principal, err := provider.AuthenticateVerified(r.Context(), token)
 		if err != nil {
 			http.Error(w, ErrUnauthenticated.Error(), http.StatusUnauthorized)
 			return

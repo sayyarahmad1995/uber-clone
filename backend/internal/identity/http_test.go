@@ -10,10 +10,10 @@ import (
 
 type fakeProvider struct {
 	principal Principal
-	err error
+	err       error
 }
 
-func (p fakeProvider) Authenticate(context.Context, string) (Principal, error) {
+func (p fakeProvider) AuthenticateVerified(context.Context, string) (Principal, error) {
 	return p.principal, p.err
 }
 
@@ -48,6 +48,21 @@ func TestMiddlewareStoresVerifiedPrincipal(t *testing.T) {
 
 	if response.Code != http.StatusNoContent {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusNoContent)
+	}
+}
+
+func TestMiddlewareRejectsUnverifiedIdentity(t *testing.T) {
+	handler := Middleware(fakeProvider{err: ErrVerificationRequired}, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("next handler must not be called")
+	}))
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	request.Header.Set("Authorization", "Bearer unverified")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusUnauthorized)
 	}
 }
 
