@@ -15,6 +15,7 @@ import (
 
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/auth"
 	authkratos "github.com/sayyarahmad1995/uber-clone/backend/internal/auth/kratos"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/driver"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/identity"
 	identitykratos "github.com/sayyarahmad1995/uber-clone/backend/internal/identity/kratos"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/database"
@@ -33,6 +34,7 @@ type config struct {
 
 type application struct {
 	users    user.Service
+	drivers  driver.Service
 	db       *sql.DB
 	identity identity.Provider
 	auth     auth.Handler
@@ -67,6 +69,7 @@ func main() {
 
 	app := application{
 		users:    user.NewService(user.NewPostgresRepository(db)),
+		drivers:  driver.NewService(driver.NewPostgresRepository(db)),
 		db:       db,
 		identity: identityProvider,
 		auth:     auth.NewHandler(auth.NewService(authProvider)),
@@ -131,6 +134,9 @@ func (app application) routes() http.Handler {
 	mux.HandleFunc("POST /v1/auth/logout", app.auth.Logout)
 	mux.Handle("GET /v1/me", identity.Middleware(app.identity, http.HandlerFunc(app.me)))
 	mux.Handle("PUT /v1/me/capabilities/driver", identity.Middleware(app.identity, http.HandlerFunc(app.enableDriverCapability)))
+	mux.Handle("PUT /v1/driver", identity.Middleware(app.identity, http.HandlerFunc(app.onboardDriver)))
+	mux.Handle("GET /v1/driver", identity.Middleware(app.identity, http.HandlerFunc(app.getDriver)))
+	mux.Handle("PUT /v1/driver/availability", identity.Middleware(app.identity, http.HandlerFunc(app.setDriverAvailability)))
 	return mux
 }
 
@@ -149,14 +155,8 @@ func (app application) ready(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app application) me(w http.ResponseWriter, r *http.Request) {
-	p, ok := identity.PrincipalFromContext(r.Context())
+	u, ok := app.currentUser(w, r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "authentication required"})
-		return
-	}
-	u, err := app.users.GetOrCreate(r.Context(), user.ExternalIdentity{Issuer: p.Issuer, Subject: p.Subject})
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "unable to load user"})
 		return
 	}
 	writeUser(w, http.StatusOK, u)
@@ -176,8 +176,116 @@ func (app application) enableDriverCapability(w http.ResponseWriter, r *http.Req
 	writeUser(w, http.StatusOK, u)
 }
 
+func (app application) onboardDriver(w http.ResponseWriter, r *http.Request) {
+	u, ok := app.requireDriverCapability(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		Vehicle driver.VehicleInput `json:"vehicle"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request"})
+		return
+	}
+	profile, err := app.drivers.Onboard(r.Context(), u.ID, body.Vehicle)
+	if errors.Is(err, driver.ErrInvalidProfile) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "vehicle make, model, color, and license_plate are required"})
+		return
+	}
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "unable to onboard driver"})
+		return
+	}
+	writeDriver(w, http.StatusOK, profile)
+}
+
+func (app application) getDriver(w http.ResponseWriter, r *http.Request) {
+	u, ok := app.requireDriverCapability(w, r)
+	if !ok {
+		return
+	}
+	profile, err := app.drivers.Get(r.Context(), u.ID)
+	if errors.Is(err, driver.ErrNotFound) {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "driver profile not found"})
+		return
+	}
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "unable to load driver"})
+		return
+	}
+	writeDriver(w, http.StatusOK, profile)
+}
+
+func (app application) setDriverAvailability(w http.ResponseWriter, r *http.Request) {
+	u, ok := app.requireDriverCapability(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		Online bool `json:"online"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request"})
+		return
+	}
+	profile, err := app.drivers.SetOnline(r.Context(), u.ID, body.Online)
+	if errors.Is(err, driver.ErrNotFound) {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "driver onboarding is required before changing availability"})
+		return
+	}
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "unable to update driver availability"})
+		return
+	}
+	writeDriver(w, http.StatusOK, profile)
+}
+
+func (app application) currentUser(w http.ResponseWriter, r *http.Request) (user.User, bool) {
+	p, ok := identity.PrincipalFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "authentication required"})
+		return user.User{}, false
+	}
+	u, err := app.users.GetOrCreate(r.Context(), user.ExternalIdentity{Issuer: p.Issuer, Subject: p.Subject})
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "unable to load user"})
+		return user.User{}, false
+	}
+	return u, true
+}
+
+func (app application) requireDriverCapability(w http.ResponseWriter, r *http.Request) (user.User, bool) {
+	u, ok := app.currentUser(w, r)
+	if !ok {
+		return user.User{}, false
+	}
+	for _, capability := range u.Capabilities {
+		if capability == user.CapabilityDriver {
+			return u, true
+		}
+	}
+	writeJSON(w, http.StatusForbidden, map[string]string{"error": "driver capability required"})
+	return user.User{}, false
+}
+
 func writeUser(w http.ResponseWriter, status int, u user.User) {
 	writeJSON(w, status, map[string]any{"id": u.ID, "capabilities": u.Capabilities})
+}
+
+func writeDriver(w http.ResponseWriter, status int, profile driver.Profile) {
+	writeJSON(w, status, map[string]any{
+		"user_id":   profile.UserID,
+		"status":    profile.Status,
+		"is_online": profile.IsOnline,
+		"vehicle": map[string]any{
+			"id":            profile.Vehicle.ID,
+			"make":          profile.Vehicle.Make,
+			"model":         profile.Vehicle.Model,
+			"color":         profile.Vehicle.Color,
+			"license_plate": profile.Vehicle.LicensePlate,
+		},
+	})
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {
