@@ -34,10 +34,16 @@ func (r PostgresRepository) Match(ctx context.Context, rideRequestID, riderUserI
 
 	var existing Candidate
 	err = tx.QueryRowContext(ctx, `
-		SELECT ride_request_id, driver_user_id, created_at
+		SELECT ride_request_id, driver_user_id, status, created_at, decided_at
 		FROM ride_driver_candidates
 		WHERE ride_request_id = $1
-	`, rideRequestID).Scan(&existing.RideRequestID, &existing.DriverUserID, &existing.CreatedAt)
+	`, rideRequestID).Scan(
+		&existing.RideRequestID,
+		&existing.DriverUserID,
+		&existing.Status,
+		&existing.CreatedAt,
+		&existing.DecidedAt,
+	)
 	if err == nil {
 		if err := tx.Commit(); err != nil {
 			return Result{}, err
@@ -70,8 +76,14 @@ func (r PostgresRepository) Match(ctx context.Context, rideRequestID, riderUserI
 	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO ride_driver_candidates (ride_request_id, driver_user_id)
 		VALUES ($1, $2)
-		RETURNING ride_request_id, driver_user_id, created_at
-	`, rideRequestID, driverUserID).Scan(&candidate.RideRequestID, &candidate.DriverUserID, &candidate.CreatedAt); err != nil {
+		RETURNING ride_request_id, driver_user_id, status, created_at, decided_at
+	`, rideRequestID, driverUserID).Scan(
+		&candidate.RideRequestID,
+		&candidate.DriverUserID,
+		&candidate.Status,
+		&candidate.CreatedAt,
+		&candidate.DecidedAt,
+	); err != nil {
 		return Result{}, err
 	}
 
@@ -79,4 +91,61 @@ func (r PostgresRepository) Match(ctx context.Context, rideRequestID, riderUserI
 		return Result{}, err
 	}
 	return Result{Candidate: candidate, Created: true}, nil
+}
+
+func (r PostgresRepository) Decide(ctx context.Context, rideRequestID, driverUserID uuid.UUID, decision CandidateStatus) (Candidate, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Candidate{}, err
+	}
+	defer tx.Rollback()
+
+	var candidate Candidate
+	if err := tx.QueryRowContext(ctx, `
+		SELECT ride_request_id, driver_user_id, status, created_at, decided_at
+		FROM ride_driver_candidates
+		WHERE ride_request_id = $1 AND driver_user_id = $2
+		FOR UPDATE
+	`, rideRequestID, driverUserID).Scan(
+		&candidate.RideRequestID,
+		&candidate.DriverUserID,
+		&candidate.Status,
+		&candidate.CreatedAt,
+		&candidate.DecidedAt,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Candidate{}, ErrCandidateNotFound
+		}
+		return Candidate{}, err
+	}
+
+	if candidate.Status == decision {
+		if err := tx.Commit(); err != nil {
+			return Candidate{}, err
+		}
+		return candidate, nil
+	}
+	if candidate.Status != CandidateStatusPending {
+		return Candidate{}, ErrCandidateResolved
+	}
+
+	if err := tx.QueryRowContext(ctx, `
+		UPDATE ride_driver_candidates
+		SET status = $3, decided_at = NOW()
+		WHERE ride_request_id = $1 AND driver_user_id = $2
+		RETURNING ride_request_id, driver_user_id, status, created_at, decided_at
+	`, rideRequestID, driverUserID, decision).Scan(
+		&candidate.RideRequestID,
+		&candidate.DriverUserID,
+		&candidate.Status,
+		&candidate.CreatedAt,
+		&candidate.DecidedAt,
+	); err != nil {
+		return Candidate{}, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return Candidate{}, err
+	}
+	return candidate, nil
 }

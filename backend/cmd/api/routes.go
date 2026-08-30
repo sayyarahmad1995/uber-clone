@@ -41,6 +41,8 @@ func (app application) registerDriverRoutes(mux *http.ServeMux) {
 	mux.Handle("PUT /v1/driver", app.authenticated(app.onboardDriver))
 	mux.Handle("GET /v1/driver", app.authenticated(app.getDriver))
 	mux.Handle("PUT /v1/driver/availability", app.authenticated(app.setDriverAvailability))
+	mux.Handle("POST /v1/driver/ride-requests/{ride_request_id}/accept", app.authenticated(app.acceptRideRequestCandidate))
+	mux.Handle("POST /v1/driver/ride-requests/{ride_request_id}/reject", app.authenticated(app.rejectRideRequestCandidate))
 }
 
 func (app application) registerRideRoutes(mux *http.ServeMux) {
