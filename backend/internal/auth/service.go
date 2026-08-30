@@ -8,6 +8,8 @@ import (
 var (
 	ErrInvalidCredentials  = errors.New("invalid credentials")
 	ErrIdentifierConflict  = errors.New("identifier already exists")
+	ErrPasswordRejected    = errors.New("password does not meet requirements")
+	ErrRegistrationInvalid = errors.New("registration request is invalid")
 	ErrVerificationInvalid = errors.New("verification is invalid or expired")
 	ErrUnavailable         = errors.New("authentication service unavailable")
 )
