@@ -1,5 +1,10 @@
 version: v1.3.1
 dsn: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${ORY_KRATOS_DB}?sslmode=disable
+session:
+  # Defaults. Kratos environment variables override these values at runtime.
+  lifespan: 336h
+  earliest_possible_extend: 24h
+
 serve:
   public:
     base_url: http://kratos:4433/
