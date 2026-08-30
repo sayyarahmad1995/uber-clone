@@ -9,15 +9,30 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/user"
 )
 
+type rideLocationRequest struct {
+	Latitude  *float64 `json:"latitude"`
+	Longitude *float64 `json:"longitude"`
+}
+
 type createRideRequestBody struct {
-	Pickup struct {
-		Latitude  float64 `json:"latitude"`
-		Longitude float64 `json:"longitude"`
-	} `json:"pickup"`
-	Destination struct {
-		Latitude  float64 `json:"latitude"`
-		Longitude float64 `json:"longitude"`
-	} `json:"destination"`
+	Pickup      *rideLocationRequest `json:"pickup"`
+	Destination *rideLocationRequest `json:"destination"`
+}
+
+func (body createRideRequestBody) locations() (ride.Location, ride.Location, bool) {
+	if body.Pickup == nil || body.Destination == nil ||
+		body.Pickup.Latitude == nil || body.Pickup.Longitude == nil ||
+		body.Destination.Latitude == nil || body.Destination.Longitude == nil {
+		return ride.Location{}, ride.Location{}, false
+	}
+
+	return ride.Location{
+		Latitude:  *body.Pickup.Latitude,
+		Longitude: *body.Pickup.Longitude,
+	}, ride.Location{
+		Latitude:  *body.Destination.Latitude,
+		Longitude: *body.Destination.Longitude,
+	}, true
 }
 
 func (app application) createRideRequest(w http.ResponseWriter, r *http.Request) {
@@ -32,10 +47,13 @@ func (app application) createRideRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	request, err := app.rides.Create(r.Context(), u.ID,
-		ride.Location{Latitude: body.Pickup.Latitude, Longitude: body.Pickup.Longitude},
-		ride.Location{Latitude: body.Destination.Latitude, Longitude: body.Destination.Longitude},
-	)
+	pickup, destination, ok := body.locations()
+	if !ok {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "pickup and destination coordinates are required"})
+		return
+	}
+
+	request, err := app.rides.Create(r.Context(), u.ID, pickup, destination)
 	if errors.Is(err, ride.ErrInvalidLocation) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "pickup and destination coordinates are invalid"})
 		return
