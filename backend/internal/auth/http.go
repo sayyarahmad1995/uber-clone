@@ -18,7 +18,7 @@ func (h Handler) Register(w http.ResponseWriter, r *http.Request) {
 		Password   string `json:"password"`
 	}
 	if err := decode(r, &req); err != nil || strings.TrimSpace(req.Identifier) == "" || req.Password == "" {
-		failure(w, http.StatusBadRequest, "invalid request")
+		authError(w, http.StatusBadRequest, "invalid_request", "Invalid request.")
 		return
 	}
 	challenge, err := h.service.Register(r.Context(), Credentials{Identifier: strings.TrimSpace(req.Identifier), Password: req.Password})
@@ -35,7 +35,7 @@ func (h Handler) Login(w http.ResponseWriter, r *http.Request) {
 		Password   string `json:"password"`
 	}
 	if err := decode(r, &req); err != nil || strings.TrimSpace(req.Identifier) == "" || req.Password == "" {
-		failure(w, http.StatusBadRequest, "invalid request")
+		authError(w, http.StatusBadRequest, "invalid_request", "Invalid request.")
 		return
 	}
 	session, err := h.service.Login(r.Context(), Credentials{Identifier: strings.TrimSpace(req.Identifier), Password: req.Password})
@@ -49,7 +49,7 @@ func (h Handler) Login(w http.ResponseWriter, r *http.Request) {
 func (h Handler) Verify(w http.ResponseWriter, r *http.Request) {
 	var req struct{ Email string `json:"email"` }
 	if err := decode(r, &req); err != nil || strings.TrimSpace(req.Email) == "" {
-		failure(w, http.StatusBadRequest, "invalid request")
+		authError(w, http.StatusBadRequest, "invalid_request", "Invalid request.")
 		return
 	}
 	challenge, err := h.service.StartVerification(r.Context(), strings.TrimSpace(req.Email))
@@ -66,7 +66,7 @@ func (h Handler) CompleteVerification(w http.ResponseWriter, r *http.Request) {
 		Code           string `json:"code"`
 	}
 	if err := decode(r, &req); err != nil || strings.TrimSpace(req.VerificationID) == "" || strings.TrimSpace(req.Code) == "" {
-		failure(w, http.StatusBadRequest, "invalid request")
+		authError(w, http.StatusBadRequest, "invalid_request", "Invalid request.")
 		return
 	}
 	if err := h.service.CompleteVerification(r.Context(), strings.TrimSpace(req.VerificationID), strings.TrimSpace(req.Code)); err != nil {
@@ -79,7 +79,7 @@ func (h Handler) CompleteVerification(w http.ResponseWriter, r *http.Request) {
 func (h Handler) ExtendSession(w http.ResponseWriter, r *http.Request) {
 	token := strings.TrimSpace(r.Header.Get("Authorization"))
 	if token == "" {
-		failure(w, http.StatusBadRequest, "invalid request")
+		authError(w, http.StatusBadRequest, "invalid_request", "Invalid request.")
 		return
 	}
 	session, err := h.service.ExtendSession(r.Context(), token)
@@ -93,7 +93,7 @@ func (h Handler) ExtendSession(w http.ResponseWriter, r *http.Request) {
 func (h Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	token := strings.TrimSpace(r.Header.Get("Authorization"))
 	if token == "" {
-		failure(w, http.StatusBadRequest, "invalid request")
+		authError(w, http.StatusBadRequest, "invalid_request", "Invalid request.")
 		return
 	}
 	if err := h.service.Logout(r.Context(), token); err != nil && !errors.Is(err, ErrInvalidCredentials) {
@@ -116,25 +116,39 @@ func write(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
-func failure(w http.ResponseWriter, status int, message string) {
-	write(w, status, map[string]string{"error": message})
+func authError(w http.ResponseWriter, status int, code, message string) {
+	write(w, status, map[string]string{"error": code, "message": message})
 }
 
 func authFailure(w http.ResponseWriter, err error) {
+	status, code, message := httpAuthError(err)
+	var publicErr *PublicError
+	if errors.As(err, &publicErr) {
+		if strings.TrimSpace(publicErr.Code) != "" {
+			code = publicErr.Code
+		}
+		if strings.TrimSpace(publicErr.Message) != "" {
+			message = publicErr.Message
+		}
+	}
+	authError(w, status, code, message)
+}
+
+func httpAuthError(err error) (int, string, string) {
 	switch {
 	case errors.Is(err, ErrInvalidCredentials):
-		failure(w, http.StatusUnauthorized, "invalid credentials")
+		return http.StatusUnauthorized, "invalid_credentials", "Invalid credentials."
 	case errors.Is(err, ErrIdentifierConflict):
-		failure(w, http.StatusConflict, "identifier already exists")
+		return http.StatusConflict, "identifier_already_exists", "An account with this identifier already exists."
 	case errors.Is(err, ErrPasswordRejected):
-		failure(w, http.StatusBadRequest, "password does not meet requirements")
+		return http.StatusBadRequest, "password_rejected", "Password does not meet requirements."
 	case errors.Is(err, ErrRegistrationInvalid):
-		failure(w, http.StatusBadRequest, "registration request is invalid")
+		return http.StatusBadRequest, "registration_invalid", "Registration request is invalid."
 	case errors.Is(err, ErrVerificationInvalid):
-		failure(w, http.StatusBadRequest, "verification is invalid or expired")
+		return http.StatusBadRequest, "verification_invalid", "Verification is invalid or expired."
 	case errors.Is(err, ErrUnavailable):
-		failure(w, http.StatusServiceUnavailable, "authentication service unavailable")
+		return http.StatusServiceUnavailable, "authentication_unavailable", "Authentication service is unavailable."
 	default:
-		failure(w, http.StatusInternalServerError, "unable to process authentication request")
+		return http.StatusInternalServerError, "authentication_failed", "Unable to process authentication request."
 	}
 }
