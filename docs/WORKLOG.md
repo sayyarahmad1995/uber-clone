@@ -10,9 +10,9 @@ Update this file after every meaningful work session.
 
 ## Current Status
 
-**Current engineering milestone:** Ride Request Foundation — Complete, pending PR merge
+**Current engineering milestone:** Basic Driver Matching Foundation — Complete, pending PR merge
 
-**Current work item:** PR #6 is fully runtime-verified and ready for review/merge.
+**Current work item:** PR #7 is fully runtime-verified and ready for review/merge.
 
 **Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until we learn from completed work.
 
@@ -89,65 +89,77 @@ Update this file after every meaningful work session.
 - [x] Authenticated Rider ride creation runtime-verified with persisted coordinates and matching Rider user ID
 - [x] Invalid ride coordinates runtime-verified as `400 Bad Request`
 - [x] Unauthenticated ride creation runtime-verified as `401 Unauthorized`
+- [x] Ride Request Foundation merged through PR #6
+- [x] Provider-neutral Matching domain added with application-defined repository port
+- [x] Driver assignment candidate persistence added through migration `005_ride_driver_candidates.sql`
+- [x] `POST /v1/ride-requests/{ride_request_id}/match` implemented for Rider-owned ride requests
+- [x] Matching eligibility limited to Driver-capable profiles with an operational vehicle, `status=active`, and `is_online=true`
+- [x] Dual-capability Rider self-matching explicitly excluded
+- [x] Deterministic provider-free MVP selection implemented without claiming geographic proximity
+- [x] At most one candidate persisted per ride request; repeated matching reuses the same candidate
+- [x] Matching branch passes `go test ./...` and `go vet ./...`
+- [x] Matching Docker image builds and Compose stack starts successfully
+- [x] No eligible online Driver runtime-verified as `409 Conflict`
+- [x] First eligible online Driver match runtime-verified as `201 Created`
+- [x] Repeated matching runtime-verified as `200 OK` with the same candidate and creation time
+- [x] Another Rider cannot match a ride request they do not own; runtime-verified as `404 Not Found`
+- [x] Dual-capability Rider cannot match its own online Driver profile; runtime-verified as `409 Conflict` when no other Driver is eligible
+- [x] Unauthenticated matching runtime-verified as `401 Unauthorized`
 
 ---
 
-## Ride Request Foundation
+## Basic Driver Matching Foundation
 
-Active branch: `feature/ride-request-foundation`.
+Active branch: `feature/basic-driver-matching-foundation`.
 
-Draft PR: #6 — Add Ride Request Foundation.
+Draft PR: #7 — Add Basic Driver Matching Foundation.
 
 ### Architectural direction
 
-Ride ownership belongs to the authenticated application User, not to an arbitrary client-supplied identifier.
+Matching is an application-owned business capability. It consumes existing Ride and Driver state but does not let provider-specific concepts define the model.
 
-- Authentication remains shared for the account.
-- Rider capability is required before ride creation.
-- The Ride domain owns ride-request state and location coordinates.
-- External maps/routing/provider concepts do not define the Ride business model or public API.
+- The Rider can only initiate matching for a ride request they own.
+- Eligible Drivers must retain Driver capability, have an operational vehicle, be `active`, and be online.
+- A user with both Rider and Driver capabilities cannot match their own ride request to their own Driver profile.
+- Driver location is not modeled yet, so this milestone does not claim nearest-Driver or geographic matching.
+- Candidate persistence is idempotent: one ride request has at most one Driver candidate in this slice.
 
 ### Completed minimal contract
 
-`Authenticated Rider → provide pickup → provide destination → create persisted ride request with status=requested`
+`Requested Rider-owned ride → find eligible active online Driver → persist one Driver assignment candidate`
 
-The MVP ride request contains only:
+Public endpoint:
 
-- request ID
-- Rider user ID derived from authentication
-- pickup latitude/longitude
-- destination latitude/longitude
-- status `requested`
-- creation time
+`POST /v1/ride-requests/{ride_request_id}/match`
 
-Public request contract:
-
-`{"pickup":{"latitude":24.8607,"longitude":67.0011},"destination":{"latitude":24.9056,"longitude":67.0822}}`
+First successful matching returns `201 Created`; repeated matching for the same ride returns `200 OK` with the same candidate.
 
 ### Verification completed
 
 1. `go test ./...` passes.
 2. `go vet ./...` passes.
 3. Docker image builds successfully and Compose starts successfully.
-4. Authenticated Rider receives `201 Created` for a valid ride request.
-5. Returned Rider user ID matches the authenticated application User.
-6. Pickup and destination coordinates round-trip correctly.
-7. New ride request starts with `status=requested`.
-8. Invalid coordinates return `400 Bad Request`.
-9. Unauthenticated ride creation returns `401 Unauthorized`.
+4. With no eligible online Driver, matching returns `409 Conflict`.
+5. An eligible active Driver can be brought online and selected.
+6. First successful match returns `201 Created`.
+7. Returned `ride_request_id` matches the Rider-owned request.
+8. Returned `driver_user_id` matches the eligible Driver.
+9. Repeated matching returns `200 OK` with the same candidate and `created_at`.
+10. Another Rider receives `404 Not Found` when attempting to match a ride they do not own.
+11. A dual-capability Rider is excluded from matching its own Driver profile.
+12. Unauthenticated matching returns `401 Unauthorized`.
 
 ### Deliberately deferred
 
-- Driver matching and assignment
+- Driver location
+- nearest/geographic Driver selection
+- maps and routing providers
+- Driver reservation/exclusivity across concurrent rides
 - Driver accept/reject
-- pricing and fare estimates
-- payments
-- route calculation
-- maps-provider integration
+- candidate rejection/reselection/history
+- pricing and payments
 - live tracking
-- cancellation workflow
 - trip execution and completion
-- ride history
 
 ---
 
@@ -167,21 +179,20 @@ The same boundary rule applies to future maps, routing, payments, notifications,
 
 ---
 
-## Next Business Vertical Slice After Ride Request Foundation
+## Next Business Vertical Slice After Basic Driver Matching Foundation
 
-**Basic Driver Matching Foundation**
+**Driver Accept/Reject Foundation**
 
 Expected end-to-end outcome:
 
-`Requested ride → find eligible active online Driver → create application-owned Driver assignment candidate`
+`Matched candidate → assigned Driver views candidate → Driver accepts or rejects → application-owned ride/matching state changes`
 
-The slice should remain narrow. Driver acceptance, pricing, routing, live tracking, and trip execution should stay out unless they become concrete dependencies of matching.
+This next slice should introduce only the state transitions and ownership rules concretely required by Driver response. Candidate reselection after rejection may be included only if it is necessary to complete the end-to-end accept/reject flow.
 
 ---
 
-## Rough MVP Direction After Matching
+## Rough MVP Direction After Driver Response
 
-- Driver accept/reject
 - Trip execution
 - Live location/status updates
 - Trip completion
