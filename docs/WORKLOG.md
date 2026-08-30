@@ -10,9 +10,9 @@ Update this file after every meaningful work session.
 
 ## Current Status
 
-**Current engineering milestone:** Driver Capability Foundation — In Progress
+**Current engineering milestone:** Driver Capability Foundation — Completed and fully verified; ready for merge
 
-**Current work item:** Verify the shared-account Driver capability implementation, then runtime-test capability activation and `/v1/me`. Ride Request Foundation remains blocked until Driver Capability Foundation is complete.
+**Current work item:** Merge PR #4 after review. Ride Request Foundation remains next, but should begin only after the Driver Capability Foundation is merged into `main`.
 
 **Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until we learn from completed work.
 
@@ -55,12 +55,20 @@ Update this file after every meaningful work session.
 - [x] Driver capability activation reuses the existing shared user/account and authentication session
 - [x] `/v1/me` continues to expose the complete capability set for the account
 - [x] Provider-independent User service test added for Driver capability enablement
+- [x] Driver runtime flow verified: Rider-only account becomes Rider + Driver on the same user ID
+- [x] Repeated Driver activation runtime-verified as idempotent
+- [x] Unauthenticated Driver activation runtime-verified as `401 Unauthorized`
+- [x] Driver branch backend test suite passed with `go test ./...`
+- [x] Driver branch static analysis passed with `go vet ./...`
+- [x] Driver branch Docker Compose stack verified healthy; Kratos migration exits successfully with code 0
 
 ---
 
 ## Current Driver Capability Branch
 
 Active branch: `feature/driver-capability-foundation`.
+
+PR: #4 — Add shared-account Driver capability foundation.
 
 ### Architectural direction
 
@@ -82,18 +90,20 @@ The existing database already permits the `driver` capability, so this slice doe
 
 A separate Driver profile is intentionally **not** introduced merely to represent capability membership. Driver-specific data such as licensing, vehicle details, approval state, documents, availability, or operational status should be added only when a concrete Driver workflow requires those concepts.
 
-### Remaining completion gate
+### Completion gate
 
-Before this milestone is considered complete:
+Verification gate: **complete**.
 
-1. `go test ./...` passes on the branch.
-2. `go vet ./...` passes on the branch.
-3. Docker Compose starts successfully with the branch.
-4. A Rider-only authenticated account returns only `rider` from `GET /v1/me` before activation.
-5. `PUT /v1/me/capabilities/driver` returns the same user with both `driver` and `rider` capabilities.
-6. Repeating Driver activation is idempotent and does not duplicate capability data.
-7. A subsequent `GET /v1/me` exposes both capabilities consistently.
-8. Unauthenticated Driver activation is rejected.
+- `go test ./...` passes.
+- `go vet ./...` passes.
+- Docker Compose stack starts successfully and required services are healthy.
+- Rider-only `/v1/me` returns only `rider` before activation.
+- Driver activation returns the same user with both `driver` and `rider`.
+- Repeated activation is idempotent.
+- Subsequent `/v1/me` exposes both capabilities.
+- Unauthenticated activation is rejected.
+
+The branch is ready for merge after review.
 
 ---
 
@@ -117,7 +127,7 @@ The same boundary rule applies to future maps, routing, payments, notifications,
 
 **Ride Request Foundation**
 
-Entry condition: Rider and Driver capabilities are both established and runtime-verified.
+Entry condition: Rider and Driver capabilities are both established, runtime-verified, and merged into `main`.
 
 Expected end-to-end outcome:
 
