@@ -26,9 +26,6 @@ func (app application) matchRideRequest(w http.ResponseWriter, r *http.Request) 
 	case errors.Is(err, matching.ErrRideNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "ride request not found"})
 		return
-	case errors.Is(err, matching.ErrRideNotRequested):
-		writeJSON(w, http.StatusConflict, map[string]string{"error": "ride request is not available for matching"})
-		return
 	case errors.Is(err, matching.ErrNoEligibleDriver):
 		writeJSON(w, http.StatusConflict, map[string]string{"error": "no eligible driver available"})
 		return

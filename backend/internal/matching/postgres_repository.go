@@ -19,20 +19,17 @@ func (r PostgresRepository) Match(ctx context.Context, rideRequestID, riderUserI
 	}
 	defer tx.Rollback()
 
-	var rideStatus string
+	var ownedRideID uuid.UUID
 	if err := tx.QueryRowContext(ctx, `
-		SELECT status
+		SELECT id
 		FROM ride_requests
 		WHERE id = $1 AND rider_user_id = $2
 		FOR UPDATE
-	`, rideRequestID, riderUserID).Scan(&rideStatus); err != nil {
+	`, rideRequestID, riderUserID).Scan(&ownedRideID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Result{}, ErrRideNotFound
 		}
 		return Result{}, err
-	}
-	if rideStatus != "requested" {
-		return Result{}, ErrRideNotRequested
 	}
 
 	var existing Candidate

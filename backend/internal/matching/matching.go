@@ -9,9 +9,8 @@ import (
 )
 
 var (
-	ErrRideNotFound      = errors.New("ride request not found")
-	ErrRideNotRequested  = errors.New("ride request is not requested")
-	ErrNoEligibleDriver  = errors.New("no eligible driver available")
+	ErrRideNotFound     = errors.New("ride request not found")
+	ErrNoEligibleDriver = errors.New("no eligible driver available")
 )
 
 type Candidate struct {
