@@ -130,6 +130,7 @@ func (app application) routes() http.Handler {
 	mux.HandleFunc("POST /v1/auth/session/extend", app.auth.ExtendSession)
 	mux.HandleFunc("POST /v1/auth/logout", app.auth.Logout)
 	mux.Handle("GET /v1/me", identity.Middleware(app.identity, http.HandlerFunc(app.me)))
+	mux.Handle("PUT /v1/me/capabilities/driver", identity.Middleware(app.identity, http.HandlerFunc(app.enableDriverCapability)))
 	return mux
 }
 
@@ -158,7 +159,25 @@ func (app application) me(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "unable to load user"})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"id": u.ID, "capabilities": u.Capabilities})
+	writeUser(w, http.StatusOK, u)
+}
+
+func (app application) enableDriverCapability(w http.ResponseWriter, r *http.Request) {
+	p, ok := identity.PrincipalFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "authentication required"})
+		return
+	}
+	u, err := app.users.EnableCapability(r.Context(), user.ExternalIdentity{Issuer: p.Issuer, Subject: p.Subject}, user.CapabilityDriver)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "unable to enable driver capability"})
+		return
+	}
+	writeUser(w, http.StatusOK, u)
+}
+
+func writeUser(w http.ResponseWriter, status int, u user.User) {
+	writeJSON(w, status, map[string]any{"id": u.ID, "capabilities": u.Capabilities})
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {
