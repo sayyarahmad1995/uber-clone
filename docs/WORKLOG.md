@@ -10,9 +10,9 @@ Update this file after every meaningful work session.
 
 ## Current Status
 
-**Current engineering milestone:** Minimal Driver Operational Foundation — In Progress
+**Current engineering milestone:** Ride Request Foundation — Complete, pending PR merge
 
-**Current work item:** Runtime-verify the corrected Driver onboarding and availability JSON contracts, then complete the remaining authorization and persistence checks before merge.
+**Current work item:** PR #6 is fully runtime-verified and ready for review/merge.
 
 **Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until we learn from completed work.
 
@@ -74,67 +74,80 @@ Update this file after every meaningful work session.
 - [x] API-level regression tests added for onboarding `vehicle.license_plate` and availability `is_online`
 - [x] Unauthenticated Driver operational endpoints runtime-verified as `401 Unauthorized`
 - [x] Availability before onboarding runtime-verified as rejected with `409 Conflict`
+- [x] Rider-only authorization runtime-verified as `403 Forbidden` for Driver operational APIs
+- [x] Driver onboarding, persistence, availability, and repeated-onboarding identity behavior fully runtime-verified
+- [x] Minimal Driver Operational Foundation merged through PR #5
+- [x] Provider-neutral Ride domain added with application-defined repository port
+- [x] Ride request persistence added through migration `004_ride_requests.sql`
+- [x] Authenticated Rider ownership derived from the application User; no client-supplied rider ID
+- [x] `POST /v1/ride-requests` implemented with nested pickup/destination coordinates and `201 Created`
+- [x] New ride requests start with application-owned `requested` status
+- [x] Latitude/longitude validation implemented in both service and database constraints
+- [x] Provider-independent Ride service tests and HTTP JSON contract test added
+- [x] Ride branch passes `go test ./...` and `go vet ./...`
+- [x] Ride Docker image builds and Compose stack starts successfully
+- [x] Authenticated Rider ride creation runtime-verified with persisted coordinates and matching Rider user ID
+- [x] Invalid ride coordinates runtime-verified as `400 Bad Request`
+- [x] Unauthenticated ride creation runtime-verified as `401 Unauthorized`
 
 ---
 
-## Minimal Driver Operational Foundation
+## Ride Request Foundation
 
-Active branch: `feature/minimal-driver-operational-foundation`.
+Active branch: `feature/ride-request-foundation`.
 
-Draft PR: #5 — Add minimal Driver operational foundation.
+Draft PR: #6 — Add Ride Request Foundation.
 
 ### Architectural direction
 
-Driver capability membership and Driver operational state are distinct application concepts.
+Ride ownership belongs to the authenticated application User, not to an arbitrary client-supplied identifier.
 
 - Authentication remains shared for the account.
-- `driver` capability means the user may enter Driver workflows.
-- The Driver domain owns operational profile, vehicle, status, and availability data.
-- External authentication/provider concepts do not define Driver business models or public APIs.
+- Rider capability is required before ride creation.
+- The Ride domain owns ride-request state and location coordinates.
+- External maps/routing/provider concepts do not define the Ride business model or public API.
 
-### Current minimal operational contract
+### Completed minimal contract
 
-`Authenticated User with Driver capability → provide one MVP vehicle → active Driver starts offline → GET own Driver state → go online/offline`
+`Authenticated Rider → provide pickup → provide destination → create persisted ride request with status=requested`
 
-The MVP vehicle contains only:
+The MVP ride request contains only:
 
-- make
-- model
-- color
-- license plate
+- request ID
+- Rider user ID derived from authentication
+- pickup latitude/longitude
+- destination latitude/longitude
+- status `requested`
+- creation time
 
-A valid MVP onboarding becomes `active` immediately. There is no manual or external compliance approval workflow in this slice.
+Public request contract:
 
-Public request contracts use application-owned JSON:
+`{"pickup":{"latitude":24.8607,"longitude":67.0011},"destination":{"latitude":24.9056,"longitude":67.0822}}`
 
-- onboarding: `{"vehicle":{"make":"...","model":"...","color":"...","license_plate":"..."}}`
-- availability: `{"is_online":true|false}`
+### Verification completed
 
-### Remaining completion gate
-
-Before this milestone is considered complete:
-
-1. Pull the corrected branch and rerun `go test ./...` plus `go vet ./...`.
-2. Rebuild/restart the Docker Compose stack with the corrected API binary.
-3. A genuinely Rider-only account receives `403 Forbidden` from Driver operational APIs before Driver capability activation.
-4. A Driver-capable account can onboard one vehicle and receives `status=active`, `is_online=false`.
-5. `GET /v1/driver` returns the persisted operational state.
-6. Availability can move online and offline using the public `is_online` contract.
-7. Repeating onboarding reuses/updates the same Driver profile rather than duplicating it.
-8. Unauthenticated Driver operational requests remain rejected.
-
-Note: `test1@example.com` already had the Driver capability from the previous milestone because Docker Compose retained the PostgreSQL volume, so its pre-activation `GET /v1/driver` correctly reached the Driver domain and returned `404 profile not found`; that account cannot prove the Rider-only `403` case.
+1. `go test ./...` passes.
+2. `go vet ./...` passes.
+3. Docker image builds successfully and Compose starts successfully.
+4. Authenticated Rider receives `201 Created` for a valid ride request.
+5. Returned Rider user ID matches the authenticated application User.
+6. Pickup and destination coordinates round-trip correctly.
+7. New ride request starts with `status=requested`.
+8. Invalid coordinates return `400 Bad Request`.
+9. Unauthenticated ride creation returns `401 Unauthorized`.
 
 ### Deliberately deferred
 
-- Driver license/document verification
-- Background checks
-- Insurance verification
-- Manual approval queues
-- External compliance providers
-- Multiple vehicles
-- Earnings/tax onboarding
-- Production-grade regulatory onboarding
+- Driver matching and assignment
+- Driver accept/reject
+- pricing and fare estimates
+- payments
+- route calculation
+- maps-provider integration
+- live tracking
+- cancellation workflow
+- trip execution and completion
+- ride history
 
 ---
 
@@ -154,21 +167,20 @@ The same boundary rule applies to future maps, routing, payments, notifications,
 
 ---
 
-## Next Business Vertical Slice After Minimal Driver Operational Foundation
+## Next Business Vertical Slice After Ride Request Foundation
 
-**Ride Request Foundation**
+**Basic Driver Matching Foundation**
 
 Expected end-to-end outcome:
 
-`Authenticated Rider → Set pickup → Set destination → Create persisted ride request`
+`Requested ride → find eligible active online Driver → create application-owned Driver assignment candidate`
 
-The slice should stay deliberately narrow. Driver matching, live location, pricing, payments, and other later workflow concerns should not enter unless they become concrete dependencies of this slice.
+The slice should remain narrow. Driver acceptance, pricing, routing, live tracking, and trip execution should stay out unless they become concrete dependencies of matching.
 
 ---
 
-## Rough MVP Direction After Ride Request
+## Rough MVP Direction After Matching
 
-- Basic matching using active online Drivers
 - Driver accept/reject
 - Trip execution
 - Live location/status updates
