@@ -10,9 +10,9 @@ Update this file after every meaningful work session.
 
 ## Current Status
 
-**Current engineering milestone:** User Entry and Rider Foundation — Completed; provider-boundary hardening fully verified and ready for merge
+**Current engineering milestone:** Driver Capability Foundation — In Progress
 
-**Current work item:** Merge PR #3, then start Ride Request Foundation.
+**Current work item:** Establish the Driver capability and driver entry/onboarding flow on top of the existing shared authentication and User foundation. Ride Request Foundation remains blocked until both Rider and Driver capabilities are established.
 
 **Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until we learn from completed work.
 
@@ -47,36 +47,45 @@ Update this file after every meaningful work session.
 - [x] Go module metadata completed with committed `backend/go.sum`
 - [x] Full backend test suite passed locally with `go test ./...`
 - [x] Static analysis passed locally with `go vet ./...`
-- [x] Complete Docker Compose stack starts successfully
-- [x] Registration runtime-verified with application-owned `verification_id`
-- [x] Breached-password runtime-verified as `password_rejected` with useful user-facing message
-- [x] Invalid-email runtime-verified as `registration_invalid`
-- [x] Duplicate identifier runtime-verified as `identifier_already_exists`
-- [x] Verification completion runtime-verified through `POST /v1/auth/verify/complete`
-- [x] Login runtime-verified with stable application session contract
-- [x] Authenticated `GET /v1/me` runtime-verified and returns Rider capability
-- [x] Session extension runtime-verified through `POST /v1/auth/session/extend`; the current token remains valid afterward
-- [x] Logout runtime-verified through `POST /v1/auth/logout`
-- [x] Logged-out token runtime-verified as invalid through `GET /v1/me` returning `401 Unauthorized`
+- [x] Provider-boundary hardening merged through PR #3
+- [x] Merged `main` post-merge smoke-tested for registration, verification, login, `/v1/me`, session extension, logout, and invalidated-session behavior
 
 ---
 
-## Current Boundary-Hardening Branch
+## Current Driver Capability Branch
 
-Active branch: `refactor/auth-provider-boundaries`.
+Active branch: `feature/driver-capability-foundation`.
 
-PR: #3 — Harden replaceable authentication provider boundaries.
+### Architectural direction
 
-This branch combines the provider-boundary cleanup with the work previously developed on `feature/configurable-session-lifecycle`.
+Driver is a capability of the existing application user, not a separate authentication identity or separate authentication system.
 
-Session lifecycle defaults:
+The authentication flow remains shared:
 
-- `SESSION_LIFESPAN=336h`
-- `SESSION_EARLIEST_POSSIBLE_EXTEND=24h`
+`Client → Application Authentication API → Authentication domain → Provider adapter → Identity infrastructure`
 
-The values are deployment configuration for the current Kratos adapter and do not become application-domain concepts.
+After authentication, the application determines which business capabilities the user has. One account may hold multiple capabilities. Rider remains the default capability; Driver is added through application-owned Driver onboarding/activation.
 
-Verification gate: **complete**. The branch is ready for merge.
+We should not create driver-specific copies of registration, verification, login, session extension, or logout endpoints unless a concrete business requirement later proves they are necessary.
+
+### Expected end-to-end outcome
+
+`Authenticated User → Enter/enable Driver capability → Create/load Driver profile → Authenticated identity exposes Driver capability`
+
+The exact Driver onboarding data should stay MVP-minimal and be defined from concrete requirements before implementation. Licensing, vehicle details, approval workflows, document verification, background checks, availability, and dispatch behavior should not be added merely because a production ride-hailing system may eventually need them.
+
+### Completion gate
+
+Before this milestone is considered complete:
+
+1. Driver capability semantics are application-owned and coexist cleanly with Rider on one user account.
+2. Driver persistence/profile boundaries are defined without coupling business models to an external provider.
+3. An authenticated user can obtain/activate the Driver capability through an application API.
+4. Driver capability creation is idempotent and appropriately authorized.
+5. `/v1/me` (or the application-owned identity contract that replaces it) exposes the resulting capabilities consistently.
+6. Provider-independent tests cover the Driver entry/capability contract.
+7. `go test ./...` and `go vet ./...` pass.
+8. The complete Driver entry flow is runtime-verified with Docker Compose.
 
 ---
 
@@ -96,9 +105,11 @@ The same boundary rule applies to future maps, routing, payments, notifications,
 
 ---
 
-## Next Business Vertical Slice
+## Next Business Vertical Slice After Driver Capability
 
 **Ride Request Foundation**
+
+Entry condition: Rider and Driver capabilities are both established and runtime-verified.
 
 Expected end-to-end outcome:
 
@@ -143,6 +154,7 @@ Exact later boundaries remain intentionally flexible.
 - Build the MVP incrementally using business vertical slices.
 - Keep the current milestone precise and the next milestone reasonably clear.
 - Do not design later slices in detail prematurely.
+- Keep authentication shared across capabilities; do not duplicate identity systems per business role.
 - Keep the MVP simple and avoid speculative enterprise complexity.
 - Organize code around business domains with infrastructure behind application-defined boundaries.
 - Maintain future extensibility primarily through clean ports/adapters, not unused implementations.
