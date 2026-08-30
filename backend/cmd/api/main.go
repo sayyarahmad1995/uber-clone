@@ -43,7 +43,7 @@ func main() {
 		Port:            getenv("APP_PORT", "8080"),
 		DatabaseURL:     os.Getenv("DATABASE_URL"),
 		AuthProvider:    getenv("AUTH_PROVIDER", "kratos"),
-		IdentitySource:  getenv("AUTH_IDENTITY_SOURCE", "kratos"),
+		IdentitySource:  getenv("AUTH_IDENTITY_SOURCE", "primary-identity-v1"),
 		KratosPublicURL: getenv("KRATOS_PUBLIC_URL", "http://kratos:4433"),
 		KratosAdminURL:  getenv("KRATOS_ADMIN_URL", "http://kratos:4434"),
 	}
