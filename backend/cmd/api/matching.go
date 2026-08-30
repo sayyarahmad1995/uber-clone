@@ -20,8 +20,7 @@ func (app application) matchRideRequest(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	service := matching.NewService(matching.NewPostgresRepository(app.db))
-	result, err := service.Match(r.Context(), rideRequestID, u.ID)
+	result, err := app.matching.Match(r.Context(), rideRequestID, u.ID)
 	switch {
 	case errors.Is(err, matching.ErrRideNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "ride request not found"})
