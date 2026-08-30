@@ -10,9 +10,9 @@ Update this file after every meaningful work session.
 
 ## Current Status
 
-**Current engineering milestone:** Driver Capability Foundation — Completed and fully verified; ready for merge
+**Current engineering milestone:** Driver Capability Foundation — Completed, fully verified, and merged
 
-**Current work item:** Merge PR #4 after review. Ride Request Foundation remains next, but should begin only after the Driver Capability Foundation is merged into `main`.
+**Current work item:** Define and begin Ride Request Foundation from the updated `main` branch.
 
 **Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until we learn from completed work.
 
@@ -61,14 +61,13 @@ Update this file after every meaningful work session.
 - [x] Driver branch backend test suite passed with `go test ./...`
 - [x] Driver branch static analysis passed with `go vet ./...`
 - [x] Driver branch Docker Compose stack verified healthy; Kratos migration exits successfully with code 0
+- [x] Driver Capability Foundation merged through PR #4
 
 ---
 
-## Current Driver Capability Branch
+## Driver Capability Foundation
 
-Active branch: `feature/driver-capability-foundation`.
-
-PR: #4 — Add shared-account Driver capability foundation.
+PR #4 — Add shared-account Driver capability foundation — merged into `main`.
 
 ### Architectural direction
 
@@ -103,8 +102,6 @@ Verification gate: **complete**.
 - Subsequent `/v1/me` exposes both capabilities.
 - Unauthenticated activation is rejected.
 
-The branch is ready for merge after review.
-
 ---
 
 ## Architecture Rule: Replaceable External Providers
@@ -123,7 +120,7 @@ The same boundary rule applies to future maps, routing, payments, notifications,
 
 ---
 
-## Next Business Vertical Slice After Driver Capability
+## Next Business Vertical Slice
 
 **Ride Request Foundation**
 
