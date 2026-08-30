@@ -244,38 +244,52 @@ func isClientFailure(err error) bool {
 
 func classifyRegistrationError(err error) error {
 	var providerErr providerResponseError
-	if !errors.As(err, &providerErr) {
-		return auth.ErrUnavailable
-	}
-	if providerErr.status < 400 || providerErr.status >= 500 {
+	if !errors.As(err, &providerErr) || providerErr.status < 400 || providerErr.status >= 500 {
 		return auth.ErrUnavailable
 	}
 
+	message := providerErr.publicMessage()
 	for _, field := range providerErr.fields {
 		if strings.Contains(strings.ToLower(field), "password") {
-			return auth.ErrPasswordRejected
+			return auth.NewPublicError(auth.ErrPasswordRejected, "password_rejected", fallback(message, "Password does not meet requirements."))
 		}
 	}
 
 	text := strings.ToLower(strings.Join(providerErr.messages, " "))
-	if strings.Contains(text, "password") && (
-		strings.Contains(text, "breach") ||
-		strings.Contains(text, "pwn") ||
-		strings.Contains(text, "weak") ||
-		strings.Contains(text, "short") ||
-		strings.Contains(text, "minimum") ||
-		strings.Contains(text, "requirement")) {
-		return auth.ErrPasswordRejected
+	if strings.Contains(text, "password") || strings.Contains(text, "breach") || strings.Contains(text, "pwn") {
+		return auth.NewPublicError(auth.ErrPasswordRejected, "password_rejected", fallback(message, "Password does not meet requirements."))
 	}
 	if strings.Contains(text, "already") && (
 		strings.Contains(text, "exist") ||
 		strings.Contains(text, "used") ||
 		strings.Contains(text, "taken") ||
 		strings.Contains(text, "registered")) {
-		return auth.ErrIdentifierConflict
+		return auth.NewPublicError(auth.ErrIdentifierConflict, "identifier_already_exists", fallback(message, "An account with this identifier already exists."))
 	}
 
-	return auth.ErrRegistrationInvalid
+	return auth.NewPublicError(auth.ErrRegistrationInvalid, "registration_invalid", fallback(message, "Registration request is invalid."))
+}
+
+func (e providerResponseError) publicMessage() string {
+	for _, candidate := range e.messages {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "" {
+			continue
+		}
+		candidate = strings.Join(strings.Fields(candidate), " ")
+		if len(candidate) > 300 {
+			candidate = candidate[:300]
+		}
+		return candidate
+	}
+	return ""
+}
+
+func fallback(value, fallbackValue string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallbackValue
+	}
+	return value
 }
 
 func (p *Provider) submitFlow(ctx context.Context, path, flowID string, body, out any) error {
