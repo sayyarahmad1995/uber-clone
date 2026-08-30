@@ -10,9 +10,9 @@ Update this file after every meaningful work session.
 
 ## Current Status
 
-**Current engineering milestone:** User Entry and Rider Foundation — In Progress
+**Current engineering milestone:** User Entry and Rider Foundation — Completed; provider-boundary hardening fully verified and ready for merge
 
-**Current work item:** Implement the application-owned Authentication domain and API contract, with Ory isolated behind internal provider adapters.
+**Current work item:** Merge PR #3, then start Ride Request Foundation.
 
 **Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until we learn from completed work.
 
@@ -22,155 +22,103 @@ Update this file after every meaningful work session.
 
 - [x] Repository created: `sayyarahmad1995/uber-clone`
 - [x] MVP-first development approach established
-- [x] Enterprise-level business logic deferred
-- [x] Project organization will be based on business domains, not global technical layers
-- [x] Shared client application approach established
-- [x] One user account can have multiple capabilities
-- [x] Rider is the default capability
-- [x] Driver may be added later
-- [x] Courier capability deferred for future implementation
-- [x] Freight capability deferred for future implementation
-- [x] Android is the initial client platform
-- [x] iOS support is deferred, with platform-specific boundaries kept clear where needed
-- [x] Flutter selected as the client framework
+- [x] Business-domain-oriented modular monolith selected
+- [x] Shared Flutter mobile application direction established
+- [x] Android selected as the initial client platform
 - [x] Go selected for the backend
 - [x] PostgreSQL selected as the primary database
-- [x] Redis selected for required fast/transient data needs
-- [x] External OIDC selected for authentication
-- [x] Self-hosted Ory selected as the initial identity infrastructure
-- [x] Client talks only to application APIs
-- [x] Authentication UI is owned by the product
-- [x] Database and identity infrastructure remain internal
-- [x] MVP authentication abuse protection will be pragmatic, not enterprise-grade
-- [x] Provider-neutral external OIDC boundary selected
-- [x] Modular monolith selected as the initial backend architecture
-- [x] Docker Compose selected as the current deployment mechanism
-- [x] CI/CD explicitly deferred
-- [x] Kubernetes and other orchestration platforms are not part of the current implementation
-- [x] Deployment Foundation selected as the first engineering milestone
-- [x] Deployment Foundation classified as a foundational engineering milestone, not a business vertical slice
-- [x] First business vertical slice defined as User Entry and Rider Foundation
-- [x] Later MVP slices intentionally kept flexible rather than fully designed upfront
-- [x] Administrative operations deferred
-- [x] Initial decision and scope documentation created
-- [x] Work tracking added
-- [x] Deployment Foundation implemented
-- [x] Deployment Foundation runtime-verified locally with Docker Compose
-- [x] PostgreSQL container verified healthy
-- [x] API container verified running
-- [x] `GET /health` verified successfully
-- [x] Deployment Foundation merged into `main`
+- [x] Redis reserved for concrete fast/transient-data needs
+- [x] Docker Compose selected for the current deployment mechanism
+- [x] Deployment Foundation implemented, runtime-verified, and merged
+- [x] Application-owned authentication API established
+- [x] Ory Kratos isolated behind internal authentication/identity adapters
+- [x] Direct client-to-provider authentication flow superseded
+- [x] PostgreSQL-backed User domain implemented
+- [x] External identities separated from application users
+- [x] Rider capability created by default and idempotently
+- [x] Registration, verification, login, authenticated `/v1/me`, logout, and session extension implemented and locally verified
+- [x] User Entry and Rider Foundation merged through PR #2
+- [x] Replaceable-provider architecture defined in ADR-0006
+- [x] Application-owned identity namespace selected (`primary-identity-v1`)
+- [x] Public verification terminology changed from provider `flow` language to application-owned `verification_id`
+- [x] Provider errors translated to application-owned authentication errors
+- [x] Provider selection made explicit at the composition root through `AUTH_PROVIDER`
+- [x] Kratos session lifespan and extension window made configurable through deployment configuration
+- [x] Go module metadata completed with committed `backend/go.sum`
+- [x] Full backend test suite passed locally with `go test ./...`
+- [x] Static analysis passed locally with `go vet ./...`
+- [x] Complete Docker Compose stack starts successfully
+- [x] Registration runtime-verified with application-owned `verification_id`
+- [x] Breached-password runtime-verified as `password_rejected` with useful user-facing message
+- [x] Invalid-email runtime-verified as `registration_invalid`
+- [x] Duplicate identifier runtime-verified as `identifier_already_exists`
+- [x] Verification completion runtime-verified through `POST /v1/auth/verify/complete`
+- [x] Login runtime-verified with stable application session contract
+- [x] Authenticated `GET /v1/me` runtime-verified and returns Rider capability
+- [x] Session extension runtime-verified through `POST /v1/auth/session/extend`; the current token remains valid afterward
+- [x] Logout runtime-verified through `POST /v1/auth/logout`
+- [x] Logged-out token runtime-verified as invalid through `GET /v1/me` returning `401 Unauthorized`
 
 ---
 
-## MVP Delivery Direction
+## Current Boundary-Hardening Branch
 
-### Engineering Foundation
+Active branch: `refactor/auth-provider-boundaries`.
 
-**Deployment Foundation**
+PR: #3 — Harden replaceable authentication provider boundaries.
 
-Goal:
+This branch combines the provider-boundary cleanup with the work previously developed on `feature/configurable-session-lifecycle`.
 
-- Establish a minimal deployable system.
-- Use Docker Compose.
-- Make deployment repeatable with:
-  `docker compose up -d --build`
-- Verify the running system with a health endpoint.
+Session lifecycle defaults:
 
-This is a technical foundation, not a business vertical slice.
+- `SESSION_LIFESPAN=336h`
+- `SESSION_EARLIEST_POSSIBLE_EXTEND=24h`
 
-### Next Business Vertical Slice
+The values are deployment configuration for the current Kratos adapter and do not become application-domain concepts.
 
-**User Entry and Rider Foundation**
+Verification gate: **complete**. The branch is ready for merge.
+
+---
+
+## Architecture Rule: Replaceable External Providers
+
+External systems implement application-defined ports. Provider-specific concepts must not define business models or public APIs.
+
+For authentication:
+
+`Client → Application Authentication API → Authentication domain → Provider adapter → Identity infrastructure`
+
+The concrete identity provider is selected at the composition root. Kratos is the current implementation, not a business-domain dependency.
+
+An external identity maps to an application user using an application-owned identity source plus the provider subject. Replacing the provider may still require explicit subject migration/account linking if the new provider assigns different identifiers.
+
+The same boundary rule applies to future maps, routing, payments, notifications, storage, messaging, and other external services.
+
+---
+
+## Next Business Vertical Slice
+
+**Ride Request Foundation**
 
 Expected end-to-end outcome:
 
-`Open app → Authenticate → User account is created or retrieved → Rider capability exists → Enter the initial Rider experience`
+`Authenticated Rider → Set pickup → Set destination → Create persisted ride request`
 
-This slice should be refined before implementation. It is not necessary to design all later MVP slices now.
+The slice should stay deliberately narrow. Driver matching, live location, pricing, payments, and other later workflow concerns should not enter unless they become concrete dependencies of this slice.
 
-### Beyond the Next Slice
+---
 
-The rough product direction includes:
+## Rough MVP Direction After Ride Request
 
-- Creating a ride request
-- Introducing the minimum driver participation required for the ride flow
+- Minimum Driver participation required for the ride flow
 - Basic matching
+- Driver accept/reject
 - Trip execution
+- Live location/status updates
+- Trip completion
+- Trip history
 
-The exact boundaries, order, and scope of these later slices remain intentionally flexible and will be refined based on completed work and emerging requirements.
-
----
-
-## In Progress
-
-Active branch: `feature/user-entry-rider-foundation`.
-
-Implemented so far:
-
-- PostgreSQL-backed user domain.
-- User domain separated from external identity records.
-- External identity keyed by OIDC issuer + subject.
-- Provider-neutral identity provider interface and HTTP authentication boundary.
-- Temporary identity header endpoint removed.
-- Default Rider capability created idempotently.
-- Capability storage designed to support future capabilities without separate accounts.
-- Database migration runner.
-- API readiness endpoint.
-- Temporary integration endpoint for exercising user provisioning.
-
-The earlier direct OIDC client flow is superseded. The client must call only application-owned authentication APIs and show only product-owned UI. The remaining work is to implement the Authentication domain/API, provider adapters, session/token strategy, and end-to-end verification.
-
----
-
-## Completed Deployment Verification
-
-Verified successfully using:
-
-`docker compose up -d --build`
-
-Observed result:
-
-- PostgreSQL became healthy.
-- API started successfully.
-- `curl http://localhost:8080/health` returned `{"status":"ok"}`.
-
----
-
-## In Progress
-
-- [x] Define the minimal repository structure for the Deployment Foundation
-- [x] Create the minimal Go backend
-- [x] Add the health endpoint
-- [x] Containerize the backend
-- [x] Add Docker Compose configuration
-- [ ] Verify PostgreSQL starts through Docker Compose
-- [ ] Verify the project starts with `docker compose up -d --build` in a Docker-capable environment
-
----
-
-## Immediate Next Step
-
-Implement the application-owned Authentication domain and API first. Keep Ory behind internal provider adapters. Do not expose database or identity-provider ports publicly.
-
----
-
-## Deployment Foundation Goal
-
-The project must be runnable with:
-
-```bash
-docker compose up -d --build
-```
-
-The initial deployment must start:
-
-- Go backend
-- PostgreSQL
-
-The backend must expose a minimal health endpoint.
-
-This milestone is a deployable technical foundation, not a business vertical slice.
+Exact later boundaries remain intentionally flexible.
 
 ---
 
@@ -179,13 +127,12 @@ This milestone is a deployable technical foundation, not a business vertical sli
 - CI/CD
 - Kubernetes
 - iOS implementation
-- Driver implementation
 - Courier capability
 - Freight capability
 - Administrator operations
 - Enterprise-level business logic
-- Advanced ride matching
-- Payments
+- Advanced matching/dispatch
+- Payments unless concretely required by an MVP slice
 - Promotions
 - Advanced analytics
 
@@ -193,58 +140,11 @@ This milestone is a deployable technical foundation, not a business vertical sli
 
 ## Important Working Principles
 
-- Build the MVP incrementally.
-- Business functionality should be developed as vertical slices.
-- Do not fully design all future vertical slices upfront.
-- Define the current milestone precisely.
-- Keep the next milestone reasonably clear.
-- Refine later slices when earlier work and product learning justify it.
-- Establish a deployable foundation before implementing business features.
-- Keep the MVP simple.
-- Avoid premature enterprise complexity.
-- Organize code primarily around business domains.
-- Maintain boundaries for future capabilities without implementing unused functionality.
-- Challenge architectural and technical decisions when they are weak, premature, or inconsistent with the project goals.
-- Record meaningful progress and the current stopping point in this file.
-
-
----
-
-## Authentication Architecture Decision
-
-The authentication slice was corrected before completion:
-
-`Client → Application Authentication API → Authentication domain → Identity provider adapter → Ory infrastructure`
-
-The client must not call Ory directly and must not render Ory-owned UI.
-
-The public MVP surface is the application API. PostgreSQL, Kratos, Hydra, and internal integration services remain on the internal deployment network.
-
-The previous assumption of a client-side Authorization Code + PKCE flow directly against the OIDC provider is superseded.
-
-
----
-
-## Authentication Implementation Update
-
-The MVP authentication architecture was simplified to match the application-owned API decision.
-
-- Ory Kratos remains the internal identity implementation.
-- The mobile client calls only application-owned authentication APIs.
-- The API uses provider-neutral Authentication and Identity boundaries.
-- Kratos adapters implement those boundaries internally.
-- Direct client OIDC flows are not part of this MVP.
-- Hydra is deferred because OAuth authorization-server functionality is not required for the current application-owned login/session flow.
-
-Current verification work:
-
-1. validate Kratos API registration flow
-2. validate Kratos API login flow
-3. validate authenticated `GET /v1/me`
-4. correct refresh/logout behavior according to the selected Kratos session strategy
-5. run the complete Docker deployment and automated tests
-
-
-## MVP Session Decision
-
-ADR-0005 records the MVP session strategy. The client receives the authenticated session token from the application login API and uses it only with application APIs. Refresh tokens are intentionally deferred; the reserved refresh endpoint returns HTTP 501 rather than pretending to support an incomplete strategy.
+- Build the MVP incrementally using business vertical slices.
+- Keep the current milestone precise and the next milestone reasonably clear.
+- Do not design later slices in detail prematurely.
+- Keep the MVP simple and avoid speculative enterprise complexity.
+- Organize code around business domains with infrastructure behind application-defined boundaries.
+- Maintain future extensibility primarily through clean ports/adapters, not unused implementations.
+- Challenge architectural decisions that create vendor lock-in or premature complexity.
+- Update this worklog after meaningful work so the repository remains the source of truth for the stopping point.
