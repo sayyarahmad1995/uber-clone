@@ -10,9 +10,9 @@ Update this file after every meaningful work session.
 
 ## Current Status
 
-**Current engineering milestone:** Candidate Reselection After Driver Rejection — implemented and verified in PR #14, pending merge.
+**Current engineering milestone:** Driver Active-Candidate Exclusivity Across Rides — implemented and verified through PR #15.
 
-**Current stopping point:** PR #14 now retains rejected candidate attempts, excludes previously rejected Drivers for the same ride, and selects the next eligible Driver while preserving a single active candidate per ride. Static, runtime, authorization, exhaustion, and concurrency verification are complete. Concurrent matching of two different rides also exposed the next concrete business invariant: one Driver can currently hold active candidates for multiple rides.
+**Current stopping point:** Matching now prevents a Driver from holding more than one active `pending` or `accepted` ride candidate across different rides. Cross-ride concurrency, rejection release, accepted reservation, full-driver exhaustion, and same-ride concurrent idempotency have all been verified. The immediate next business slice is Trip Execution Foundation.
 
 **Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until completed work provides new information.
 
@@ -32,7 +32,8 @@ Update this file after every meaningful work session.
 - [x] Driver Candidate Accept/Reject Foundation — PR #10
 - [x] Verified Identity Authentication Enforcement — PR #11
 - [x] Session Extension Contract Correction — PR #12
-- [x] Candidate Reselection After Driver Rejection — PR #14 (verified, pending merge)
+- [x] Candidate Reselection After Driver Rejection — PR #14
+- [x] Driver Active-Candidate Exclusivity Across Rides — PR #15
 
 ---
 
@@ -181,7 +182,7 @@ After a successful provider extension response, the adapter re-reads the provide
 
 ## Candidate Reselection After Driver Rejection
 
-Implemented and verified in PR #14; pending merge.
+Merged through PR #14.
 
 ### Business flow
 
@@ -212,30 +213,65 @@ Implemented and verified in PR #14; pending merge.
 - While D1 is the pending candidate, D2/D3/D4 cannot accept the ride and receive `404 ride request candidate not found`; database inspection confirms only one pending candidate row.
 - Ten concurrent match calls against an existing pending candidate all return the same Driver and original `created_at`.
 - Ten concurrent first-match calls against a ride with zero candidates produce exactly one `201 Created` and nine `200 OK` responses, all returning the same Driver and `created_at`; database inspection confirms exactly one pending candidate row.
-- Concurrent first matches for two different riders/rides can currently select the same Driver. This confirms the next missing business invariant is Driver exclusivity across active ride candidates rather than a defect in the per-ride reselection contract.
+- Concurrent first matches for two different riders/rides can select the same Driver, which motivated PR #15.
+
+---
+
+## Driver Active-Candidate Exclusivity Across Rides
+
+Merged and verified through PR #15.
+
+### Business flow
+
+`Concurrent ride requests → matching reserves different eligible Drivers → one Driver cannot hold active candidates for multiple rides`
+
+### Implemented contract
+
+- Drivers with an active `pending` or `accepted` candidate are excluded from matching for other rides.
+- Candidate activity remains the source of truth; no speculative global Driver busy-state was introduced.
+- Driver profile rows are selected with `FOR UPDATE ... SKIP LOCKED` to serialize cross-ride matching without blocking on a Driver another matching transaction is reserving.
+- A partial unique index on `driver_user_id` where candidate status is `pending` or `accepted` enforces the persistence invariant that one Driver can hold at most one active ride candidate.
+- Rejected candidate history remains ride-scoped and does not globally exclude the Driver.
+- Rejection releases the Driver for matching on another ride.
+- Acceptance keeps the Driver reserved until a later trip-lifecycle slice defines how that reservation ends.
+- Existing matching HTTP/domain contracts remain unchanged.
+
+### Verification completed
+
+- `go test ./...` passes.
+- `go vet ./...` passes.
+- Migration `008_driver_active_candidate_exclusivity.sql` applies successfully on invariant-clean data.
+- The migration refuses pre-existing duplicate active candidates rather than silently rewriting them as rejected decisions.
+- Docker image builds and Compose startup succeed with migration `008` recorded in `schema_migrations`.
+- Two concurrent first-match requests for different riders/rides return `201 Created` with different Drivers.
+- Database inspection confirms no Driver has more than one active candidate.
+- Rejecting D1 releases D1; a subsequent ride can select D1 again.
+- Accepting D2 keeps D2 reserved; a later ride skips D2 and selects another available Driver.
+- With all four Drivers actively reserved, concurrent matching returns `409 no eligible driver available` rather than double-assigning a Driver.
+- After freeing exactly one Driver, ten concurrent initial match calls for the same ride produce exactly one `201 Created` and nine `200 OK` responses, all returning the same Driver and identical `created_at`; database inspection confirms exactly one pending row.
 
 ### Deliberately deferred
 
-- Driver reservation/exclusivity across different rides.
 - Candidate timeout/expiry.
-- Dispatch queues.
-- Geographic/proximity matching.
 - Trip execution state.
+- Live Driver/rider location tracking.
+- Geographic/proximity matching.
+- Dispatch queues.
 - Pricing/payments.
 
 ---
 
 ## Next Business Vertical Slice
 
-**Driver Active-Candidate Exclusivity Across Rides**
+**Trip Execution Foundation**
 
 Expected end-to-end outcome:
 
-`Concurrent ride requests → matching reserves different eligible Drivers → one Driver cannot hold active candidates for multiple rides`
+`Driver accepts candidate → accepted ride becomes an application-owned trip → matched Driver advances trip through minimal execution states → trip completion persists`
 
-The current matching model serializes candidate creation per ride but not across rides. Concurrent first-match requests for two different rides can therefore select the same eligible Driver. The next slice should introduce the minimum application and persistence invariant needed to exclude or serialize Drivers that already hold an active `pending` or `accepted` candidate. Preserve rejected history as ride-scoped and avoid introducing trip execution, geographic matching, dispatch queues, pricing, or other unrelated complexity.
+The next slice should establish only the minimum trip lifecycle needed to consume an accepted candidate and make Driver reservation termination explicit. Avoid adding pricing, payments, route optimization, live location streaming, cancellation policy, ETA calculation, or dispatch sophistication until a concrete later slice requires them.
 
-The concurrent two-rider/two-ride scenario verified during PR #14 should become a primary acceptance test for this slice.
+Key invariant to define first: an accepted candidate represents an exclusive Driver/Rider pairing and should be promoted into a trip exactly once, with authorization tied to the authenticated matched Driver and Rider.
 
 ---
 
@@ -253,11 +289,10 @@ The same boundary rule applies to future maps, routing, payments, notifications,
 
 ---
 
-## Rough MVP Direction After Driver Exclusivity
+## Rough MVP Direction After Trip Execution Foundation
 
-- Trip execution.
 - Live location/status updates.
-- Trip completion.
+- Trip completion hardening.
 - Trip history.
 
 Exact later boundaries remain intentionally flexible.
