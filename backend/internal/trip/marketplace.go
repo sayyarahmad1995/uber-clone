@@ -25,11 +25,14 @@ func (r PostgresRepository) AcceptProposedFare(ctx context.Context, rideRequestI
 		FOR UPDATE
 	`, rideRequestID).Scan(&riderUserID, &bookingMode, &status, &proposedAmount, &currency); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return Trip{}, ErrMarketplaceNotOpen
+			return Trip{}, ErrMarketplaceNotApplicable
 		}
 		return Trip{}, err
 	}
-	if bookingMode != "offers" || status != "requested" {
+	if bookingMode != "offers" {
+		return Trip{}, ErrMarketplaceNotApplicable
+	}
+	if status != "requested" {
 		return Trip{}, ErrMarketplaceNotOpen
 	}
 
