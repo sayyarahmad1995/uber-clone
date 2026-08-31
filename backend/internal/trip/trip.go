@@ -9,11 +9,14 @@ import (
 )
 
 var (
-	ErrAssignmentNotFound = errors.New("accepted assignment not found")
-	ErrAssignmentResolved = errors.New("ride request candidate already resolved")
-	ErrTripNotFound       = errors.New("trip not found")
-	ErrTripNotStarted     = errors.New("trip has not started")
-	ErrTripCompleted      = errors.New("trip already completed")
+	ErrAssignmentNotFound   = errors.New("accepted assignment not found")
+	ErrAssignmentResolved   = errors.New("ride request candidate already resolved")
+	ErrTripNotFound         = errors.New("trip not found")
+	ErrTripNotStarted       = errors.New("trip has not started")
+	ErrTripCompleted        = errors.New("trip already completed")
+	ErrMarketplaceNotOpen   = errors.New("ride request marketplace is not open")
+	ErrMarketplaceOfferGone = errors.New("ride offer is not actionable")
+	ErrDriverUnavailable    = errors.New("driver is no longer available")
 )
 
 type Status string
@@ -42,6 +45,8 @@ type Acceptance struct {
 
 type Repository interface {
 	Accept(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Acceptance, error)
+	AcceptProposedFare(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Trip, error)
+	SelectOffer(ctx context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID) (Trip, error)
 	Start(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Trip, error)
 	Complete(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Trip, error)
 }
@@ -52,6 +57,14 @@ func NewService(repository Repository) Service { return Service{repository: repo
 
 func (s Service) Accept(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Acceptance, error) {
 	return s.repository.Accept(ctx, rideRequestID, driverUserID)
+}
+
+func (s Service) AcceptProposedFare(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Trip, error) {
+	return s.repository.AcceptProposedFare(ctx, rideRequestID, driverUserID)
+}
+
+func (s Service) SelectOffer(ctx context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID) (Trip, error) {
+	return s.repository.SelectOffer(ctx, rideRequestID, riderUserID, driverUserID)
 }
 
 func (s Service) Start(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Trip, error) {
