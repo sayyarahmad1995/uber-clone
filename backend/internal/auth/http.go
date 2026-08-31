@@ -140,6 +140,8 @@ func httpAuthError(err error) (int, string, string) {
 		return http.StatusUnauthorized, "invalid_credentials", "Invalid credentials."
 	case errors.Is(err, ErrVerificationRequired):
 		return http.StatusForbidden, "verification_required", "Account verification is required."
+	case errors.Is(err, ErrSessionNotExtendable):
+		return http.StatusConflict, "session_not_extendable", "Session cannot be extended yet."
 	case errors.Is(err, ErrIdentifierConflict):
 		return http.StatusConflict, "identifier_already_exists", "An account with this identifier already exists."
 	case errors.Is(err, ErrPasswordRejected):
