@@ -10,11 +10,11 @@ import (
 )
 
 var (
-	ErrRideNotFound      = errors.New("ride request not found")
-	ErrRideNotOpen       = errors.New("ride request is not open for offers")
-	ErrDriverIneligible  = errors.New("driver is not eligible to offer")
-	ErrAmountOutOfRange  = errors.New("offer amount is outside allowed range")
-	ErrOfferNotFound     = errors.New("ride offer not found")
+	ErrRideNotFound       = errors.New("ride request not found")
+	ErrRideNotOpen        = errors.New("ride request is not open for offers")
+	ErrDriverIneligible   = errors.New("driver is not eligible to offer")
+	ErrAmountOutOfRange   = errors.New("offer amount is outside allowed range")
+	ErrOfferNotFound      = errors.New("ride offer not found")
 	ErrOfferNotActionable = errors.New("ride offer is not actionable")
 )
 
@@ -82,15 +82,7 @@ func (s Service) Submit(ctx context.Context, rideRequestID, driverUserID uuid.UU
 	}
 
 	if amountMinor == market.ProposedAmountMinor {
-		assignedTrip, err := s.trips.AcceptProposedFare(ctx, rideRequestID, driverUserID)
-		if err != nil {
-			return Submission{}, mapTripAssignmentError(err)
-		}
-		acceptedOffer, err := s.repository.Get(ctx, rideRequestID, driverUserID)
-		if err != nil {
-			return Submission{}, err
-		}
-		return Submission{Offer: acceptedOffer, Trip: &assignedTrip}, nil
+		return s.AcceptProposed(ctx, rideRequestID, driverUserID)
 	}
 
 	result, err := s.repository.Upsert(ctx, rideRequestID, driverUserID, amountMinor, minimum, maximum, market.Currency)
@@ -98,6 +90,21 @@ func (s Service) Submit(ctx context.Context, rideRequestID, driverUserID uuid.UU
 		return Submission{}, err
 	}
 	return Submission{Offer: result}, nil
+}
+
+func (s Service) AcceptProposed(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Submission, error) {
+	if _, err := s.repository.Market(ctx, rideRequestID); err != nil {
+		return Submission{}, err
+	}
+	assignedTrip, err := s.trips.AcceptProposedFare(ctx, rideRequestID, driverUserID)
+	if err != nil {
+		return Submission{}, mapTripAssignmentError(err)
+	}
+	acceptedOffer, err := s.repository.Get(ctx, rideRequestID, driverUserID)
+	if err != nil {
+		return Submission{}, err
+	}
+	return Submission{Offer: acceptedOffer, Trip: &assignedTrip}, nil
 }
 
 func (s Service) ListForRider(ctx context.Context, rideRequestID, riderUserID uuid.UUID) ([]Offer, error) {
