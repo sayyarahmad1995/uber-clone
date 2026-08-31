@@ -93,9 +93,6 @@ func (s Service) Submit(ctx context.Context, rideRequestID, driverUserID uuid.UU
 }
 
 func (s Service) AcceptProposed(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Submission, error) {
-	if _, err := s.repository.Market(ctx, rideRequestID); err != nil {
-		return Submission{}, err
-	}
 	assignedTrip, err := s.trips.AcceptProposedFare(ctx, rideRequestID, driverUserID)
 	if err != nil {
 		return Submission{}, mapTripAssignmentError(err)
