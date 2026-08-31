@@ -10,57 +10,87 @@ import (
 
 type fakeRepository struct {
 	created Request
-	pickup Location
-	destination Location
+	input   CreateInput
 }
 
-func (f *fakeRepository) Create(_ context.Context, riderUserID uuid.UUID, pickup, destination Location) (Request, error) {
-	f.pickup = pickup
-	f.destination = destination
-	f.created = Request{ID: uuid.New(), RiderUserID: riderUserID, Pickup: pickup, Destination: destination, Status: StatusRequested}
+func (f *fakeRepository) Create(_ context.Context, riderUserID uuid.UUID, input CreateInput) (Request, error) {
+	f.input = input
+	f.created = Request{
+		ID:           uuid.New(),
+		RiderUserID:  riderUserID,
+		Pickup:       input.Pickup,
+		Destination:  input.Destination,
+		BookingMode:  input.BookingMode,
+		ProposedFare: input.ProposedFare,
+		Status:       StatusRequested,
+	}
 	return f.created, nil
 }
 
-func TestCreateRideRequest(t *testing.T) {
+func TestCreateAutomaticRideRequestByDefault(t *testing.T) {
 	repo := &fakeRepository{}
 	service := NewService(repo)
-	riderID := uuid.New()
-	pickup := Location{Latitude: 24.8607, Longitude: 67.0011}
-	destination := Location{Latitude: 24.9056, Longitude: 67.0822}
-
-	request, err := service.Create(context.Background(), riderID, pickup, destination)
+	request, err := service.Create(context.Background(), uuid.New(), CreateInput{
+		Pickup:      Location{},
+		Destination: Location{},
+	})
 	if err != nil {
 		t.Fatalf("Create returned error: %v", err)
 	}
-	if request.RiderUserID != riderID {
-		t.Fatalf("expected rider %s, got %s", riderID, request.RiderUserID)
+	if request.BookingMode != BookingModeAutomatic {
+		t.Fatalf("expected automatic booking mode, got %q", request.BookingMode)
 	}
-	if request.Status != StatusRequested {
-		t.Fatalf("expected requested status, got %q", request.Status)
+	if request.ProposedFare != nil {
+		t.Fatal("automatic request unexpectedly has proposed fare")
 	}
-	if repo.pickup != pickup || repo.destination != destination {
-		t.Fatalf("locations were not passed to repository")
+}
+
+func TestCreateOffersRideRequest(t *testing.T) {
+	repo := &fakeRepository{}
+	service := NewService(repo)
+	fare := Money{AmountMinor: 70000, Currency: "pkr"}
+
+	request, err := service.Create(context.Background(), uuid.New(), CreateInput{
+		Pickup:       Location{},
+		Destination:  Location{},
+		BookingMode:  BookingModeOffers,
+		ProposedFare: &fare,
+	})
+	if err != nil {
+		t.Fatalf("Create returned error: %v", err)
+	}
+	if request.ProposedFare == nil || request.ProposedFare.AmountMinor != 70000 || request.ProposedFare.Currency != "PKR" {
+		t.Fatalf("unexpected proposed fare: %#v", request.ProposedFare)
 	}
 }
 
 func TestCreateRejectsInvalidLocations(t *testing.T) {
-	service := NewService(&fakeRepository{})
-	tests := []struct {
-		name string
-		pickup Location
-		destination Location
-	}{
-		{name: "pickup latitude", pickup: Location{Latitude: 91, Longitude: 0}, destination: Location{}},
-		{name: "pickup longitude", pickup: Location{Latitude: 0, Longitude: 181}, destination: Location{}},
-		{name: "destination latitude", pickup: Location{}, destination: Location{Latitude: -91, Longitude: 0}},
-		{name: "destination longitude", pickup: Location{}, destination: Location{Latitude: 0, Longitude: -181}},
+	_, err := NewService(&fakeRepository{}).Create(context.Background(), uuid.New(), CreateInput{
+		Pickup:      Location{Latitude: 91},
+		Destination: Location{},
+	})
+	if !errors.Is(err, ErrInvalidLocation) {
+		t.Fatalf("expected ErrInvalidLocation, got %v", err)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := service.Create(context.Background(), uuid.New(), tt.pickup, tt.destination)
-			if !errors.Is(err, ErrInvalidLocation) {
-				t.Fatalf("expected ErrInvalidLocation, got %v", err)
-			}
+}
+
+func TestCreateOffersRequiresValidFare(t *testing.T) {
+	service := NewService(&fakeRepository{})
+	tests := []*Money{
+		nil,
+		{AmountMinor: 0, Currency: "PKR"},
+		{AmountMinor: 100, Currency: "US"},
+	}
+
+	for _, fare := range tests {
+		_, err := service.Create(context.Background(), uuid.New(), CreateInput{
+			Pickup:       Location{},
+			Destination:  Location{},
+			BookingMode:  BookingModeOffers,
+			ProposedFare: fare,
 		})
+		if !errors.Is(err, ErrInvalidFare) {
+			t.Fatalf("expected ErrInvalidFare for %#v, got %v", fare, err)
+		}
 	}
 }

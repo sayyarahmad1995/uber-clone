@@ -8,13 +8,11 @@ import (
 
 func (app application) routes() http.Handler {
 	mux := http.NewServeMux()
-
 	app.registerSystemRoutes(mux)
 	app.registerAuthRoutes(mux)
 	app.registerUserRoutes(mux)
 	app.registerDriverRoutes(mux)
 	app.registerRideRoutes(mux)
-
 	return mux
 }
 
@@ -41,6 +39,7 @@ func (app application) registerDriverRoutes(mux *http.ServeMux) {
 	mux.Handle("PUT /v1/driver", app.authenticated(app.onboardDriver))
 	mux.Handle("GET /v1/driver", app.authenticated(app.getDriver))
 	mux.Handle("PUT /v1/driver/availability", app.authenticated(app.setDriverAvailability))
+	mux.Handle("PUT /v1/driver/ride-requests/{ride_request_id}/offer", app.authenticated(app.submitRideOffer))
 	mux.Handle("POST /v1/driver/ride-requests/{ride_request_id}/accept", app.authenticated(app.acceptRideRequestCandidate))
 	mux.Handle("POST /v1/driver/ride-requests/{ride_request_id}/reject", app.authenticated(app.rejectRideRequestCandidate))
 	mux.Handle("POST /v1/driver/ride-requests/{ride_request_id}/start", app.authenticated(app.startTrip))
@@ -50,6 +49,7 @@ func (app application) registerDriverRoutes(mux *http.ServeMux) {
 func (app application) registerRideRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /v1/ride-requests", app.authenticated(app.createRideRequest))
 	mux.Handle("POST /v1/ride-requests/{ride_request_id}/match", app.authenticated(app.matchRideRequest))
+	mux.Handle("GET /v1/ride-requests/{ride_request_id}/offers", app.authenticated(app.listRideOffers))
 }
 
 func (app application) authenticated(handler http.HandlerFunc) http.Handler {

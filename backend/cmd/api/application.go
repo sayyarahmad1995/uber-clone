@@ -10,6 +10,7 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/identity"
 	identitykratos "github.com/sayyarahmad1995/uber-clone/backend/internal/identity/kratos"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/matching"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/offer"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/database"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/migrations"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/ride"
@@ -22,6 +23,7 @@ type application struct {
 	drivers  driver.Service
 	rides    ride.Service
 	matching matching.Service
+	offers   offer.Service
 	trips    trip.Service
 	db       *sql.DB
 	identity identity.Provider
@@ -51,6 +53,7 @@ func newApplication(cfg config) (application, func(), error) {
 		drivers:  driver.NewService(driver.NewPostgresRepository(db)),
 		rides:    ride.NewService(ride.NewPostgresRepository(db)),
 		matching: matching.NewService(matching.NewPostgresRepository(db)),
+		offers:   offer.NewService(offer.NewPostgresRepository(db)),
 		trips:    trip.NewService(trip.NewPostgresRepository(db)),
 		db:       db,
 		identity: identityProvider,

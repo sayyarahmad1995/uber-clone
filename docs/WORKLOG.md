@@ -10,9 +10,9 @@ Update this file after every meaningful work session.
 
 ## Current Status
 
-**Current engineering milestone:** Trip Execution Foundation — implemented and verified through PR #16.
+**Current engineering milestone:** Ride Offer Marketplace Foundation — implemented and verified through PR #17.
 
-**Current stopping point:** An accepted Driver candidate is now atomically promoted into an application-owned Trip. The assigned Driver can start and complete that Trip, completion releases the Driver for future matching, and accepted candidate history remains immutable. Static tests, migration/backfill behavior, authorization, transition/idempotency behavior, persistence, and Driver release/rematch have all been verified. The next business slice should be selected from fresh `main` after PR #16 merges.
+**Current stopping point:** Ride Requests now support application-owned `automatic` and `offers` booking modes. In offers mode, the Rider supplies a proposed fare, eligible Drivers can submit or update one bounded offer each, and the owning Rider can list those offers. Offers remain non-reserving: they do not create `ride_driver_candidates` or Trips. Existing automatic matching remains backward compatible. Static tests, Docker startup/migration behavior, fare-boundary behavior, offer updates/listing, persistence, and automatic-mode regression behavior have been verified. The next business slice is Rider Offer Selection Foundation, where Rider selection must atomically create exclusive assignment while keeping Trip agnostic to how the Driver was selected.
 
 **Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until completed work provides new information.
 
@@ -35,6 +35,7 @@ Update this file after every meaningful work session.
 - [x] Candidate Reselection After Driver Rejection — PR #14
 - [x] Driver Active-Candidate Exclusivity Across Rides — PR #15
 - [x] Trip Execution Foundation — PR #16
+- [x] Ride Offer Marketplace Foundation — PR #17
 
 ---
 
@@ -321,15 +322,85 @@ Implemented and verified through PR #16.
 
 ---
 
+## Ride Offer Marketplace Foundation
+
+Implemented and verified through PR #17.
+
+### Business flow
+
+`Rider creates offers-mode request with proposed fare → eligible Drivers submit/update bounded offers → Rider lists offers`
+
+This slice intentionally stops before Rider selection and exclusive assignment.
+
+### Implemented contract
+
+- Ride Requests now have application-owned booking modes: `automatic` and `offers`.
+- Empty/omitted booking mode defaults to `automatic`, preserving the previous contract.
+- `offers` requests require a Rider proposed fare represented as integer minor units plus a three-letter currency.
+- Money remains application-owned; no payment-provider concepts are present in Ride or Offer APIs.
+- Driver offers are separate from `ride_driver_candidates` and do not reserve Drivers or create Trips.
+- A Driver has at most one mutable offer row per Ride Request; updating an offer preserves `created_at` and advances `updated_at`.
+- For MVP, an offer must be between 90% and 130% of the Rider proposed fare, with minimum rounding upward and maximum rounding downward.
+- Offering Drivers must have Driver capability, an active Driver profile, a vehicle, be online, and have no unreleased pending/accepted candidate assignment.
+- A Driver cannot offer on their own Ride Request.
+- The automatic matching endpoint rejects `offers` Ride Requests rather than silently dispatching them.
+- The owning Rider can list offers, ordered deterministically by amount, creation time, then Driver ID.
+- Endpoints:
+  - `PUT /v1/driver/ride-requests/{ride_request_id}/offer`
+  - `GET /v1/ride-requests/{ride_request_id}/offers`
+
+### Verification completed
+
+- `go test ./...` passes on the final formatted PR head.
+- `go vet ./...` passes on the final formatted PR head.
+- Docker image builds successfully.
+- Docker Compose starts successfully after a clean `docker compose down -v` reset.
+- PostgreSQL becomes healthy, Kratos migrations apply successfully, and the API starts.
+- Migration `010_ride_offer_marketplace_foundation.sql` is recorded in `schema_migrations`.
+- Creating an offers-mode Ride Request with proposed fare `100000 PKR` returns `201 Created` and persists the offers mode and proposed fare.
+- Calling automatic `/match` for an offers-mode request returns `409 Conflict` with `ride request uses the offers marketplace`.
+- Eligible online Drivers can submit offers at the exact 90% and 130% boundaries (`90000` and `130000`) with `200 OK`.
+- Offers immediately outside the bounds (`89999` and `130001`) return `400 Bad Request`.
+- Updating a Driver offer from `90000` to `105000` preserves `created_at`, advances `updated_at`, and leaves one row for that Driver/Ride pair.
+- Rider offer listing returns the expected two offers ordered by amount.
+- Database inspection confirms the two expected `ride_offers` rows and confirms zero `ride_driver_candidates` for the offers-mode Ride Request.
+- Creating a Ride Request without `booking_mode` returns `booking_mode=automatic` and no proposed fare.
+- Existing automatic matching remains backward compatible and returns `201 Created` with a Driver candidate.
+- A stale second-Rider token returned `401 Unauthorized`; the separate authenticated non-owning Rider `404` runtime assertion was not repeated after the clean database reset.
+
+### Deliberately deferred
+
+- Rider selecting an offer.
+- Marketplace-driven Trip assignment.
+- Driver discovery/feed and geospatial offer targeting.
+- Offer expiration/cancellation.
+- Back-and-forth negotiation history.
+- Platform fare estimation or surge pricing.
+- Payments.
+- Real-time location.
+
+---
+
 ## Next Business Vertical Slice
 
-Select the next slice from fresh `main` after PR #16 merges. The first concrete user-visible capability that consumes the completed Trip lifecycle is likely one of:
+Rider Offer Selection Foundation.
 
-- Rider/Driver trip status retrieval.
-- Minimal trip history.
-- Live operational location/status updates.
+Target business flow:
 
-The exact boundary remains intentionally undecided until the merged model is reviewed. Do not introduce pricing, payments, route optimization, cancellation policy, ETA calculation, or dispatch sophistication until a concrete MVP slice requires them.
+`Rider lists offers → Rider selects one Driver offer → application atomically validates availability and creates exclusive assignment → competing offers become non-actionable → assigned Trip exists`
+
+Key invariants for the next slice:
+
+- Rider can select only an offer belonging to their own open offers-mode Ride Request.
+- Selection must serialize concurrent Rider/Driver marketplace changes.
+- The selected Driver must still be eligible/unassigned at selection time; stale eligibility at offer-submission time is insufficient.
+- If the selected Driver is no longer available, return conflict rather than silently choosing another Driver.
+- Exactly one selected Driver/assignment may win under concurrent selection attempts.
+- Competing offers should remain historical data but become non-actionable once the marketplace closes.
+- Trip should remain agnostic to assignment strategy: automatic dispatch and offers marketplace must converge on the same application-owned assignment/Trip boundary.
+- Do not reinterpret `ride_driver_candidates` as bids/offers.
+
+The exact persistence representation for marketplace closure/selected offer should be decided in that slice based on the atomicity requirements.
 
 ---
 
@@ -347,10 +418,11 @@ The same boundary rule applies to future maps, routing, payments, notifications,
 
 ---
 
-## Rough MVP Direction After Trip Execution Foundation
+## Rough MVP Direction After Ride Offer Marketplace Foundation
 
-- Trip status/read models and history.
-- Live location/status updates.
+- Rider Offer Selection Foundation and marketplace-driven Trip assignment.
+- Driver/Rider marketplace discovery/read models only where a concrete UI flow needs them.
+- Live location/status updates after booking/assignment semantics are stable.
 - Trip lifecycle hardening where concrete product requirements demand it.
 
 Exact later boundaries remain intentionally flexible.

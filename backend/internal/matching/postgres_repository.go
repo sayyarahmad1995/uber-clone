@@ -10,7 +10,9 @@ import (
 
 type PostgresRepository struct{ db *sql.DB }
 
-func NewPostgresRepository(db *sql.DB) PostgresRepository { return PostgresRepository{db: db} }
+func NewPostgresRepository(db *sql.DB) PostgresRepository {
+	return PostgresRepository{db: db}
+}
 
 func (r PostgresRepository) Match(ctx context.Context, rideRequestID, riderUserID uuid.UUID) (Result, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -20,16 +22,20 @@ func (r PostgresRepository) Match(ctx context.Context, rideRequestID, riderUserI
 	defer tx.Rollback()
 
 	var ownedRideID uuid.UUID
-	if err := tx.QueryRowContext(ctx, `
-		SELECT id
-		FROM ride_requests
-		WHERE id = $1 AND rider_user_id = $2
-		FOR UPDATE
-	`, rideRequestID, riderUserID).Scan(&ownedRideID); err != nil {
+	var bookingMode string
+	if err := tx.QueryRowContext(
+		ctx,
+		`SELECT id, booking_mode FROM ride_requests WHERE id = $1 AND rider_user_id = $2 FOR UPDATE`,
+		rideRequestID,
+		riderUserID,
+	).Scan(&ownedRideID, &bookingMode); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Result{}, ErrRideNotFound
 		}
 		return Result{}, err
+	}
+	if bookingMode != "automatic" {
+		return Result{}, ErrRideNotMatchable
 	}
 
 	var existing Candidate
