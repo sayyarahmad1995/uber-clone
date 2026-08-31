@@ -176,8 +176,8 @@ func lockEligibleMarketplaceDriver(ctx context.Context, tx *sql.Tx, driverUserID
 func insertMarketplaceTrip(ctx context.Context, tx *sql.Tx, rideRequestID, riderUserID, driverUserID uuid.UUID) (Trip, error) {
 	var trip Trip
 	if err := tx.QueryRowContext(ctx, `
-		INSERT INTO trips (ride_request_id, rider_user_id, driver_user_id)
-		VALUES ($1, $2, $3)
+		INSERT INTO trips (ride_request_id, rider_user_id, driver_user_id, assigned_at)
+		VALUES ($1, $2, $3, NOW())
 		RETURNING ride_request_id, rider_user_id, driver_user_id, status, assigned_at, started_at, completed_at
 	`, rideRequestID, riderUserID, driverUserID).Scan(
 		&trip.RideRequestID,
