@@ -1,15 +1,12 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"net/http"
 
 	"github.com/google/uuid"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/matching"
 )
-
-type candidateDecisionFunc func(context.Context, uuid.UUID, uuid.UUID) (matching.Candidate, error)
 
 func (app application) matchRideRequest(w http.ResponseWriter, r *http.Request) {
 	u, ok := app.requireRiderCapability(w, r)
@@ -47,15 +44,7 @@ func (app application) matchRideRequest(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
-func (app application) acceptRideRequestCandidate(w http.ResponseWriter, r *http.Request) {
-	app.decideRideRequestCandidate(w, r, app.matching.Accept)
-}
-
 func (app application) rejectRideRequestCandidate(w http.ResponseWriter, r *http.Request) {
-	app.decideRideRequestCandidate(w, r, app.matching.Reject)
-}
-
-func (app application) decideRideRequestCandidate(w http.ResponseWriter, r *http.Request, decide candidateDecisionFunc) {
 	u, ok := app.requireDriverCapability(w, r)
 	if !ok {
 		return
@@ -67,7 +56,7 @@ func (app application) decideRideRequestCandidate(w http.ResponseWriter, r *http
 		return
 	}
 
-	candidate, err := decide(r.Context(), rideRequestID, u.ID)
+	candidate, err := app.matching.Reject(r.Context(), rideRequestID, u.ID)
 	switch {
 	case errors.Is(err, matching.ErrCandidateNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "ride request candidate not found"})

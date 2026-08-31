@@ -13,6 +13,7 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/database"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/migrations"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/ride"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/trip"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/user"
 )
 
@@ -21,6 +22,7 @@ type application struct {
 	drivers  driver.Service
 	rides    ride.Service
 	matching matching.Service
+	trips    trip.Service
 	db       *sql.DB
 	identity identity.Provider
 	auth     auth.Handler
@@ -49,6 +51,7 @@ func newApplication(cfg config) (application, func(), error) {
 		drivers:  driver.NewService(driver.NewPostgresRepository(db)),
 		rides:    ride.NewService(ride.NewPostgresRepository(db)),
 		matching: matching.NewService(matching.NewPostgresRepository(db)),
+		trips:    trip.NewService(trip.NewPostgresRepository(db)),
 		db:       db,
 		identity: identityProvider,
 		auth:     auth.NewHandler(auth.NewService(authProvider)),

@@ -77,6 +77,7 @@ func (r PostgresRepository) Match(ctx context.Context, rideRequestID, riderUserI
 			FROM ride_driver_candidates active
 			WHERE active.driver_user_id = p.user_id
 			  AND active.status IN ('pending', 'accepted')
+			  AND active.released_at IS NULL
 		  )
 		ORDER BY p.updated_at ASC, p.user_id ASC
 		LIMIT 1
@@ -109,7 +110,7 @@ func (r PostgresRepository) Match(ctx context.Context, rideRequestID, riderUserI
 	return Result{Candidate: candidate, Created: true}, nil
 }
 
-func (r PostgresRepository) Decide(ctx context.Context, rideRequestID, driverUserID uuid.UUID, decision CandidateStatus) (Candidate, error) {
+func (r PostgresRepository) Reject(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Candidate, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return Candidate{}, err
@@ -135,7 +136,7 @@ func (r PostgresRepository) Decide(ctx context.Context, rideRequestID, driverUse
 		return Candidate{}, err
 	}
 
-	if candidate.Status == decision {
+	if candidate.Status == CandidateStatusRejected {
 		if err := tx.Commit(); err != nil {
 			return Candidate{}, err
 		}
@@ -147,10 +148,10 @@ func (r PostgresRepository) Decide(ctx context.Context, rideRequestID, driverUse
 
 	if err := tx.QueryRowContext(ctx, `
 		UPDATE ride_driver_candidates
-		SET status = $3, decided_at = NOW()
+		SET status = 'rejected', decided_at = NOW()
 		WHERE ride_request_id = $1 AND driver_user_id = $2
 		RETURNING ride_request_id, driver_user_id, status, created_at, decided_at
-	`, rideRequestID, driverUserID, decision).Scan(
+	`, rideRequestID, driverUserID).Scan(
 		&candidate.RideRequestID,
 		&candidate.DriverUserID,
 		&candidate.Status,
