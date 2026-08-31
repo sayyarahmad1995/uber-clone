@@ -11,6 +11,8 @@ import (
 
 type fakeRepository struct {
 	market          Market
+	discovery       []DiscoveryItem
+	discoveryLimit  int
 	upsertedAmount  int64
 	upsertedMinimum int64
 	upsertedMaximum int64
@@ -18,6 +20,11 @@ type fakeRepository struct {
 
 func (f *fakeRepository) Market(context.Context, uuid.UUID) (Market, error) {
 	return f.market, nil
+}
+
+func (f *fakeRepository) Discover(_ context.Context, _ uuid.UUID, limit int) ([]DiscoveryItem, error) {
+	f.discoveryLimit = limit
+	return f.discovery, nil
 }
 
 func (f *fakeRepository) Upsert(_ context.Context, rideRequestID, driverUserID uuid.UUID, amountMinor, minimumMinor, maximumMinor int64, currency string) (Offer, error) {
@@ -41,6 +48,23 @@ func (f *fakeRepository) Reject(context.Context, uuid.UUID, uuid.UUID, uuid.UUID
 
 func (f *fakeRepository) Get(context.Context, uuid.UUID, uuid.UUID) (Offer, error) {
 	return Offer{}, nil
+}
+
+func TestDiscoverUsesBoundedMarketplaceFeed(t *testing.T) {
+	expected := []DiscoveryItem{{RideRequestID: uuid.New()}}
+	repo := &fakeRepository{discovery: expected}
+	service := NewService(repo, trip.Service{})
+
+	actual, err := service.Discover(context.Background(), uuid.New())
+	if err != nil {
+		t.Fatalf("Discover returned error: %v", err)
+	}
+	if repo.discoveryLimit != DiscoveryLimit {
+		t.Fatalf("expected discovery limit %d, got %d", DiscoveryLimit, repo.discoveryLimit)
+	}
+	if len(actual) != 1 || actual[0].RideRequestID != expected[0].RideRequestID {
+		t.Fatalf("unexpected discovery result: %#v", actual)
+	}
 }
 
 func TestBoundsUseNinetyToOneHundredThirtyPercent(t *testing.T) {

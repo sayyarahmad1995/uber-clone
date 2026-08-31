@@ -21,6 +21,7 @@ var (
 const (
 	MinimumPercent int64 = 90
 	MaximumPercent int64 = 130
+	DiscoveryLimit       = 50
 )
 
 type Status string
@@ -36,6 +37,21 @@ type Market struct {
 	RideRequestID       uuid.UUID
 	ProposedAmountMinor int64
 	Currency            string
+}
+
+type Location struct {
+	Latitude  float64
+	Longitude float64
+}
+
+type DiscoveryItem struct {
+	RideRequestID uuid.UUID
+	RiderUserID   uuid.UUID
+	Pickup        Location
+	Destination   Location
+	ProposedFare  Market
+	CreatedAt     time.Time
+	OwnOffer      *Offer
 }
 
 type Offer struct {
@@ -56,6 +72,7 @@ type Submission struct {
 
 type Repository interface {
 	Market(context.Context, uuid.UUID) (Market, error)
+	Discover(context.Context, uuid.UUID, int) ([]DiscoveryItem, error)
 	Upsert(context.Context, uuid.UUID, uuid.UUID, int64, int64, int64, string) (Offer, error)
 	ListForRider(context.Context, uuid.UUID, uuid.UUID) ([]Offer, error)
 	Reject(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) (Offer, error)
@@ -69,6 +86,10 @@ type Service struct {
 
 func NewService(repository Repository, trips trip.Service) Service {
 	return Service{repository: repository, trips: trips}
+}
+
+func (s Service) Discover(ctx context.Context, driverUserID uuid.UUID) ([]DiscoveryItem, error) {
+	return s.repository.Discover(ctx, driverUserID, DiscoveryLimit)
 }
 
 func (s Service) Submit(ctx context.Context, rideRequestID, driverUserID uuid.UUID, amountMinor int64) (Submission, error) {
