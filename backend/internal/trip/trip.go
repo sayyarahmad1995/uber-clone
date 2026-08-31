@@ -9,14 +9,15 @@ import (
 )
 
 var (
-	ErrAssignmentNotFound   = errors.New("accepted assignment not found")
-	ErrAssignmentResolved   = errors.New("ride request candidate already resolved")
-	ErrTripNotFound         = errors.New("trip not found")
-	ErrTripNotStarted       = errors.New("trip has not started")
-	ErrTripCompleted        = errors.New("trip already completed")
-	ErrMarketplaceNotOpen   = errors.New("ride request marketplace is not open")
-	ErrMarketplaceOfferGone = errors.New("ride offer is not actionable")
-	ErrDriverUnavailable    = errors.New("driver is no longer available")
+	ErrAssignmentNotFound       = errors.New("accepted assignment not found")
+	ErrAssignmentResolved       = errors.New("ride request candidate already resolved")
+	ErrTripNotFound             = errors.New("trip not found")
+	ErrTripNotStarted           = errors.New("trip has not started")
+	ErrTripCompleted            = errors.New("trip already completed")
+	ErrMarketplaceNotApplicable = errors.New("ride request does not use marketplace booking")
+	ErrMarketplaceNotOpen       = errors.New("ride request marketplace is not open")
+	ErrMarketplaceOfferGone     = errors.New("ride offer is not actionable")
+	ErrDriverUnavailable        = errors.New("driver is no longer available")
 )
 
 type Status string
