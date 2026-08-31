@@ -10,9 +10,9 @@ Update this file after every meaningful work session.
 
 ## Current Status
 
-**Current engineering milestone:** Driver Active-Candidate Exclusivity Across Rides — implemented and verified through PR #15.
+**Current engineering milestone:** Trip Execution Foundation — implemented and verified through PR #16.
 
-**Current stopping point:** Matching now prevents a Driver from holding more than one active `pending` or `accepted` ride candidate across different rides. Cross-ride concurrency, rejection release, accepted reservation, full-driver exhaustion, and same-ride concurrent idempotency have all been verified. The immediate next business slice is Trip Execution Foundation.
+**Current stopping point:** An accepted Driver candidate is now atomically promoted into an application-owned Trip. The assigned Driver can start and complete that Trip, completion releases the Driver for future matching, and accepted candidate history remains immutable. Static tests, migration/backfill behavior, authorization, transition/idempotency behavior, persistence, and Driver release/rematch have all been verified. The next business slice should be selected from fresh `main` after PR #16 merges.
 
 **Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until completed work provides new information.
 
@@ -34,6 +34,7 @@ Update this file after every meaningful work session.
 - [x] Session Extension Contract Correction — PR #12
 - [x] Candidate Reselection After Driver Rejection — PR #14
 - [x] Driver Active-Candidate Exclusivity Across Rides — PR #15
+- [x] Trip Execution Foundation — PR #16
 
 ---
 
@@ -227,14 +228,15 @@ Merged and verified through PR #15.
 
 ### Implemented contract
 
-- Drivers with an active `pending` or `accepted` candidate are excluded from matching for other rides.
-- Candidate activity remains the source of truth; no speculative global Driver busy-state was introduced.
+- Drivers with an active candidate are excluded from matching for other rides.
+- Before Trip Execution Foundation, `pending` and `accepted` candidates were both indefinitely active; PR #16 refines this so `pending`, and `accepted` with `released_at IS NULL`, are active.
+- Candidate/assignment activity remains the source of truth; no speculative global Driver busy-state was introduced.
 - Driver profile rows are selected with `FOR UPDATE ... SKIP LOCKED` to serialize cross-ride matching without blocking on a Driver another matching transaction is reserving.
-- A partial unique index on `driver_user_id` where candidate status is `pending` or `accepted` enforces the persistence invariant that one Driver can hold at most one active ride candidate.
+- A partial unique index on `driver_user_id` enforces the persistence invariant that one Driver can hold at most one active ride assignment.
 - Rejected candidate history remains ride-scoped and does not globally exclude the Driver.
 - Rejection releases the Driver for matching on another ride.
-- Acceptance keeps the Driver reserved until a later trip-lifecycle slice defines how that reservation ends.
-- Existing matching HTTP/domain contracts remain unchanged.
+- Trip completion now releases an accepted Driver while preserving the accepted candidate as immutable assignment history.
+- Existing matching HTTP/domain contracts remain unchanged except that acceptance is now owned atomically by the Trip application boundary.
 
 ### Verification completed
 
@@ -250,7 +252,7 @@ Merged and verified through PR #15.
 - With all four Drivers actively reserved, concurrent matching returns `409 no eligible driver available` rather than double-assigning a Driver.
 - After freeing exactly one Driver, ten concurrent initial match calls for the same ride produce exactly one `201 Created` and nine `200 OK` responses, all returning the same Driver and identical `created_at`; database inspection confirms exactly one pending row.
 
-### Deliberately deferred
+### Deliberately deferred at PR #15
 
 - Candidate timeout/expiry.
 - Trip execution state.
@@ -261,17 +263,73 @@ Merged and verified through PR #15.
 
 ---
 
+## Trip Execution Foundation
+
+Implemented and verified through PR #16.
+
+### Business flow
+
+`Matched Driver accepts → assigned Trip exists → assigned Driver starts → Trip becomes in_progress → assigned Driver completes → Trip becomes completed → Driver becomes eligible for matching again`
+
+### Implemented contract
+
+- Trip lifecycle states are `assigned`, `in_progress`, and `completed`.
+- Trip identity reuses the application-owned `ride_request_id` for this MVP.
+- Candidate acceptance and Trip creation happen atomically; matching no longer exposes an independent acceptance path that could bypass Trip creation.
+- Accepted candidate history remains `accepted`; completion does not rewrite acceptance as another decision.
+- `released_at` on the accepted candidate marks when that assignment stops reserving the Driver.
+- Driver active-candidate exclusivity covers `pending` candidates and `accepted` candidates whose `released_at` is null.
+- Migration `009_trip_execution_foundation.sql` backfills existing accepted candidates into `assigned` Trips because assignment is derivable from the recorded acceptance; it does not fabricate start or completion events.
+- Only the assigned authenticated Driver can start or complete a Trip.
+- Repeated accept, start, and complete operations are idempotent and preserve their original timestamps.
+- Complete-before-start and start-after-completion return conflict.
+- Wrong-Driver Trip mutation returns not found to avoid assignment leakage.
+- Driver-scoped execution endpoints:
+  - `POST /v1/driver/ride-requests/{ride_request_id}/accept`
+  - `POST /v1/driver/ride-requests/{ride_request_id}/start`
+  - `POST /v1/driver/ride-requests/{ride_request_id}/complete`
+
+### Verification completed
+
+- `go test ./...` passes.
+- `go vet ./...` passes.
+- Docker image builds successfully and Docker Compose starts successfully.
+- PostgreSQL is healthy, Kratos migration succeeds, and the API starts on port 8080.
+- Migration `009_trip_execution_foundation.sql` is recorded in `schema_migrations`.
+- Existing accepted candidates are backfilled as `assigned` Trips with null `started_at`, `completed_at`, and `released_at`.
+- The active-Driver partial unique index now constrains `pending`/`accepted` candidates only while `released_at IS NULL`.
+- Fresh matching creates a candidate with `201 Created`.
+- First accept returns `200 OK`; repeated accept returns the same candidate `created_at` and `decided_at`.
+- Complete-before-start returns `409 Conflict`.
+- Another Driver attempting to start the Trip returns `404 Not Found`.
+- First start returns `in_progress`; repeated start preserves the same `started_at`.
+- First complete returns `completed`; repeated complete preserves the same `completed_at`.
+- Start after completion returns `409 Conflict`.
+- Database inspection confirms the completed Trip retains candidate status `accepted` and sets `released_at` equal to `completed_at`.
+- A fresh ride immediately matches the completed Trip's Driver again with `201 Created`, directly proving completion releases the Driver for future matching.
+
+### Deliberately deferred
+
+- Live Driver/rider location updates.
+- Route progress and ETA.
+- Pricing and fare calculation.
+- Payments.
+- Cancellations.
+- Ratings and receipts.
+- Maps integration.
+- Rider-facing trip history.
+
+---
+
 ## Next Business Vertical Slice
 
-**Trip Execution Foundation**
+Select the next slice from fresh `main` after PR #16 merges. The first concrete user-visible capability that consumes the completed Trip lifecycle is likely one of:
 
-Expected end-to-end outcome:
+- Rider/Driver trip status retrieval.
+- Minimal trip history.
+- Live operational location/status updates.
 
-`Driver accepts candidate → accepted ride becomes an application-owned trip → matched Driver advances trip through minimal execution states → trip completion persists`
-
-The next slice should establish only the minimum trip lifecycle needed to consume an accepted candidate and make Driver reservation termination explicit. Avoid adding pricing, payments, route optimization, live location streaming, cancellation policy, ETA calculation, or dispatch sophistication until a concrete later slice requires them.
-
-Key invariant to define first: an accepted candidate represents an exclusive Driver/Rider pairing and should be promoted into a trip exactly once, with authorization tied to the authenticated matched Driver and Rider.
+The exact boundary remains intentionally undecided until the merged model is reviewed. Do not introduce pricing, payments, route optimization, cancellation policy, ETA calculation, or dispatch sophistication until a concrete MVP slice requires them.
 
 ---
 
@@ -291,9 +349,9 @@ The same boundary rule applies to future maps, routing, payments, notifications,
 
 ## Rough MVP Direction After Trip Execution Foundation
 
+- Trip status/read models and history.
 - Live location/status updates.
-- Trip completion hardening.
-- Trip history.
+- Trip lifecycle hardening where concrete product requirements demand it.
 
 Exact later boundaries remain intentionally flexible.
 

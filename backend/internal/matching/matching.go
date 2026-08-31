@@ -38,7 +38,7 @@ type Result struct {
 
 type Repository interface {
 	Match(ctx context.Context, rideRequestID, riderUserID uuid.UUID) (Result, error)
-	Decide(ctx context.Context, rideRequestID, driverUserID uuid.UUID, decision CandidateStatus) (Candidate, error)
+	Reject(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Candidate, error)
 }
 
 type Service struct{ repository Repository }
@@ -49,10 +49,6 @@ func (s Service) Match(ctx context.Context, rideRequestID, riderUserID uuid.UUID
 	return s.repository.Match(ctx, rideRequestID, riderUserID)
 }
 
-func (s Service) Accept(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Candidate, error) {
-	return s.repository.Decide(ctx, rideRequestID, driverUserID, CandidateStatusAccepted)
-}
-
 func (s Service) Reject(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Candidate, error) {
-	return s.repository.Decide(ctx, rideRequestID, driverUserID, CandidateStatusRejected)
+	return s.repository.Reject(ctx, rideRequestID, driverUserID)
 }
