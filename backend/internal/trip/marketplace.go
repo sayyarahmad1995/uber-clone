@@ -1,0 +1,229 @@
+package trip
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+
+	"github.com/google/uuid"
+)
+
+func (r PostgresRepository) AcceptProposedFare(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Trip, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Trip{}, err
+	}
+	defer tx.Rollback()
+
+	var riderUserID uuid.UUID
+	var bookingMode, status, currency string
+	var proposedAmount int64
+	if err := tx.QueryRowContext(ctx, `
+		SELECT rider_user_id, booking_mode, status, proposed_fare_minor, currency
+		FROM ride_requests
+		WHERE id = $1
+		FOR UPDATE
+	`, rideRequestID).Scan(&riderUserID, &bookingMode, &status, &proposedAmount, &currency); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Trip{}, ErrMarketplaceNotOpen
+		}
+		return Trip{}, err
+	}
+	if bookingMode != "offers" || status != "requested" {
+		return Trip{}, ErrMarketplaceNotOpen
+	}
+
+	if existing, found, err := selectTripByRide(ctx, tx, rideRequestID); err != nil {
+		return Trip{}, err
+	} else if found {
+		if existing.DriverUserID == driverUserID {
+			return existing, tx.Commit()
+		}
+		return Trip{}, ErrMarketplaceNotOpen
+	}
+
+	if err := lockEligibleMarketplaceDriver(ctx, tx, driverUserID); err != nil {
+		return Trip{}, err
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO ride_offers (ride_request_id, driver_user_id, amount_minor, currency, status, decided_at)
+		VALUES ($1, $2, $3, $4, 'accepted', NOW())
+		ON CONFLICT (ride_request_id, driver_user_id)
+		DO UPDATE SET amount_minor = EXCLUDED.amount_minor,
+		              currency = EXCLUDED.currency,
+		              status = 'accepted',
+		              decided_at = NOW(),
+		              updated_at = NOW()
+	`, rideRequestID, driverUserID, proposedAmount, currency); err != nil {
+		return Trip{}, err
+	}
+
+	trip, err := insertMarketplaceTrip(ctx, tx, rideRequestID, riderUserID, driverUserID)
+	if err != nil {
+		return Trip{}, err
+	}
+	if err := closeCompetingOffers(ctx, tx, rideRequestID, driverUserID); err != nil {
+		return Trip{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return Trip{}, err
+	}
+	return trip, nil
+}
+
+func (r PostgresRepository) SelectOffer(ctx context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID) (Trip, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Trip{}, err
+	}
+	defer tx.Rollback()
+
+	var actualRider uuid.UUID
+	var bookingMode, status string
+	if err := tx.QueryRowContext(ctx, `
+		SELECT rider_user_id, booking_mode, status
+		FROM ride_requests
+		WHERE id = $1
+		FOR UPDATE
+	`, rideRequestID).Scan(&actualRider, &bookingMode, &status); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Trip{}, ErrMarketplaceNotOpen
+		}
+		return Trip{}, err
+	}
+	if actualRider != riderUserID {
+		return Trip{}, ErrMarketplaceOfferGone
+	}
+	if bookingMode != "offers" || status != "requested" {
+		return Trip{}, ErrMarketplaceNotOpen
+	}
+	if _, found, err := selectTripByRide(ctx, tx, rideRequestID); err != nil {
+		return Trip{}, err
+	} else if found {
+		return Trip{}, ErrMarketplaceNotOpen
+	}
+
+	var offerStatus string
+	if err := tx.QueryRowContext(ctx, `
+		SELECT status
+		FROM ride_offers
+		WHERE ride_request_id = $1 AND driver_user_id = $2
+		FOR UPDATE
+	`, rideRequestID, driverUserID).Scan(&offerStatus); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Trip{}, ErrMarketplaceOfferGone
+		}
+		return Trip{}, err
+	}
+	if offerStatus != "pending" {
+		return Trip{}, ErrMarketplaceOfferGone
+	}
+
+	if err := lockEligibleMarketplaceDriver(ctx, tx, driverUserID); err != nil {
+		return Trip{}, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE ride_offers
+		SET status = 'accepted', decided_at = NOW(), updated_at = NOW()
+		WHERE ride_request_id = $1 AND driver_user_id = $2
+	`, rideRequestID, driverUserID); err != nil {
+		return Trip{}, err
+	}
+
+	trip, err := insertMarketplaceTrip(ctx, tx, rideRequestID, riderUserID, driverUserID)
+	if err != nil {
+		return Trip{}, err
+	}
+	if err := closeCompetingOffers(ctx, tx, rideRequestID, driverUserID); err != nil {
+		return Trip{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return Trip{}, err
+	}
+	return trip, nil
+}
+
+func lockEligibleMarketplaceDriver(ctx context.Context, tx *sql.Tx, driverUserID uuid.UUID) error {
+	var locked uuid.UUID
+	err := tx.QueryRowContext(ctx, `
+		SELECT p.user_id
+		FROM driver_profiles p
+		JOIN driver_vehicles v ON v.driver_user_id = p.user_id
+		JOIN user_capabilities c ON c.user_id = p.user_id AND c.capability = 'driver'
+		WHERE p.user_id = $1
+		  AND p.status = 'active'
+		  AND p.is_online = TRUE
+		  AND NOT EXISTS (
+			SELECT 1 FROM ride_driver_candidates active
+			WHERE active.driver_user_id = p.user_id
+			  AND active.status IN ('pending', 'accepted')
+			  AND active.released_at IS NULL
+		  )
+		  AND NOT EXISTS (
+			SELECT 1 FROM trips t
+			WHERE t.driver_user_id = p.user_id
+			  AND t.status IN ('assigned', 'in_progress')
+		  )
+		FOR UPDATE OF p
+	`, driverUserID).Scan(&locked)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrDriverUnavailable
+	}
+	return err
+}
+
+func insertMarketplaceTrip(ctx context.Context, tx *sql.Tx, rideRequestID, riderUserID, driverUserID uuid.UUID) (Trip, error) {
+	var trip Trip
+	if err := tx.QueryRowContext(ctx, `
+		INSERT INTO trips (ride_request_id, rider_user_id, driver_user_id)
+		VALUES ($1, $2, $3)
+		RETURNING ride_request_id, rider_user_id, driver_user_id, status, assigned_at, started_at, completed_at
+	`, rideRequestID, riderUserID, driverUserID).Scan(
+		&trip.RideRequestID,
+		&trip.RiderUserID,
+		&trip.DriverUserID,
+		&trip.Status,
+		&trip.AssignedAt,
+		&trip.StartedAt,
+		&trip.CompletedAt,
+	); err != nil {
+		return Trip{}, err
+	}
+	return trip, nil
+}
+
+func closeCompetingOffers(ctx context.Context, tx *sql.Tx, rideRequestID, selectedDriverID uuid.UUID) error {
+	_, err := tx.ExecContext(ctx, `
+		UPDATE ride_offers
+		SET status = 'closed', decided_at = NOW(), updated_at = NOW()
+		WHERE ride_request_id = $1
+		  AND driver_user_id <> $2
+		  AND status = 'pending'
+	`, rideRequestID, selectedDriverID)
+	return err
+}
+
+func selectTripByRide(ctx context.Context, tx *sql.Tx, rideRequestID uuid.UUID) (Trip, bool, error) {
+	var trip Trip
+	err := tx.QueryRowContext(ctx, `
+		SELECT ride_request_id, rider_user_id, driver_user_id, status, assigned_at, started_at, completed_at
+		FROM trips
+		WHERE ride_request_id = $1
+	`, rideRequestID).Scan(
+		&trip.RideRequestID,
+		&trip.RiderUserID,
+		&trip.DriverUserID,
+		&trip.Status,
+		&trip.AssignedAt,
+		&trip.StartedAt,
+		&trip.CompletedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Trip{}, false, nil
+	}
+	if err != nil {
+		return Trip{}, false, err
+	}
+	return trip, true, nil
+}
