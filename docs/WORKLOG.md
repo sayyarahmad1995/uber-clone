@@ -10,9 +10,9 @@ Update this file after every meaningful work session.
 
 ## Current Status
 
-**Current engineering milestone:** Driver Candidate Accept/Reject Foundation — merged and verified.
+**Current engineering milestone:** Authentication hardening and session-extension correction — merged and verified through PR #12.
 
-**Current stopping point:** PR #9 (Ride Request required-location hardening) and PR #10 (Driver candidate accept/reject foundation) are merged. The immediate next business slice is candidate reselection after Driver rejection so a rejected ride can progress to another eligible Driver instead of remaining stranded.
+**Current stopping point:** PR #11 (verified-identity authentication enforcement) and PR #12 (session-extension contract correction) are merged and runtime-verified. The immediate next business slice remains candidate reselection after Driver rejection so a rejected ride can progress to another eligible Driver instead of remaining stranded.
 
 **Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until completed work provides new information.
 
@@ -30,6 +30,8 @@ Update this file after every meaningful work session.
 - [x] API Composition Cleanup — PR #8
 - [x] Ride Request required-location hardening — PR #9
 - [x] Driver Candidate Accept/Reject Foundation — PR #10
+- [x] Verified Identity Authentication Enforcement — PR #11
+- [x] Session Extension Contract Correction — PR #12
 
 ---
 
@@ -111,6 +113,71 @@ Merged through PR #10.
 
 ---
 
+## Verified Identity Authentication Enforcement
+
+Merged through PR #11.
+
+### Authentication contract
+
+`Register → unverified → login denied → verify identity → login succeeds → authenticated APIs succeed`
+
+### Implemented behavior
+
+- Unverified login is denied with `403 Forbidden` and application-owned `verification_required`.
+- A provider session created during an unverified login attempt is revoked best-effort before any token can be returned.
+- Session extension also requires a verified identity.
+- Protected application APIs reject stale/unverified sessions with `401 Unauthorized`.
+- Kratos verification state remains inside the authentication/identity adapters; it does not become part of the public User model.
+- OIDC replacement remains provider-neutral through the application-owned verification contract.
+- Verification recovery uses the existing `POST /v1/auth/verify` endpoint to initiate a fresh verification challenge for the same registered email.
+
+### Verification completed
+
+- Unverified login returns `403 verification_required` and does not leak an access token.
+- Restarting verification with the registered email returns a fresh application-owned `verification_id`.
+- Verification completion, subsequent login, and verified protected access succeed.
+- Unverified/stale sessions are rejected on protected APIs.
+
+### Deliberately deferred
+
+- Application-owned resend cooldowns.
+- Verification resend rate limiting.
+- Provider-specific resend timers or throttling details in the public API.
+
+For MVP, OTP/verification-flow expiry and provider-side throttling remain provider responsibilities. If application-level abuse protection is added later, it should remain provider-neutral and use application-owned errors such as `429 Too Many Requests` rather than exposing Kratos-specific mechanics.
+
+---
+
+## Session Extension Contract Correction
+
+Merged through PR #12.
+
+### Defect corrected
+
+`POST /v1/auth/session/extend` previously could return `200 OK` even when the provider had not advanced the persisted session expiry, causing `expires_in` to continue decreasing while the API implied that extension succeeded.
+
+### Application contract
+
+- Valid, verified session and provider advances `expires_at` → `200 OK` with refreshed `expires_in`.
+- Valid, verified session but provider does not advance `expires_at` → `409 Conflict` with application-owned `session_not_extendable`.
+- Expired/invalid session → `401 Unauthorized` with `invalid_credentials`.
+- Provider-specific HTTP status behavior does not define the public application contract.
+
+### Adapter invariant
+
+After a successful provider extension response, the adapter re-reads the provider session and requires the new `expires_at` to be strictly later than the pre-extension value. A successful provider HTTP status with unchanged expiry is treated as not extendable rather than as application success.
+
+### Verification completed
+
+- `go test ./...` passes.
+- `go vet ./...` passes.
+- Runtime verification with `SESSION_LIFESPAN=2m` and `SESSION_EARLIEST_POSSIBLE_EXTEND=60s`:
+  - Before 60 seconds: repeated extension attempts return `409 session_not_extendable`.
+  - After the eligibility interval: extension returns `200 OK` and resets `expires_in` to approximately 119 seconds.
+  - After the final extended session expires: extension returns `401 invalid_credentials`.
+
+---
+
 ## Next Business Vertical Slice
 
 **Candidate Reselection After Driver Rejection**
@@ -161,6 +228,7 @@ Exact later boundaries remain intentionally flexible.
 - Payments unless concretely required by an MVP slice.
 - Promotions.
 - Advanced analytics.
+- Authentication resend cooldown/rate-limit policy beyond provider defaults.
 
 ---
 
