@@ -33,7 +33,11 @@ func (app application) acceptRideRequestCandidate(w http.ResponseWriter, r *http
 			writeJSON(w, http.StatusOK, response)
 			return
 		}
-		if !errors.Is(marketplaceErr, offer.ErrRideNotFound) && !errors.Is(marketplaceErr, offer.ErrRideNotOpen) {
+		if errors.Is(marketplaceErr, offer.ErrRideNotOpen) {
+			writeOfferError(w, marketplaceErr)
+			return
+		}
+		if !errors.Is(marketplaceErr, offer.ErrRideNotFound) {
 			if writeOfferError(w, marketplaceErr) {
 				return
 			}
