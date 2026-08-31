@@ -37,6 +37,9 @@ func (r PostgresRepository) Match(ctx context.Context, rideRequestID, riderUserI
 		SELECT ride_request_id, driver_user_id, status, created_at, decided_at
 		FROM ride_driver_candidates
 		WHERE ride_request_id = $1
+		  AND status IN ('pending', 'accepted')
+		ORDER BY created_at DESC, driver_user_id ASC
+		LIMIT 1
 	`, rideRequestID).Scan(
 		&existing.RideRequestID,
 		&existing.DriverUserID,
@@ -63,9 +66,15 @@ func (r PostgresRepository) Match(ctx context.Context, rideRequestID, riderUserI
 		WHERE p.status = 'active'
 		  AND p.is_online = TRUE
 		  AND p.user_id <> $1
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM ride_driver_candidates prior
+			WHERE prior.ride_request_id = $2
+			  AND prior.driver_user_id = p.user_id
+		  )
 		ORDER BY p.updated_at ASC, p.user_id ASC
 		LIMIT 1
-	`, riderUserID).Scan(&driverUserID); err != nil {
+	`, riderUserID, rideRequestID).Scan(&driverUserID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Result{}, ErrNoEligibleDriver
 		}

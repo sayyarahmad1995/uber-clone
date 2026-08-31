@@ -10,9 +10,9 @@ Update this file after every meaningful work session.
 
 ## Current Status
 
-**Current engineering milestone:** Authentication hardening and session-extension correction — merged and verified through PR #12.
+**Current engineering milestone:** Candidate Reselection After Driver Rejection — implemented and verified in PR #14, pending merge.
 
-**Current stopping point:** PR #11 (verified-identity authentication enforcement) and PR #12 (session-extension contract correction) are merged and runtime-verified. The immediate next business slice remains candidate reselection after Driver rejection so a rejected ride can progress to another eligible Driver instead of remaining stranded.
+**Current stopping point:** PR #14 now retains rejected candidate attempts, excludes previously rejected Drivers for the same ride, and selects the next eligible Driver while preserving a single active candidate per ride. Static, runtime, authorization, exhaustion, and concurrency verification are complete. Concurrent matching of two different rides also exposed the next concrete business invariant: one Driver can currently hold active candidates for multiple rides.
 
 **Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until completed work provides new information.
 
@@ -32,6 +32,7 @@ Update this file after every meaningful work session.
 - [x] Driver Candidate Accept/Reject Foundation — PR #10
 - [x] Verified Identity Authentication Enforcement — PR #11
 - [x] Session Extension Contract Correction — PR #12
+- [x] Candidate Reselection After Driver Rejection — PR #14 (verified, pending merge)
 
 ---
 
@@ -178,15 +179,63 @@ After a successful provider extension response, the adapter re-reads the provide
 
 ---
 
+## Candidate Reselection After Driver Rejection
+
+Implemented and verified in PR #14; pending merge.
+
+### Business flow
+
+`Requested ride → candidate Driver rejects → rejected attempt retained → matching excludes prior Drivers → next eligible Driver selected`
+
+### Implemented contract
+
+- Candidate history is retained per `(ride_request_id, driver_user_id)`.
+- A ride has at most one active `pending` or `accepted` candidate.
+- Repeated matching while a candidate is pending or accepted is idempotent and returns that candidate.
+- After rejection, matching excludes every Driver previously attempted for that ride and selects the next eligible Driver using deterministic ordering.
+- Rejected Drivers remain eligible for different rides; rejection history is ride-scoped.
+- When all eligible Drivers have rejected a ride, matching returns `409 Conflict` with `no eligible driver available`.
+- Ride-level `FOR UPDATE` locking remains the serialization point for concurrent match attempts.
+- Existing HTTP and domain contracts remain unchanged.
+
+### Verification completed
+
+- `go test ./...` passes.
+- `go vet ./...` passes.
+- Docker/Compose runtime and migration startup succeed after using the repository's valid Go-style Kratos duration configuration.
+- Rejection followed by rematch selects a different Driver.
+- Multiple sequential rejections progress through different eligible Drivers without reselection.
+- Pending candidate matching is idempotent.
+- Accepted candidate matching is idempotent.
+- Exhausting all four eligible Drivers returns `409 no eligible driver available`.
+- A Driver rejected on one ride remains eligible on a different ride.
+- While D1 is the pending candidate, D2/D3/D4 cannot accept the ride and receive `404 ride request candidate not found`; database inspection confirms only one pending candidate row.
+- Ten concurrent match calls against an existing pending candidate all return the same Driver and original `created_at`.
+- Ten concurrent first-match calls against a ride with zero candidates produce exactly one `201 Created` and nine `200 OK` responses, all returning the same Driver and `created_at`; database inspection confirms exactly one pending candidate row.
+- Concurrent first matches for two different riders/rides can currently select the same Driver. This confirms the next missing business invariant is Driver exclusivity across active ride candidates rather than a defect in the per-ride reselection contract.
+
+### Deliberately deferred
+
+- Driver reservation/exclusivity across different rides.
+- Candidate timeout/expiry.
+- Dispatch queues.
+- Geographic/proximity matching.
+- Trip execution state.
+- Pricing/payments.
+
+---
+
 ## Next Business Vertical Slice
 
-**Candidate Reselection After Driver Rejection**
+**Driver Active-Candidate Exclusivity Across Rides**
 
 Expected end-to-end outcome:
 
-`Requested ride → candidate Driver rejects → rejected attempt is retained → matching excludes rejected Driver → next eligible Driver can be selected`
+`Concurrent ride requests → matching reserves different eligible Drivers → one Driver cannot hold active candidates for multiple rides`
 
-The current one-candidate-per-ride model is insufficient for this behavior. The next slice should introduce the minimum candidate-attempt history needed to preserve rejection history and select a subsequent eligible Driver. Avoid introducing dispatch queues, Driver reservations, geographic matching, pricing, trip execution, or other unrelated complexity unless a concrete invariant requires it.
+The current matching model serializes candidate creation per ride but not across rides. Concurrent first-match requests for two different rides can therefore select the same eligible Driver. The next slice should introduce the minimum application and persistence invariant needed to exclude or serialize Drivers that already hold an active `pending` or `accepted` candidate. Preserve rejected history as ride-scoped and avoid introducing trip execution, geographic matching, dispatch queues, pricing, or other unrelated complexity.
+
+The concurrent two-rider/two-ride scenario verified during PR #14 should become a primary acceptance test for this slice.
 
 ---
 
@@ -204,7 +253,7 @@ The same boundary rule applies to future maps, routing, payments, notifications,
 
 ---
 
-## Rough MVP Direction After Reselection
+## Rough MVP Direction After Driver Exclusivity
 
 - Trip execution.
 - Live location/status updates.
