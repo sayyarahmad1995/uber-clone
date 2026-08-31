@@ -10,11 +10,11 @@ Update this file after every meaningful work session.
 
 ## Current Status
 
-**Current engineering milestone:** Rider Offer Selection Foundation — implemented and verified through PR #18.
+**Current engineering milestone:** Driver Marketplace Discovery Foundation — implemented, runtime-verified, and merged through PR #19.
 
-**Current stopping point:** Offers-mode Ride Requests now support atomic commitment. A Driver can accept the Rider's proposed fare for immediate assignment, or submit a counteroffer that the owning Rider may accept or reject. Marketplace commitment revalidates Driver eligibility at assignment time, creates exactly one application-owned Trip, closes competing pending offers, and remains mutually exclusive with automatic matching. Runtime concurrency verification covered simultaneous Driver acceptance, simultaneous Rider selection, same-Driver marketplace races, and marketplace-versus-automatic cross-strategy contention without duplicate active commitments. The next MVP slice should make the marketplace discoverable to Drivers without weakening the assignment invariants established here.
+**Current stopping point:** Eligible Drivers can now discover open offers-mode Ride Requests through an application-owned marketplace feed without out-of-band Ride Request IDs. Discovery is read-only and non-reserving, suppresses inventory for Drivers who are not operationally eligible, excludes the Driver's own Rider requests and automatic-mode requests, projects the authenticated Driver's existing offer, and removes rides after assignment. Existing offer submission and Trip assignment remain the authoritative write paths and continue to revalidate eligibility atomically.
 
-**Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until completed work provides new information.
+**Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until completed work provides new information. The next business slice should be selected from a concrete Rider/Driver client-flow requirement rather than introducing location, maps, or notification infrastructure speculatively.
 
 ---
 
@@ -37,6 +37,7 @@ Update this file after every meaningful work session.
 - [x] Trip Execution Foundation — PR #16
 - [x] Ride Offer Marketplace Foundation — PR #17
 - [x] Rider Offer Selection Foundation — PR #18
+- [x] Driver Marketplace Discovery Foundation — PR #19
 
 ---
 
@@ -440,23 +441,67 @@ Implemented and verified through PR #18.
 
 ---
 
+## Driver Marketplace Discovery Foundation
+
+Implemented, verified, and merged through PR #19.
+
+### Business flow
+
+`Eligible online Driver opens marketplace → application lists open offers-mode Ride Requests → Driver chooses a Ride Request → Driver accepts proposed fare or submits/updates a counteroffer through the existing marketplace contract`
+
+### Implemented contract
+
+- Driver marketplace discovery endpoint: `GET /v1/driver/marketplace/ride-requests`.
+- Discovery is read-only and does not reserve Drivers, mutate Ride Requests, create candidates, create offers, or create Trips.
+- Only Ride Requests with `booking_mode=offers`, `status=requested`, and no Trip are discoverable.
+- The authenticated Driver's own Ride Requests are excluded, preserving shared-account Rider/Driver semantics.
+- Drivers who are not operationally eligible receive an empty feed. Eligibility requires Driver capability, an active Driver profile, online availability, a vehicle, no unreleased active candidate, and no active Trip.
+- Discovery returns pickup, destination, proposed fare, Ride Request creation time, and the authenticated Driver's existing offer when one exists.
+- Rider identity is not exposed in the Driver marketplace response.
+- Results are deterministic, newest-first, and bounded to 50 Ride Requests for the MVP.
+- Discovery is a snapshot only; offer submission and Trip assignment remain authoritative and revalidate eligibility/availability atomically.
+
+### Verification completed
+
+- `go test ./...` passes on the PR head.
+- `go vet ./...` passes on the PR head.
+- `gofmt` produced no changes.
+- Docker image builds successfully and Docker Compose starts the rebuilt API successfully.
+- A free eligible Driver sees open offers-mode Ride Requests in newest-first order.
+- Automatic-mode Ride Requests are absent from the feed.
+- A Driver with an active Trip receives an empty feed and cannot submit another offer; completing the Trip restores discovery eligibility.
+- An offline Driver receives an empty feed; returning online restores eligibility when no other commitment exists.
+- Submitting a counteroffer keeps the Ride Request discoverable and projects the Driver's pending `own_offer` into the feed.
+- Historical pending offers are projected as `own_offer` while their Ride Requests remain open.
+- Once a Ride Request is assigned and a Trip exists, it disappears from another eligible Driver's feed.
+- A shared account with both Rider and Driver capability does not see its own Rider-created marketplace request in its Driver feed.
+- The same self-created request is visible to another free eligible Driver, confirming that self-exclusion is owner-specific rather than a global visibility defect.
+
+### Deliberately deferred
+
+- Live Driver location.
+- Geographic filtering and proximity ranking.
+- Maps/routing provider integration.
+- Push notifications or marketplace subscriptions.
+- Cursor pagination.
+- Offer expiration/cancellation.
+- Pricing/surge.
+- Payments.
+
+---
+
 ## Next Business Vertical Slice
 
-Driver Marketplace Discovery Foundation.
+Not fixed yet. Select the next slice from the next concrete Rider/Driver MVP client flow rather than introducing infrastructure speculatively.
 
-Target business flow:
+Strong candidates, only when a consuming flow requires them:
 
-`Eligible online Driver opens marketplace → application lists open offers-mode Ride Requests → Driver chooses a Ride Request → Driver accepts proposed fare or submits a counteroffer using the existing commitment contract`
+- Live Driver Location Foundation if marketplace ranking or active-trip tracking needs current coordinates.
+- Marketplace geographic filtering/ranking once location ownership and freshness semantics are defined.
+- Rider/Driver current-trip read models if the client needs assignment/execution state retrieval beyond mutation responses.
+- Cancellation semantics if the next end-to-end flow requires Rider or Driver cancellation before completion.
 
-Key invariants for the next slice:
-
-- Discovery is a read model; it must not reserve Drivers or mutate Ride Requests.
-- Only open `offers` Ride Requests without an assigned Trip are discoverable.
-- Drivers who are not currently eligible to participate should not receive actionable marketplace inventory.
-- The read model should expose application-owned Ride Request and proposed-fare data without provider-specific concepts.
-- Keep initial discovery simple and deterministic; do not introduce maps-provider coupling or speculative dispatch infrastructure.
-- Geographic filtering/ranking should be added only when a concrete location/UX requirement consumes it.
-- Existing offer submission and Trip assignment remain the authoritative write paths; discovery must not duplicate their eligibility or commitment semantics beyond what is necessary to avoid obviously non-actionable results.
+The next slice must preserve the established boundary: external maps, routing, notification, or payment systems implement application-defined ports and must not define business models or public APIs.
 
 ---
 
@@ -474,12 +519,13 @@ The same boundary rule applies to future maps, routing, payments, notifications,
 
 ---
 
-## Rough MVP Direction After Rider Offer Selection Foundation
+## Rough MVP Direction After Driver Marketplace Discovery Foundation
 
-- Driver Marketplace Discovery Foundation so Drivers can discover open offers-mode Ride Requests without out-of-band IDs.
-- Live location/status updates after booking/assignment semantics are stable and a concrete discovery or trip UX requires them.
-- Trip lifecycle hardening where concrete product requirements demand it.
-- Rider-facing trip/history read models when required by the client flow.
+- Choose the next concrete Rider/Driver client flow before adding infrastructure.
+- Add live location/status only when discovery ranking or active-trip UX consumes it.
+- Add geographic marketplace filtering/ranking only after application-owned location and freshness semantics exist.
+- Harden Trip lifecycle or add cancellation/read models when concrete client flows require them.
+- Add Rider-facing trip/history read models when required by the client flow.
 
 Exact later boundaries remain intentionally flexible.
 
