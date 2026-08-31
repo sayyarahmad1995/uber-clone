@@ -72,8 +72,15 @@ func (r PostgresRepository) Match(ctx context.Context, rideRequestID, riderUserI
 			WHERE prior.ride_request_id = $2
 			  AND prior.driver_user_id = p.user_id
 		  )
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM ride_driver_candidates active
+			WHERE active.driver_user_id = p.user_id
+			  AND active.status IN ('pending', 'accepted')
+		  )
 		ORDER BY p.updated_at ASC, p.user_id ASC
 		LIMIT 1
+		FOR UPDATE OF p SKIP LOCKED
 	`, riderUserID, rideRequestID).Scan(&driverUserID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Result{}, ErrNoEligibleDriver
