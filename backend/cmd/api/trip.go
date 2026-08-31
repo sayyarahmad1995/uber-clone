@@ -85,7 +85,11 @@ func (app application) transitionTrip(w http.ResponseWriter, r *http.Request, tr
 }
 
 func writeTrip(w http.ResponseWriter, result trip.Trip) {
-	writeJSON(w, http.StatusOK, map[string]any{
+	writeJSON(w, http.StatusOK, tripResponse(result))
+}
+
+func tripResponse(result trip.Trip) map[string]any {
+	return map[string]any{
 		"ride_request_id": result.RideRequestID,
 		"rider_user_id":   result.RiderUserID,
 		"driver_user_id":  result.DriverUserID,
@@ -93,5 +97,5 @@ func writeTrip(w http.ResponseWriter, result trip.Trip) {
 		"assigned_at":     result.AssignedAt,
 		"started_at":      result.StartedAt,
 		"completed_at":    result.CompletedAt,
-	})
+	}
 }
