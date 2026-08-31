@@ -10,9 +10,9 @@ Update this file after every meaningful work session.
 
 ## Current Status
 
-**Current engineering milestone:** Ride Offer Marketplace Foundation — implemented and verified through PR #17.
+**Current engineering milestone:** Rider Offer Selection Foundation — implemented and verified through PR #18.
 
-**Current stopping point:** Ride Requests now support application-owned `automatic` and `offers` booking modes. In offers mode, the Rider supplies a proposed fare, eligible Drivers can submit or update one bounded offer each, and the owning Rider can list those offers. Offers remain non-reserving: they do not create `ride_driver_candidates` or Trips. Existing automatic matching remains backward compatible. Static tests, Docker startup/migration behavior, fare-boundary behavior, offer updates/listing, persistence, and automatic-mode regression behavior have been verified. The next business slice is Rider Offer Selection Foundation, where Rider selection must atomically create exclusive assignment while keeping Trip agnostic to how the Driver was selected.
+**Current stopping point:** Offers-mode Ride Requests now support atomic commitment. A Driver can accept the Rider's proposed fare for immediate assignment, or submit a counteroffer that the owning Rider may accept or reject. Marketplace commitment revalidates Driver eligibility at assignment time, creates exactly one application-owned Trip, closes competing pending offers, and remains mutually exclusive with automatic matching. Runtime concurrency verification covered simultaneous Driver acceptance, simultaneous Rider selection, same-Driver marketplace races, and marketplace-versus-automatic cross-strategy contention without duplicate active commitments. The next MVP slice should make the marketplace discoverable to Drivers without weakening the assignment invariants established here.
 
 **Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until completed work provides new information.
 
@@ -36,6 +36,7 @@ Update this file after every meaningful work session.
 - [x] Driver Active-Candidate Exclusivity Across Rides — PR #15
 - [x] Trip Execution Foundation — PR #16
 - [x] Ride Offer Marketplace Foundation — PR #17
+- [x] Rider Offer Selection Foundation — PR #18
 
 ---
 
@@ -381,26 +382,81 @@ This slice intentionally stops before Rider selection and exclusive assignment.
 
 ---
 
+## Rider Offer Selection Foundation
+
+Implemented and verified through PR #18.
+
+### Business flow
+
+`Rider creates offers-mode request → Driver either accepts proposed fare or submits counteroffer → exact proposed-fare acceptance assigns immediately → Rider may accept/reject counteroffers → accepted counteroffer assigns atomically`
+
+### Implemented contract
+
+- Offer decision states are `pending`, `accepted`, `rejected`, and `closed`, with `decided_at` recorded for resolved offers.
+- Exact proposed-fare acceptance by an eligible Driver creates an accepted offer and assigned Trip atomically.
+- Repeating exact proposed-fare acceptance by the winning Driver is idempotent and returns the original assignment timestamps.
+- Another Driver attempting to accept after assignment receives marketplace conflict rather than an automatic-candidate error.
+- Counteroffers remain non-reserving until Rider selection.
+- The owning Rider can accept or reject a specific pending Driver offer.
+- Selecting a counteroffer revalidates Driver capability, active profile, online state, vehicle, active candidate state, and active Trip state while serialized under the marketplace transaction.
+- Successful marketplace assignment closes competing pending offers while preserving offer history.
+- Marketplace assignment creates no `ride_driver_candidates`; automatic dispatch and marketplace selection converge at the same application-owned Trip boundary.
+- Automatic matching excludes Drivers with active Trips, including Trips created through the marketplace.
+- A partial unique index permits at most one accepted offer per Ride Request.
+- A partial unique index permits at most one active Trip (`assigned` or `in_progress`) per Driver.
+- PostgreSQL active-Trip uniqueness races are mapped narrowly to application-owned Driver-unavailable conflict instead of leaking `500 Internal Server Error`.
+- Endpoints:
+  - existing `POST /v1/driver/ride-requests/{ride_request_id}/accept` supports automatic candidate acceptance and offers-mode proposed-fare acceptance.
+  - existing `PUT /v1/driver/ride-requests/{ride_request_id}/offer` assigns immediately when the submitted amount equals the Rider proposed fare.
+  - `POST /v1/ride-requests/{ride_request_id}/offers/{driver_user_id}/accept`
+  - `POST /v1/ride-requests/{ride_request_id}/offers/{driver_user_id}/reject`
+
+### Verification completed
+
+- `go test ./...` passes on the final implementation head.
+- `go vet ./...` passes on the final implementation head.
+- Clean Docker startup applies migrations through `011_rider_offer_selection_foundation.sql`.
+- Exact proposed-fare Driver acceptance returns `200 OK`, creates exactly one accepted offer and one assigned Trip, and repeated acceptance is idempotent.
+- Losing exact-fare acceptance after another Driver wins returns `409 Conflict` with marketplace-not-open semantics, not automatic candidate `404`.
+- Rider rejection persists `rejected`; Rider acceptance persists the selected offer as `accepted`, closes the competing pending offer, creates exactly one Trip, and creates zero candidate rows.
+- Taking a Driver offline after offer submission causes Rider acceptance to return `409 Conflict`; the pending offer remains unchanged and no Trip is created.
+- Automatic matching skips a Driver who already has an active marketplace Trip.
+- Marketplace assignment rejects a Driver who already has an active automatic candidate.
+- Two Drivers exact-accepting the same offers ride concurrently produce exactly one assignment and no `500`; the losing Driver receives controlled conflict.
+- Two Rider selections against different pending offers concurrently produce one `200`, one `409`, exactly one accepted offer, one closed competing offer, and one Trip.
+- The same Driver exact-accepting two independent marketplace rides concurrently produces one `200`, one `409`, one active Trip, and no partial loser state.
+- Marketplace acceptance racing with automatic matching preserves one active commitment per Driver; the automatic matcher selects another eligible Driver when appropriate and no cross-strategy double commitment occurs.
+- Marketplace-created Trips start and complete through the existing Trip execution endpoints, and completion releases the Driver for future work.
+
+### Deliberately deferred
+
+- Driver discovery/feed and geospatial targeting.
+- Offer expiration/cancellation.
+- Rider cancellation policy.
+- Back-and-forth negotiation history.
+- Platform fare estimation/surge.
+- Payments.
+- Live location.
+
+---
+
 ## Next Business Vertical Slice
 
-Rider Offer Selection Foundation.
+Driver Marketplace Discovery Foundation.
 
 Target business flow:
 
-`Rider lists offers → Rider selects one Driver offer → application atomically validates availability and creates exclusive assignment → competing offers become non-actionable → assigned Trip exists`
+`Eligible online Driver opens marketplace → application lists open offers-mode Ride Requests → Driver chooses a Ride Request → Driver accepts proposed fare or submits a counteroffer using the existing commitment contract`
 
 Key invariants for the next slice:
 
-- Rider can select only an offer belonging to their own open offers-mode Ride Request.
-- Selection must serialize concurrent Rider/Driver marketplace changes.
-- The selected Driver must still be eligible/unassigned at selection time; stale eligibility at offer-submission time is insufficient.
-- If the selected Driver is no longer available, return conflict rather than silently choosing another Driver.
-- Exactly one selected Driver/assignment may win under concurrent selection attempts.
-- Competing offers should remain historical data but become non-actionable once the marketplace closes.
-- Trip should remain agnostic to assignment strategy: automatic dispatch and offers marketplace must converge on the same application-owned assignment/Trip boundary.
-- Do not reinterpret `ride_driver_candidates` as bids/offers.
-
-The exact persistence representation for marketplace closure/selected offer should be decided in that slice based on the atomicity requirements.
+- Discovery is a read model; it must not reserve Drivers or mutate Ride Requests.
+- Only open `offers` Ride Requests without an assigned Trip are discoverable.
+- Drivers who are not currently eligible to participate should not receive actionable marketplace inventory.
+- The read model should expose application-owned Ride Request and proposed-fare data without provider-specific concepts.
+- Keep initial discovery simple and deterministic; do not introduce maps-provider coupling or speculative dispatch infrastructure.
+- Geographic filtering/ranking should be added only when a concrete location/UX requirement consumes it.
+- Existing offer submission and Trip assignment remain the authoritative write paths; discovery must not duplicate their eligibility or commitment semantics beyond what is necessary to avoid obviously non-actionable results.
 
 ---
 
@@ -418,12 +474,12 @@ The same boundary rule applies to future maps, routing, payments, notifications,
 
 ---
 
-## Rough MVP Direction After Ride Offer Marketplace Foundation
+## Rough MVP Direction After Rider Offer Selection Foundation
 
-- Rider Offer Selection Foundation and marketplace-driven Trip assignment.
-- Driver/Rider marketplace discovery/read models only where a concrete UI flow needs them.
-- Live location/status updates after booking/assignment semantics are stable.
+- Driver Marketplace Discovery Foundation so Drivers can discover open offers-mode Ride Requests without out-of-band IDs.
+- Live location/status updates after booking/assignment semantics are stable and a concrete discovery or trip UX requires them.
 - Trip lifecycle hardening where concrete product requirements demand it.
+- Rider-facing trip/history read models when required by the client flow.
 
 Exact later boundaries remain intentionally flexible.
 

@@ -48,13 +48,15 @@ func newApplication(cfg config) (application, func(), error) {
 		return application{}, nil, fmt.Errorf("identity infrastructure initialization failed: %w", err)
 	}
 
+	tripService := trip.NewService(trip.NewPostgresRepository(db))
+
 	return application{
 		users:    user.NewService(user.NewPostgresRepository(db)),
 		drivers:  driver.NewService(driver.NewPostgresRepository(db)),
 		rides:    ride.NewService(ride.NewPostgresRepository(db)),
 		matching: matching.NewService(matching.NewPostgresRepository(db)),
-		offers:   offer.NewService(offer.NewPostgresRepository(db)),
-		trips:    trip.NewService(trip.NewPostgresRepository(db)),
+		offers:   offer.NewService(offer.NewPostgresRepository(db), tripService),
+		trips:    tripService,
 		db:       db,
 		identity: identityProvider,
 		auth:     auth.NewHandler(auth.NewService(authProvider)),

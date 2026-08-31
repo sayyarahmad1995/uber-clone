@@ -50,6 +50,8 @@ func (app application) registerRideRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /v1/ride-requests", app.authenticated(app.createRideRequest))
 	mux.Handle("POST /v1/ride-requests/{ride_request_id}/match", app.authenticated(app.matchRideRequest))
 	mux.Handle("GET /v1/ride-requests/{ride_request_id}/offers", app.authenticated(app.listRideOffers))
+	mux.Handle("POST /v1/ride-requests/{ride_request_id}/offers/{driver_user_id}/accept", app.authenticated(app.acceptRideOffer))
+	mux.Handle("POST /v1/ride-requests/{ride_request_id}/offers/{driver_user_id}/reject", app.authenticated(app.rejectRideOffer))
 }
 
 func (app application) authenticated(handler http.HandlerFunc) http.Handler {

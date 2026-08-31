@@ -85,6 +85,12 @@ func (r PostgresRepository) Match(ctx context.Context, rideRequestID, riderUserI
 			  AND active.status IN ('pending', 'accepted')
 			  AND active.released_at IS NULL
 		  )
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM trips t
+			WHERE t.driver_user_id = p.user_id
+			  AND t.status IN ('assigned', 'in_progress')
+		  )
 		ORDER BY p.updated_at ASC, p.user_id ASC
 		LIMIT 1
 		FOR UPDATE OF p SKIP LOCKED

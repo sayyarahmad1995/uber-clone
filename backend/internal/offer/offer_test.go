@@ -6,13 +6,14 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/trip"
 )
 
 type fakeRepository struct {
-	market           Market
-	upsertedAmount   int64
-	upsertedMinimum  int64
-	upsertedMaximum  int64
+	market          Market
+	upsertedAmount  int64
+	upsertedMinimum int64
+	upsertedMaximum int64
 }
 
 func (f *fakeRepository) Market(context.Context, uuid.UUID) (Market, error) {
@@ -26,11 +27,20 @@ func (f *fakeRepository) Upsert(_ context.Context, rideRequestID, driverUserID u
 		DriverUserID:  driverUserID,
 		AmountMinor:   amountMinor,
 		Currency:      currency,
+		Status:        StatusPending,
 	}, nil
 }
 
 func (f *fakeRepository) ListForRider(context.Context, uuid.UUID, uuid.UUID) ([]Offer, error) {
 	return nil, nil
+}
+
+func (f *fakeRepository) Reject(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) (Offer, error) {
+	return Offer{}, nil
+}
+
+func (f *fakeRepository) Get(context.Context, uuid.UUID, uuid.UUID) (Offer, error) {
+	return Offer{}, nil
 }
 
 func TestBoundsUseNinetyToOneHundredThirtyPercent(t *testing.T) {
@@ -40,7 +50,7 @@ func TestBoundsUseNinetyToOneHundredThirtyPercent(t *testing.T) {
 	}
 }
 
-func TestSubmitAcceptsBoundaryAmounts(t *testing.T) {
+func TestSubmitAcceptsBoundaryCounteroffers(t *testing.T) {
 	for _, amount := range []int64{9000, 13000} {
 		repo := &fakeRepository{
 			market: Market{
@@ -49,7 +59,7 @@ func TestSubmitAcceptsBoundaryAmounts(t *testing.T) {
 				Currency:            "PKR",
 			},
 		}
-		service := NewService(repo)
+		service := NewService(repo, trip.Service{})
 		if _, err := service.Submit(context.Background(), repo.market.RideRequestID, uuid.New(), amount); err != nil {
 			t.Fatalf("Submit(%d) returned error: %v", amount, err)
 		}
@@ -64,7 +74,7 @@ func TestSubmitRejectsOutsideRange(t *testing.T) {
 			Currency:            "PKR",
 		},
 	}
-	service := NewService(repo)
+	service := NewService(repo, trip.Service{})
 	for _, amount := range []int64{8999, 13001} {
 		_, err := service.Submit(context.Background(), repo.market.RideRequestID, uuid.New(), amount)
 		if !errors.Is(err, ErrAmountOutOfRange) {
