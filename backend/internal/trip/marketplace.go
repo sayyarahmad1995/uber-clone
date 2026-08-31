@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 func (r PostgresRepository) AcceptProposedFare(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Trip, error) {
@@ -191,6 +192,10 @@ func insertMarketplaceTrip(ctx context.Context, tx *sql.Tx, rideRequestID, rider
 		&trip.StartedAt,
 		&trip.CompletedAt,
 	); err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "trips_active_driver_idx" {
+			return Trip{}, ErrDriverUnavailable
+		}
 		return Trip{}, err
 	}
 	return trip, nil
