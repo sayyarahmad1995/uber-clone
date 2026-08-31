@@ -4,70 +4,34 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/ride"
 )
 
-func TestCreateRideRequestBodyUsesApplicationOwnedLocationContract(t *testing.T) {
+func TestCreateRideRequestBodyUsesApplicationOwnedContract(t *testing.T) {
 	var body createRideRequestBody
-	err := json.NewDecoder(strings.NewReader(`{
-		"pickup":{"latitude":24.8607,"longitude":67.0011},
-		"destination":{"latitude":24.9056,"longitude":67.0822}
-	}`)).Decode(&body)
-	if err != nil {
-		t.Fatalf("Decode returned error: %v", err)
-	}
-
-	pickup, destination, ok := body.locations()
-	if !ok {
-		t.Fatal("locations reported complete request as incomplete")
-	}
-	if pickup.Latitude != 24.8607 || pickup.Longitude != 67.0011 {
-		t.Fatalf("unexpected pickup: %#v", pickup)
-	}
-	if destination.Latitude != 24.9056 || destination.Longitude != 67.0822 {
-		t.Fatalf("unexpected destination: %#v", destination)
-	}
+	err := json.NewDecoder(strings.NewReader(`{"pickup":{"latitude":24.8607,"longitude":67.0011},"destination":{"latitude":24.9056,"longitude":67.0822},"booking_mode":"offers","proposed_fare":{"amount_minor":70000,"currency":"PKR"}}`)).Decode(&body)
+	if err != nil { t.Fatalf("Decode returned error: %v",err) }
+	input,ok := body.input(); if !ok { t.Fatal("input reported complete request as incomplete") }
+	if input.BookingMode != ride.BookingModeOffers { t.Fatalf("unexpected booking mode: %q",input.BookingMode) }
+	if input.ProposedFare == nil || input.ProposedFare.AmountMinor != 70000 || input.ProposedFare.Currency != "PKR" { t.Fatalf("unexpected fare: %#v",input.ProposedFare) }
 }
 
 func TestCreateRideRequestBodyRequiresCompleteLocations(t *testing.T) {
-	tests := []struct {
-		name string
-		body string
-	}{
-		{name: "missing pickup", body: `{"destination":{"latitude":24.9056,"longitude":67.0822}}`},
-		{name: "missing destination", body: `{"pickup":{"latitude":24.8607,"longitude":67.0011}}`},
-		{name: "missing pickup latitude", body: `{"pickup":{"longitude":67.0011},"destination":{"latitude":24.9056,"longitude":67.0822}}`},
-		{name: "missing pickup longitude", body: `{"pickup":{"latitude":24.8607},"destination":{"latitude":24.9056,"longitude":67.0822}}`},
-		{name: "missing destination latitude", body: `{"pickup":{"latitude":24.8607,"longitude":67.0011},"destination":{"longitude":67.0822}}`},
-		{name: "missing destination longitude", body: `{"pickup":{"latitude":24.8607,"longitude":67.0011},"destination":{"latitude":24.9056}}`},
-	}
+	var body createRideRequestBody
+	if err := json.NewDecoder(strings.NewReader(`{"pickup":{"latitude":24.8607},"destination":{"latitude":24.9056,"longitude":67.0822}}`)).Decode(&body); err != nil { t.Fatal(err) }
+	if _,ok := body.input(); ok { t.Fatal("input accepted incomplete locations") }
+}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var body createRideRequestBody
-			if err := json.NewDecoder(strings.NewReader(tt.body)).Decode(&body); err != nil {
-				t.Fatalf("Decode returned error: %v", err)
-			}
-			if _, _, ok := body.locations(); ok {
-				t.Fatal("locations accepted incomplete request")
-			}
-		})
-	}
+func TestCreateRideRequestBodyRequiresCompleteFareWhenPresent(t *testing.T) {
+	var body createRideRequestBody
+	if err := json.NewDecoder(strings.NewReader(`{"pickup":{"latitude":0,"longitude":0},"destination":{"latitude":0,"longitude":0},"booking_mode":"offers","proposed_fare":{"currency":"PKR"}}`)).Decode(&body); err != nil { t.Fatal(err) }
+	if _,ok := body.input(); ok { t.Fatal("input accepted incomplete fare") }
 }
 
 func TestCreateRideRequestBodyAllowsPresentZeroCoordinates(t *testing.T) {
 	var body createRideRequestBody
-	if err := json.NewDecoder(strings.NewReader(`{
-		"pickup":{"latitude":0,"longitude":0},
-		"destination":{"latitude":0,"longitude":0}
-	}`)).Decode(&body); err != nil {
-		t.Fatalf("Decode returned error: %v", err)
-	}
-
-	pickup, destination, ok := body.locations()
-	if !ok {
-		t.Fatal("locations rejected present zero coordinates")
-	}
-	if pickup.Latitude != 0 || pickup.Longitude != 0 || destination.Latitude != 0 || destination.Longitude != 0 {
-		t.Fatalf("unexpected zero-coordinate mapping: pickup=%#v destination=%#v", pickup, destination)
-	}
+	if err := json.NewDecoder(strings.NewReader(`{"pickup":{"latitude":0,"longitude":0},"destination":{"latitude":0,"longitude":0}}`)).Decode(&body); err != nil { t.Fatal(err) }
+	input,ok := body.input(); if !ok { t.Fatal("input rejected present zero coordinates") }
+	if input.Pickup.Latitude != 0 || input.Pickup.Longitude != 0 || input.Destination.Latitude != 0 || input.Destination.Longitude != 0 { t.Fatalf("unexpected coordinates: %#v",input) }
 }

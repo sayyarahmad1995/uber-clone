@@ -9,46 +9,18 @@ import (
 )
 
 var (
-	ErrRideNotFound      = errors.New("ride request not found")
-	ErrNoEligibleDriver  = errors.New("no eligible driver available")
+	ErrRideNotFound = errors.New("ride request not found")
+	ErrRideNotMatchable = errors.New("ride request does not use automatic matching")
+	ErrNoEligibleDriver = errors.New("no eligible driver available")
 	ErrCandidateNotFound = errors.New("driver candidate not found")
 	ErrCandidateResolved = errors.New("driver candidate already resolved")
 )
-
 type CandidateStatus string
-
-const (
-	CandidateStatusPending  CandidateStatus = "pending"
-	CandidateStatusAccepted CandidateStatus = "accepted"
-	CandidateStatusRejected CandidateStatus = "rejected"
-)
-
-type Candidate struct {
-	RideRequestID uuid.UUID
-	DriverUserID  uuid.UUID
-	Status        CandidateStatus
-	CreatedAt     time.Time
-	DecidedAt     *time.Time
-}
-
-type Result struct {
-	Candidate Candidate
-	Created   bool
-}
-
-type Repository interface {
-	Match(ctx context.Context, rideRequestID, riderUserID uuid.UUID) (Result, error)
-	Reject(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Candidate, error)
-}
-
+const ( CandidateStatusPending CandidateStatus="pending"; CandidateStatusAccepted CandidateStatus="accepted"; CandidateStatusRejected CandidateStatus="rejected" )
+type Candidate struct { RideRequestID uuid.UUID; DriverUserID uuid.UUID; Status CandidateStatus; CreatedAt time.Time; DecidedAt *time.Time }
+type Result struct { Candidate Candidate; Created bool }
+type Repository interface { Match(context.Context,uuid.UUID,uuid.UUID)(Result,error); Reject(context.Context,uuid.UUID,uuid.UUID)(Candidate,error) }
 type Service struct{ repository Repository }
-
-func NewService(repository Repository) Service { return Service{repository: repository} }
-
-func (s Service) Match(ctx context.Context, rideRequestID, riderUserID uuid.UUID) (Result, error) {
-	return s.repository.Match(ctx, rideRequestID, riderUserID)
-}
-
-func (s Service) Reject(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Candidate, error) {
-	return s.repository.Reject(ctx, rideRequestID, driverUserID)
-}
+func NewService(repository Repository) Service { return Service{repository:repository} }
+func (s Service) Match(ctx context.Context,rideRequestID,riderUserID uuid.UUID)(Result,error) { return s.repository.Match(ctx,rideRequestID,riderUserID) }
+func (s Service) Reject(ctx context.Context,rideRequestID,driverUserID uuid.UUID)(Candidate,error) { return s.repository.Reject(ctx,rideRequestID,driverUserID) }
