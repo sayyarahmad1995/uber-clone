@@ -122,6 +122,8 @@ func (s Service) Reject(ctx context.Context, rideRequestID, riderUserID, driverU
 
 func mapTripAssignmentError(err error) error {
 	switch {
+	case errors.Is(err, trip.ErrMarketplaceNotApplicable):
+		return ErrRideNotFound
 	case errors.Is(err, trip.ErrMarketplaceNotOpen):
 		return ErrRideNotOpen
 	case errors.Is(err, trip.ErrMarketplaceOfferGone):
