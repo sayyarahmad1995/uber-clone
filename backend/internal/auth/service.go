@@ -6,13 +6,14 @@ import (
 )
 
 var (
-	ErrInvalidCredentials   = errors.New("invalid credentials")
-	ErrIdentifierConflict   = errors.New("identifier already exists")
-	ErrPasswordRejected     = errors.New("password does not meet requirements")
-	ErrRegistrationInvalid  = errors.New("registration request is invalid")
-	ErrVerificationInvalid  = errors.New("verification is invalid or expired")
-	ErrVerificationRequired = errors.New("account verification is required")
-	ErrUnavailable          = errors.New("authentication service unavailable")
+	ErrInvalidCredentials    = errors.New("invalid credentials")
+	ErrIdentifierConflict    = errors.New("identifier already exists")
+	ErrPasswordRejected      = errors.New("password does not meet requirements")
+	ErrRegistrationInvalid   = errors.New("registration request is invalid")
+	ErrVerificationInvalid   = errors.New("verification is invalid or expired")
+	ErrVerificationRequired  = errors.New("account verification is required")
+	ErrSessionNotExtendable  = errors.New("session is not extendable yet")
+	ErrUnavailable           = errors.New("authentication service unavailable")
 )
 
 type PublicError struct {

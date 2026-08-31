@@ -134,15 +134,18 @@ func (p *Provider) ExtendSession(ctx context.Context, token string) (auth.Sessio
 		return auth.Session{}, auth.ErrUnavailable
 	}
 	resp.Body.Close()
-	if resp.StatusCode >= 300 && resp.StatusCode != http.StatusNotFound {
+	if resp.StatusCode == http.StatusNotFound {
+		return auth.Session{}, auth.ErrSessionNotExtendable
+	}
+	if resp.StatusCode >= 300 {
 		return auth.Session{}, auth.ErrUnavailable
 	}
-	updated := current
-	if resp.StatusCode < 300 {
-		updated, err = p.session(ctx, token)
-		if err != nil {
-			return auth.Session{}, err
-		}
+	updated, err := p.session(ctx, token)
+	if err != nil {
+		return auth.Session{}, err
+	}
+	if !updated.ExpiresAt.After(current.ExpiresAt) {
+		return auth.Session{}, auth.ErrSessionNotExtendable
 	}
 	return auth.Session{AccessToken: token, ExpiresIn: max(1, int64(time.Until(updated.ExpiresAt).Seconds()))}, nil
 }
