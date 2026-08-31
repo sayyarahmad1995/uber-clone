@@ -12,6 +12,7 @@ type fakeRepository struct {
 	trip       Trip
 	err        error
 	rideID     uuid.UUID
+	riderID    uuid.UUID
 	driverID   uuid.UUID
 	operation  string
 }
@@ -19,6 +20,16 @@ type fakeRepository struct {
 func (f *fakeRepository) Accept(_ context.Context, rideRequestID, driverUserID uuid.UUID) (Acceptance, error) {
 	f.rideID, f.driverID, f.operation = rideRequestID, driverUserID, "accept"
 	return f.acceptance, f.err
+}
+
+func (f *fakeRepository) AcceptProposedFare(_ context.Context, rideRequestID, driverUserID uuid.UUID) (Trip, error) {
+	f.rideID, f.driverID, f.operation = rideRequestID, driverUserID, "accept_proposed_fare"
+	return f.trip, f.err
+}
+
+func (f *fakeRepository) SelectOffer(_ context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID) (Trip, error) {
+	f.rideID, f.riderID, f.driverID, f.operation = rideRequestID, riderUserID, driverUserID, "select_offer"
+	return f.trip, f.err
 }
 
 func (f *fakeRepository) Start(_ context.Context, rideRequestID, driverUserID uuid.UUID) (Trip, error) {
@@ -49,6 +60,28 @@ func TestServiceDelegatesDriverOwnedTripLifecycle(t *testing.T) {
 	}
 	if repository.operation != "complete" || repository.rideID != rideID || repository.driverID != driverID {
 		t.Fatalf("unexpected complete delegation: %#v", repository)
+	}
+}
+
+func TestServiceDelegatesMarketplaceAssignment(t *testing.T) {
+	rideID := uuid.New()
+	riderID := uuid.New()
+	driverID := uuid.New()
+	repository := &fakeRepository{trip: Trip{RideRequestID: rideID, RiderUserID: riderID, DriverUserID: driverID}}
+	service := NewService(repository)
+
+	if _, err := service.AcceptProposedFare(context.Background(), rideID, driverID); err != nil {
+		t.Fatalf("accept proposed fare: %v", err)
+	}
+	if repository.operation != "accept_proposed_fare" {
+		t.Fatalf("unexpected proposed fare delegation: %#v", repository)
+	}
+
+	if _, err := service.SelectOffer(context.Background(), rideID, riderID, driverID); err != nil {
+		t.Fatalf("select offer: %v", err)
+	}
+	if repository.operation != "select_offer" || repository.riderID != riderID {
+		t.Fatalf("unexpected offer selection delegation: %#v", repository)
 	}
 }
 
