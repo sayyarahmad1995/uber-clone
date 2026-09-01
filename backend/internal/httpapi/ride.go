@@ -79,6 +79,19 @@ func (api *API) createRideRequest(w http.ResponseWriter, r *http.Request) {
 	writeRideRequest(w, http.StatusCreated, request)
 }
 
+func (api *API) listRideRequests(w http.ResponseWriter, r *http.Request) {
+	u, ok := api.requireRiderCapability(w, r)
+	if !ok {
+		return
+	}
+	views, err := api.rideStatuses.ListOwned(r.Context(), u.ID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "unable to list ride requests"})
+		return
+	}
+	writeJSON(w, http.StatusOK, rideRequestListResponse(views))
+}
+
 func (api *API) getRideRequestStatus(w http.ResponseWriter, r *http.Request) {
 	u, ok := api.requireRiderCapability(w, r)
 	if !ok {
@@ -115,6 +128,14 @@ func writeRideRequest(w http.ResponseWriter, status int, request ride.Request) {
 		response["proposed_fare"] = map[string]any{"amount_minor": request.ProposedFare.AmountMinor, "currency": request.ProposedFare.Currency}
 	}
 	writeJSON(w, status, response)
+}
+
+func rideRequestListResponse(views []ridestatus.View) map[string]any {
+	requests := make([]map[string]any, 0, len(views))
+	for _, view := range views {
+		requests = append(requests, rideRequestStatusResponse(view.RideRequest, view.Trip))
+	}
+	return map[string]any{"ride_requests": requests}
 }
 
 func rideRequestStatusResponse(request ride.Request, assignedTrip *trip.Trip) map[string]any {
