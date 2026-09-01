@@ -1,4 +1,4 @@
-package main
+package httpapi
 
 import (
 	"errors"
@@ -8,38 +8,34 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/cancellation"
 )
 
-func (app application) cancelRideRequest(w http.ResponseWriter, r *http.Request) {
-	u, ok := app.requireRiderCapability(w, r)
+func (api *API) cancelRideRequest(w http.ResponseWriter, r *http.Request) {
+	u, ok := api.requireRiderCapability(w, r)
 	if !ok {
 		return
 	}
-
 	rideRequestID, err := uuid.Parse(r.PathValue("ride_request_id"))
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid ride_request_id"})
 		return
 	}
-
-	result, err := app.cancellations.CancelByRider(r.Context(), rideRequestID, u.ID)
+	result, err := api.cancellations.CancelByRider(r.Context(), rideRequestID, u.ID)
 	if writeCancellationError(w, err) {
 		return
 	}
 	writeCancellation(w, result)
 }
 
-func (app application) cancelDriverRideRequest(w http.ResponseWriter, r *http.Request) {
-	u, ok := app.requireDriverCapability(w, r)
+func (api *API) cancelDriverRideRequest(w http.ResponseWriter, r *http.Request) {
+	u, ok := api.requireDriverCapability(w, r)
 	if !ok {
 		return
 	}
-
 	rideRequestID, err := uuid.Parse(r.PathValue("ride_request_id"))
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid ride_request_id"})
 		return
 	}
-
-	result, err := app.cancellations.CancelByDriver(r.Context(), rideRequestID, u.ID)
+	result, err := api.cancellations.CancelByDriver(r.Context(), rideRequestID, u.ID)
 	if writeCancellationError(w, err) {
 		return
 	}

@@ -16,7 +16,7 @@ func main() {
 	}
 	defer cleanup()
 
-	if err := runServer(cfg.Port, app.routes(), logger); err != nil {
+	if err := runServer(cfg.Port, app.handler, logger); err != nil {
 		logger.Error("API server stopped", "error", err)
 		os.Exit(1)
 	}
