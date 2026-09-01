@@ -51,6 +51,7 @@ func (api *API) registerDriverRoutes(mux *http.ServeMux) {
 
 func (api *API) registerRideRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /v1/ride-requests", api.authenticated(api.createRideRequest))
+	mux.Handle("GET /v1/ride-requests", api.authenticated(api.listRideRequests))
 	mux.Handle("GET /v1/ride-requests/{ride_request_id}", api.authenticated(api.getRideRequestStatus))
 	mux.Handle("POST /v1/ride-requests/{ride_request_id}/cancel", api.authenticated(api.cancelRideRequest))
 	mux.Handle("POST /v1/ride-requests/{ride_request_id}/match", api.authenticated(api.matchRideRequest))

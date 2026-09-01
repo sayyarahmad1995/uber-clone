@@ -14,7 +14,11 @@ type PostgresRepository struct{ db *sql.DB }
 
 func NewPostgresRepository(db *sql.DB) PostgresRepository { return PostgresRepository{db: db} }
 
-func (r PostgresRepository) GetOwned(ctx context.Context, rideRequestID, riderUserID uuid.UUID) (View, error) {
+type scanner interface {
+	Scan(dest ...any) error
+}
+
+func scanView(row scanner) (View, error) {
 	var view View
 	var proposedAmount sql.NullInt64
 	var proposedCurrency sql.NullString
@@ -27,7 +31,67 @@ func (r PostgresRepository) GetOwned(ctx context.Context, rideRequestID, riderUs
 	var completedAt sql.NullTime
 	var tripCancelledAt sql.NullTime
 
-	err := r.db.QueryRowContext(ctx, `
+	if err := row.Scan(
+		&view.RideRequest.ID,
+		&view.RideRequest.RiderUserID,
+		&view.RideRequest.Pickup.Latitude,
+		&view.RideRequest.Pickup.Longitude,
+		&view.RideRequest.Destination.Latitude,
+		&view.RideRequest.Destination.Longitude,
+		&view.RideRequest.BookingMode,
+		&proposedAmount,
+		&proposedCurrency,
+		&view.RideRequest.Status,
+		&view.RideRequest.CreatedAt,
+		&rideCancelledAt,
+		&rideCancelledBy,
+		&tripDriver,
+		&tripStatus,
+		&assignedAt,
+		&startedAt,
+		&completedAt,
+		&tripCancelledAt,
+	); err != nil {
+		return View{}, err
+	}
+
+	if proposedAmount.Valid && proposedCurrency.Valid {
+		view.RideRequest.ProposedFare = &ride.Money{
+			AmountMinor: proposedAmount.Int64,
+			Currency:    proposedCurrency.String,
+		}
+	}
+	if rideCancelledAt.Valid {
+		view.RideRequest.CancelledAt = &rideCancelledAt.Time
+	}
+	if rideCancelledBy.Valid {
+		view.RideRequest.CancelledBy = ride.CancellationActor(rideCancelledBy.String)
+	}
+	if tripDriver.Valid && tripStatus.Valid && assignedAt.Valid {
+		projectedTrip := trip.Trip{
+			RideRequestID: view.RideRequest.ID,
+			RiderUserID:   view.RideRequest.RiderUserID,
+			DriverUserID:  tripDriver.UUID,
+			Status:        trip.Status(tripStatus.String),
+			AssignedAt:    assignedAt.Time,
+		}
+		if startedAt.Valid {
+			projectedTrip.StartedAt = &startedAt.Time
+		}
+		if completedAt.Valid {
+			projectedTrip.CompletedAt = &completedAt.Time
+		}
+		if tripCancelledAt.Valid {
+			projectedTrip.CancelledAt = &tripCancelledAt.Time
+		}
+		view.Trip = &projectedTrip
+	}
+
+	return view, nil
+}
+
+func (r PostgresRepository) GetOwned(ctx context.Context, rideRequestID, riderUserID uuid.UUID) (View, error) {
+	view, err := scanView(r.db.QueryRowContext(ctx, `
 		SELECT
 			rr.id,
 			rr.rider_user_id,
@@ -52,66 +116,56 @@ func (r PostgresRepository) GetOwned(ctx context.Context, rideRequestID, riderUs
 		LEFT JOIN trips t ON t.ride_request_id = rr.id
 		WHERE rr.id = $1
 		  AND rr.rider_user_id = $2
-	`, rideRequestID, riderUserID).Scan(
-		&view.RideRequest.ID,
-		&view.RideRequest.RiderUserID,
-		&view.RideRequest.Pickup.Latitude,
-		&view.RideRequest.Pickup.Longitude,
-		&view.RideRequest.Destination.Latitude,
-		&view.RideRequest.Destination.Longitude,
-		&view.RideRequest.BookingMode,
-		&proposedAmount,
-		&proposedCurrency,
-		&view.RideRequest.Status,
-		&view.RideRequest.CreatedAt,
-		&rideCancelledAt,
-		&rideCancelledBy,
-		&tripDriver,
-		&tripStatus,
-		&assignedAt,
-		&startedAt,
-		&completedAt,
-		&tripCancelledAt,
-	)
+	`, rideRequestID, riderUserID))
 	if errors.Is(err, sql.ErrNoRows) {
 		return View{}, ErrNotFound
 	}
+	return view, err
+}
+
+func (r PostgresRepository) ListOwned(ctx context.Context, riderUserID uuid.UUID, limit int) ([]View, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT
+			rr.id,
+			rr.rider_user_id,
+			rr.pickup_latitude,
+			rr.pickup_longitude,
+			rr.destination_latitude,
+			rr.destination_longitude,
+			rr.booking_mode,
+			rr.proposed_fare_minor,
+			rr.currency,
+			rr.status,
+			rr.created_at,
+			rr.cancelled_at,
+			rr.cancelled_by,
+			t.driver_user_id,
+			t.status,
+			t.assigned_at,
+			t.started_at,
+			t.completed_at,
+			t.cancelled_at
+		FROM ride_requests rr
+		LEFT JOIN trips t ON t.ride_request_id = rr.id
+		WHERE rr.rider_user_id = $1
+		ORDER BY rr.created_at DESC, rr.id DESC
+		LIMIT $2
+	`, riderUserID, limit)
 	if err != nil {
-		return View{}, err
+		return nil, err
 	}
+	defer rows.Close()
 
-	if proposedAmount.Valid && proposedCurrency.Valid {
-		view.RideRequest.ProposedFare = &ride.Money{
-			AmountMinor: proposedAmount.Int64,
-			Currency:    proposedCurrency.String,
+	views := make([]View, 0)
+	for rows.Next() {
+		view, err := scanView(rows)
+		if err != nil {
+			return nil, err
 		}
+		views = append(views, view)
 	}
-	if rideCancelledAt.Valid {
-		view.RideRequest.CancelledAt = &rideCancelledAt.Time
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
-	if rideCancelledBy.Valid {
-		view.RideRequest.CancelledBy = ride.CancellationActor(rideCancelledBy.String)
-	}
-
-	if tripDriver.Valid && tripStatus.Valid && assignedAt.Valid {
-		projectedTrip := trip.Trip{
-			RideRequestID: view.RideRequest.ID,
-			RiderUserID:   view.RideRequest.RiderUserID,
-			DriverUserID:  tripDriver.UUID,
-			Status:        trip.Status(tripStatus.String),
-			AssignedAt:    assignedAt.Time,
-		}
-		if startedAt.Valid {
-			projectedTrip.StartedAt = &startedAt.Time
-		}
-		if completedAt.Valid {
-			projectedTrip.CompletedAt = &completedAt.Time
-		}
-		if tripCancelledAt.Valid {
-			projectedTrip.CancelledAt = &tripCancelledAt.Time
-		}
-		view.Trip = &projectedTrip
-	}
-
-	return view, nil
+	return views, nil
 }
