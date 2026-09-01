@@ -39,6 +39,7 @@ func (app application) registerDriverRoutes(mux *http.ServeMux) {
 	mux.Handle("PUT /v1/driver", app.authenticated(app.onboardDriver))
 	mux.Handle("GET /v1/driver", app.authenticated(app.getDriver))
 	mux.Handle("PUT /v1/driver/availability", app.authenticated(app.setDriverAvailability))
+	mux.Handle("GET /v1/driver/trip", app.authenticated(app.getDriverCurrentTrip))
 	mux.Handle("GET /v1/driver/marketplace/ride-requests", app.authenticated(app.discoverDriverMarketplace))
 	mux.Handle("PUT /v1/driver/ride-requests/{ride_request_id}/offer", app.authenticated(app.submitRideOffer))
 	mux.Handle("POST /v1/driver/ride-requests/{ride_request_id}/accept", app.authenticated(app.acceptRideRequestCandidate))
