@@ -14,20 +14,22 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/database"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/migrations"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/ride"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/ridestatus"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/trip"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/user"
 )
 
 type application struct {
-	users    user.Service
-	drivers  driver.Service
-	rides    ride.Service
-	matching matching.Service
-	offers   offer.Service
-	trips    trip.Service
-	db       *sql.DB
-	identity identity.Provider
-	auth     auth.Handler
+	users        user.Service
+	drivers      driver.Service
+	rides        ride.Service
+	rideStatuses ridestatus.Service
+	matching     matching.Service
+	offers       offer.Service
+	trips        trip.Service
+	db           *sql.DB
+	identity     identity.Provider
+	auth         auth.Handler
 }
 
 func newApplication(cfg config) (application, func(), error) {
@@ -51,15 +53,16 @@ func newApplication(cfg config) (application, func(), error) {
 	tripService := trip.NewService(trip.NewPostgresRepository(db))
 
 	return application{
-		users:    user.NewService(user.NewPostgresRepository(db)),
-		drivers:  driver.NewService(driver.NewPostgresRepository(db)),
-		rides:    ride.NewService(ride.NewPostgresRepository(db)),
-		matching: matching.NewService(matching.NewPostgresRepository(db)),
-		offers:   offer.NewService(offer.NewPostgresRepository(db), tripService),
-		trips:    tripService,
-		db:       db,
-		identity: identityProvider,
-		auth:     auth.NewHandler(auth.NewService(authProvider)),
+		users:        user.NewService(user.NewPostgresRepository(db)),
+		drivers:      driver.NewService(driver.NewPostgresRepository(db)),
+		rides:        ride.NewService(ride.NewPostgresRepository(db)),
+		rideStatuses: ridestatus.NewService(ridestatus.NewPostgresRepository(db)),
+		matching:     matching.NewService(matching.NewPostgresRepository(db)),
+		offers:       offer.NewService(offer.NewPostgresRepository(db), tripService),
+		trips:        tripService,
+		db:           db,
+		identity:     identityProvider,
+		auth:         auth.NewHandler(auth.NewService(authProvider)),
 	}, cleanup, nil
 }
 
