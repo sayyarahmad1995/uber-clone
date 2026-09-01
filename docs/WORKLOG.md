@@ -10,11 +10,11 @@ Update this file after every meaningful work session.
 
 ## Current Status
 
-**Current engineering milestone:** Driver Marketplace Discovery Foundation — implemented, runtime-verified, and merged through PR #19.
+**Current engineering milestone:** Ride Cancellation Foundation — implemented, runtime-verified, and merged through PR #22.
 
-**Current stopping point:** Eligible Drivers can now discover open offers-mode Ride Requests through an application-owned marketplace feed without out-of-band Ride Request IDs. Discovery is read-only and non-reserving, suppresses inventory for Drivers who are not operationally eligible, excludes the Driver's own Rider requests and automatic-mode requests, projects the authenticated Driver's existing offer, and removes rides after assignment. Existing offer submission and Trip assignment remain the authoritative write paths and continue to revalidate eligibility atomically.
+**Current stopping point:** Riders and assigned Drivers can now cancel open Ride Requests through application-owned cancellation semantics. Cancellation terminates the Ride Request, cancels any assigned or in-progress Trip, releases automatic matching commitments, closes pending marketplace offers, preserves historical decisions, and prevents cancelled rides from being matched or assigned again. Rider status reads expose authoritative cancellation metadata and optional Trip state. Completed Trips remain non-cancellable.
 
-**Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until completed work provides new information. The next business slice should be selected from a concrete Rider/Driver client-flow requirement rather than introducing location, maps, or notification infrastructure speculatively.
+**Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until completed work provides new information. The next business slice should be selected from a concrete Rider/Driver client-flow requirement rather than introducing location, maps, notifications, or payment infrastructure speculatively.
 
 ---
 
@@ -38,6 +38,8 @@ Update this file after every meaningful work session.
 - [x] Ride Offer Marketplace Foundation — PR #17
 - [x] Rider Offer Selection Foundation — PR #18
 - [x] Driver Marketplace Discovery Foundation — PR #19
+- [x] Rider Ride-Request Status Foundation — PR #21
+- [x] Ride Cancellation Foundation — PR #22
 
 ---
 
@@ -490,16 +492,99 @@ Implemented, verified, and merged through PR #19.
 
 ---
 
+## Rider Ride-Request Status Foundation
+
+Implemented, verified, and merged through PR #21.
+
+### Business flow
+
+`Owning Rider creates Ride Request → Rider reads current Ride Request state → optional Trip assignment/execution state is projected without strategy-specific branching`
+
+### Implemented contract
+
+- Rider status endpoint: `GET /v1/ride-requests/{ride_request_id}`.
+- Only the owning authenticated Rider can read the Ride Request; nonexistent and non-owned requests both return `404 Not Found`.
+- Invalid Ride Request UUIDs return `400 Bad Request`.
+- The read model composes application-owned Ride Request state with an optional Trip.
+- Automatic and offers-mode Ride Requests use the same status contract.
+- Ride Request status and Trip status remain separate concepts. A Ride Request can remain `requested` while its Trip progresses through `assigned`, `in_progress`, and `completed`.
+- Trip projection includes assigned Driver identity and assignment/execution timestamps without exposing Rider identity.
+- No new persistence lifecycle or migration was introduced for this read model.
+
+### Verification completed
+
+- `go test ./...` passes.
+- `go vet ./...` passes.
+- Runtime verification covered automatic and offers-mode Ride Requests through assignment and Trip execution.
+- Ownership isolation returns non-leaking `404 Not Found` for another authenticated Rider.
+- The same endpoint projects strategy-neutral Ride Request state and optional Trip state for both automatic matching and marketplace assignment.
+
+---
+
+## Ride Cancellation Foundation
+
+Implemented, verified, and merged through PR #22.
+
+### Business flow
+
+`Open Ride Request → owning Rider or assigned Driver cancels → Ride Request becomes cancelled → optional assigned/in-progress Trip becomes cancelled → active Driver commitment is released → status read model reflects cancellation`
+
+### Implemented contract
+
+- Rider cancellation endpoint: `POST /v1/ride-requests/{ride_request_id}/cancel`.
+- Driver cancellation endpoint: `POST /v1/driver/ride-requests/{ride_request_id}/cancel`.
+- Rider may cancel their own Ride Request before Trip completion.
+- Driver may cancel only a Trip assigned to their authenticated Driver account.
+- Repeated cancellation is idempotent and preserves the original cancellation timestamp.
+- Ride Request cancellation records application-owned `cancelled_at` and `cancelled_by` (`rider` or `driver`).
+- Assigned/in-progress Trips transition to `cancelled` with the same cancellation timestamp.
+- Completed Trips cannot be cancelled and return conflict without mutating completed state.
+- Active automatic candidates are released while preserving candidate decision history.
+- Pending marketplace offers are closed with a decision timestamp; accepted/rejected/closed offer history remains intact.
+- Cancelled automatic Ride Requests cannot be matched again.
+- Automatic acceptance locks and revalidates the Ride Request before locking the candidate so cancellation and acceptance serialize without resurrecting cancelled work.
+- Start/complete on cancelled Trips return conflict.
+- The Rider status read model exposes Ride Request cancellation metadata and optional Trip cancellation state.
+
+### Verification completed
+
+- `gofmt` produced no changes and the working tree remained clean.
+- `go test ./...` passes.
+- `go vet ./...` passes.
+- Runtime verification used a fresh database and fresh Rider/Driver accounts.
+- Rider cancellation before assignment returns `cancelled`, `cancelled_by=rider`, and `trip=null`; repeated cancellation preserves the original `cancelled_at`.
+- Matching a cancelled automatic Ride Request returns `409 Conflict`.
+- Rider cancellation after automatic assignment cancels both Ride Request and Trip and releases the Driver for immediate rematching.
+- Rider cancellation during `in_progress` preserves `started_at`, leaves `completed_at` null, and prevents subsequent completion.
+- Driver-initiated cancellation records `cancelled_by=driver`; a non-assigned Driver receives non-leaking `404 Not Found`.
+- Cancelling an offers-mode Ride Request closes pending marketplace offers; further offer submission returns `409 Conflict`.
+- Cancelling an assigned marketplace Trip releases the Driver so they can immediately accept another marketplace Ride Request.
+- Rider and Driver cancellation attempts against a completed Trip both return `409 Conflict` and leave the completed Trip unchanged.
+- A concurrent Rider-cancel versus automatic Driver-accept test serialized correctly: cancellation won, acceptance returned `409 Conflict`, and final state remained cancelled with no Trip.
+
+### Deliberately deferred
+
+- Cancellation fees or refunds.
+- No-show semantics.
+- Driver compensation.
+- Cancellation reason taxonomy.
+- Abuse/rate-limit policy.
+- Notifications.
+- Location/geofence policy.
+- Payments.
+
+---
+
 ## Next Business Vertical Slice
 
 Not fixed yet. Select the next slice from the next concrete Rider/Driver MVP client flow rather than introducing infrastructure speculatively.
 
 Strong candidates, only when a consuming flow requires them:
 
-- Live Driver Location Foundation if marketplace ranking or active-trip tracking needs current coordinates.
+- Live Driver Location Foundation if marketplace ranking, dispatch quality, or active-trip tracking needs current coordinates.
 - Marketplace geographic filtering/ranking once location ownership and freshness semantics are defined.
-- Rider/Driver current-trip read models if the client needs assignment/execution state retrieval beyond mutation responses.
-- Cancellation semantics if the next end-to-end flow requires Rider or Driver cancellation before completion.
+- Rider/Driver current-trip or trip-history read models if the client needs retrieval beyond the existing Rider Ride-Request status view.
+- Offer expiration or marketplace lifecycle hardening if stale marketplace inventory becomes a concrete client problem.
 
 The next slice must preserve the established boundary: external maps, routing, notification, or payment systems implement application-defined ports and must not define business models or public APIs.
 
@@ -519,13 +604,13 @@ The same boundary rule applies to future maps, routing, payments, notifications,
 
 ---
 
-## Rough MVP Direction After Driver Marketplace Discovery Foundation
+## Rough MVP Direction After Ride Cancellation Foundation
 
 - Choose the next concrete Rider/Driver client flow before adding infrastructure.
-- Add live location/status only when discovery ranking or active-trip UX consumes it.
+- Add live location/status only when marketplace ranking, dispatch quality, or active-trip UX consumes it.
 - Add geographic marketplace filtering/ranking only after application-owned location and freshness semantics exist.
-- Harden Trip lifecycle or add cancellation/read models when concrete client flows require them.
-- Add Rider-facing trip/history read models when required by the client flow.
+- Add Rider/Driver current-trip or history read models only when concrete client flows require them.
+- Harden marketplace offer lifecycle, cancellation policy, or pricing only when an end-to-end flow exposes the need.
 
 Exact later boundaries remain intentionally flexible.
 
