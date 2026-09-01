@@ -10,9 +10,9 @@ Update this file after every meaningful work session.
 
 ## Current Status
 
-**Current engineering milestone:** Ride Cancellation Foundation — implemented, runtime-verified, and merged through PR #22.
+**Current engineering milestone:** Driver Current-Trip Read Foundation — implemented and runtime-verified through PR #24.
 
-**Current stopping point:** Riders and assigned Drivers can now cancel open Ride Requests through application-owned cancellation semantics. Cancellation terminates the Ride Request, cancels any assigned or in-progress Trip, releases automatic matching commitments, closes pending marketplace offers, preserves historical decisions, and prevents cancelled rides from being matched or assigned again. Rider status reads expose authoritative cancellation metadata and optional Trip state. Completed Trips remain non-cancellable.
+**Current stopping point:** Authenticated Drivers can recover their current active Trip through a strategy-neutral read model after refresh, restart, or navigation. The current-Trip read exposes pickup, destination, assignment/execution status, and timestamps without exposing Rider identity or redundantly echoing Driver identity. Assigned and in-progress Trips are current; completed and cancelled Trips are historical and therefore excluded. Rider cancellation, Driver capability enforcement, and cross-Driver ownership isolation are verified.
 
 **Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until completed work provides new information. The next business slice should be selected from a concrete Rider/Driver client-flow requirement rather than introducing location, maps, notifications, or payment infrastructure speculatively.
 
@@ -40,6 +40,7 @@ Update this file after every meaningful work session.
 - [x] Driver Marketplace Discovery Foundation — PR #19
 - [x] Rider Ride-Request Status Foundation — PR #21
 - [x] Ride Cancellation Foundation — PR #22
+- [x] Driver Current-Trip Read Foundation — PR #24
 
 ---
 
@@ -575,6 +576,52 @@ Implemented, verified, and merged through PR #22.
 
 ---
 
+## Driver Current-Trip Read Foundation
+
+Implemented and runtime-verified through PR #24.
+
+### Business flow
+
+`Authenticated Driver → read current active Trip → receive pickup/destination and assignment/execution state`
+
+### Implemented contract
+
+- Driver current-Trip endpoint: `GET /v1/driver/trip`.
+- The endpoint requires the authenticated account to have Driver capability.
+- The read returns only the authenticated Driver's active Trip.
+- Active Trip statuses are `assigned` and `in_progress`; completed and cancelled Trips are excluded as historical.
+- The response includes Ride Request ID, pickup, destination, Trip status, `assigned_at`, and optional `started_at`.
+- Rider identity is not exposed, and the authenticated Driver identity is not redundantly echoed.
+- The read model is strategy-neutral because automatic matching and marketplace assignment already converge at the application-owned `trips` boundary.
+- The existing unique active-Trip persistence invariant makes the current Trip singular; no `current_trip_id`, duplicated busy flag, new lifecycle table, or migration was introduced.
+- A dedicated `internal/drivertrip` read model keeps client projection concerns separate from the Trip mutation repository.
+
+### Verification completed
+
+- `gofmt` produced no changes and `git status --short` remained empty on the feature implementation head.
+- `go test ./...` passes, including the new `internal/drivertrip` package.
+- `go vet ./...` passes.
+- A Driver with no active Trip receives `404 {"error":"active trip not found"}`.
+- A Rider-only authenticated account receives `403 {"error":"driver capability required"}`.
+- After automatic assignment, the assigned Driver reads the correct Ride Request ID, pickup/destination, `status=assigned`, non-null `assigned_at`, and null `started_at`.
+- Contract assertions confirm the current-Trip response exposes neither `rider_user_id` nor `driver_user_id`.
+- Starting the same Trip changes the current read to `status=in_progress`, preserves the Ride Request ID and assignment time, and exposes non-null `started_at`.
+- Completing the Trip removes it from the current read and returns `404`.
+- Cross-Driver isolation is enforced: the assigned Driver receives `200`, while an unrelated Driver receives `404`.
+- Rider cancellation of an assigned Trip removes it from the current read and subsequent access returns `404`.
+
+### Deliberately deferred
+
+- Driver Trip history.
+- Rider identity/contact details in the Driver Trip projection.
+- Live Driver/Rider location.
+- Route progress and ETA.
+- Maps/routing provider integration.
+- Notifications.
+- Pricing/payments.
+
+---
+
 ## Next Business Vertical Slice
 
 Not fixed yet. Select the next slice from the next concrete Rider/Driver MVP client flow rather than introducing infrastructure speculatively.
@@ -583,7 +630,7 @@ Strong candidates, only when a consuming flow requires them:
 
 - Live Driver Location Foundation if marketplace ranking, dispatch quality, or active-trip tracking needs current coordinates.
 - Marketplace geographic filtering/ranking once location ownership and freshness semantics are defined.
-- Rider/Driver current-trip or trip-history read models if the client needs retrieval beyond the existing Rider Ride-Request status view.
+- Rider/Driver Trip History Foundation if a concrete client flow needs retrieval of completed or cancelled Trips beyond the existing Rider Ride-Request status and Driver current-Trip views.
 - Offer expiration or marketplace lifecycle hardening if stale marketplace inventory becomes a concrete client problem.
 
 The next slice must preserve the established boundary: external maps, routing, notification, or payment systems implement application-defined ports and must not define business models or public APIs.
@@ -604,12 +651,12 @@ The same boundary rule applies to future maps, routing, payments, notifications,
 
 ---
 
-## Rough MVP Direction After Ride Cancellation Foundation
+## Rough MVP Direction After Driver Current-Trip Read Foundation
 
 - Choose the next concrete Rider/Driver client flow before adding infrastructure.
 - Add live location/status only when marketplace ranking, dispatch quality, or active-trip UX consumes it.
 - Add geographic marketplace filtering/ranking only after application-owned location and freshness semantics exist.
-- Add Rider/Driver current-trip or history read models only when concrete client flows require them.
+- Add Trip history read models only when a concrete Rider/Driver client flow requires historical retrieval beyond the current status views.
 - Harden marketplace offer lifecycle, cancellation policy, or pricing only when an end-to-end flow exposes the need.
 
 Exact later boundaries remain intentionally flexible.

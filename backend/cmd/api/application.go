@@ -8,6 +8,7 @@ import (
 	authkratos "github.com/sayyarahmad1995/uber-clone/backend/internal/auth/kratos"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/cancellation"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/driver"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/drivertrip"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/identity"
 	identitykratos "github.com/sayyarahmad1995/uber-clone/backend/internal/identity/kratos"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/matching"
@@ -23,6 +24,7 @@ import (
 type application struct {
 	users         user.Service
 	drivers       driver.Service
+	driverTrips   drivertrip.Service
 	rides         ride.Service
 	rideStatuses  ridestatus.Service
 	cancellations cancellation.Service
@@ -57,6 +59,7 @@ func newApplication(cfg config) (application, func(), error) {
 	return application{
 		users:         user.NewService(user.NewPostgresRepository(db)),
 		drivers:       driver.NewService(driver.NewPostgresRepository(db)),
+		driverTrips:   drivertrip.NewService(drivertrip.NewPostgresRepository(db)),
 		rides:         ride.NewService(ride.NewPostgresRepository(db)),
 		rideStatuses:  ridestatus.NewService(ridestatus.NewPostgresRepository(db)),
 		cancellations: cancellation.NewService(cancellation.NewPostgresRepository(db)),
