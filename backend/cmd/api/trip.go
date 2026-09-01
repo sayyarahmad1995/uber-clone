@@ -96,6 +96,9 @@ func (app application) transitionTrip(w http.ResponseWriter, r *http.Request, tr
 	case errors.Is(err, trip.ErrTripCompleted):
 		writeJSON(w, http.StatusConflict, map[string]string{"error": "trip already completed"})
 		return
+	case errors.Is(err, trip.ErrTripCancelled):
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "trip already cancelled"})
+		return
 	case err != nil:
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "unable to update trip"})
 		return
@@ -117,5 +120,6 @@ func tripResponse(result trip.Trip) map[string]any {
 		"assigned_at":     result.AssignedAt,
 		"started_at":      result.StartedAt,
 		"completed_at":    result.CompletedAt,
+		"cancelled_at":    result.CancelledAt,
 	}
 }

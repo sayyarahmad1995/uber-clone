@@ -45,11 +45,13 @@ func (app application) registerDriverRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /v1/driver/ride-requests/{ride_request_id}/reject", app.authenticated(app.rejectRideRequestCandidate))
 	mux.Handle("POST /v1/driver/ride-requests/{ride_request_id}/start", app.authenticated(app.startTrip))
 	mux.Handle("POST /v1/driver/ride-requests/{ride_request_id}/complete", app.authenticated(app.completeTrip))
+	mux.Handle("POST /v1/driver/ride-requests/{ride_request_id}/cancel", app.authenticated(app.cancelDriverRideRequest))
 }
 
 func (app application) registerRideRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /v1/ride-requests", app.authenticated(app.createRideRequest))
 	mux.Handle("GET /v1/ride-requests/{ride_request_id}", app.authenticated(app.getRideRequestStatus))
+	mux.Handle("POST /v1/ride-requests/{ride_request_id}/cancel", app.authenticated(app.cancelRideRequest))
 	mux.Handle("POST /v1/ride-requests/{ride_request_id}/match", app.authenticated(app.matchRideRequest))
 	mux.Handle("GET /v1/ride-requests/{ride_request_id}/offers", app.authenticated(app.listRideOffers))
 	mux.Handle("POST /v1/ride-requests/{ride_request_id}/offers/{driver_user_id}/accept", app.authenticated(app.acceptRideOffer))

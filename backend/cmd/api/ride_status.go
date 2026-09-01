@@ -51,6 +51,10 @@ func rideRequestStatusResponse(request ride.Request, assignedTrip *trip.Trip) ma
 			"currency":     request.ProposedFare.Currency,
 		}
 	}
+	if request.CancelledAt != nil {
+		response["cancelled_at"] = request.CancelledAt
+		response["cancelled_by"] = request.CancelledBy
+	}
 	if assignedTrip != nil {
 		response["trip"] = map[string]any{
 			"driver_user_id": assignedTrip.DriverUserID,
@@ -58,6 +62,7 @@ func rideRequestStatusResponse(request ride.Request, assignedTrip *trip.Trip) ma
 			"assigned_at":    assignedTrip.AssignedAt,
 			"started_at":     assignedTrip.StartedAt,
 			"completed_at":   assignedTrip.CompletedAt,
+			"cancelled_at":   assignedTrip.CancelledAt,
 		}
 	}
 	return response

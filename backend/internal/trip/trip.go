@@ -14,6 +14,7 @@ var (
 	ErrTripNotFound             = errors.New("trip not found")
 	ErrTripNotStarted           = errors.New("trip has not started")
 	ErrTripCompleted            = errors.New("trip already completed")
+	ErrTripCancelled            = errors.New("trip already cancelled")
 	ErrMarketplaceNotApplicable = errors.New("ride request does not use marketplace booking")
 	ErrMarketplaceNotOpen       = errors.New("ride request marketplace is not open")
 	ErrMarketplaceOfferGone     = errors.New("ride offer is not actionable")
@@ -26,6 +27,7 @@ const (
 	StatusAssigned   Status = "assigned"
 	StatusInProgress Status = "in_progress"
 	StatusCompleted  Status = "completed"
+	StatusCancelled  Status = "cancelled"
 )
 
 type Trip struct {
@@ -36,6 +38,7 @@ type Trip struct {
 	AssignedAt    time.Time
 	StartedAt     *time.Time
 	CompletedAt   *time.Time
+	CancelledAt   *time.Time
 }
 
 type Acceptance struct {

@@ -22,13 +22,13 @@ func (r PostgresRepository) Match(ctx context.Context, rideRequestID, riderUserI
 	defer tx.Rollback()
 
 	var ownedRideID uuid.UUID
-	var bookingMode string
+	var bookingMode, rideStatus string
 	if err := tx.QueryRowContext(
 		ctx,
-		`SELECT id, booking_mode FROM ride_requests WHERE id = $1 AND rider_user_id = $2 FOR UPDATE`,
+		`SELECT id, booking_mode, status FROM ride_requests WHERE id = $1 AND rider_user_id = $2 FOR UPDATE`,
 		rideRequestID,
 		riderUserID,
-	).Scan(&ownedRideID, &bookingMode); err != nil {
+	).Scan(&ownedRideID, &bookingMode, &rideStatus); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Result{}, ErrRideNotFound
 		}
@@ -37,6 +37,9 @@ func (r PostgresRepository) Match(ctx context.Context, rideRequestID, riderUserI
 	if bookingMode != "automatic" {
 		return Result{}, ErrRideNotMatchable
 	}
+	if rideStatus != "requested" {
+		return Result{}, ErrRideNotOpen
+	}
 
 	var existing Candidate
 	err = tx.QueryRowContext(ctx, `
@@ -44,6 +47,7 @@ func (r PostgresRepository) Match(ctx context.Context, rideRequestID, riderUserI
 		FROM ride_driver_candidates
 		WHERE ride_request_id = $1
 		  AND status IN ('pending', 'accepted')
+		  AND released_at IS NULL
 		ORDER BY created_at DESC, driver_user_id ASC
 		LIMIT 1
 	`, rideRequestID).Scan(
@@ -130,8 +134,9 @@ func (r PostgresRepository) Reject(ctx context.Context, rideRequestID, driverUse
 	defer tx.Rollback()
 
 	var candidate Candidate
+	var releasedAt sql.NullTime
 	if err := tx.QueryRowContext(ctx, `
-		SELECT ride_request_id, driver_user_id, status, created_at, decided_at
+		SELECT ride_request_id, driver_user_id, status, created_at, decided_at, released_at
 		FROM ride_driver_candidates
 		WHERE ride_request_id = $1 AND driver_user_id = $2
 		FOR UPDATE
@@ -141,11 +146,15 @@ func (r PostgresRepository) Reject(ctx context.Context, rideRequestID, driverUse
 		&candidate.Status,
 		&candidate.CreatedAt,
 		&candidate.DecidedAt,
+		&releasedAt,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Candidate{}, ErrCandidateNotFound
 		}
 		return Candidate{}, err
+	}
+	if releasedAt.Valid {
+		return Candidate{}, ErrCandidateResolved
 	}
 
 	if candidate.Status == CandidateStatusRejected {

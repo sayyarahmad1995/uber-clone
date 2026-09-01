@@ -20,19 +20,40 @@ func (r PostgresRepository) Accept(ctx context.Context, rideRequestID, driverUse
 	}
 	defer tx.Rollback()
 
-	var candidateStatus string
-	var candidateCreatedAt time.Time
-	var candidateDecidedAt *time.Time
+	var riderUserID uuid.UUID
+	var rideStatus string
 	if err := tx.QueryRowContext(ctx, `
-		SELECT status, created_at, decided_at
-		FROM ride_driver_candidates
-		WHERE ride_request_id = $1 AND driver_user_id = $2
+		SELECT rider_user_id, status
+		FROM ride_requests
+		WHERE id = $1
 		FOR UPDATE
-	`, rideRequestID, driverUserID).Scan(&candidateStatus, &candidateCreatedAt, &candidateDecidedAt); err != nil {
+	`, rideRequestID).Scan(&riderUserID, &rideStatus); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Acceptance{}, ErrAssignmentNotFound
 		}
 		return Acceptance{}, err
+	}
+	if rideStatus != "requested" {
+		return Acceptance{}, ErrAssignmentResolved
+	}
+
+	var candidateStatus string
+	var candidateCreatedAt time.Time
+	var candidateDecidedAt *time.Time
+	var candidateReleasedAt *time.Time
+	if err := tx.QueryRowContext(ctx, `
+		SELECT status, created_at, decided_at, released_at
+		FROM ride_driver_candidates
+		WHERE ride_request_id = $1 AND driver_user_id = $2
+		FOR UPDATE
+	`, rideRequestID, driverUserID).Scan(&candidateStatus, &candidateCreatedAt, &candidateDecidedAt, &candidateReleasedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Acceptance{}, ErrAssignmentNotFound
+		}
+		return Acceptance{}, err
+	}
+	if candidateReleasedAt != nil {
+		return Acceptance{}, ErrAssignmentResolved
 	}
 
 	switch candidateStatus {
@@ -51,15 +72,6 @@ func (r PostgresRepository) Accept(ctx context.Context, rideRequestID, driverUse
 		return Acceptance{}, ErrAssignmentResolved
 	}
 
-	var riderUserID uuid.UUID
-	if err := tx.QueryRowContext(ctx, `
-		SELECT rider_user_id
-		FROM ride_requests
-		WHERE id = $1
-	`, rideRequestID).Scan(&riderUserID); err != nil {
-		return Acceptance{}, err
-	}
-
 	assignedAt := candidateCreatedAt
 	if candidateDecidedAt != nil {
 		assignedAt = *candidateDecidedAt
@@ -72,15 +84,18 @@ func (r PostgresRepository) Accept(ctx context.Context, rideRequestID, driverUse
 		return Acceptance{}, err
 	}
 
-	trip, err := selectTrip(ctx, tx, rideRequestID, driverUserID, false)
+	assignedTrip, err := selectTrip(ctx, tx, rideRequestID, driverUserID, false)
 	if err != nil {
 		return Acceptance{}, err
+	}
+	if assignedTrip.Status == StatusCancelled {
+		return Acceptance{}, ErrAssignmentResolved
 	}
 	if err := tx.Commit(); err != nil {
 		return Acceptance{}, err
 	}
 	return Acceptance{
-		Trip:               trip,
+		Trip:               assignedTrip,
 		CandidateCreatedAt: candidateCreatedAt,
 		CandidateDecidedAt: candidateDecidedAt,
 	}, nil
@@ -93,26 +108,27 @@ func (r PostgresRepository) Start(ctx context.Context, rideRequestID, driverUser
 	}
 	defer tx.Rollback()
 
-	trip, err := selectTrip(ctx, tx, rideRequestID, driverUserID, true)
+	result, err := selectTrip(ctx, tx, rideRequestID, driverUserID, true)
 	if err != nil {
 		return Trip{}, err
 	}
 
-	switch trip.Status {
+	switch result.Status {
 	case StatusAssigned:
 		if err := tx.QueryRowContext(ctx, `
 			UPDATE trips
 			SET status = 'in_progress', started_at = NOW()
 			WHERE ride_request_id = $1 AND driver_user_id = $2
-			RETURNING ride_request_id, rider_user_id, driver_user_id, status, assigned_at, started_at, completed_at
+			RETURNING ride_request_id, rider_user_id, driver_user_id, status, assigned_at, started_at, completed_at, cancelled_at
 		`, rideRequestID, driverUserID).Scan(
-			&trip.RideRequestID,
-			&trip.RiderUserID,
-			&trip.DriverUserID,
-			&trip.Status,
-			&trip.AssignedAt,
-			&trip.StartedAt,
-			&trip.CompletedAt,
+			&result.RideRequestID,
+			&result.RiderUserID,
+			&result.DriverUserID,
+			&result.Status,
+			&result.AssignedAt,
+			&result.StartedAt,
+			&result.CompletedAt,
+			&result.CancelledAt,
 		); err != nil {
 			return Trip{}, err
 		}
@@ -120,6 +136,8 @@ func (r PostgresRepository) Start(ctx context.Context, rideRequestID, driverUser
 		// Idempotent start.
 	case StatusCompleted:
 		return Trip{}, ErrTripCompleted
+	case StatusCancelled:
+		return Trip{}, ErrTripCancelled
 	default:
 		return Trip{}, errors.New("unknown trip status")
 	}
@@ -127,7 +145,7 @@ func (r PostgresRepository) Start(ctx context.Context, rideRequestID, driverUser
 	if err := tx.Commit(); err != nil {
 		return Trip{}, err
 	}
-	return trip, nil
+	return result, nil
 }
 
 func (r PostgresRepository) Complete(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Trip, error) {
@@ -137,12 +155,12 @@ func (r PostgresRepository) Complete(ctx context.Context, rideRequestID, driverU
 	}
 	defer tx.Rollback()
 
-	trip, err := selectTrip(ctx, tx, rideRequestID, driverUserID, true)
+	result, err := selectTrip(ctx, tx, rideRequestID, driverUserID, true)
 	if err != nil {
 		return Trip{}, err
 	}
 
-	switch trip.Status {
+	switch result.Status {
 	case StatusAssigned:
 		return Trip{}, ErrTripNotStarted
 	case StatusInProgress:
@@ -150,25 +168,28 @@ func (r PostgresRepository) Complete(ctx context.Context, rideRequestID, driverU
 			UPDATE trips
 			SET status = 'completed', completed_at = NOW()
 			WHERE ride_request_id = $1 AND driver_user_id = $2
-			RETURNING ride_request_id, rider_user_id, driver_user_id, status, assigned_at, started_at, completed_at
+			RETURNING ride_request_id, rider_user_id, driver_user_id, status, assigned_at, started_at, completed_at, cancelled_at
 		`, rideRequestID, driverUserID).Scan(
-			&trip.RideRequestID,
-			&trip.RiderUserID,
-			&trip.DriverUserID,
-			&trip.Status,
-			&trip.AssignedAt,
-			&trip.StartedAt,
-			&trip.CompletedAt,
+			&result.RideRequestID,
+			&result.RiderUserID,
+			&result.DriverUserID,
+			&result.Status,
+			&result.AssignedAt,
+			&result.StartedAt,
+			&result.CompletedAt,
+			&result.CancelledAt,
 		); err != nil {
 			return Trip{}, err
 		}
 	case StatusCompleted:
 		// Idempotent completion; also repair a missing release marker below.
+	case StatusCancelled:
+		return Trip{}, ErrTripCancelled
 	default:
 		return Trip{}, errors.New("unknown trip status")
 	}
 
-	if trip.CompletedAt == nil {
+	if result.CompletedAt == nil {
 		return Trip{}, errors.New("completed trip missing completed_at")
 	}
 	if _, err := tx.ExecContext(ctx, `
@@ -177,19 +198,19 @@ func (r PostgresRepository) Complete(ctx context.Context, rideRequestID, driverU
 		WHERE ride_request_id = $1
 		  AND driver_user_id = $2
 		  AND status = 'accepted'
-	`, rideRequestID, driverUserID, *trip.CompletedAt); err != nil {
+	`, rideRequestID, driverUserID, *result.CompletedAt); err != nil {
 		return Trip{}, err
 	}
 
 	if err := tx.Commit(); err != nil {
 		return Trip{}, err
 	}
-	return trip, nil
+	return result, nil
 }
 
 func selectTrip(ctx context.Context, tx *sql.Tx, rideRequestID, driverUserID uuid.UUID, forUpdate bool) (Trip, error) {
 	query := `
-		SELECT ride_request_id, rider_user_id, driver_user_id, status, assigned_at, started_at, completed_at
+		SELECT ride_request_id, rider_user_id, driver_user_id, status, assigned_at, started_at, completed_at, cancelled_at
 		FROM trips
 		WHERE ride_request_id = $1 AND driver_user_id = $2
 	`
@@ -197,20 +218,21 @@ func selectTrip(ctx context.Context, tx *sql.Tx, rideRequestID, driverUserID uui
 		query += " FOR UPDATE"
 	}
 
-	var trip Trip
+	var result Trip
 	if err := tx.QueryRowContext(ctx, query, rideRequestID, driverUserID).Scan(
-		&trip.RideRequestID,
-		&trip.RiderUserID,
-		&trip.DriverUserID,
-		&trip.Status,
-		&trip.AssignedAt,
-		&trip.StartedAt,
-		&trip.CompletedAt,
+		&result.RideRequestID,
+		&result.RiderUserID,
+		&result.DriverUserID,
+		&result.Status,
+		&result.AssignedAt,
+		&result.StartedAt,
+		&result.CompletedAt,
+		&result.CancelledAt,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Trip{}, ErrTripNotFound
 		}
 		return Trip{}, err
 	}
-	return trip, nil
+	return result, nil
 }

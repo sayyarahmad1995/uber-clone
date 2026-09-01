@@ -18,11 +18,14 @@ func (r PostgresRepository) GetOwned(ctx context.Context, rideRequestID, riderUs
 	var view View
 	var proposedAmount sql.NullInt64
 	var proposedCurrency sql.NullString
+	var rideCancelledAt sql.NullTime
+	var rideCancelledBy sql.NullString
 	var tripDriver uuid.NullUUID
 	var tripStatus sql.NullString
 	var assignedAt sql.NullTime
 	var startedAt sql.NullTime
 	var completedAt sql.NullTime
+	var tripCancelledAt sql.NullTime
 
 	err := r.db.QueryRowContext(ctx, `
 		SELECT
@@ -37,11 +40,14 @@ func (r PostgresRepository) GetOwned(ctx context.Context, rideRequestID, riderUs
 			rr.currency,
 			rr.status,
 			rr.created_at,
+			rr.cancelled_at,
+			rr.cancelled_by,
 			t.driver_user_id,
 			t.status,
 			t.assigned_at,
 			t.started_at,
-			t.completed_at
+			t.completed_at,
+			t.cancelled_at
 		FROM ride_requests rr
 		LEFT JOIN trips t ON t.ride_request_id = rr.id
 		WHERE rr.id = $1
@@ -58,11 +64,14 @@ func (r PostgresRepository) GetOwned(ctx context.Context, rideRequestID, riderUs
 		&proposedCurrency,
 		&view.RideRequest.Status,
 		&view.RideRequest.CreatedAt,
+		&rideCancelledAt,
+		&rideCancelledBy,
 		&tripDriver,
 		&tripStatus,
 		&assignedAt,
 		&startedAt,
 		&completedAt,
+		&tripCancelledAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return View{}, ErrNotFound
@@ -76,6 +85,12 @@ func (r PostgresRepository) GetOwned(ctx context.Context, rideRequestID, riderUs
 			AmountMinor: proposedAmount.Int64,
 			Currency:    proposedCurrency.String,
 		}
+	}
+	if rideCancelledAt.Valid {
+		view.RideRequest.CancelledAt = &rideCancelledAt.Time
+	}
+	if rideCancelledBy.Valid {
+		view.RideRequest.CancelledBy = ride.CancellationActor(rideCancelledBy.String)
 	}
 
 	if tripDriver.Valid && tripStatus.Valid && assignedAt.Valid {
@@ -91,6 +106,9 @@ func (r PostgresRepository) GetOwned(ctx context.Context, rideRequestID, riderUs
 		}
 		if completedAt.Valid {
 			projectedTrip.CompletedAt = &completedAt.Time
+		}
+		if tripCancelledAt.Valid {
+			projectedTrip.CancelledAt = &tripCancelledAt.Time
 		}
 		view.Trip = &projectedTrip
 	}
