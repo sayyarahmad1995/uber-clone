@@ -12,6 +12,8 @@ import (
 
 var ErrNotFound = errors.New("active trip not found")
 
+const historyLimit = 50
+
 type View struct {
 	RideRequestID uuid.UUID
 	Pickup        ride.Location
@@ -19,10 +21,13 @@ type View struct {
 	Status        trip.Status
 	AssignedAt    time.Time
 	StartedAt     *time.Time
+	CompletedAt   *time.Time
+	CancelledAt   *time.Time
 }
 
 type Repository interface {
 	GetCurrent(ctx context.Context, driverUserID uuid.UUID) (View, error)
+	ListHistory(ctx context.Context, driverUserID uuid.UUID, limit int) ([]View, error)
 }
 
 type Service struct{ repository Repository }
@@ -31,4 +36,8 @@ func NewService(repository Repository) Service { return Service{repository: repo
 
 func (s Service) GetCurrent(ctx context.Context, driverUserID uuid.UUID) (View, error) {
 	return s.repository.GetCurrent(ctx, driverUserID)
+}
+
+func (s Service) ListHistory(ctx context.Context, driverUserID uuid.UUID) ([]View, error) {
+	return s.repository.ListHistory(ctx, driverUserID, historyLimit)
 }
