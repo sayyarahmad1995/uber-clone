@@ -104,6 +104,19 @@ func (api *API) getDriverCurrentTrip(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, driverCurrentTripResponse(view))
 }
 
+func (api *API) listDriverTripHistory(w http.ResponseWriter, r *http.Request) {
+	u, ok := api.requireDriverCapability(w, r)
+	if !ok {
+		return
+	}
+	views, err := api.driverTrips.ListHistory(r.Context(), u.ID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "unable to list trip history"})
+		return
+	}
+	writeJSON(w, http.StatusOK, driverTripHistoryResponse(views))
+}
+
 func writeDriver(w http.ResponseWriter, status int, profile driver.Profile) {
 	writeJSON(w, status, map[string]any{
 		"user_id": profile.UserID, "status": profile.Status, "is_online": profile.IsOnline,
@@ -120,4 +133,21 @@ func driverCurrentTripResponse(view drivertrip.View) map[string]any {
 		"assigned_at":     view.AssignedAt,
 		"started_at":      view.StartedAt,
 	}
+}
+
+func driverTripHistoryResponse(views []drivertrip.View) map[string]any {
+	trips := make([]map[string]any, 0, len(views))
+	for _, view := range views {
+		trips = append(trips, map[string]any{
+			"ride_request_id": view.RideRequestID,
+			"pickup":          map[string]any{"latitude": view.Pickup.Latitude, "longitude": view.Pickup.Longitude},
+			"destination":     map[string]any{"latitude": view.Destination.Latitude, "longitude": view.Destination.Longitude},
+			"status":          view.Status,
+			"assigned_at":     view.AssignedAt,
+			"started_at":      view.StartedAt,
+			"completed_at":    view.CompletedAt,
+			"cancelled_at":    view.CancelledAt,
+		})
+	}
+	return map[string]any{"trips": trips}
 }
