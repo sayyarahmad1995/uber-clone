@@ -8,6 +8,7 @@ import (
 	authkratos "github.com/sayyarahmad1995/uber-clone/backend/internal/auth/kratos"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/cancellation"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/driver"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/driverlocation"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/drivertrip"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/httpapi"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/identity"
@@ -43,18 +44,19 @@ func newApplication(cfg config) (application, func(), error) {
 	}
 	tripService := trip.NewService(trip.NewPostgresRepository(db))
 	api := httpapi.New(httpapi.Dependencies{
-		Users:         user.NewService(user.NewPostgresRepository(db)),
-		Drivers:       driver.NewService(driver.NewPostgresRepository(db)),
-		DriverTrips:   drivertrip.NewService(drivertrip.NewPostgresRepository(db)),
-		Rides:         ride.NewService(ride.NewPostgresRepository(db)),
-		RideStatuses:  ridestatus.NewService(ridestatus.NewPostgresRepository(db)),
-		Cancellations: cancellation.NewService(cancellation.NewPostgresRepository(db)),
-		Matching:      matching.NewService(matching.NewPostgresRepository(db)),
-		Offers:        offer.NewService(offer.NewPostgresRepository(db), tripService),
-		Trips:         tripService,
-		DB:            db,
-		Identity:      identityProvider,
-		Auth:          auth.NewHandler(auth.NewService(authProvider)),
+		Users:           user.NewService(user.NewPostgresRepository(db)),
+		Drivers:         driver.NewService(driver.NewPostgresRepository(db)),
+		DriverLocations: driverlocation.NewService(driverlocation.NewPostgresRepository(db)),
+		DriverTrips:     drivertrip.NewService(drivertrip.NewPostgresRepository(db)),
+		Rides:           ride.NewService(ride.NewPostgresRepository(db)),
+		RideStatuses:    ridestatus.NewService(ridestatus.NewPostgresRepository(db)),
+		Cancellations:   cancellation.NewService(cancellation.NewPostgresRepository(db)),
+		Matching:        matching.NewService(matching.NewPostgresRepository(db)),
+		Offers:          offer.NewService(offer.NewPostgresRepository(db), tripService),
+		Trips:           tripService,
+		DB:              db,
+		Identity:        identityProvider,
+		Auth:            auth.NewHandler(auth.NewService(authProvider)),
 	})
 	return application{handler: api.Handler()}, cleanup, nil
 }

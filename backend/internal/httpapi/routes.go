@@ -39,6 +39,7 @@ func (api *API) registerDriverRoutes(mux *http.ServeMux) {
 	mux.Handle("PUT /v1/driver", api.authenticated(api.onboardDriver))
 	mux.Handle("GET /v1/driver", api.authenticated(api.getDriver))
 	mux.Handle("PUT /v1/driver/availability", api.authenticated(api.setDriverAvailability))
+	mux.Handle("PUT /v1/driver/location", api.authenticated(api.setDriverLocation))
 	mux.Handle("GET /v1/driver/trip", api.authenticated(api.getDriverCurrentTrip))
 	mux.Handle("GET /v1/driver/trips", api.authenticated(api.listDriverTripHistory))
 	mux.Handle("GET /v1/driver/marketplace/ride-requests", api.authenticated(api.discoverDriverMarketplace))
