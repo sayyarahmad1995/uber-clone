@@ -1,4 +1,4 @@
-package main
+package httpapi
 
 import (
 	"context"
@@ -12,21 +12,19 @@ import (
 
 type tripTransitionFunc func(context.Context, uuid.UUID, uuid.UUID) (trip.Trip, error)
 
-func (app application) acceptRideRequestCandidate(w http.ResponseWriter, r *http.Request) {
-	u, ok := app.requireDriverCapability(w, r)
+func (api *API) acceptRideRequestCandidate(w http.ResponseWriter, r *http.Request) {
+	u, ok := api.requireDriverCapability(w, r)
 	if !ok {
 		return
 	}
-
 	rideRequestID, err := uuid.Parse(r.PathValue("ride_request_id"))
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid ride_request_id"})
 		return
 	}
-
-	acceptance, err := app.trips.Accept(r.Context(), rideRequestID, u.ID)
+	acceptance, err := api.trips.Accept(r.Context(), rideRequestID, u.ID)
 	if errors.Is(err, trip.ErrAssignmentNotFound) {
-		marketplaceAcceptance, marketplaceErr := app.offers.AcceptProposed(r.Context(), rideRequestID, u.ID)
+		marketplaceAcceptance, marketplaceErr := api.offers.AcceptProposed(r.Context(), rideRequestID, u.ID)
 		if marketplaceErr == nil {
 			response := rideOfferResponse(marketplaceAcceptance.Offer)
 			response["trip"] = tripResponse(*marketplaceAcceptance.Trip)
@@ -43,7 +41,6 @@ func (app application) acceptRideRequestCandidate(w http.ResponseWriter, r *http
 			}
 		}
 	}
-
 	switch {
 	case errors.Is(err, trip.ErrAssignmentNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "ride request candidate not found"})
@@ -55,7 +52,6 @@ func (app application) acceptRideRequestCandidate(w http.ResponseWriter, r *http
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "unable to update ride request candidate"})
 		return
 	}
-
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ride_request_id": acceptance.Trip.RideRequestID,
 		"driver_user_id":  acceptance.Trip.DriverUserID,
@@ -65,26 +61,24 @@ func (app application) acceptRideRequestCandidate(w http.ResponseWriter, r *http
 	})
 }
 
-func (app application) startTrip(w http.ResponseWriter, r *http.Request) {
-	app.transitionTrip(w, r, app.trips.Start)
+func (api *API) startTrip(w http.ResponseWriter, r *http.Request) {
+	api.transitionTrip(w, r, api.trips.Start)
 }
 
-func (app application) completeTrip(w http.ResponseWriter, r *http.Request) {
-	app.transitionTrip(w, r, app.trips.Complete)
+func (api *API) completeTrip(w http.ResponseWriter, r *http.Request) {
+	api.transitionTrip(w, r, api.trips.Complete)
 }
 
-func (app application) transitionTrip(w http.ResponseWriter, r *http.Request, transition tripTransitionFunc) {
-	u, ok := app.requireDriverCapability(w, r)
+func (api *API) transitionTrip(w http.ResponseWriter, r *http.Request, transition tripTransitionFunc) {
+	u, ok := api.requireDriverCapability(w, r)
 	if !ok {
 		return
 	}
-
 	rideRequestID, err := uuid.Parse(r.PathValue("ride_request_id"))
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid ride_request_id"})
 		return
 	}
-
 	result, err := transition(r.Context(), rideRequestID, u.ID)
 	switch {
 	case errors.Is(err, trip.ErrTripNotFound):
@@ -103,7 +97,6 @@ func (app application) transitionTrip(w http.ResponseWriter, r *http.Request, tr
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "unable to update trip"})
 		return
 	}
-
 	writeTrip(w, result)
 }
 

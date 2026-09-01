@@ -1,14 +1,15 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
+	"net/http"
 
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/auth"
 	authkratos "github.com/sayyarahmad1995/uber-clone/backend/internal/auth/kratos"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/cancellation"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/driver"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/drivertrip"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/httpapi"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/identity"
 	identitykratos "github.com/sayyarahmad1995/uber-clone/backend/internal/identity/kratos"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/matching"
@@ -22,18 +23,7 @@ import (
 )
 
 type application struct {
-	users         user.Service
-	drivers       driver.Service
-	driverTrips   drivertrip.Service
-	rides         ride.Service
-	rideStatuses  ridestatus.Service
-	cancellations cancellation.Service
-	matching      matching.Service
-	offers        offer.Service
-	trips         trip.Service
-	db            *sql.DB
-	identity      identity.Provider
-	auth          auth.Handler
+	handler http.Handler
 }
 
 func newApplication(cfg config) (application, func(), error) {
@@ -41,35 +31,32 @@ func newApplication(cfg config) (application, func(), error) {
 	if err != nil {
 		return application{}, nil, fmt.Errorf("database connection failed: %w", err)
 	}
-
 	cleanup := func() { _ = db.Close() }
 	if err := migrations.Apply(db); err != nil {
 		cleanup()
 		return application{}, nil, fmt.Errorf("database migration failed: %w", err)
 	}
-
 	authProvider, identityProvider, err := buildIdentityProviders(cfg)
 	if err != nil {
 		cleanup()
 		return application{}, nil, fmt.Errorf("identity infrastructure initialization failed: %w", err)
 	}
-
 	tripService := trip.NewService(trip.NewPostgresRepository(db))
-
-	return application{
-		users:         user.NewService(user.NewPostgresRepository(db)),
-		drivers:       driver.NewService(driver.NewPostgresRepository(db)),
-		driverTrips:   drivertrip.NewService(drivertrip.NewPostgresRepository(db)),
-		rides:         ride.NewService(ride.NewPostgresRepository(db)),
-		rideStatuses:  ridestatus.NewService(ridestatus.NewPostgresRepository(db)),
-		cancellations: cancellation.NewService(cancellation.NewPostgresRepository(db)),
-		matching:      matching.NewService(matching.NewPostgresRepository(db)),
-		offers:        offer.NewService(offer.NewPostgresRepository(db), tripService),
-		trips:         tripService,
-		db:            db,
-		identity:      identityProvider,
-		auth:          auth.NewHandler(auth.NewService(authProvider)),
-	}, cleanup, nil
+	api := httpapi.New(httpapi.Dependencies{
+		Users:         user.NewService(user.NewPostgresRepository(db)),
+		Drivers:       driver.NewService(driver.NewPostgresRepository(db)),
+		DriverTrips:   drivertrip.NewService(drivertrip.NewPostgresRepository(db)),
+		Rides:         ride.NewService(ride.NewPostgresRepository(db)),
+		RideStatuses:  ridestatus.NewService(ridestatus.NewPostgresRepository(db)),
+		Cancellations: cancellation.NewService(cancellation.NewPostgresRepository(db)),
+		Matching:      matching.NewService(matching.NewPostgresRepository(db)),
+		Offers:        offer.NewService(offer.NewPostgresRepository(db), tripService),
+		Trips:         tripService,
+		DB:            db,
+		Identity:      identityProvider,
+		Auth:          auth.NewHandler(auth.NewService(authProvider)),
+	})
+	return application{handler: api.Handler()}, cleanup, nil
 }
 
 func buildIdentityProviders(cfg config) (auth.Provider, identity.Provider, error) {

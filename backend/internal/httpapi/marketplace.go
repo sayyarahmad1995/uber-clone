@@ -1,4 +1,4 @@
-package main
+package httpapi
 
 import (
 	"encoding/json"
@@ -13,29 +13,25 @@ type submitRideOfferBody struct {
 	AmountMinor *int64 `json:"amount_minor"`
 }
 
-func (app application) submitRideOffer(w http.ResponseWriter, r *http.Request) {
-	u, ok := app.requireDriverCapability(w, r)
+func (api *API) submitRideOffer(w http.ResponseWriter, r *http.Request) {
+	u, ok := api.requireDriverCapability(w, r)
 	if !ok {
 		return
 	}
-
 	rideRequestID, err := uuid.Parse(r.PathValue("ride_request_id"))
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid ride_request_id"})
 		return
 	}
-
 	var body submitRideOfferBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.AmountMinor == nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "amount_minor is required"})
 		return
 	}
-
-	result, err := app.offers.Submit(r.Context(), rideRequestID, u.ID, *body.AmountMinor)
+	result, err := api.offers.Submit(r.Context(), rideRequestID, u.ID, *body.AmountMinor)
 	if writeOfferError(w, err) {
 		return
 	}
-
 	response := rideOfferResponse(result.Offer)
 	if result.Trip != nil {
 		response["trip"] = tripResponse(*result.Trip)
@@ -43,23 +39,20 @@ func (app application) submitRideOffer(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, response)
 }
 
-func (app application) listRideOffers(w http.ResponseWriter, r *http.Request) {
-	u, ok := app.requireRiderCapability(w, r)
+func (api *API) listRideOffers(w http.ResponseWriter, r *http.Request) {
+	u, ok := api.requireRiderCapability(w, r)
 	if !ok {
 		return
 	}
-
 	rideRequestID, err := uuid.Parse(r.PathValue("ride_request_id"))
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid ride_request_id"})
 		return
 	}
-
-	results, err := app.offers.ListForRider(r.Context(), rideRequestID, u.ID)
+	results, err := api.offers.ListForRider(r.Context(), rideRequestID, u.ID)
 	if writeOfferError(w, err) {
 		return
 	}
-
 	items := make([]map[string]any, 0, len(results))
 	for _, result := range results {
 		items = append(items, rideOfferResponse(result))
@@ -67,8 +60,8 @@ func (app application) listRideOffers(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"offers": items})
 }
 
-func (app application) acceptRideOffer(w http.ResponseWriter, r *http.Request) {
-	u, ok := app.requireRiderCapability(w, r)
+func (api *API) acceptRideOffer(w http.ResponseWriter, r *http.Request) {
+	u, ok := api.requireRiderCapability(w, r)
 	if !ok {
 		return
 	}
@@ -76,15 +69,15 @@ func (app application) acceptRideOffer(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	result, err := app.offers.Accept(r.Context(), rideRequestID, u.ID, driverUserID)
+	result, err := api.offers.Accept(r.Context(), rideRequestID, u.ID, driverUserID)
 	if writeOfferError(w, err) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"trip": tripResponse(result)})
 }
 
-func (app application) rejectRideOffer(w http.ResponseWriter, r *http.Request) {
-	u, ok := app.requireRiderCapability(w, r)
+func (api *API) rejectRideOffer(w http.ResponseWriter, r *http.Request) {
+	u, ok := api.requireRiderCapability(w, r)
 	if !ok {
 		return
 	}
@@ -92,11 +85,28 @@ func (app application) rejectRideOffer(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	result, err := app.offers.Reject(r.Context(), rideRequestID, u.ID, driverUserID)
+	result, err := api.offers.Reject(r.Context(), rideRequestID, u.ID, driverUserID)
 	if writeOfferError(w, err) {
 		return
 	}
 	writeRideOffer(w, http.StatusOK, result)
+}
+
+func (api *API) discoverDriverMarketplace(w http.ResponseWriter, r *http.Request) {
+	u, ok := api.requireDriverCapability(w, r)
+	if !ok {
+		return
+	}
+	items, err := api.offers.Discover(r.Context(), u.ID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "unable to discover marketplace ride requests"})
+		return
+	}
+	response := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		response = append(response, driverMarketplaceItemResponse(item))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ride_requests": response})
 }
 
 func parseOfferPath(w http.ResponseWriter, r *http.Request) (uuid.UUID, uuid.UUID, bool) {
@@ -141,13 +151,25 @@ func rideOfferResponse(result offer.Offer) map[string]any {
 	return map[string]any{
 		"ride_request_id": result.RideRequestID,
 		"driver_user_id":  result.DriverUserID,
-		"fare": map[string]any{
-			"amount_minor": result.AmountMinor,
-			"currency":     result.Currency,
-		},
-		"status":     result.Status,
-		"created_at": result.CreatedAt,
-		"updated_at": result.UpdatedAt,
-		"decided_at": result.DecidedAt,
+		"fare":            map[string]any{"amount_minor": result.AmountMinor, "currency": result.Currency},
+		"status":          result.Status,
+		"created_at":      result.CreatedAt,
+		"updated_at":      result.UpdatedAt,
+		"decided_at":      result.DecidedAt,
 	}
+}
+
+func driverMarketplaceItemResponse(item offer.DiscoveryItem) map[string]any {
+	response := map[string]any{
+		"id":            item.RideRequestID,
+		"pickup":        map[string]float64{"latitude": item.Pickup.Latitude, "longitude": item.Pickup.Longitude},
+		"destination":   map[string]float64{"latitude": item.Destination.Latitude, "longitude": item.Destination.Longitude},
+		"proposed_fare": map[string]any{"amount_minor": item.ProposedFare.ProposedAmountMinor, "currency": item.ProposedFare.Currency},
+		"created_at":    item.CreatedAt,
+		"own_offer":     nil,
+	}
+	if item.OwnOffer != nil {
+		response["own_offer"] = rideOfferResponse(*item.OwnOffer)
+	}
+	return response
 }

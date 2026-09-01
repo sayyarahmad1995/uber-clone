@@ -1,4 +1,4 @@
-package main
+package httpapi
 
 import (
 	"errors"
@@ -8,19 +8,17 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/matching"
 )
 
-func (app application) matchRideRequest(w http.ResponseWriter, r *http.Request) {
-	u, ok := app.requireRiderCapability(w, r)
+func (api *API) matchRideRequest(w http.ResponseWriter, r *http.Request) {
+	u, ok := api.requireRiderCapability(w, r)
 	if !ok {
 		return
 	}
-
 	rideRequestID, err := uuid.Parse(r.PathValue("ride_request_id"))
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid ride_request_id"})
 		return
 	}
-
-	result, err := app.matching.Match(r.Context(), rideRequestID, u.ID)
+	result, err := api.matching.Match(r.Context(), rideRequestID, u.ID)
 	switch {
 	case errors.Is(err, matching.ErrRideNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "ride request not found"})
@@ -38,31 +36,24 @@ func (app application) matchRideRequest(w http.ResponseWriter, r *http.Request) 
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "unable to match ride request"})
 		return
 	}
-
 	status := http.StatusOK
 	if result.Created {
 		status = http.StatusCreated
 	}
-	writeJSON(w, status, map[string]any{
-		"ride_request_id": result.Candidate.RideRequestID,
-		"driver_user_id":  result.Candidate.DriverUserID,
-		"created_at":      result.Candidate.CreatedAt,
-	})
+	writeJSON(w, status, map[string]any{"ride_request_id": result.Candidate.RideRequestID, "driver_user_id": result.Candidate.DriverUserID, "created_at": result.Candidate.CreatedAt})
 }
 
-func (app application) rejectRideRequestCandidate(w http.ResponseWriter, r *http.Request) {
-	u, ok := app.requireDriverCapability(w, r)
+func (api *API) rejectRideRequestCandidate(w http.ResponseWriter, r *http.Request) {
+	u, ok := api.requireDriverCapability(w, r)
 	if !ok {
 		return
 	}
-
 	rideRequestID, err := uuid.Parse(r.PathValue("ride_request_id"))
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid ride_request_id"})
 		return
 	}
-
-	candidate, err := app.matching.Reject(r.Context(), rideRequestID, u.ID)
+	candidate, err := api.matching.Reject(r.Context(), rideRequestID, u.ID)
 	switch {
 	case errors.Is(err, matching.ErrCandidateNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "ride request candidate not found"})
@@ -74,7 +65,6 @@ func (app application) rejectRideRequestCandidate(w http.ResponseWriter, r *http
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "unable to update ride request candidate"})
 		return
 	}
-
 	writeCandidateDecision(w, candidate)
 }
 
