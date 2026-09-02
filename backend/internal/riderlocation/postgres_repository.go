@@ -12,7 +12,7 @@ type PostgresRepository struct{ db *sql.DB }
 
 func NewPostgresRepository(db *sql.DB) PostgresRepository { return PostgresRepository{db: db} }
 
-func (r PostgresRepository) GetForActiveTrip(ctx context.Context, riderUserID uuid.UUID) (View, error) {
+func (r PostgresRepository) GetForRide(ctx context.Context, rideRequestID, riderUserID uuid.UUID) (View, error) {
 	var view View
 	var latitude sql.NullFloat64
 	var longitude sql.NullFloat64
@@ -26,10 +26,10 @@ func (r PostgresRepository) GetForActiveTrip(ctx context.Context, riderUserID uu
 			dl.updated_at
 		FROM trips t
 		LEFT JOIN driver_locations dl ON dl.driver_user_id = t.driver_user_id
-		WHERE t.rider_user_id = $1
+		WHERE t.ride_request_id = $1
+		  AND t.rider_user_id = $2
 		  AND t.status IN ('assigned', 'in_progress')
-		LIMIT 1
-	`, riderUserID).Scan(
+	`, rideRequestID, riderUserID).Scan(
 		&view.RideRequestID,
 		&latitude,
 		&longitude,

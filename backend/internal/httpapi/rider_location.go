@@ -4,16 +4,23 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/riderlocation"
 )
 
-func (api *API) getRiderActiveTripDriverLocation(w http.ResponseWriter, r *http.Request) {
+func (api *API) getRiderRideDriverLocation(w http.ResponseWriter, r *http.Request) {
 	u, ok := api.requireRiderCapability(w, r)
 	if !ok {
 		return
 	}
 
-	view, err := api.riderLocations.GetForActiveTrip(r.Context(), u.ID)
+	rideRequestID, err := uuid.Parse(r.PathValue("ride_request_id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid ride_request_id"})
+		return
+	}
+
+	view, err := api.riderLocations.GetForRide(r.Context(), rideRequestID, u.ID)
 	switch {
 	case errors.Is(err, riderlocation.ErrActiveTripNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "active trip not found"})
