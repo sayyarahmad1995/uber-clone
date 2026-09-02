@@ -54,6 +54,27 @@ Rider fare             |
               Trip
 ```
 
+## Marketplace competition invariant
+
+A counteroffer does not reserve the Ride Request and does not reserve the Driver for that Ride Request.
+
+Until assignment commits successfully, the Ride Request remains competitively available to other eligible Drivers and the Rider may still act on pending counteroffers.
+
+The first valid assignment transaction that successfully commits wins the Ride Request. Assignment can be created by either:
+
+- an eligible Driver accepting the Rider proposed fare; or
+- the Rider accepting an actionable Driver counteroffer.
+
+Once one assignment commits:
+
+- the Ride Request is no longer actionable for any other Driver;
+- all competing pending counteroffers become closed/non-actionable;
+- all competing acceptance attempts must fail without creating another Trip;
+- a later exact-fare acceptance cannot override an already committed counteroffer assignment;
+- a later Rider counteroffer acceptance cannot override an already committed exact-fare assignment.
+
+There is no artificial grace period or priority window between exact-fare acceptance and Rider counteroffer acceptance. Transactional commit order determines the winner. This keeps competition understandable and avoids hidden timing policy.
+
 ## Geographic matching role
 
 Geographic matching remains valuable, but its business role is marketplace eligibility, distribution, and ranking rather than defining a separate Rider booking mode.
