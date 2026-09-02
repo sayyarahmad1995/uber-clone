@@ -10,12 +10,17 @@ import (
 )
 
 type PostgresRepository struct {
-	db                      *sql.DB
-	driverLocationFreshness time.Duration
+	db                       *sql.DB
+	driverLocationFreshness  time.Duration
+	candidateResponseTimeout time.Duration
 }
 
-func NewPostgresRepository(db *sql.DB, driverLocationFreshness time.Duration) PostgresRepository {
-	return PostgresRepository{db: db, driverLocationFreshness: driverLocationFreshness}
+func NewPostgresRepository(db *sql.DB, driverLocationFreshness, candidateResponseTimeout time.Duration) PostgresRepository {
+	return PostgresRepository{
+		db:                       db,
+		driverLocationFreshness:  driverLocationFreshness,
+		candidateResponseTimeout: candidateResponseTimeout,
+	}
 }
 
 func (r PostgresRepository) Match(ctx context.Context, rideRequestID, riderUserID uuid.UUID) (Result, error) {
@@ -46,6 +51,19 @@ func (r PostgresRepository) Match(ctx context.Context, rideRequestID, riderUserI
 		return Result{}, ErrRideNotOpen
 	}
 
+	now := time.Now().UTC()
+	candidateCutoff := now.Add(-r.candidateResponseTimeout)
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE ride_driver_candidates
+		SET released_at = $2
+		WHERE ride_request_id = $1
+		  AND status = 'pending'
+		  AND released_at IS NULL
+		  AND created_at <= $3
+	`, rideRequestID, now, candidateCutoff); err != nil {
+		return Result{}, err
+	}
+
 	var existing Candidate
 	err = tx.QueryRowContext(ctx, `
 		SELECT ride_request_id, driver_user_id, status, created_at, decided_at
@@ -72,7 +90,7 @@ func (r PostgresRepository) Match(ctx context.Context, rideRequestID, riderUserI
 		return Result{}, err
 	}
 
-	locationCutoff := time.Now().UTC().Add(-r.driverLocationFreshness)
+	locationCutoff := now.Add(-r.driverLocationFreshness)
 	var driverUserID uuid.UUID
 	if err := tx.QueryRowContext(ctx, `
 		SELECT p.user_id
@@ -94,8 +112,11 @@ func (r PostgresRepository) Match(ctx context.Context, rideRequestID, riderUserI
 			SELECT 1
 			FROM ride_driver_candidates active
 			WHERE active.driver_user_id = p.user_id
-			  AND active.status IN ('pending', 'accepted')
 			  AND active.released_at IS NULL
+			  AND (
+				active.status = 'accepted'
+				OR (active.status = 'pending' AND active.created_at > $4)
+			  )
 		  )
 		  AND NOT EXISTS (
 			SELECT 1
@@ -105,17 +126,31 @@ func (r PostgresRepository) Match(ctx context.Context, rideRequestID, riderUserI
 		  )
 		ORDER BY
 		  2 * 6371000 * ASIN(SQRT(LEAST(1.0,
-			POWER(SIN(RADIANS(dl.latitude - $4) / 2), 2) +
-			COS(RADIANS($4)) * COS(RADIANS(dl.latitude)) *
-			POWER(SIN(RADIANS(dl.longitude - $5) / 2), 2)
+			POWER(SIN(RADIANS(dl.latitude - $5) / 2), 2) +
+			COS(RADIANS($5)) * COS(RADIANS(dl.latitude)) *
+			POWER(SIN(RADIANS(dl.longitude - $6) / 2), 2)
 		  ))) ASC,
 		  p.user_id ASC
 		LIMIT 1
 		FOR UPDATE OF p SKIP LOCKED
-	`, riderUserID, rideRequestID, locationCutoff, pickupLatitude, pickupLongitude).Scan(&driverUserID); err != nil {
+	`, riderUserID, rideRequestID, locationCutoff, candidateCutoff, pickupLatitude, pickupLongitude).Scan(&driverUserID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			if err := tx.Commit(); err != nil {
+				return Result{}, err
+			}
 			return Result{}, ErrNoEligibleDriver
 		}
+		return Result{}, err
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE ride_driver_candidates
+		SET released_at = $2
+		WHERE driver_user_id = $1
+		  AND status = 'pending'
+		  AND released_at IS NULL
+		  AND created_at <= $3
+	`, driverUserID, now, candidateCutoff); err != nil {
 		return Result{}, err
 	}
 
