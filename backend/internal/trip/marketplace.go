@@ -17,8 +17,9 @@ func (r PostgresRepository) AcceptProposedFare(ctx context.Context, rideRequestI
 	defer tx.Rollback()
 
 	var riderUserID uuid.UUID
-	var bookingMode, status, currency string
-	var proposedAmount int64
+	var bookingMode, status string
+	var proposedAmount sql.NullInt64
+	var currency sql.NullString
 	if err := tx.QueryRowContext(ctx, `
 		SELECT rider_user_id, booking_mode, status, proposed_fare_minor, currency
 		FROM ride_requests
@@ -35,6 +36,9 @@ func (r PostgresRepository) AcceptProposedFare(ctx context.Context, rideRequestI
 	}
 	if status != "requested" {
 		return Trip{}, ErrMarketplaceNotOpen
+	}
+	if !proposedAmount.Valid || !currency.Valid {
+		return Trip{}, errors.New("offers ride request missing proposed fare")
 	}
 
 	if existing, found, err := selectTripByRide(ctx, tx, rideRequestID); err != nil {
@@ -59,7 +63,7 @@ func (r PostgresRepository) AcceptProposedFare(ctx context.Context, rideRequestI
 		              status = 'accepted',
 		              decided_at = NOW(),
 		              updated_at = NOW()
-	`, rideRequestID, driverUserID, proposedAmount, currency); err != nil {
+	`, rideRequestID, driverUserID, proposedAmount.Int64, currency.String); err != nil {
 		return Trip{}, err
 	}
 
