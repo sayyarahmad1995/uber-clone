@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -170,6 +171,15 @@ func openIntegrationDB(t *testing.T) *sql.DB {
 		t.Fatalf("open integration database: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
+
+	var databaseName string
+	if err := db.QueryRow(`SELECT current_database()`).Scan(&databaseName); err != nil {
+		t.Fatalf("read integration database name: %v", err)
+	}
+	if !strings.HasSuffix(databaseName, "_test") {
+		t.Fatalf("refusing to run integration fixtures against non-test database %q; use a database name ending in _test", databaseName)
+	}
+
 	if err := migrations.Apply(db); err != nil {
 		t.Fatalf("apply migrations: %v", err)
 	}
@@ -209,7 +219,7 @@ func createIntegrationDriver(t *testing.T, db *sql.DB, location *integrationLoca
 
 func insertIntegrationUser(t *testing.T, db *sql.DB, userID uuid.UUID, capability string) {
 	t.Helper()
-	if _, err := db.Exec(`INSERT INTO users (id, external_subject) VALUES ($1, $2)`, userID, "integration:"+userID.String()); err != nil {
+	if _, err := db.Exec(`INSERT INTO users (id) VALUES ($1)`, userID); err != nil {
 		t.Fatalf("insert user: %v", err)
 	}
 	if _, err := db.Exec(`INSERT INTO user_capabilities (user_id, capability) VALUES ($1, $2)`, userID, capability); err != nil {
