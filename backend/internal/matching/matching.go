@@ -18,7 +18,7 @@ var (
 )
 
 const (
-	DefaultDriverLocationFreshness          = 2 * time.Minute
+	DefaultDriverLocationFreshness           = 2 * time.Minute
 	DefaultAutomaticCandidateResponseTimeout = 30 * time.Second
 )
 
