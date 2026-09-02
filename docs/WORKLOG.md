@@ -2,19 +2,23 @@
 
 ## Purpose
 
-This file tracks meaningful project progress and the current stopping point so work can resume without reconstructing previous decisions.
+This file is the repository-level source of truth for meaningful project progress, the current stopping point, established architecture, and the next likely business slice.
 
-Update this file after every meaningful work session.
+Keep it concise. Detailed implementation and verification history belongs in the corresponding pull requests and commits.
 
 ---
 
 ## Current Status
 
-**Current engineering milestone:** Driver Current-Trip Read Foundation — implemented and runtime-verified through PR #24.
+**Current engineering milestone:** Driver Location Foundation — implemented, statically verified, runtime-verified, and merged through PR #28.
 
-**Current stopping point:** Authenticated Drivers can recover their current active Trip through a strategy-neutral read model after refresh, restart, or navigation. The current-Trip read exposes pickup, destination, assignment/execution status, and timestamps without exposing Rider identity or redundantly echoing Driver identity. Assigned and in-progress Trips are current; completed and cancelled Trips are historical and therefore excluded. Rider cancellation, Driver capability enforcement, and cross-Driver ownership isolation are verified.
+**Current `main`:** `e053add8c461008c8661846ff84d53f848659988`.
 
-**Current MVP planning approach:** Define the current milestone precisely, keep the next business milestone reasonably clear, and intentionally leave later slices flexible until completed work provides new information. The next business slice should be selected from a concrete Rider/Driver client-flow requirement rather than introducing location, maps, notifications, or payment infrastructure speculatively.
+**Current stopping point:** Drivers can publish application-owned current coordinates through `PUT /v1/driver/location`. The application stores one latest location row per active Driver profile, validates coordinate ranges, accepts explicit `(0,0)`, owns freshness through server-generated `updated_at`, and does not expose Driver identity in the response. No map, routing, geocoding, PostGIS, location history, or external provider concept has entered the public API or business model.
+
+The recovery/read surface is now reasonably balanced: Riders can read/list their Ride Requests; Drivers can read their current Trip and historical Trips; cancellation and marketplace assignment converge on the shared Trip model; current Driver location is available as an application-owned operational signal for the next concrete consumer.
+
+**Next architectural decision:** consume Driver location in a narrow business flow before adding broader geospatial infrastructure. The preferred next slice is Rider Active-Trip Driver Location Read Foundation unless marketplace ranking becomes the higher product priority.
 
 ---
 
@@ -28,7 +32,7 @@ Update this file after every meaningful work session.
 - [x] Ride Request Foundation — PR #6
 - [x] Basic Driver Matching Foundation — PR #7
 - [x] API Composition Cleanup — PR #8
-- [x] Ride Request required-location hardening — PR #9
+- [x] Ride Request Required-Location Hardening — PR #9
 - [x] Driver Candidate Accept/Reject Foundation — PR #10
 - [x] Verified Identity Authentication Enforcement — PR #11
 - [x] Session Extension Contract Correction — PR #12
@@ -41,652 +45,185 @@ Update this file after every meaningful work session.
 - [x] Rider Ride-Request Status Foundation — PR #21
 - [x] Ride Cancellation Foundation — PR #22
 - [x] Driver Current-Trip Read Foundation — PR #24
+- [x] HTTP API Structure Refactor — PR #25
+- [x] Rider Ride-Request List Foundation — PR #26
+- [x] Driver Trip History Foundation — PR #27
+- [x] Driver Location Foundation — PR #28
+
+Worklog-only alignment PRs are intentionally omitted from the business-milestone list.
 
 ---
 
-## Ride Request Required-Location Hardening
+## Recent Milestones
 
-Merged through PR #9.
+### HTTP API Structure Refactor — PR #25
 
-### Contract
+Merged as `43c5cdc233c753707cdac23b5ca6290c8b51960b`.
 
-Ride request pickup/destination objects and each latitude/longitude field are required at the HTTP transport boundary. Presence is distinguished from numeric zero using pointer-backed request DTOs; the Ride domain remains transport-neutral.
+- `cmd/api` is now the composition root rather than the HTTP transport layer.
+- HTTP transport lives under `internal/httpapi`.
+- Business packages remain HTTP-neutral.
+- The refactor intentionally introduced no API, business-lifecycle, or migration changes.
+- A single `internal/httpapi` package is deliberate for the current scale; transport subpackages should appear only when concrete complexity justifies them.
 
-### Verification completed
+### Rider Ride-Request List Foundation — PR #26
 
-- `go test ./...` passes.
-- `go vet ./...` passes.
-- Docker image builds successfully.
-- Docker Compose starts successfully.
-- PostgreSQL is healthy.
-- API starts successfully.
-- Kratos migration exits successfully with code 0.
-- Valid ride request returns `201 Created`.
-- Missing pickup returns `400 Bad Request`.
-- Missing destination returns `400 Bad Request`.
-- Missing pickup latitude/longitude returns `400 Bad Request`.
-- Missing destination latitude/longitude returns `400 Bad Request`.
-- Explicitly supplied `(0,0)` coordinates remain valid and return `201 Created`.
+Merged as `b78c30e86c26c8970bf3aeab74d3c9f26e09460b`.
 
----
+- Endpoint: `GET /v1/ride-requests`.
+- Returns only the authenticated Rider's Ride Requests.
+- Automatic and offers-mode requests share one strategy-neutral read model.
+- Ride Request status and optional Trip status remain separate.
+- Results are newest-first and bounded to 50.
+- No Rider identity is echoed.
+- No migration was required.
 
-## Driver Candidate Accept/Reject Foundation
+### Driver Trip History Foundation — PR #27
 
-Merged through PR #10.
+Merged as `3acf605e8759e9571214792546961b98080764fd`.
 
-### Business flow
+- Endpoint: `GET /v1/driver/trips`.
+- Requires Driver capability and returns only the authenticated Driver's historical Trips.
+- Historical statuses are `completed` and `cancelled`; active `assigned`/`in_progress` remains the responsibility of `GET /v1/driver/trip`.
+- Results are newest-first and bounded to 50.
+- Rider identity and redundant Driver identity are not exposed.
+- No migration was required.
 
-`Matched candidate → matched Driver accepts or rejects → application-owned candidate decision persists`
+### Driver Location Foundation — PR #28
 
-### Implemented contract
+Merged as `e053add8c461008c8661846ff84d53f848659988`.
 
-- Candidate lifecycle states: `pending`, `accepted`, `rejected`.
-- Candidate decisions persist `decided_at`.
-- Candidate decision rows are serialized with `FOR UPDATE`.
-- Repeating the same decision is idempotent and preserves the original `decided_at`.
-- Attempting the opposite decision after resolution returns conflict.
-- Candidate ownership is derived from the authenticated application User with Driver capability; no client-supplied Driver ID is accepted.
-- A Driver cannot act on another Driver's candidate; the API returns `404 Not Found` to avoid assignment leakage.
-- Driver-scoped endpoints:
-  - `POST /v1/driver/ride-requests/{ride_request_id}/accept`
-  - `POST /v1/driver/ride-requests/{ride_request_id}/reject`
+- Endpoint: `PUT /v1/driver/location`.
+- Requires authentication, Driver capability, and an active Driver profile.
+- Request requires latitude and longitude; valid ranges are `[-90, 90]` and `[-180, 180]`.
+- Explicit `(0,0)` is valid.
+- `driver_locations` stores one current row per Driver and updates it in place.
+- `updated_at` is server-owned and represents the latest accepted update time.
+- Driver identity is authentication-derived, never client-supplied, and is not echoed in the response.
+- Migration `013_driver_location_foundation.sql` owns persistence constraints.
+- Runtime verification confirmed valid upsert/re-upsert, timestamp advancement, zero coordinates, range validation, unauthenticated rejection, migration application, and one-row current-location persistence.
 
-### Verification completed
-
-- `go test ./...` passes.
-- `go vet ./...` passes.
-- Docker image builds successfully.
-- Docker Compose starts successfully.
-- PostgreSQL is healthy.
-- API starts successfully.
-- Kratos migration exits successfully with code 0.
-- Matched Driver accept returns `200 OK`, `status=accepted`, non-null `decided_at`.
-- Repeated accept returns `200 OK` with unchanged `decided_at`.
-- Reject after accept returns `409 Conflict`.
-- Another Driver attempting the decision returns `404 Not Found`.
-- Matched Driver reject returns `200 OK`, `status=rejected`, non-null `decided_at`.
-- Repeated reject returns `200 OK` with unchanged `decided_at`.
-- Accept after reject returns `409 Conflict`.
-- Unauthenticated decision returns `401 Unauthorized`.
-- Rider-only account returns `403 Forbidden`.
-- After PR #9 merged, PR #10 was refreshed onto the new `main`; the combined tree again passed `go test ./...`, `go vet ./...`, Docker build, Compose startup, PostgreSQL health, API startup, and Kratos migration.
-
-### Deliberately deferred
-
-- Candidate reselection after rejection.
-- Driver reservation/exclusivity across different rides.
-- Ride/trip execution state.
-- Driver location and proximity matching.
-- Pricing and payments.
-- Live tracking.
+Deliberately not included: location history, background-location policy, Rider location tracking, push/stream subscriptions, route/ETA/maps integration, geocoding, PostGIS, and geographic marketplace ranking.
 
 ---
 
-## Verified Identity Authentication Enforcement
+## Current Business Model and Invariants
 
-Merged through PR #11.
+### Identity and capabilities
 
-### Authentication contract
+- One application account may hold multiple capabilities, including Rider and Driver.
+- Authentication is shared; Driver does not have a separate identity system.
+- Capability membership is separate from capability-specific profile and operational data.
+- Verified identity is required for authenticated application use.
 
-`Register → unverified → login denied → verify identity → login succeeds → authenticated APIs succeed`
+### Ride Requests and marketplace
 
-### Implemented behavior
+- Ride Requests support application-owned `automatic` and `offers` booking modes.
+- Offers-mode money uses integer minor units plus currency; payment-provider concepts are not part of the model.
+- Driver offers do not reserve a Driver until assignment.
+- Multiple Drivers may offer; only one assignment may win.
+- Automatic matching and marketplace selection converge at the same Trip boundary.
 
-- Unverified login is denied with `403 Forbidden` and application-owned `verification_required`.
-- A provider session created during an unverified login attempt is revoked best-effort before any token can be returned.
-- Session extension also requires a verified identity.
-- Protected application APIs reject stale/unverified sessions with `401 Unauthorized`.
-- Kratos verification state remains inside the authentication/identity adapters; it does not become part of the public User model.
-- OIDC replacement remains provider-neutral through the application-owned verification contract.
-- Verification recovery uses the existing `POST /v1/auth/verify` endpoint to initiate a fresh verification challenge for the same registered email.
+### Driver commitments
 
-### Verification completed
+- A Driver may have at most one active candidate/assignment commitment.
+- Candidate activity is `pending`, or `accepted` while `released_at IS NULL`.
+- A Driver may have at most one active Trip with status `assigned` or `in_progress`.
+- Assignment paths revalidate Driver eligibility atomically.
+- Trip completion or cancellation releases the active Driver commitment while preserving history.
 
-- Unverified login returns `403 verification_required` and does not leak an access token.
-- Restarting verification with the registered email returns a fresh application-owned `verification_id`.
-- Verification completion, subsequent login, and verified protected access succeed.
-- Unverified/stale sessions are rejected on protected APIs.
+### Trips and cancellation
 
-### Deliberately deferred
+- Trip states are `assigned`, `in_progress`, `completed`, and `cancelled`.
+- Rider and assigned Driver cancellation converge on the same application-owned Ride Request/Trip state.
+- Repeated cancellation is idempotent.
+- Completed Trips cannot be cancelled.
+- Current Driver Trip reads exclude completed/cancelled history; Driver Trip history excludes active Trips.
 
-- Application-owned resend cooldowns.
-- Verification resend rate limiting.
-- Provider-specific resend timers or throttling details in the public API.
+### Driver location
 
-For MVP, OTP/verification-flow expiry and provider-side throttling remain provider responsibilities. If application-level abuse protection is added later, it should remain provider-neutral and use application-owned errors such as `429 Too Many Requests` rather than exposing Kratos-specific mechanics.
-
----
-
-## Session Extension Contract Correction
-
-Merged through PR #12.
-
-### Defect corrected
-
-`POST /v1/auth/session/extend` previously could return `200 OK` even when the provider had not advanced the persisted session expiry, causing `expires_in` to continue decreasing while the API implied that extension succeeded.
-
-### Application contract
-
-- Valid, verified session and provider advances `expires_at` → `200 OK` with refreshed `expires_in`.
-- Valid, verified session but provider does not advance `expires_at` → `409 Conflict` with application-owned `session_not_extendable`.
-- Expired/invalid session → `401 Unauthorized` with `invalid_credentials`.
-- Provider-specific HTTP status behavior does not define the public application contract.
-
-### Adapter invariant
-
-After a successful provider extension response, the adapter re-reads the provider session and requires the new `expires_at` to be strictly later than the pre-extension value. A successful provider HTTP status with unchanged expiry is treated as not extendable rather than as application success.
-
-### Verification completed
-
-- `go test ./...` passes.
-- `go vet ./...` passes.
-- Runtime verification with `SESSION_LIFESPAN=2m` and `SESSION_EARLIEST_POSSIBLE_EXTEND=60s`:
-  - Before 60 seconds: repeated extension attempts return `409 session_not_extendable`.
-  - After the eligibility interval: extension returns `200 OK` and resets `expires_in` to approximately 119 seconds.
-  - After the final extended session expires: extension returns `401 invalid_credentials`.
-
----
-
-## Candidate Reselection After Driver Rejection
-
-Merged through PR #14.
-
-### Business flow
-
-`Requested ride → candidate Driver rejects → rejected attempt retained → matching excludes prior Drivers → next eligible Driver selected`
-
-### Implemented contract
-
-- Candidate history is retained per `(ride_request_id, driver_user_id)`.
-- A ride has at most one active `pending` or `accepted` candidate.
-- Repeated matching while a candidate is pending or accepted is idempotent and returns that candidate.
-- After rejection, matching excludes every Driver previously attempted for that ride and selects the next eligible Driver using deterministic ordering.
-- Rejected Drivers remain eligible for different rides; rejection history is ride-scoped.
-- When all eligible Drivers have rejected a ride, matching returns `409 Conflict` with `no eligible driver available`.
-- Ride-level `FOR UPDATE` locking remains the serialization point for concurrent match attempts.
-- Existing HTTP and domain contracts remain unchanged.
-
-### Verification completed
-
-- `go test ./...` passes.
-- `go vet ./...` passes.
-- Docker/Compose runtime and migration startup succeed after using the repository's valid Go-style Kratos duration configuration.
-- Rejection followed by rematch selects a different Driver.
-- Multiple sequential rejections progress through different eligible Drivers without reselection.
-- Pending candidate matching is idempotent.
-- Accepted candidate matching is idempotent.
-- Exhausting all four eligible Drivers returns `409 no eligible driver available`.
-- A Driver rejected on one ride remains eligible on a different ride.
-- While D1 is the pending candidate, D2/D3/D4 cannot accept the ride and receive `404 ride request candidate not found`; database inspection confirms only one pending candidate row.
-- Ten concurrent match calls against an existing pending candidate all return the same Driver and original `created_at`.
-- Ten concurrent first-match calls against a ride with zero candidates produce exactly one `201 Created` and nine `200 OK` responses, all returning the same Driver and `created_at`; database inspection confirms exactly one pending candidate row.
-- Concurrent first matches for two different riders/rides can select the same Driver, which motivated PR #15.
-
----
-
-## Driver Active-Candidate Exclusivity Across Rides
-
-Merged and verified through PR #15.
-
-### Business flow
-
-`Concurrent ride requests → matching reserves different eligible Drivers → one Driver cannot hold active candidates for multiple rides`
-
-### Implemented contract
-
-- Drivers with an active candidate are excluded from matching for other rides.
-- Before Trip Execution Foundation, `pending` and `accepted` candidates were both indefinitely active; PR #16 refines this so `pending`, and `accepted` with `released_at IS NULL`, are active.
-- Candidate/assignment activity remains the source of truth; no speculative global Driver busy-state was introduced.
-- Driver profile rows are selected with `FOR UPDATE ... SKIP LOCKED` to serialize cross-ride matching without blocking on a Driver another matching transaction is reserving.
-- A partial unique index on `driver_user_id` enforces the persistence invariant that one Driver can hold at most one active ride assignment.
-- Rejected candidate history remains ride-scoped and does not globally exclude the Driver.
-- Rejection releases the Driver for matching on another ride.
-- Trip completion now releases an accepted Driver while preserving the accepted candidate as immutable assignment history.
-- Existing matching HTTP/domain contracts remain unchanged except that acceptance is now owned atomically by the Trip application boundary.
-
-### Verification completed
-
-- `go test ./...` passes.
-- `go vet ./...` passes.
-- Migration `008_driver_active_candidate_exclusivity.sql` applies successfully on invariant-clean data.
-- The migration refuses pre-existing duplicate active candidates rather than silently rewriting them as rejected decisions.
-- Docker image builds and Compose startup succeed with migration `008` recorded in `schema_migrations`.
-- Two concurrent first-match requests for different riders/rides return `201 Created` with different Drivers.
-- Database inspection confirms no Driver has more than one active candidate.
-- Rejecting D1 releases D1; a subsequent ride can select D1 again.
-- Accepting D2 keeps D2 reserved; a later ride skips D2 and selects another available Driver.
-- With all four Drivers actively reserved, concurrent matching returns `409 no eligible driver available` rather than double-assigning a Driver.
-- After freeing exactly one Driver, ten concurrent initial match calls for the same ride produce exactly one `201 Created` and nine `200 OK` responses, all returning the same Driver and identical `created_at`; database inspection confirms exactly one pending row.
-
-### Deliberately deferred at PR #15
-
-- Candidate timeout/expiry.
-- Trip execution state.
-- Live Driver/rider location tracking.
-- Geographic/proximity matching.
-- Dispatch queues.
-- Pricing/payments.
-
----
-
-## Trip Execution Foundation
-
-Implemented and verified through PR #16.
-
-### Business flow
-
-`Matched Driver accepts → assigned Trip exists → assigned Driver starts → Trip becomes in_progress → assigned Driver completes → Trip becomes completed → Driver becomes eligible for matching again`
-
-### Implemented contract
-
-- Trip lifecycle states are `assigned`, `in_progress`, and `completed`.
-- Trip identity reuses the application-owned `ride_request_id` for this MVP.
-- Candidate acceptance and Trip creation happen atomically; matching no longer exposes an independent acceptance path that could bypass Trip creation.
-- Accepted candidate history remains `accepted`; completion does not rewrite acceptance as another decision.
-- `released_at` on the accepted candidate marks when that assignment stops reserving the Driver.
-- Driver active-candidate exclusivity covers `pending` candidates and `accepted` candidates whose `released_at` is null.
-- Migration `009_trip_execution_foundation.sql` backfills existing accepted candidates into `assigned` Trips because assignment is derivable from the recorded acceptance; it does not fabricate start or completion events.
-- Only the assigned authenticated Driver can start or complete a Trip.
-- Repeated accept, start, and complete operations are idempotent and preserve their original timestamps.
-- Complete-before-start and start-after-completion return conflict.
-- Wrong-Driver Trip mutation returns not found to avoid assignment leakage.
-- Driver-scoped execution endpoints:
-  - `POST /v1/driver/ride-requests/{ride_request_id}/accept`
-  - `POST /v1/driver/ride-requests/{ride_request_id}/start`
-  - `POST /v1/driver/ride-requests/{ride_request_id}/complete`
-
-### Verification completed
-
-- `go test ./...` passes.
-- `go vet ./...` passes.
-- Docker image builds successfully and Docker Compose starts successfully.
-- PostgreSQL is healthy, Kratos migration succeeds, and the API starts on port 8080.
-- Migration `009_trip_execution_foundation.sql` is recorded in `schema_migrations`.
-- Existing accepted candidates are backfilled as `assigned` Trips with null `started_at`, `completed_at`, and `released_at`.
-- The active-Driver partial unique index now constrains `pending`/`accepted` candidates only while `released_at IS NULL`.
-- Fresh matching creates a candidate with `201 Created`.
-- First accept returns `200 OK`; repeated accept returns the same candidate `created_at` and `decided_at`.
-- Complete-before-start returns `409 Conflict`.
-- Another Driver attempting to start the Trip returns `404 Not Found`.
-- First start returns `in_progress`; repeated start preserves the same `started_at`.
-- First complete returns `completed`; repeated complete preserves the same `completed_at`.
-- Start after completion returns `409 Conflict`.
-- Database inspection confirms the completed Trip retains candidate status `accepted` and sets `released_at` equal to `completed_at`.
-- A fresh ride immediately matches the completed Trip's Driver again with `201 Created`, directly proving completion releases the Driver for future matching.
-
-### Deliberately deferred
-
-- Live Driver/rider location updates.
-- Route progress and ETA.
-- Pricing and fare calculation.
-- Payments.
-- Cancellations.
-- Ratings and receipts.
-- Maps integration.
-- Rider-facing trip history.
-
----
-
-## Ride Offer Marketplace Foundation
-
-Implemented and verified through PR #17.
-
-### Business flow
-
-`Rider creates offers-mode request with proposed fare → eligible Drivers submit/update bounded offers → Rider lists offers`
-
-This slice intentionally stops before Rider selection and exclusive assignment.
-
-### Implemented contract
-
-- Ride Requests now have application-owned booking modes: `automatic` and `offers`.
-- Empty/omitted booking mode defaults to `automatic`, preserving the previous contract.
-- `offers` requests require a Rider proposed fare represented as integer minor units plus a three-letter currency.
-- Money remains application-owned; no payment-provider concepts are present in Ride or Offer APIs.
-- Driver offers are separate from `ride_driver_candidates` and do not reserve Drivers or create Trips.
-- A Driver has at most one mutable offer row per Ride Request; updating an offer preserves `created_at` and advances `updated_at`.
-- For MVP, an offer must be between 90% and 130% of the Rider proposed fare, with minimum rounding upward and maximum rounding downward.
-- Offering Drivers must have Driver capability, an active Driver profile, a vehicle, be online, and have no unreleased pending/accepted candidate assignment.
-- A Driver cannot offer on their own Ride Request.
-- The automatic matching endpoint rejects `offers` Ride Requests rather than silently dispatching them.
-- The owning Rider can list offers, ordered deterministically by amount, creation time, then Driver ID.
-- Endpoints:
-  - `PUT /v1/driver/ride-requests/{ride_request_id}/offer`
-  - `GET /v1/ride-requests/{ride_request_id}/offers`
-
-### Verification completed
-
-- `go test ./...` passes on the final formatted PR head.
-- `go vet ./...` passes on the final formatted PR head.
-- Docker image builds successfully.
-- Docker Compose starts successfully after a clean `docker compose down -v` reset.
-- PostgreSQL becomes healthy, Kratos migrations apply successfully, and the API starts.
-- Migration `010_ride_offer_marketplace_foundation.sql` is recorded in `schema_migrations`.
-- Creating an offers-mode Ride Request with proposed fare `100000 PKR` returns `201 Created` and persists the offers mode and proposed fare.
-- Calling automatic `/match` for an offers-mode request returns `409 Conflict` with `ride request uses the offers marketplace`.
-- Eligible online Drivers can submit offers at the exact 90% and 130% boundaries (`90000` and `130000`) with `200 OK`.
-- Offers immediately outside the bounds (`89999` and `130001`) return `400 Bad Request`.
-- Updating a Driver offer from `90000` to `105000` preserves `created_at`, advances `updated_at`, and leaves one row for that Driver/Ride pair.
-- Rider offer listing returns the expected two offers ordered by amount.
-- Database inspection confirms the two expected `ride_offers` rows and confirms zero `ride_driver_candidates` for the offers-mode Ride Request.
-- Creating a Ride Request without `booking_mode` returns `booking_mode=automatic` and no proposed fare.
-- Existing automatic matching remains backward compatible and returns `201 Created` with a Driver candidate.
-- A stale second-Rider token returned `401 Unauthorized`; the separate authenticated non-owning Rider `404` runtime assertion was not repeated after the clean database reset.
-
-### Deliberately deferred
-
-- Rider selecting an offer.
-- Marketplace-driven Trip assignment.
-- Driver discovery/feed and geospatial offer targeting.
-- Offer expiration/cancellation.
-- Back-and-forth negotiation history.
-- Platform fare estimation or surge pricing.
-- Payments.
-- Real-time location.
-
----
-
-## Rider Offer Selection Foundation
-
-Implemented and verified through PR #18.
-
-### Business flow
-
-`Rider creates offers-mode request → Driver either accepts proposed fare or submits counteroffer → exact proposed-fare acceptance assigns immediately → Rider may accept/reject counteroffers → accepted counteroffer assigns atomically`
-
-### Implemented contract
-
-- Offer decision states are `pending`, `accepted`, `rejected`, and `closed`, with `decided_at` recorded for resolved offers.
-- Exact proposed-fare acceptance by an eligible Driver creates an accepted offer and assigned Trip atomically.
-- Repeating exact proposed-fare acceptance by the winning Driver is idempotent and returns the original assignment timestamps.
-- Another Driver attempting to accept after assignment receives marketplace conflict rather than an automatic-candidate error.
-- Counteroffers remain non-reserving until Rider selection.
-- The owning Rider can accept or reject a specific pending Driver offer.
-- Selecting a counteroffer revalidates Driver capability, active profile, online state, vehicle, active candidate state, and active Trip state while serialized under the marketplace transaction.
-- Successful marketplace assignment closes competing pending offers while preserving offer history.
-- Marketplace assignment creates no `ride_driver_candidates`; automatic dispatch and marketplace selection converge at the same application-owned Trip boundary.
-- Automatic matching excludes Drivers with active Trips, including Trips created through the marketplace.
-- A partial unique index permits at most one accepted offer per Ride Request.
-- A partial unique index permits at most one active Trip (`assigned` or `in_progress`) per Driver.
-- PostgreSQL active-Trip uniqueness races are mapped narrowly to application-owned Driver-unavailable conflict instead of leaking `500 Internal Server Error`.
-- Endpoints:
-  - existing `POST /v1/driver/ride-requests/{ride_request_id}/accept` supports automatic candidate acceptance and offers-mode proposed-fare acceptance.
-  - existing `PUT /v1/driver/ride-requests/{ride_request_id}/offer` assigns immediately when the submitted amount equals the Rider proposed fare.
-  - `POST /v1/ride-requests/{ride_request_id}/offers/{driver_user_id}/accept`
-  - `POST /v1/ride-requests/{ride_request_id}/offers/{driver_user_id}/reject`
-
-### Verification completed
-
-- `go test ./...` passes on the final implementation head.
-- `go vet ./...` passes on the final implementation head.
-- Clean Docker startup applies migrations through `011_rider_offer_selection_foundation.sql`.
-- Exact proposed-fare Driver acceptance returns `200 OK`, creates exactly one accepted offer and one assigned Trip, and repeated acceptance is idempotent.
-- Losing exact-fare acceptance after another Driver wins returns `409 Conflict` with marketplace-not-open semantics, not automatic candidate `404`.
-- Rider rejection persists `rejected`; Rider acceptance persists the selected offer as `accepted`, closes the competing pending offer, creates exactly one Trip, and creates zero candidate rows.
-- Taking a Driver offline after offer submission causes Rider acceptance to return `409 Conflict`; the pending offer remains unchanged and no Trip is created.
-- Automatic matching skips a Driver who already has an active marketplace Trip.
-- Marketplace assignment rejects a Driver who already has an active automatic candidate.
-- Two Drivers exact-accepting the same offers ride concurrently produce exactly one assignment and no `500`; the losing Driver receives controlled conflict.
-- Two Rider selections against different pending offers concurrently produce one `200`, one `409`, exactly one accepted offer, one closed competing offer, and one Trip.
-- The same Driver exact-accepting two independent marketplace rides concurrently produces one `200`, one `409`, one active Trip, and no partial loser state.
-- Marketplace acceptance racing with automatic matching preserves one active commitment per Driver; the automatic matcher selects another eligible Driver when appropriate and no cross-strategy double commitment occurs.
-- Marketplace-created Trips start and complete through the existing Trip execution endpoints, and completion releases the Driver for future work.
-
-### Deliberately deferred
-
-- Driver discovery/feed and geospatial targeting.
-- Offer expiration/cancellation.
-- Rider cancellation policy.
-- Back-and-forth negotiation history.
-- Platform fare estimation/surge.
-- Payments.
-- Live location.
-
----
-
-## Driver Marketplace Discovery Foundation
-
-Implemented, verified, and merged through PR #19.
-
-### Business flow
-
-`Eligible online Driver opens marketplace → application lists open offers-mode Ride Requests → Driver chooses a Ride Request → Driver accepts proposed fare or submits/updates a counteroffer through the existing marketplace contract`
-
-### Implemented contract
-
-- Driver marketplace discovery endpoint: `GET /v1/driver/marketplace/ride-requests`.
-- Discovery is read-only and does not reserve Drivers, mutate Ride Requests, create candidates, create offers, or create Trips.
-- Only Ride Requests with `booking_mode=offers`, `status=requested`, and no Trip are discoverable.
-- The authenticated Driver's own Ride Requests are excluded, preserving shared-account Rider/Driver semantics.
-- Drivers who are not operationally eligible receive an empty feed. Eligibility requires Driver capability, an active Driver profile, online availability, a vehicle, no unreleased active candidate, and no active Trip.
-- Discovery returns pickup, destination, proposed fare, Ride Request creation time, and the authenticated Driver's existing offer when one exists.
-- Rider identity is not exposed in the Driver marketplace response.
-- Results are deterministic, newest-first, and bounded to 50 Ride Requests for the MVP.
-- Discovery is a snapshot only; offer submission and Trip assignment remain authoritative and revalidate eligibility/availability atomically.
-
-### Verification completed
-
-- `go test ./...` passes on the PR head.
-- `go vet ./...` passes on the PR head.
-- `gofmt` produced no changes.
-- Docker image builds successfully and Docker Compose starts the rebuilt API successfully.
-- A free eligible Driver sees open offers-mode Ride Requests in newest-first order.
-- Automatic-mode Ride Requests are absent from the feed.
-- A Driver with an active Trip receives an empty feed and cannot submit another offer; completing the Trip restores discovery eligibility.
-- An offline Driver receives an empty feed; returning online restores eligibility when no other commitment exists.
-- Submitting a counteroffer keeps the Ride Request discoverable and projects the Driver's pending `own_offer` into the feed.
-- Historical pending offers are projected as `own_offer` while their Ride Requests remain open.
-- Once a Ride Request is assigned and a Trip exists, it disappears from another eligible Driver's feed.
-- A shared account with both Rider and Driver capability does not see its own Rider-created marketplace request in its Driver feed.
-- The same self-created request is visible to another free eligible Driver, confirming that self-exclusion is owner-specific rather than a global visibility defect.
-
-### Deliberately deferred
-
-- Live Driver location.
-- Geographic filtering and proximity ranking.
-- Maps/routing provider integration.
-- Push notifications or marketplace subscriptions.
-- Cursor pagination.
-- Offer expiration/cancellation.
-- Pricing/surge.
-- Payments.
-
----
-
-## Rider Ride-Request Status Foundation
-
-Implemented, verified, and merged through PR #21.
-
-### Business flow
-
-`Owning Rider creates Ride Request → Rider reads current Ride Request state → optional Trip assignment/execution state is projected without strategy-specific branching`
-
-### Implemented contract
-
-- Rider status endpoint: `GET /v1/ride-requests/{ride_request_id}`.
-- Only the owning authenticated Rider can read the Ride Request; nonexistent and non-owned requests both return `404 Not Found`.
-- Invalid Ride Request UUIDs return `400 Bad Request`.
-- The read model composes application-owned Ride Request state with an optional Trip.
-- Automatic and offers-mode Ride Requests use the same status contract.
-- Ride Request status and Trip status remain separate concepts. A Ride Request can remain `requested` while its Trip progresses through `assigned`, `in_progress`, and `completed`.
-- Trip projection includes assigned Driver identity and assignment/execution timestamps without exposing Rider identity.
-- No new persistence lifecycle or migration was introduced for this read model.
-
-### Verification completed
-
-- `go test ./...` passes.
-- `go vet ./...` passes.
-- Runtime verification covered automatic and offers-mode Ride Requests through assignment and Trip execution.
-- Ownership isolation returns non-leaking `404 Not Found` for another authenticated Rider.
-- The same endpoint projects strategy-neutral Ride Request state and optional Trip state for both automatic matching and marketplace assignment.
-
----
-
-## Ride Cancellation Foundation
-
-Implemented, verified, and merged through PR #22.
-
-### Business flow
-
-`Open Ride Request → owning Rider or assigned Driver cancels → Ride Request becomes cancelled → optional assigned/in-progress Trip becomes cancelled → active Driver commitment is released → status read model reflects cancellation`
-
-### Implemented contract
-
-- Rider cancellation endpoint: `POST /v1/ride-requests/{ride_request_id}/cancel`.
-- Driver cancellation endpoint: `POST /v1/driver/ride-requests/{ride_request_id}/cancel`.
-- Rider may cancel their own Ride Request before Trip completion.
-- Driver may cancel only a Trip assigned to their authenticated Driver account.
-- Repeated cancellation is idempotent and preserves the original cancellation timestamp.
-- Ride Request cancellation records application-owned `cancelled_at` and `cancelled_by` (`rider` or `driver`).
-- Assigned/in-progress Trips transition to `cancelled` with the same cancellation timestamp.
-- Completed Trips cannot be cancelled and return conflict without mutating completed state.
-- Active automatic candidates are released while preserving candidate decision history.
-- Pending marketplace offers are closed with a decision timestamp; accepted/rejected/closed offer history remains intact.
-- Cancelled automatic Ride Requests cannot be matched again.
-- Automatic acceptance locks and revalidates the Ride Request before locking the candidate so cancellation and acceptance serialize without resurrecting cancelled work.
-- Start/complete on cancelled Trips return conflict.
-- The Rider status read model exposes Ride Request cancellation metadata and optional Trip cancellation state.
-
-### Verification completed
-
-- `gofmt` produced no changes and the working tree remained clean.
-- `go test ./...` passes.
-- `go vet ./...` passes.
-- Runtime verification used a fresh database and fresh Rider/Driver accounts.
-- Rider cancellation before assignment returns `cancelled`, `cancelled_by=rider`, and `trip=null`; repeated cancellation preserves the original `cancelled_at`.
-- Matching a cancelled automatic Ride Request returns `409 Conflict`.
-- Rider cancellation after automatic assignment cancels both Ride Request and Trip and releases the Driver for immediate rematching.
-- Rider cancellation during `in_progress` preserves `started_at`, leaves `completed_at` null, and prevents subsequent completion.
-- Driver-initiated cancellation records `cancelled_by=driver`; a non-assigned Driver receives non-leaking `404 Not Found`.
-- Cancelling an offers-mode Ride Request closes pending marketplace offers; further offer submission returns `409 Conflict`.
-- Cancelling an assigned marketplace Trip releases the Driver so they can immediately accept another marketplace Ride Request.
-- Rider and Driver cancellation attempts against a completed Trip both return `409 Conflict` and leave the completed Trip unchanged.
-- A concurrent Rider-cancel versus automatic Driver-accept test serialized correctly: cancellation won, acceptance returned `409 Conflict`, and final state remained cancelled with no Trip.
-
-### Deliberately deferred
-
-- Cancellation fees or refunds.
-- No-show semantics.
-- Driver compensation.
-- Cancellation reason taxonomy.
-- Abuse/rate-limit policy.
-- Notifications.
-- Location/geofence policy.
-- Payments.
-
----
-
-## Driver Current-Trip Read Foundation
-
-Implemented and runtime-verified through PR #24.
-
-### Business flow
-
-`Authenticated Driver → read current active Trip → receive pickup/destination and assignment/execution state`
-
-### Implemented contract
-
-- Driver current-Trip endpoint: `GET /v1/driver/trip`.
-- The endpoint requires the authenticated account to have Driver capability.
-- The read returns only the authenticated Driver's active Trip.
-- Active Trip statuses are `assigned` and `in_progress`; completed and cancelled Trips are excluded as historical.
-- The response includes Ride Request ID, pickup, destination, Trip status, `assigned_at`, and optional `started_at`.
-- Rider identity is not exposed, and the authenticated Driver identity is not redundantly echoed.
-- The read model is strategy-neutral because automatic matching and marketplace assignment already converge at the application-owned `trips` boundary.
-- The existing unique active-Trip persistence invariant makes the current Trip singular; no `current_trip_id`, duplicated busy flag, new lifecycle table, or migration was introduced.
-- A dedicated `internal/drivertrip` read model keeps client projection concerns separate from the Trip mutation repository.
-
-### Verification completed
-
-- `gofmt` produced no changes and `git status --short` remained empty on the feature implementation head.
-- `go test ./...` passes, including the new `internal/drivertrip` package.
-- `go vet ./...` passes.
-- A Driver with no active Trip receives `404 {"error":"active trip not found"}`.
-- A Rider-only authenticated account receives `403 {"error":"driver capability required"}`.
-- After automatic assignment, the assigned Driver reads the correct Ride Request ID, pickup/destination, `status=assigned`, non-null `assigned_at`, and null `started_at`.
-- Contract assertions confirm the current-Trip response exposes neither `rider_user_id` nor `driver_user_id`.
-- Starting the same Trip changes the current read to `status=in_progress`, preserves the Ride Request ID and assignment time, and exposes non-null `started_at`.
-- Completing the Trip removes it from the current read and returns `404`.
-- Cross-Driver isolation is enforced: the assigned Driver receives `200`, while an unrelated Driver receives `404`.
-- Rider cancellation of an assigned Trip removes it from the current read and subsequent access returns `404`.
-
-### Deliberately deferred
-
-- Driver Trip history.
-- Rider identity/contact details in the Driver Trip projection.
-- Live Driver/Rider location.
-- Route progress and ETA.
-- Maps/routing provider integration.
-- Notifications.
-- Pricing/payments.
-
----
-
-## Next Business Vertical Slice
-
-Not fixed yet. Select the next slice from the next concrete Rider/Driver MVP client flow rather than introducing infrastructure speculatively.
-
-Strong candidates, only when a consuming flow requires them:
-
-- Live Driver Location Foundation if marketplace ranking, dispatch quality, or active-trip tracking needs current coordinates.
-- Marketplace geographic filtering/ranking once location ownership and freshness semantics are defined.
-- Rider/Driver Trip History Foundation if a concrete client flow needs retrieval of completed or cancelled Trips beyond the existing Rider Ride-Request status and Driver current-Trip views.
-- Offer expiration or marketplace lifecycle hardening if stale marketplace inventory becomes a concrete client problem.
-
-The next slice must preserve the established boundary: external maps, routing, notification, or payment systems implement application-defined ports and must not define business models or public APIs.
+- Location is volatile operational telemetry, not durable Driver profile/vehicle state.
+- Current location is stored separately from `driver_profiles`.
+- One latest location row exists per Driver.
+- Server-owned `updated_at` is the current freshness signal.
+- Location publishing does not require the Driver to be online or to have an active Trip; downstream consumers decide whether a location is eligible/fresh enough for their use case.
 
 ---
 
 ## Architecture Rule: Replaceable External Providers
 
-External systems implement application-defined ports. Provider-specific concepts must not define business models or public APIs.
+External systems implement application-defined ports. External-system concepts must never define business models or public APIs.
 
 For authentication:
 
 `Client → Application Authentication API → Authentication domain → Provider adapter → Identity infrastructure`
 
-The concrete identity provider is selected at the composition root. Kratos is the current implementation, not a business-domain dependency.
+Kratos is the current identity implementation, not a domain dependency.
 
-The same boundary rule applies to future maps, routing, payments, notifications, storage, messaging, and other external services.
+The same rule applies to maps, routing, geocoding, payments, notifications, storage, messaging, and future external services.
+
+Provider-neutral application concepts come first; vendor adapters come later and remain replaceable.
 
 ---
 
-## Rough MVP Direction After Driver Current-Trip Read Foundation
+## Next Business Vertical Slice
 
-- Choose the next concrete Rider/Driver client flow before adding infrastructure.
-- Add live location/status only when marketplace ranking, dispatch quality, or active-trip UX consumes it.
-- Add geographic marketplace filtering/ranking only after application-owned location and freshness semantics exist.
-- Add Trip history read models only when a concrete Rider/Driver client flow requires historical retrieval beyond the current status views.
-- Harden marketplace offer lifecycle, cancellation policy, or pricing only when an end-to-end flow exposes the need.
+### Preferred: Rider Active-Trip Driver Location Read Foundation
 
-Exact later boundaries remain intentionally flexible.
+Use the newly established Driver location state in the narrowest concrete consumer flow.
+
+Proposed contract direction:
+
+- An authenticated Rider may read the latest location of the Driver assigned to their own active Trip.
+- Authorization is derived from Ride Request ownership plus the active Trip assignment; no Driver ID is accepted from the Rider.
+- Only active `assigned`/`in_progress` Trips participate.
+- The response should expose coordinates and `updated_at`, not Driver account identity.
+- Missing current Driver location should have an application-owned non-leaking result.
+- Freshness policy should be explicit if the product flow needs one; do not invent a threshold before the client behavior requires it.
+- No streaming, WebSocket, push, maps SDK, routing provider, or breadcrumb history in this first consumer slice.
+
+Why this comes before geographic marketplace ranking: it exercises location ownership, authorization, missing-location behavior, and freshness semantics with a narrow deterministic consumer. Marketplace geographic ranking requires additional policy choices—online eligibility, freshness threshold, distance computation, ranking/tie-breaking, and search radius—and should be built after those primitives are proven.
+
+### Following candidate: Marketplace Geographic Ranking Foundation
+
+When product priority requires it:
+
+- consider only operationally eligible Drivers with sufficiently fresh current locations;
+- compute application-owned distance for MVP without introducing PostGIS unless query scale justifies it;
+- define deterministic proximity ordering and fallback behavior;
+- keep maps/routing/geocoding providers outside matching-domain contracts.
 
 ---
 
 ## Deferred
 
-- CI/CD.
-- Kubernetes.
+- CI/CD and Kubernetes.
 - iOS implementation.
-- Courier capability.
-- Freight capability.
+- Courier and freight capabilities.
 - Administrator operations.
-- Enterprise-level business logic.
-- Advanced matching/dispatch.
-- Payments unless concretely required by an MVP slice.
-- Promotions.
-- Advanced analytics.
+- Enterprise-level workflow/process infrastructure.
+- Advanced dispatch queues and optimization.
+- PostGIS/geospatial indexing until scale/query behavior warrants it.
+- Live location streaming and breadcrumb history.
+- Route progress, ETA, and maps integration.
+- Push notifications/subscriptions.
+- Payments until concretely required by an MVP slice.
+- Promotions and advanced analytics.
+- Marketplace offer expiration and multi-round negotiation.
+- Advanced cancellation fees/refunds/no-show policy.
 - Authentication resend cooldown/rate-limit policy beyond provider defaults.
 
 ---
 
-## Important Working Principles
+## Working Principles
 
 - Build the MVP incrementally using business vertical slices.
-- Finish the current slice before expanding into the next one.
-- Keep authentication shared across capabilities; do not duplicate identity systems per business role.
-- Represent capability membership separately from capability-specific profile/operational data.
-- Organize code around business domains with infrastructure behind application-defined boundaries.
-- Maintain future extensibility primarily through clean ports/adapters, not speculative implementations.
-- Challenge architectural decisions that create vendor lock-in or premature complexity.
-- Keep the repository worklog aligned with the actual merged state.
+- Finish and verify the current slice before expanding into the next one.
+- Keep the repository worklog aligned with actual merged state.
+- Keep `cmd/api` as composition root and business packages transport-neutral.
+- Prefer clean application-owned boundaries over provider-specific abstractions.
+- Do not introduce duplicated lifecycle state when an existing invariant is authoritative.
+- Add infrastructure only when a concrete business flow consumes it.
+- Preserve ownership/privacy boundaries and avoid identity leakage in read models.
+- Use persistence constraints for important singularity/exclusivity invariants, with application transactions providing business serialization.
+- Challenge premature abstractions, vendor lock-in, duplicated state, and speculative enterprise complexity.
