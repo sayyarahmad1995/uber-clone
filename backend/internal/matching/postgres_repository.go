@@ -4,14 +4,18 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 )
 
-type PostgresRepository struct{ db *sql.DB }
+type PostgresRepository struct {
+	db                      *sql.DB
+	driverLocationFreshness time.Duration
+}
 
-func NewPostgresRepository(db *sql.DB) PostgresRepository {
-	return PostgresRepository{db: db}
+func NewPostgresRepository(db *sql.DB, driverLocationFreshness time.Duration) PostgresRepository {
+	return PostgresRepository{db: db, driverLocationFreshness: driverLocationFreshness}
 }
 
 func (r PostgresRepository) Match(ctx context.Context, rideRequestID, riderUserID uuid.UUID) (Result, error) {
@@ -23,12 +27,13 @@ func (r PostgresRepository) Match(ctx context.Context, rideRequestID, riderUserI
 
 	var ownedRideID uuid.UUID
 	var bookingMode, rideStatus string
+	var pickupLatitude, pickupLongitude float64
 	if err := tx.QueryRowContext(
 		ctx,
-		`SELECT id, booking_mode, status FROM ride_requests WHERE id = $1 AND rider_user_id = $2 FOR UPDATE`,
+		`SELECT id, booking_mode, status, pickup_latitude, pickup_longitude FROM ride_requests WHERE id = $1 AND rider_user_id = $2 FOR UPDATE`,
 		rideRequestID,
 		riderUserID,
-	).Scan(&ownedRideID, &bookingMode, &rideStatus); err != nil {
+	).Scan(&ownedRideID, &bookingMode, &rideStatus, &pickupLatitude, &pickupLongitude); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Result{}, ErrRideNotFound
 		}
@@ -67,15 +72,18 @@ func (r PostgresRepository) Match(ctx context.Context, rideRequestID, riderUserI
 		return Result{}, err
 	}
 
+	locationCutoff := time.Now().UTC().Add(-r.driverLocationFreshness)
 	var driverUserID uuid.UUID
 	if err := tx.QueryRowContext(ctx, `
 		SELECT p.user_id
 		FROM driver_profiles p
 		JOIN driver_vehicles v ON v.driver_user_id = p.user_id
 		JOIN user_capabilities c ON c.user_id = p.user_id AND c.capability = 'driver'
+		JOIN driver_locations dl ON dl.driver_user_id = p.user_id
 		WHERE p.status = 'active'
 		  AND p.is_online = TRUE
 		  AND p.user_id <> $1
+		  AND dl.updated_at >= $3
 		  AND NOT EXISTS (
 			SELECT 1
 			FROM ride_driver_candidates prior
@@ -95,10 +103,16 @@ func (r PostgresRepository) Match(ctx context.Context, rideRequestID, riderUserI
 			WHERE t.driver_user_id = p.user_id
 			  AND t.status IN ('assigned', 'in_progress')
 		  )
-		ORDER BY p.updated_at ASC, p.user_id ASC
+		ORDER BY
+		  2 * 6371000 * ASIN(SQRT(LEAST(1.0,
+			POWER(SIN(RADIANS(dl.latitude - $4) / 2), 2) +
+			COS(RADIANS($4)) * COS(RADIANS(dl.latitude)) *
+			POWER(SIN(RADIANS(dl.longitude - $5) / 2), 2)
+		  ))) ASC,
+		  p.user_id ASC
 		LIMIT 1
 		FOR UPDATE OF p SKIP LOCKED
-	`, riderUserID, rideRequestID).Scan(&driverUserID); err != nil {
+	`, riderUserID, rideRequestID, locationCutoff, pickupLatitude, pickupLongitude).Scan(&driverUserID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Result{}, ErrNoEligibleDriver
 		}
