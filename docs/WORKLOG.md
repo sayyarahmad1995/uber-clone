@@ -10,17 +10,17 @@ Keep it concise. Detailed implementation and verification history belongs in the
 
 ## Current Status
 
-**Current engineering milestone:** Rider Active-Trip Driver Location Read Foundation — implemented and verified in PR #30; pending merge.
+**Current engineering milestone:** Automatic Ride Dispatch Lifecycle — geographic matching, candidate lifecycle/timeout semantics, Trip execution, cancellation, and DB-backed transactional coverage are implemented and merged through PR #44.
 
-**Current `main`:** `de1e92c48c9397917bd98150545d5cf77bb5b9a6` (worklog alignment through Driver Location Foundation).
+**Current `main`:** `0ecbd93febf8b75efaeb1df1db25c80488e3b2ee`.
 
-**Current feature head before this worklog commit:** `0595a1e8c19a15581da0e580684f43a1b5b10b69`.
+**Current stopping point:** Automatic matching selects the nearest operationally eligible Driver using fresh application-owned Driver location, straight-line Haversine distance, deterministic UUID tie-breaking, active-candidate/Trip exclusion, and a 30-second Driver response window. The response window is enforced consistently across matching, acceptance, and rejection. Candidate release semantics align with database uniqueness constraints, and released history no longer blocks future Driver participation.
 
-**Current stopping point:** Drivers publish one application-owned current location through `PUT /v1/driver/location`. An authenticated Rider can now read the latest location of the Driver assigned to a specific owned active Ride Request through `GET /v1/ride-requests/{ride_request_id}/driver-location`. Authorization is derived from Ride Request ownership and active Trip assignment; no Driver identity is accepted from or exposed to the Rider. The read is valid only while the Trip is `assigned` or `in_progress` and returns coordinates plus server-owned `updated_at`.
+Trip acceptance, Start, Complete, and cancellation are protected by PostgreSQL integration tests. Completion and cancellation release active Driver commitments while preserving history. Rider/Driver cancellation is idempotent, completed Trips cannot be cancelled, and cancellation also closes pending marketplace offers for the cancelled ride.
 
-The Rider location read deliberately does not assume Rider-side active-Trip singularity. Ride Request ID is part of the resource path, so a Rider with multiple active Trips remains deterministic. Missing/non-owned/non-active Trips produce the same non-leaking result. No map, routing, geocoding, PostGIS, location history, streaming, or external provider concept has entered the public API or business model.
+A dedicated `*_test` PostgreSQL database pattern protects repository integration tests from development-data contamination. No new runtime infrastructure, exposed database port, PostGIS dependency, background timeout worker, Redis, scheduler, or external maps/routing provider has been introduced.
 
-**Next architectural decision:** geographic marketplace ranking is now the leading product slice because Driver location has both a write foundation and a narrow authorized Rider consumer. Before implementation, define the minimum application-owned eligibility policy: online state, location freshness threshold, distance calculation, deterministic tie-breaking, and any MVP search-radius/fallback behavior.
+**Next product slice:** expose the authenticated Driver's current automatic candidate as an explicit read model. Today Drivers can accept/reject a known Ride Request, but there is no narrow Driver-facing read endpoint for the currently assigned pending automatic candidate. Add that read before introducing additional matching policy.
 
 ---
 
@@ -51,56 +51,64 @@ The Rider location read deliberately does not assume Rider-side active-Trip sing
 - [x] Rider Ride-Request List Foundation — PR #26
 - [x] Driver Trip History Foundation — PR #27
 - [x] Driver Location Foundation — PR #28
-- [ ] Rider Active-Trip Driver Location Read Foundation — PR #30 (implemented and verified; pending merge)
+- [x] Rider Active-Trip Driver Location Read Foundation — PR #30
+- [x] Automatic Candidate Acceptance Error Semantics Fix — PR #31
+- [x] Geographic Automatic Matching — PR #32
+- [x] Released Candidate Exclusivity Alignment — PR #33
+- [x] Automatic Candidate Response Timeout — PR #35
+- [x] Matching PostgreSQL Integration Coverage — PR #36
+- [x] Trip Acceptance PostgreSQL Integration Coverage — PR #38
+- [x] Trip Execution PostgreSQL Integration Coverage — PR #40
+- [x] Cancellation PostgreSQL Integration Coverage — PR #42
+- [x] Automatic Candidate Reject Timeout Alignment — PR #44
 
-Worklog-only alignment PRs are intentionally omitted from the business-milestone list.
+Replacement PRs created only to work around the GitHub Draft→Ready connector issue are listed by their merged PR number. Worklog-only alignment PRs are intentionally omitted from the business-milestone list.
 
 ---
 
-## Recent Milestones
+## Recent Architecture and Behavior
 
-### Driver Trip History Foundation — PR #27
+### Geographic automatic matching
 
-Merged as `3acf605e8759e9571214792546961b98080764fd`.
+- Automatic matching requires an active, online Driver with Driver capability, a vehicle, and a fresh current location.
+- Driver location freshness is **2 minutes**.
+- Missing or stale Driver location makes that Driver ineligible for new candidate selection.
+- Eligible Drivers are ordered by application-owned Haversine pickup distance, then Driver UUID for deterministic tie-breaking.
+- Existing pending/accepted candidates for a ride are returned idempotently instead of being re-ranked.
+- Drivers previously considered for the same ride are not retried after timeout/rejection.
+- Active candidate and active Trip exclusivity remain authoritative.
+- No PostGIS, routing/ETA provider, destination-distance ranking, city model, service-area model, or fixed pickup radius is part of the current matching policy.
 
-- Endpoint: `GET /v1/driver/trips`.
-- Requires Driver capability and returns only the authenticated Driver's historical Trips.
-- Historical statuses are `completed` and `cancelled`; active `assigned`/`in_progress` remains the responsibility of `GET /v1/driver/trip`.
-- Results are newest-first and bounded to 50.
-- Rider identity and redundant Driver identity are not exposed.
-- No migration was required.
+### Automatic candidate lifecycle
 
-### Driver Location Foundation — PR #28
+- A pending automatic candidate has a **30-second response window**.
+- Timeout is lazy and transactional; no background worker is required.
+- Matching releases expired pending candidates before reselection.
+- Late acceptance releases the pending candidate and returns the resolved-assignment result without creating a Trip.
+- Late rejection releases the pending candidate and returns the resolved-candidate result without recording misleading rejection history.
+- Accepted candidates do not expire; the Trip lifecycle owns the commitment after acceptance.
+- `released_at` is the authoritative release marker; no separate `expired` status exists.
 
-Merged as `e053add8c461008c8661846ff84d53f848659988`.
+### Trip and cancellation lifecycle
 
-- Endpoint: `PUT /v1/driver/location`.
-- Requires authentication, Driver capability, and an active Driver profile.
-- Request requires latitude and longitude; valid ranges are `[-90, 90]` and `[-180, 180]`.
-- Explicit `(0,0)` is valid.
-- `driver_locations` stores one current row per Driver and updates it in place.
-- `updated_at` is server-owned and represents the latest accepted update time.
-- Driver identity is authentication-derived, never client-supplied, and is not echoed in the response.
-- Migration `013_driver_location_foundation.sql` owns persistence constraints.
-- Runtime verification confirmed valid upsert/re-upsert, timestamp advancement, zero coordinates, range validation, unauthenticated rejection, migration application, and one-row current-location persistence.
+- Trip states are `assigned`, `in_progress`, `completed`, and `cancelled`.
+- Acceptance creates at most one assigned Trip and is idempotent for an already accepted candidate.
+- Start transitions `assigned → in_progress` and is idempotent while already in progress.
+- Complete requires an in-progress Trip, transitions to `completed`, and releases the accepted candidate at the completion timestamp.
+- Repeated Complete preserves the original completion timestamp.
+- Rider and assigned Driver cancellation converge on the same transactional Ride Request/Trip state.
+- Cancellation releases pending/accepted candidates and closes pending marketplace offers for the cancelled ride.
+- Repeated cancellation preserves the original cancellation metadata.
+- Completed Trips cannot be cancelled.
 
-### Rider Active-Trip Driver Location Read Foundation — PR #30
+### PostgreSQL integration testing
 
-Implemented and verified; pending merge.
-
-- Endpoint: `GET /v1/ride-requests/{ride_request_id}/driver-location`.
-- Requires Rider capability and scopes the read to a Ride Request owned by the authenticated Rider.
-- The Ride Request must have an active Trip in `assigned` or `in_progress` state.
-- Authorization and assigned-Driver resolution happen in one application-owned query using authenticated Rider ID plus Ride Request ID.
-- Success returns `ride_request_id`, latitude, longitude, and server-owned `updated_at`; Rider and Driver identity are not exposed.
-- Nonexistent, non-owned, completed, cancelled, or otherwise non-active Trips return the same non-leaking `active trip not found` result.
-- An active Trip without a published Driver location maps to the application-owned `driver location not available` result.
-- No migration or duplicate location state was introduced.
-- Static verification passed: `gofmt`, `go test ./...`, and `go vet ./...`.
-- Runtime verification confirmed assigned and in-progress reads, immediate latest-location propagation after Driver re-publish, completed-Trip cutoff, cross-Rider isolation, invalid-ID handling, unauthenticated rejection, and response privacy.
-- The no-location branch was not destructively forced at runtime because the fixture Driver already had current location state; repository/application tests cover the missing-row contract.
-
-Deliberately not included: location history, background-location policy, Rider location publishing, push/stream subscriptions, route/ETA/maps integration, geocoding, PostGIS, and geographic marketplace ranking.
+- Repository integration tests are gated by `TEST_DATABASE_URL`.
+- Integration tests refuse to run against a database whose name does not end in `_test`.
+- Tests apply the real embedded migrations and use generated UUID fixtures with cleanup.
+- PostgreSQL remains internal to the Docker Compose network; tests run from a temporary Go container attached to that network.
+- No Testcontainers dependency, extra Compose service, or host PostgreSQL port was added.
+- Matching, automatic acceptance, Trip execution, and cancellation critical transactional invariants now have DB-backed coverage.
 
 ---
 
@@ -124,18 +132,11 @@ Deliberately not included: location history, background-location policy, Rider l
 ### Driver commitments
 
 - A Driver may have at most one active candidate/assignment commitment.
-- Candidate activity is `pending`, or `accepted` while `released_at IS NULL`.
+- Candidate activity is pending or accepted while `released_at IS NULL`.
 - A Driver may have at most one active Trip with status `assigned` or `in_progress`.
 - Assignment paths revalidate Driver eligibility atomically.
+- Released candidate history does not block future participation.
 - Trip completion or cancellation releases the active Driver commitment while preserving history.
-
-### Trips and cancellation
-
-- Trip states are `assigned`, `in_progress`, `completed`, and `cancelled`.
-- Rider and assigned Driver cancellation converge on the same application-owned Ride Request/Trip state.
-- Repeated cancellation is idempotent.
-- Completed Trips cannot be cancelled.
-- Current Driver Trip reads exclude completed/cancelled history; Driver Trip history excludes active Trips.
 
 ### Driver location
 
@@ -143,8 +144,8 @@ Deliberately not included: location history, background-location policy, Rider l
 - Current location is stored separately from `driver_profiles`.
 - One latest location row exists per Driver.
 - Server-owned `updated_at` is the current freshness signal.
-- Location publishing does not require the Driver to be online or to have an active Trip; downstream consumers decide whether a location is eligible/fresh enough for their use case.
-- Rider reads resolve Driver location through an owned, explicitly identified active Ride Request; Rider-side active-Trip singularity is not assumed.
+- Location publishing does not require the Driver to be online or to have an active Trip; consumers own eligibility/freshness policy.
+- Rider reads resolve Driver location through an owned, explicitly identified active Ride Request.
 - Rider location responses expose location state, not Driver account identity.
 
 ---
@@ -167,45 +168,48 @@ Provider-neutral application concepts come first; vendor adapters come later and
 
 ## Next Business Vertical Slice
 
-### Preferred: Marketplace Geographic Ranking Foundation
+### Preferred: Driver Current Automatic Candidate Read
 
-Driver location now has a write path and a narrow authorized Rider consumer. The next useful location consumer is automatic marketplace/matching selection.
+Automatic dispatch can create a pending Driver candidate, and Drivers can already accept or reject a known Ride Request. The missing product boundary is a narrow authenticated Driver read for the current pending automatic candidate.
 
-Before implementation, define the smallest explicit policy needed by that consumer:
+The slice should:
 
-- only operationally eligible Drivers participate;
-- current location must satisfy a concrete freshness threshold owned by the application;
-- compute application-owned straight-line distance for MVP rather than introducing a maps/routing provider;
-- define deterministic ordering for equal/near-equal candidates;
-- define search-radius and fallback behavior only if the MVP flow requires them;
-- keep the existing active-candidate and active-Trip exclusion invariants authoritative;
-- do not introduce PostGIS until query scale or database-side geospatial behavior actually warrants it.
+- derive Driver identity from authentication;
+- return at most the authenticated Driver's one current unreleased pending automatic candidate;
+- expose only Rider/ride information required for the Driver to decide whether to accept or reject;
+- include candidate timing information needed by the client to represent the existing 30-second response window;
+- return a non-leaking not-found/empty result when no actionable candidate exists;
+- preserve current candidate/Trip exclusivity and timeout semantics;
+- avoid polling infrastructure, push notifications, WebSockets, Redis, or background workers in this slice.
 
-The matching contract should remain provider-neutral. Maps, road-network routing, ETA, geocoding, and vendor-specific location objects stay outside the matching domain.
+### Pickup-radius policy remains deferred
 
-### Correctness cleanup to track
+Automatic matching currently chooses the nearest fresh eligible Driver with no fixed distance cutoff. A very distant but fresh Driver can therefore still be selected if no closer eligible Driver exists.
 
-Runtime fixture work for PR #30 exposed a pre-existing error-semantics issue: when the wrong Driver attempts to accept an automatic candidate, the acceptance path can fall through marketplace-offer handling and return a generic `500` instead of an application-owned candidate/authorization result. This predates PR #30 and should be corrected in a focused slice rather than scope-creeping the Rider location read.
+Do **not** introduce an arbitrary radius yet. A fixed pickup radius is a marketplace operating policy, not merely a technical safeguard. Define it when we have an explicit launch-area/service-boundary requirement, observed dispatch data, or an ETA/acceptance target that justifies the number.
+
+Keep service boundaries separate from nearest-Driver ranking. Future city-to-city or broader mobility products must not be constrained by a prematurely hard-coded same-city assumption.
 
 ---
 
 ## Deferred
 
-- CI/CD and Kubernetes.
-- iOS implementation.
+- Fixed pickup/search radius until justified by operating policy/data.
+- City/service-area and city-to-city product semantics.
+- PostGIS/geospatial indexing until scale/query behavior warrants it.
+- Routing/ETA/maps integration and geocoding.
+- Live location streaming and breadcrumb history.
+- Push notifications/subscriptions.
+- Redis/background dispatch workers until a concrete flow requires them.
+- Payments until concretely required by an MVP slice.
 - Courier and freight capabilities.
 - Administrator operations.
-- Enterprise-level workflow/process infrastructure.
 - Advanced dispatch queues and optimization.
-- PostGIS/geospatial indexing until scale/query behavior warrants it.
-- Live location streaming and breadcrumb history.
-- Route progress, ETA, and maps integration.
-- Push notifications/subscriptions.
-- Payments until concretely required by an MVP slice.
-- Promotions and advanced analytics.
-- Marketplace offer expiration and multi-round negotiation.
 - Advanced cancellation fees/refunds/no-show policy.
-- Authentication resend cooldown/rate-limit policy beyond provider defaults.
+- Marketplace multi-round negotiation.
+- CI/CD and Kubernetes.
+- iOS implementation.
+- Enterprise-level workflow/process infrastructure.
 
 ---
 
@@ -213,11 +217,11 @@ Runtime fixture work for PR #30 exposed a pre-existing error-semantics issue: wh
 
 - Build the MVP incrementally using business vertical slices.
 - Finish and verify the current slice before expanding into the next one.
-- Keep the repository worklog aligned with actual merged state.
+- Keep this worklog aligned with actual merged state.
 - Keep `cmd/api` as composition root and business packages transport-neutral.
 - Prefer clean application-owned boundaries over provider-specific abstractions.
 - Do not introduce duplicated lifecycle state when an existing invariant is authoritative.
 - Add infrastructure only when a concrete business flow consumes it.
 - Preserve ownership/privacy boundaries and avoid identity leakage in read models.
 - Use persistence constraints for important singularity/exclusivity invariants, with application transactions providing business serialization.
-- Challenge premature abstractions, vendor lock-in, duplicated state, and speculative enterprise complexity.
+- Challenge premature abstractions, vendor lock-in, duplicated state, speculative enterprise complexity, and unvalidated business constants.
