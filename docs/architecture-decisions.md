@@ -2,7 +2,7 @@
 
 ## Status
 
-Living document. Decisions are recorded for the MVP and may be revised when new requirements justify a change.
+Living document. Decisions are recorded for the MVP and may be revised only when new requirements justify a change. Accepted ADRs and this document are authoritative for implementation until explicitly superseded.
 
 ## 1. Vertical development
 
@@ -62,7 +62,7 @@ We will not introduce a custom OIDC identity provider for the MVP.
 
 PostgreSQL is the primary transactional database.
 
-Redis is used for fast, ephemeral, or cache-oriented data where appropriate.
+Redis is used for fast, ephemeral, or cache-oriented data only when a concrete vertical slice needs it.
 
 We will not use Redis as a replacement for transactional persistence.
 
@@ -77,3 +77,23 @@ The initial scaling strategy is vertical scaling rather than a distributed multi
 Administrator operations are deferred.
 
 Only administrative functionality that becomes a concrete dependency of an MVP vertical slice will be designed and implemented. A complete enterprise administration system is out of scope for the initial build.
+
+## 11. Ride request marketplace model
+
+The Rider has one ride-request product flow. The Rider provides pickup, destination, and a proposed fare; the Rider does not choose between separate automatic and offers booking modes.
+
+Eligible Drivers receive or discover actionable Ride Requests according to application-owned marketplace eligibility, distribution, and ranking policy.
+
+A Driver may either accept the Rider proposed fare or submit a counteroffer. Exact-fare acceptance can assign immediately; a counteroffer requires Rider acceptance before assignment. Both paths converge on the same atomic Trip assignment and execution lifecycle.
+
+Existing `booking_mode` persistence is legacy incremental implementation debt and must not be expanded into a Rider-facing product concept. Geographic matching should be reused for marketplace eligibility/distribution/ranking rather than treated as a separate Rider-selected booking strategy.
+
+See [ADR-0007: Unified Ride Request Marketplace Model](ADR-0007-ride-request-marketplace-model.md) for the authoritative decision and migration rules.
+
+## 12. Documentation authority
+
+Architecture and product documents are part of the implementation contract.
+
+Future implementation must be checked against the accepted ADRs, this document, the product/capability model, MVP scope, and current worklog before a slice is designed. A code change must not silently redefine a documented business flow.
+
+When implementation and documentation conflict, determine whether the code drifted or the requirement truly changed. If the product requirement changed, update or supersede the relevant architecture decision explicitly before building deeper dependencies on the new model.
