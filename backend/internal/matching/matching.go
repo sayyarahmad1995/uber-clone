@@ -17,7 +17,10 @@ var (
 	ErrCandidateResolved = errors.New("driver candidate already resolved")
 )
 
-const DefaultDriverLocationFreshness = 2 * time.Minute
+const (
+	DefaultDriverLocationFreshness          = 2 * time.Minute
+	DefaultAutomaticCandidateResponseTimeout = 30 * time.Second
+)
 
 type CandidateStatus string
 
