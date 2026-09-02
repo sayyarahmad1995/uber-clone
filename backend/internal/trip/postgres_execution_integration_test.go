@@ -6,6 +6,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func TestPostgresRepositoryStartTransitionsAssignedTrip(t *testing.T) {
@@ -171,7 +173,7 @@ func TestPostgresRepositoryCompleteIsIdempotent(t *testing.T) {
 	}
 }
 
-func createAcceptedTripFixture(t *testing.T, db *sql.DB, rideID, riderID, driverID [16]byte) {
+func createAcceptedTripFixture(t *testing.T, db *sql.DB, rideID, riderID, driverID uuid.UUID) {
 	t.Helper()
 	createdAt := time.Now().UTC().Add(-time.Second)
 	decidedAt := time.Now().UTC()
