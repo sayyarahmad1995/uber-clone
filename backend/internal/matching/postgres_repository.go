@@ -104,11 +104,11 @@ func (r PostgresRepository) Match(ctx context.Context, rideRequestID, riderUserI
 			  AND t.status IN ('assigned', 'in_progress')
 		  )
 		ORDER BY
-		  2 * 6371000 * ASIN(SQRT(
+		  2 * 6371000 * ASIN(SQRT(LEAST(1.0,
 			POWER(SIN(RADIANS(dl.latitude - $4) / 2), 2) +
 			COS(RADIANS($4)) * COS(RADIANS(dl.latitude)) *
 			POWER(SIN(RADIANS(dl.longitude - $5) / 2), 2)
-		  )) ASC,
+		  ))) ASC,
 		  p.user_id ASC
 		LIMIT 1
 		FOR UPDATE OF p SKIP LOCKED
