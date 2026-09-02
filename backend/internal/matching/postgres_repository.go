@@ -216,6 +216,24 @@ func (r PostgresRepository) Reject(ctx context.Context, rideRequestID, driverUse
 		return Candidate{}, ErrCandidateResolved
 	}
 
+	now := time.Now().UTC()
+	if !candidate.CreatedAt.After(now.Add(-r.candidateResponseTimeout)) {
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE ride_driver_candidates
+			SET released_at = $3
+			WHERE ride_request_id = $1
+			  AND driver_user_id = $2
+			  AND status = 'pending'
+			  AND released_at IS NULL
+		`, rideRequestID, driverUserID, now); err != nil {
+			return Candidate{}, err
+		}
+		if err := tx.Commit(); err != nil {
+			return Candidate{}, err
+		}
+		return Candidate{}, ErrCandidateResolved
+	}
+
 	if err := tx.QueryRowContext(ctx, `
 		UPDATE ride_driver_candidates
 		SET status = 'rejected', decided_at = NOW()
