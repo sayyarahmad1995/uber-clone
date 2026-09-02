@@ -9,9 +9,14 @@ import (
 	"github.com/google/uuid"
 )
 
-type PostgresRepository struct{ db *sql.DB }
+type PostgresRepository struct {
+	db                       *sql.DB
+	candidateResponseTimeout time.Duration
+}
 
-func NewPostgresRepository(db *sql.DB) PostgresRepository { return PostgresRepository{db: db} }
+func NewPostgresRepository(db *sql.DB, candidateResponseTimeout time.Duration) PostgresRepository {
+	return PostgresRepository{db: db, candidateResponseTimeout: candidateResponseTimeout}
+}
 
 func (r PostgresRepository) Accept(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Acceptance, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -58,6 +63,23 @@ func (r PostgresRepository) Accept(ctx context.Context, rideRequestID, driverUse
 
 	switch candidateStatus {
 	case "pending":
+		now := time.Now().UTC()
+		if !candidateCreatedAt.After(now.Add(-r.candidateResponseTimeout)) {
+			if _, err := tx.ExecContext(ctx, `
+				UPDATE ride_driver_candidates
+				SET released_at = $3
+				WHERE ride_request_id = $1
+				  AND driver_user_id = $2
+				  AND status = 'pending'
+				  AND released_at IS NULL
+			`, rideRequestID, driverUserID, now); err != nil {
+				return Acceptance{}, err
+			}
+			if err := tx.Commit(); err != nil {
+				return Acceptance{}, err
+			}
+			return Acceptance{}, ErrAssignmentResolved
+		}
 		if err := tx.QueryRowContext(ctx, `
 			UPDATE ride_driver_candidates
 			SET status = 'accepted', decided_at = NOW()

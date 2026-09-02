@@ -43,7 +43,7 @@ func newApplication(cfg config) (application, func(), error) {
 		cleanup()
 		return application{}, nil, fmt.Errorf("identity infrastructure initialization failed: %w", err)
 	}
-	tripService := trip.NewService(trip.NewPostgresRepository(db))
+	tripService := trip.NewService(trip.NewPostgresRepository(db, matching.DefaultAutomaticCandidateResponseTimeout))
 	api := httpapi.New(httpapi.Dependencies{
 		Users:           user.NewService(user.NewPostgresRepository(db)),
 		Drivers:         driver.NewService(driver.NewPostgresRepository(db)),
@@ -53,12 +53,16 @@ func newApplication(cfg config) (application, func(), error) {
 		Rides:           ride.NewService(ride.NewPostgresRepository(db)),
 		RideStatuses:    ridestatus.NewService(ridestatus.NewPostgresRepository(db)),
 		Cancellations:   cancellation.NewService(cancellation.NewPostgresRepository(db)),
-		Matching:        matching.NewService(matching.NewPostgresRepository(db, matching.DefaultDriverLocationFreshness)),
-		Offers:          offer.NewService(offer.NewPostgresRepository(db), tripService),
-		Trips:           tripService,
-		DB:              db,
-		Identity:        identityProvider,
-		Auth:            auth.NewHandler(auth.NewService(authProvider)),
+		Matching: matching.NewService(matching.NewPostgresRepository(
+			db,
+			matching.DefaultDriverLocationFreshness,
+			matching.DefaultAutomaticCandidateResponseTimeout,
+		)),
+		Offers:   offer.NewService(offer.NewPostgresRepository(db), tripService),
+		Trips:    tripService,
+		DB:       db,
+		Identity: identityProvider,
+		Auth:     auth.NewHandler(auth.NewService(authProvider)),
 	})
 	return application{handler: api.Handler()}, cleanup, nil
 }
