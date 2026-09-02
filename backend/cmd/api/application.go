@@ -53,7 +53,7 @@ func newApplication(cfg config) (application, func(), error) {
 		Rides:           ride.NewService(ride.NewPostgresRepository(db)),
 		RideStatuses:    ridestatus.NewService(ridestatus.NewPostgresRepository(db)),
 		Cancellations:   cancellation.NewService(cancellation.NewPostgresRepository(db)),
-		Matching:        matching.NewService(matching.NewPostgresRepository(db)),
+		Matching:        matching.NewService(matching.NewPostgresRepository(db, matching.DefaultDriverLocationFreshness)),
 		Offers:          offer.NewService(offer.NewPostgresRepository(db), tripService),
 		Trips:           tripService,
 		DB:              db,
