@@ -10,15 +10,17 @@ Keep it concise. Detailed implementation and verification history belongs in the
 
 ## Current Status
 
-**Current engineering milestone:** Driver Location Foundation — implemented, statically verified, runtime-verified, and merged through PR #28.
+**Current engineering milestone:** Rider Active-Trip Driver Location Read Foundation — implemented and verified in PR #30; pending merge.
 
-**Current `main`:** `e053add8c461008c8661846ff84d53f848659988`.
+**Current `main`:** `de1e92c48c9397917bd98150545d5cf77bb5b9a6` (worklog alignment through Driver Location Foundation).
 
-**Current stopping point:** Drivers can publish application-owned current coordinates through `PUT /v1/driver/location`. The application stores one latest location row per active Driver profile, validates coordinate ranges, accepts explicit `(0,0)`, owns freshness through server-generated `updated_at`, and does not expose Driver identity in the response. No map, routing, geocoding, PostGIS, location history, or external provider concept has entered the public API or business model.
+**Current feature head before this worklog commit:** `0595a1e8c19a15581da0e580684f43a1b5b10b69`.
 
-The recovery/read surface is now reasonably balanced: Riders can read/list their Ride Requests; Drivers can read their current Trip and historical Trips; cancellation and marketplace assignment converge on the shared Trip model; current Driver location is available as an application-owned operational signal for the next concrete consumer.
+**Current stopping point:** Drivers publish one application-owned current location through `PUT /v1/driver/location`. An authenticated Rider can now read the latest location of the Driver assigned to a specific owned active Ride Request through `GET /v1/ride-requests/{ride_request_id}/driver-location`. Authorization is derived from Ride Request ownership and active Trip assignment; no Driver identity is accepted from or exposed to the Rider. The read is valid only while the Trip is `assigned` or `in_progress` and returns coordinates plus server-owned `updated_at`.
 
-**Next architectural decision:** consume Driver location in a narrow business flow before adding broader geospatial infrastructure. The preferred next slice is Rider Active-Trip Driver Location Read Foundation unless marketplace ranking becomes the higher product priority.
+The Rider location read deliberately does not assume Rider-side active-Trip singularity. Ride Request ID is part of the resource path, so a Rider with multiple active Trips remains deterministic. Missing/non-owned/non-active Trips produce the same non-leaking result. No map, routing, geocoding, PostGIS, location history, streaming, or external provider concept has entered the public API or business model.
+
+**Next architectural decision:** geographic marketplace ranking is now the leading product slice because Driver location has both a write foundation and a narrow authorized Rider consumer. Before implementation, define the minimum application-owned eligibility policy: online state, location freshness threshold, distance calculation, deterministic tie-breaking, and any MVP search-radius/fallback behavior.
 
 ---
 
@@ -49,34 +51,13 @@ The recovery/read surface is now reasonably balanced: Riders can read/list their
 - [x] Rider Ride-Request List Foundation — PR #26
 - [x] Driver Trip History Foundation — PR #27
 - [x] Driver Location Foundation — PR #28
+- [ ] Rider Active-Trip Driver Location Read Foundation — PR #30 (implemented and verified; pending merge)
 
 Worklog-only alignment PRs are intentionally omitted from the business-milestone list.
 
 ---
 
 ## Recent Milestones
-
-### HTTP API Structure Refactor — PR #25
-
-Merged as `43c5cdc233c753707cdac23b5ca6290c8b51960b`.
-
-- `cmd/api` is now the composition root rather than the HTTP transport layer.
-- HTTP transport lives under `internal/httpapi`.
-- Business packages remain HTTP-neutral.
-- The refactor intentionally introduced no API, business-lifecycle, or migration changes.
-- A single `internal/httpapi` package is deliberate for the current scale; transport subpackages should appear only when concrete complexity justifies them.
-
-### Rider Ride-Request List Foundation — PR #26
-
-Merged as `b78c30e86c26c8970bf3aeab74d3c9f26e09460b`.
-
-- Endpoint: `GET /v1/ride-requests`.
-- Returns only the authenticated Rider's Ride Requests.
-- Automatic and offers-mode requests share one strategy-neutral read model.
-- Ride Request status and optional Trip status remain separate.
-- Results are newest-first and bounded to 50.
-- No Rider identity is echoed.
-- No migration was required.
 
 ### Driver Trip History Foundation — PR #27
 
@@ -103,7 +84,23 @@ Merged as `e053add8c461008c8661846ff84d53f848659988`.
 - Migration `013_driver_location_foundation.sql` owns persistence constraints.
 - Runtime verification confirmed valid upsert/re-upsert, timestamp advancement, zero coordinates, range validation, unauthenticated rejection, migration application, and one-row current-location persistence.
 
-Deliberately not included: location history, background-location policy, Rider location tracking, push/stream subscriptions, route/ETA/maps integration, geocoding, PostGIS, and geographic marketplace ranking.
+### Rider Active-Trip Driver Location Read Foundation — PR #30
+
+Implemented and verified; pending merge.
+
+- Endpoint: `GET /v1/ride-requests/{ride_request_id}/driver-location`.
+- Requires Rider capability and scopes the read to a Ride Request owned by the authenticated Rider.
+- The Ride Request must have an active Trip in `assigned` or `in_progress` state.
+- Authorization and assigned-Driver resolution happen in one application-owned query using authenticated Rider ID plus Ride Request ID.
+- Success returns `ride_request_id`, latitude, longitude, and server-owned `updated_at`; Rider and Driver identity are not exposed.
+- Nonexistent, non-owned, completed, cancelled, or otherwise non-active Trips return the same non-leaking `active trip not found` result.
+- An active Trip without a published Driver location maps to the application-owned `driver location not available` result.
+- No migration or duplicate location state was introduced.
+- Static verification passed: `gofmt`, `go test ./...`, and `go vet ./...`.
+- Runtime verification confirmed assigned and in-progress reads, immediate latest-location propagation after Driver re-publish, completed-Trip cutoff, cross-Rider isolation, invalid-ID handling, unauthenticated rejection, and response privacy.
+- The no-location branch was not destructively forced at runtime because the fixture Driver already had current location state; repository/application tests cover the missing-row contract.
+
+Deliberately not included: location history, background-location policy, Rider location publishing, push/stream subscriptions, route/ETA/maps integration, geocoding, PostGIS, and geographic marketplace ranking.
 
 ---
 
@@ -147,6 +144,8 @@ Deliberately not included: location history, background-location policy, Rider l
 - One latest location row exists per Driver.
 - Server-owned `updated_at` is the current freshness signal.
 - Location publishing does not require the Driver to be online or to have an active Trip; downstream consumers decide whether a location is eligible/fresh enough for their use case.
+- Rider reads resolve Driver location through an owned, explicitly identified active Ride Request; Rider-side active-Trip singularity is not assumed.
+- Rider location responses expose location state, not Driver account identity.
 
 ---
 
@@ -168,30 +167,25 @@ Provider-neutral application concepts come first; vendor adapters come later and
 
 ## Next Business Vertical Slice
 
-### Preferred: Rider Active-Trip Driver Location Read Foundation
+### Preferred: Marketplace Geographic Ranking Foundation
 
-Use the newly established Driver location state in the narrowest concrete consumer flow.
+Driver location now has a write path and a narrow authorized Rider consumer. The next useful location consumer is automatic marketplace/matching selection.
 
-Proposed contract direction:
+Before implementation, define the smallest explicit policy needed by that consumer:
 
-- An authenticated Rider may read the latest location of the Driver assigned to their own active Trip.
-- Authorization is derived from Ride Request ownership plus the active Trip assignment; no Driver ID is accepted from the Rider.
-- Only active `assigned`/`in_progress` Trips participate.
-- The response should expose coordinates and `updated_at`, not Driver account identity.
-- Missing current Driver location should have an application-owned non-leaking result.
-- Freshness policy should be explicit if the product flow needs one; do not invent a threshold before the client behavior requires it.
-- No streaming, WebSocket, push, maps SDK, routing provider, or breadcrumb history in this first consumer slice.
+- only operationally eligible Drivers participate;
+- current location must satisfy a concrete freshness threshold owned by the application;
+- compute application-owned straight-line distance for MVP rather than introducing a maps/routing provider;
+- define deterministic ordering for equal/near-equal candidates;
+- define search-radius and fallback behavior only if the MVP flow requires them;
+- keep the existing active-candidate and active-Trip exclusion invariants authoritative;
+- do not introduce PostGIS until query scale or database-side geospatial behavior actually warrants it.
 
-Why this comes before geographic marketplace ranking: it exercises location ownership, authorization, missing-location behavior, and freshness semantics with a narrow deterministic consumer. Marketplace geographic ranking requires additional policy choices—online eligibility, freshness threshold, distance computation, ranking/tie-breaking, and search radius—and should be built after those primitives are proven.
+The matching contract should remain provider-neutral. Maps, road-network routing, ETA, geocoding, and vendor-specific location objects stay outside the matching domain.
 
-### Following candidate: Marketplace Geographic Ranking Foundation
+### Correctness cleanup to track
 
-When product priority requires it:
-
-- consider only operationally eligible Drivers with sufficiently fresh current locations;
-- compute application-owned distance for MVP without introducing PostGIS unless query scale justifies it;
-- define deterministic proximity ordering and fallback behavior;
-- keep maps/routing/geocoding providers outside matching-domain contracts.
+Runtime fixture work for PR #30 exposed a pre-existing error-semantics issue: when the wrong Driver attempts to accept an automatic candidate, the acceptance path can fall through marketplace-offer handling and return a generic `500` instead of an application-owned candidate/authorization result. This predates PR #30 and should be corrected in a focused slice rather than scope-creeping the Rider location read.
 
 ---
 

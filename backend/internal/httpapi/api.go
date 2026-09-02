@@ -13,6 +13,7 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/matching"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/offer"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/ride"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/riderlocation"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/ridestatus"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/trip"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/user"
@@ -23,6 +24,7 @@ type Dependencies struct {
 	Drivers         driver.Service
 	DriverLocations driverlocation.Service
 	DriverTrips     drivertrip.Service
+	RiderLocations  riderlocation.Service
 	Rides           ride.Service
 	RideStatuses    ridestatus.Service
 	Cancellations   cancellation.Service
@@ -39,6 +41,7 @@ type API struct {
 	drivers         driver.Service
 	driverLocations driverlocation.Service
 	driverTrips     drivertrip.Service
+	riderLocations  riderlocation.Service
 	rides           ride.Service
 	rideStatuses    ridestatus.Service
 	cancellations   cancellation.Service
@@ -56,6 +59,7 @@ func New(deps Dependencies) *API {
 		drivers:         deps.Drivers,
 		driverLocations: deps.DriverLocations,
 		driverTrips:     deps.DriverTrips,
+		riderLocations:  deps.RiderLocations,
 		rides:           deps.Rides,
 		rideStatuses:    deps.RideStatuses,
 		cancellations:   deps.Cancellations,

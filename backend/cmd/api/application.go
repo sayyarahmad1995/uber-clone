@@ -18,6 +18,7 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/database"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/migrations"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/ride"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/riderlocation"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/ridestatus"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/trip"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/user"
@@ -48,6 +49,7 @@ func newApplication(cfg config) (application, func(), error) {
 		Drivers:         driver.NewService(driver.NewPostgresRepository(db)),
 		DriverLocations: driverlocation.NewService(driverlocation.NewPostgresRepository(db)),
 		DriverTrips:     drivertrip.NewService(drivertrip.NewPostgresRepository(db)),
+		RiderLocations:  riderlocation.NewService(riderlocation.NewPostgresRepository(db)),
 		Rides:           ride.NewService(ride.NewPostgresRepository(db)),
 		RideStatuses:    ridestatus.NewService(ridestatus.NewPostgresRepository(db)),
 		Cancellations:   cancellation.NewService(cancellation.NewPostgresRepository(db)),
