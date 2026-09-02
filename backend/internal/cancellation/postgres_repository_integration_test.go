@@ -28,13 +28,9 @@ func TestPostgresRepositoryCancelByRiderReleasesPendingCandidate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cancel by rider: %v", err)
 	}
-	if result.Status != ride.StatusCancelled || result.CancelledBy != ride.CancellationActorRider {
+	if result.Status != ride.StatusCancelled || result.CancelledBy != ride.CancellationActorRider || result.Trip != nil {
 		t.Fatalf("unexpected cancellation result: %#v", result)
 	}
-	if result.Trip != nil {
-		t.Fatalf("expected no trip, got %#v", result.Trip)
-	}
-
 	assertRideCancelledAt(t, db, rideID, "rider", result.CancelledAt)
 	assertCandidateReleasedAt(t, db, rideID, driverID, result.CancelledAt)
 }
@@ -49,13 +45,13 @@ func TestPostgresRepositoryCancelByRiderCancelsAssignedTripAndReleasesCandidate(
 
 	result, err := NewPostgresRepository(db).CancelByRider(context.Background(), rideID, riderID)
 	if err != nil {
-		t.Fatalf("cancel assigned trip: %v", err)
+		t.Fatalf("cancel by rider: %v", err)
 	}
 	if result.Trip == nil || result.Trip.Status != trip.StatusCancelled || result.Trip.CancelledAt == nil {
 		t.Fatalf("expected cancelled trip, got %#v", result.Trip)
 	}
 	if !result.Trip.CancelledAt.Equal(result.CancelledAt) {
-		t.Fatalf("expected ride/trip cancellation timestamps to match, ride=%v trip=%v", result.CancelledAt, *result.Trip.CancelledAt)
+		t.Fatalf("expected ride/trip cancellation timestamps to match, ride=%v trip=%v", result.CancelledAt, result.Trip.CancelledAt)
 	}
 	assertCandidateReleasedAt(t, db, rideID, driverID, result.CancelledAt)
 }
@@ -72,12 +68,10 @@ func TestPostgresRepositoryCancelByDriverCancelsInProgressTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cancel by driver: %v", err)
 	}
-	if result.CancelledBy != ride.CancellationActorDriver {
-		t.Fatalf("expected driver cancellation actor, got %s", result.CancelledBy)
+	if result.CancelledBy != ride.CancellationActorDriver || result.Trip == nil || result.Trip.Status != trip.StatusCancelled {
+		t.Fatalf("unexpected driver cancellation result: %#v", result)
 	}
-	if result.Trip == nil || result.Trip.Status != trip.StatusCancelled || result.Trip.CancelledAt == nil {
-		t.Fatalf("expected cancelled trip, got %#v", result.Trip)
-	}
+	assertRideCancelledAt(t, db, rideID, "driver", result.CancelledAt)
 	assertCandidateReleasedAt(t, db, rideID, driverID, result.CancelledAt)
 }
 
@@ -92,20 +86,20 @@ func TestPostgresRepositoryCancelIsIdempotent(t *testing.T) {
 
 	first, err := repository.CancelByRider(context.Background(), rideID, riderID)
 	if err != nil {
-		t.Fatalf("first cancellation: %v", err)
+		t.Fatalf("first cancel: %v", err)
 	}
 	second, err := repository.CancelByRider(context.Background(), rideID, riderID)
 	if err != nil {
-		t.Fatalf("second cancellation: %v", err)
+		t.Fatalf("second cancel: %v", err)
 	}
-	if !first.CancelledAt.Equal(second.CancelledAt) || first.CancelledBy != second.CancelledBy {
+	if first.CancelledBy != second.CancelledBy || !first.CancelledAt.Equal(second.CancelledAt) {
 		t.Fatalf("expected stable cancellation metadata, first=%#v second=%#v", first, second)
 	}
 	if first.Trip == nil || second.Trip == nil || first.Trip.CancelledAt == nil || second.Trip.CancelledAt == nil {
 		t.Fatal("expected cancelled trip on both results")
 	}
 	if !first.Trip.CancelledAt.Equal(*second.Trip.CancelledAt) {
-		t.Fatalf("expected stable trip cancellation timestamp, first=%v second=%v", *first.Trip.CancelledAt, *second.Trip.CancelledAt)
+		t.Fatalf("expected stable trip cancelled_at, first=%v second=%v", first.Trip.CancelledAt, second.Trip.CancelledAt)
 	}
 }
 
@@ -116,7 +110,12 @@ func TestPostgresRepositoryCancelCompletedTripIsRejectedWithoutMutation(t *testi
 	rideID := createCancellationRide(t, db, riderID, "automatic")
 	releasedAt := time.Now().UTC().Add(-time.Second)
 	insertCancellationCandidate(t, db, rideID, driverID, "accepted", &releasedAt)
-	completedAt := insertCancellationTrip(t, db, rideID, riderID, driverID, trip.StatusCompleted)
+	insertCancellationTrip(t, db, rideID, riderID, driverID, trip.StatusCompleted)
+
+	var beforeCompletedAt time.Time
+	if err := db.QueryRow(`SELECT completed_at FROM trips WHERE ride_request_id = $1`, rideID).Scan(&beforeCompletedAt); err != nil {
+		t.Fatalf("select trip completion before cancellation: %v", err)
+	}
 
 	_, err := NewPostgresRepository(db).CancelByRider(context.Background(), rideID, riderID)
 	if !errors.Is(err, ErrTripCompleted) {
@@ -133,10 +132,10 @@ func TestPostgresRepositoryCancelCompletedTripIsRejectedWithoutMutation(t *testi
 	}
 	var persistedCompletedAt time.Time
 	if err := db.QueryRow(`SELECT completed_at FROM trips WHERE ride_request_id = $1`, rideID).Scan(&persistedCompletedAt); err != nil {
-		t.Fatalf("select trip completion: %v", err)
+		t.Fatalf("select trip completion after cancellation: %v", err)
 	}
-	if !persistedCompletedAt.Equal(completedAt) {
-		t.Fatalf("completed_at changed unexpectedly: before=%v after=%v", completedAt, persistedCompletedAt)
+	if !persistedCompletedAt.Equal(beforeCompletedAt) {
+		t.Fatalf("completed_at changed unexpectedly: before=%v after=%v", beforeCompletedAt, persistedCompletedAt)
 	}
 }
 
@@ -161,7 +160,7 @@ func TestPostgresRepositoryCancelClosesPendingOffersWithoutTouchingOtherRide(t *
 		t.Fatalf("select cancelled ride offer: %v", err)
 	}
 	if status != "closed" || !decidedAt.Valid || !decidedAt.Time.Equal(result.CancelledAt) {
-		t.Fatalf("expected closed offer at cancellation time, status=%s decided=%v cancellation=%v", status, decidedAt, result.CancelledAt)
+		t.Fatalf("expected closed offer at cancellation time, status=%s decided=%v cancelled=%v", status, decidedAt, result.CancelledAt)
 	}
 
 	var otherStatus string
@@ -170,7 +169,7 @@ func TestPostgresRepositoryCancelClosesPendingOffersWithoutTouchingOtherRide(t *
 		t.Fatalf("select unrelated offer: %v", err)
 	}
 	if otherStatus != "pending" || otherDecidedAt.Valid {
-		t.Fatalf("unrelated offer changed: status=%s decided=%v", otherStatus, otherDecidedAt)
+		t.Fatalf("unrelated offer was mutated: status=%s decided=%v", otherStatus, otherDecidedAt)
 	}
 }
 
@@ -207,7 +206,9 @@ func createCancellationUser(t *testing.T, db *sql.DB, capability string) uuid.UU
 	if _, err := db.Exec(`INSERT INTO user_capabilities (user_id, capability) VALUES ($1, $2)`, userID, capability); err != nil {
 		t.Fatalf("insert capability: %v", err)
 	}
-	t.Cleanup(func() { _, _ = db.Exec(`DELETE FROM users WHERE id = $1`, userID) })
+	t.Cleanup(func() {
+		_, _ = db.Exec(`DELETE FROM users WHERE id = $1`, userID)
+	})
 	return userID
 }
 
@@ -220,7 +221,7 @@ func createCancellationDriver(t *testing.T, db *sql.DB) uuid.UUID {
 	return userID
 }
 
-func createCancellationRide(t *testing.T, db *sql.DB, riderUserID uuid.UUID, bookingMode string) uuid.UUID {
+func createCancellationRide(t *testing.T, db *sql.DB, riderID uuid.UUID, bookingMode string) uuid.UUID {
 	t.Helper()
 	rideID := uuid.New()
 	if bookingMode == "offers" {
@@ -231,7 +232,7 @@ func createCancellationRide(t *testing.T, db *sql.DB, riderUserID uuid.UUID, boo
 				booking_mode, proposed_fare_minor, currency
 			)
 			VALUES ($1, $2, 24.8610, 67.0010, 24.8800, 67.0200, 'requested', 'offers', 100000, 'PKR')
-		`, rideID, riderUserID); err != nil {
+		`, rideID, riderID); err != nil {
 			t.Fatalf("insert offers ride: %v", err)
 		}
 	} else {
@@ -241,7 +242,7 @@ func createCancellationRide(t *testing.T, db *sql.DB, riderUserID uuid.UUID, boo
 				destination_latitude, destination_longitude, status, booking_mode
 			)
 			VALUES ($1, $2, 24.8610, 67.0010, 24.8800, 67.0200, 'requested', 'automatic')
-		`, rideID, riderUserID); err != nil {
+		`, rideID, riderID); err != nil {
 			t.Fatalf("insert automatic ride: %v", err)
 		}
 	}
