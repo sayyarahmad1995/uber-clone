@@ -24,7 +24,7 @@ type Dependencies struct {
 	Drivers         driver.Service
 	DriverLocations driverlocation.Service
 	DriverTrips     drivertrip.Service
-	RiderLocations riderlocation.Service
+	RiderLocations  riderlocation.Service
 	Rides           ride.Service
 	RideStatuses    ridestatus.Service
 	Cancellations   cancellation.Service
