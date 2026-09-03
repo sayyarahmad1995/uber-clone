@@ -10,74 +10,7 @@ import (
 )
 
 func (r PostgresRepository) AcceptProposedFare(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Trip, error) {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return Trip{}, err
-	}
-	defer tx.Rollback()
-
-	var riderUserID uuid.UUID
-	var bookingMode, status string
-	var proposedAmount sql.NullInt64
-	var currency sql.NullString
-	if err := tx.QueryRowContext(ctx, `
-		SELECT rider_user_id, booking_mode, status, proposed_fare_minor, currency
-		FROM ride_requests
-		WHERE id = $1
-		FOR UPDATE
-	`, rideRequestID).Scan(&riderUserID, &bookingMode, &status, &proposedAmount, &currency); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return Trip{}, ErrMarketplaceNotApplicable
-		}
-		return Trip{}, err
-	}
-	if bookingMode != "offers" {
-		return Trip{}, ErrMarketplaceNotApplicable
-	}
-	if status != "requested" {
-		return Trip{}, ErrMarketplaceNotOpen
-	}
-	if !proposedAmount.Valid || !currency.Valid {
-		return Trip{}, errors.New("offers ride request missing proposed fare")
-	}
-
-	if existing, found, err := selectTripByRide(ctx, tx, rideRequestID); err != nil {
-		return Trip{}, err
-	} else if found {
-		if existing.DriverUserID == driverUserID {
-			return existing, tx.Commit()
-		}
-		return Trip{}, ErrMarketplaceNotOpen
-	}
-
-	if err := lockEligibleMarketplaceDriver(ctx, tx, driverUserID); err != nil {
-		return Trip{}, err
-	}
-
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO ride_offers (ride_request_id, driver_user_id, amount_minor, currency, status, decided_at)
-		VALUES ($1, $2, $3, $4, 'accepted', NOW())
-		ON CONFLICT (ride_request_id, driver_user_id)
-		DO UPDATE SET amount_minor = EXCLUDED.amount_minor,
-		              currency = EXCLUDED.currency,
-		              status = 'accepted',
-		              decided_at = NOW(),
-		              updated_at = NOW()
-	`, rideRequestID, driverUserID, proposedAmount.Int64, currency.String); err != nil {
-		return Trip{}, err
-	}
-
-	trip, err := insertMarketplaceTrip(ctx, tx, rideRequestID, riderUserID, driverUserID)
-	if err != nil {
-		return Trip{}, err
-	}
-	if err := closeCompetingOffers(ctx, tx, rideRequestID, driverUserID); err != nil {
-		return Trip{}, err
-	}
-	if err := tx.Commit(); err != nil {
-		return Trip{}, err
-	}
-	return trip, nil
+	return Trip{}, ErrMarketplaceNotApplicable
 }
 
 func (r PostgresRepository) SelectOffer(ctx context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID) (Trip, error) {
@@ -88,13 +21,15 @@ func (r PostgresRepository) SelectOffer(ctx context.Context, rideRequestID, ride
 	defer tx.Rollback()
 
 	var actualRider uuid.UUID
-	var bookingMode, status string
+	var status string
+	var proposedAmount sql.NullInt64
+	var currency sql.NullString
 	if err := tx.QueryRowContext(ctx, `
-		SELECT rider_user_id, booking_mode, status
+		SELECT rider_user_id, status, proposed_fare_minor, currency
 		FROM ride_requests
 		WHERE id = $1
 		FOR UPDATE
-	`, rideRequestID).Scan(&actualRider, &bookingMode, &status); err != nil {
+	`, rideRequestID).Scan(&actualRider, &status, &proposedAmount, &currency); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Trip{}, ErrMarketplaceNotOpen
 		}
@@ -103,7 +38,7 @@ func (r PostgresRepository) SelectOffer(ctx context.Context, rideRequestID, ride
 	if actualRider != riderUserID {
 		return Trip{}, ErrMarketplaceOfferGone
 	}
-	if bookingMode != "offers" || status != "requested" {
+	if status != "requested" || !proposedAmount.Valid || !currency.Valid {
 		return Trip{}, ErrMarketplaceNotOpen
 	}
 	if _, found, err := selectTripByRide(ctx, tx, rideRequestID); err != nil {
