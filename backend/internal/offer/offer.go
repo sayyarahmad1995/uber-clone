@@ -102,10 +102,6 @@ func (s Service) Submit(ctx context.Context, rideRequestID, driverUserID uuid.UU
 		return Submission{}, ErrAmountOutOfRange
 	}
 
-	if amountMinor == market.ProposedAmountMinor {
-		return s.AcceptProposed(ctx, rideRequestID, driverUserID)
-	}
-
 	result, err := s.repository.Upsert(ctx, rideRequestID, driverUserID, amountMinor, minimum, maximum, market.Currency)
 	if err != nil {
 		return Submission{}, err
@@ -114,15 +110,16 @@ func (s Service) Submit(ctx context.Context, rideRequestID, driverUserID uuid.UU
 }
 
 func (s Service) AcceptProposed(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Submission, error) {
-	assignedTrip, err := s.trips.AcceptProposedFare(ctx, rideRequestID, driverUserID)
-	if err != nil {
-		return Submission{}, mapTripAssignmentError(err)
-	}
-	acceptedOffer, err := s.repository.Get(ctx, rideRequestID, driverUserID)
+	market, err := s.repository.Market(ctx, rideRequestID)
 	if err != nil {
 		return Submission{}, err
 	}
-	return Submission{Offer: acceptedOffer, Trip: &assignedTrip}, nil
+	minimum, maximum := Bounds(market.ProposedAmountMinor)
+	result, err := s.repository.Upsert(ctx, rideRequestID, driverUserID, market.ProposedAmountMinor, minimum, maximum, market.Currency)
+	if err != nil {
+		return Submission{}, err
+	}
+	return Submission{Offer: result}, nil
 }
 
 func (s Service) ListForRider(ctx context.Context, rideRequestID, riderUserID uuid.UUID) ([]Offer, error) {
