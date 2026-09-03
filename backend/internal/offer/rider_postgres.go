@@ -31,7 +31,8 @@ func (r PostgresRepository) ListForRider(ctx context.Context, rideRequestID, rid
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT o.ride_request_id, o.driver_user_id, o.amount_minor, o.currency,
 		       o.status, o.created_at, o.updated_at, o.decided_at,
-		       v.make, v.model, v.color,
+		       p.display_name,
+		       v.make, v.model, v.model_year, v.color,
 		       CASE WHEN l.updated_at BETWEEN statement_timestamp() - ($3 * INTERVAL '1 second') AND statement_timestamp()
 		            THEN `+pickupDistanceSQL+` END AS pickup_distance_meters,
 		       o.amount_minor = rr.proposed_fare_minor AND o.currency = rr.currency AS matches_proposed_fare,
@@ -59,15 +60,22 @@ func (r PostgresRepository) ListForRider(ctx context.Context, rideRequestID, rid
 	items := make([]RiderOffer, 0)
 	for rows.Next() {
 		var item RiderOffer
-		var make, model, color sql.NullString
+		var displayName, make, model, color sql.NullString
+		var modelYear sql.NullInt64
 		var distance sql.NullFloat64
 		if err := rows.Scan(&item.RideRequestID, &item.DriverUserID, &item.AmountMinor, &item.Currency,
 			&item.Status, &item.CreatedAt, &item.UpdatedAt, &item.DecidedAt,
-			&make, &model, &color, &distance, &item.MatchesProposedFare, &item.Selectable); err != nil {
+			&displayName, &make, &model, &modelYear, &color, &distance, &item.MatchesProposedFare, &item.Selectable); err != nil {
 			return nil, err
+		}
+		if displayName.Valid {
+			item.Driver = &DriverSummary{DisplayName: displayName.String}
 		}
 		if make.Valid && model.Valid && color.Valid {
 			item.Vehicle = &VehicleSummary{Make: make.String, Model: model.String, Color: color.String}
+			if modelYear.Valid {
+				item.Vehicle.ModelYear = int(modelYear.Int64)
+			}
 		}
 		if distance.Valid {
 			item.PickupDistanceMeters = &distance.Float64
