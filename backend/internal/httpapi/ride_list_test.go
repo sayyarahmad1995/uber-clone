@@ -46,8 +46,11 @@ func TestRideRequestListResponseUsesStatusProjectionAndEmptyArray(t *testing.T) 
 		t.Fatalf("unexpected ride_requests payload: %#v", response["ride_requests"])
 	}
 	item := requests[0]
-	if item["id"] != request.ID || item["booking_mode"] != ride.BookingModeOffers || item["proposed_fare"] == nil {
+	if item["id"] != request.ID || item["proposed_fare"] == nil {
 		t.Fatalf("unexpected ride request projection: %#v", item)
+	}
+	if _, exists := item["booking_mode"]; exists {
+		t.Fatal("list response must not expose legacy booking_mode")
 	}
 	tripPayload, ok := item["trip"].(map[string]any)
 	if !ok || tripPayload["status"] != trip.StatusInProgress || tripPayload["driver_user_id"] != assignedTrip.DriverUserID {

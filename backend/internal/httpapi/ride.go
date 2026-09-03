@@ -24,26 +24,19 @@ type rideFareRequest struct {
 type createRideRequestBody struct {
 	Pickup       *rideLocationRequest `json:"pickup"`
 	Destination  *rideLocationRequest `json:"destination"`
-	BookingMode  ride.BookingMode     `json:"booking_mode"`
 	ProposedFare *rideFareRequest     `json:"proposed_fare"`
 }
 
 func (body createRideRequestBody) input() (ride.CreateInput, bool) {
-	if body.Pickup == nil || body.Destination == nil || body.Pickup.Latitude == nil || body.Pickup.Longitude == nil || body.Destination.Latitude == nil || body.Destination.Longitude == nil {
+	if body.Pickup == nil || body.Destination == nil || body.Pickup.Latitude == nil || body.Pickup.Longitude == nil || body.Destination.Latitude == nil || body.Destination.Longitude == nil || body.ProposedFare == nil || body.ProposedFare.AmountMinor == nil || body.ProposedFare.Currency == nil {
 		return ride.CreateInput{}, false
 	}
-	input := ride.CreateInput{
-		Pickup:      ride.Location{Latitude: *body.Pickup.Latitude, Longitude: *body.Pickup.Longitude},
-		Destination: ride.Location{Latitude: *body.Destination.Latitude, Longitude: *body.Destination.Longitude},
-		BookingMode: body.BookingMode,
-	}
-	if body.ProposedFare != nil {
-		if body.ProposedFare.AmountMinor == nil || body.ProposedFare.Currency == nil {
-			return ride.CreateInput{}, false
-		}
-		input.ProposedFare = &ride.Money{AmountMinor: *body.ProposedFare.AmountMinor, Currency: *body.ProposedFare.Currency}
-	}
-	return input, true
+	return ride.CreateInput{
+		Pickup:       ride.Location{Latitude: *body.Pickup.Latitude, Longitude: *body.Pickup.Longitude},
+		Destination:  ride.Location{Latitude: *body.Destination.Latitude, Longitude: *body.Destination.Longitude},
+		BookingMode:  ride.BookingModeOffers,
+		ProposedFare: &ride.Money{AmountMinor: *body.ProposedFare.AmountMinor, Currency: *body.ProposedFare.Currency},
+	}, true
 }
 
 func (api *API) createRideRequest(w http.ResponseWriter, r *http.Request) {
@@ -58,7 +51,7 @@ func (api *API) createRideRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	input, ok := body.input()
 	if !ok {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "pickup, destination, and complete fare fields are required when provided"})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "pickup, destination, and proposed_fare are required"})
 		return
 	}
 	request, err := api.rides.Create(r.Context(), u.ID, input)
@@ -67,10 +60,10 @@ func (api *API) createRideRequest(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "pickup and destination coordinates are invalid"})
 		return
 	case errors.Is(err, ride.ErrInvalidBookingMode):
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "booking_mode must be automatic or offers"})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "unable to create ride request"})
 		return
 	case errors.Is(err, ride.ErrInvalidFare):
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "offers booking requires a positive proposed_fare with a three-letter currency"})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "proposed_fare must be positive and use a three-letter currency"})
 		return
 	case err != nil:
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "unable to create ride request"})
@@ -120,7 +113,6 @@ func writeRideRequest(w http.ResponseWriter, status int, request ride.Request) {
 		"rider_user_id": request.RiderUserID,
 		"pickup":        map[string]any{"latitude": request.Pickup.Latitude, "longitude": request.Pickup.Longitude},
 		"destination":   map[string]any{"latitude": request.Destination.Latitude, "longitude": request.Destination.Longitude},
-		"booking_mode":  request.BookingMode,
 		"status":        request.Status,
 		"created_at":    request.CreatedAt,
 	}
@@ -140,13 +132,12 @@ func rideRequestListResponse(views []ridestatus.View) map[string]any {
 
 func rideRequestStatusResponse(request ride.Request, assignedTrip *trip.Trip) map[string]any {
 	response := map[string]any{
-		"id":           request.ID,
-		"pickup":       map[string]any{"latitude": request.Pickup.Latitude, "longitude": request.Pickup.Longitude},
-		"destination":  map[string]any{"latitude": request.Destination.Latitude, "longitude": request.Destination.Longitude},
-		"booking_mode": request.BookingMode,
-		"status":       request.Status,
-		"created_at":   request.CreatedAt,
-		"trip":         nil,
+		"id":          request.ID,
+		"pickup":      map[string]any{"latitude": request.Pickup.Latitude, "longitude": request.Pickup.Longitude},
+		"destination": map[string]any{"latitude": request.Destination.Latitude, "longitude": request.Destination.Longitude},
+		"status":      request.Status,
+		"created_at":  request.CreatedAt,
+		"trip":        nil,
 	}
 	if request.ProposedFare != nil {
 		response["proposed_fare"] = map[string]any{"amount_minor": request.ProposedFare.AmountMinor, "currency": request.ProposedFare.Currency}

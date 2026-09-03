@@ -90,6 +90,38 @@ func TestSubmitAcceptsBoundaryCounteroffers(t *testing.T) {
 	}
 }
 
+func TestAcceptProposedCreatesPendingOfferWithoutTrip(t *testing.T) {
+	repo := &fakeRepository{market: Market{RideRequestID: uuid.New(), ProposedAmountMinor: 10000, Currency: "PKR"}}
+	service := NewService(repo, trip.Service{})
+
+	result, err := service.AcceptProposed(context.Background(), repo.market.RideRequestID, uuid.New())
+	if err != nil {
+		t.Fatalf("AcceptProposed returned error: %v", err)
+	}
+	if repo.upsertedAmount != 10000 {
+		t.Fatalf("expected proposed fare 10000, got %d", repo.upsertedAmount)
+	}
+	if result.Offer.Status != StatusPending {
+		t.Fatalf("expected pending offer, got %s", result.Offer.Status)
+	}
+	if result.Trip != nil {
+		t.Fatal("exact-fare Driver response must not assign a Trip")
+	}
+}
+
+func TestSubmitProposedFareUsesSamePendingOfferPath(t *testing.T) {
+	repo := &fakeRepository{market: Market{RideRequestID: uuid.New(), ProposedAmountMinor: 10000, Currency: "PKR"}}
+	service := NewService(repo, trip.Service{})
+
+	result, err := service.Submit(context.Background(), repo.market.RideRequestID, uuid.New(), 10000)
+	if err != nil {
+		t.Fatalf("Submit returned error: %v", err)
+	}
+	if result.Offer.AmountMinor != 10000 || result.Offer.Status != StatusPending || result.Trip != nil {
+		t.Fatalf("unexpected exact-fare submission: %#v", result)
+	}
+}
+
 func TestSubmitRejectsOutsideRange(t *testing.T) {
 	repo := &fakeRepository{
 		market: Market{

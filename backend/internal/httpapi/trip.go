@@ -26,9 +26,7 @@ func (api *API) acceptRideRequestCandidate(w http.ResponseWriter, r *http.Reques
 	if errors.Is(err, trip.ErrAssignmentNotFound) {
 		marketplaceAcceptance, marketplaceErr := api.offers.AcceptProposed(r.Context(), rideRequestID, u.ID)
 		if marketplaceErr == nil {
-			response := rideOfferResponse(marketplaceAcceptance.Offer)
-			response["trip"] = tripResponse(*marketplaceAcceptance.Trip)
-			writeJSON(w, http.StatusOK, response)
+			writeJSON(w, http.StatusOK, rideOfferResponse(marketplaceAcceptance.Offer))
 			return
 		}
 		if errors.Is(marketplaceErr, offer.ErrRideNotOpen) {
