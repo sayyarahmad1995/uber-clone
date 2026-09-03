@@ -16,17 +16,18 @@ func NewPostgresRepository(db *sql.DB) PostgresRepository {
 
 func (r PostgresRepository) Market(ctx context.Context, rideRequestID uuid.UUID) (Market, error) {
 	var market Market
-	var bookingMode, status string
+	var status string
+	var proposedAmount sql.NullInt64
+	var currency sql.NullString
 	err := r.db.QueryRowContext(ctx, `
-		SELECT rr.id, rr.proposed_fare_minor, rr.currency, rr.booking_mode, rr.status
+		SELECT rr.id, rr.proposed_fare_minor, rr.currency, rr.status
 		FROM ride_requests rr
 		WHERE rr.id = $1
 		  AND NOT EXISTS (SELECT 1 FROM trips t WHERE t.ride_request_id = rr.id)
 	`, rideRequestID).Scan(
 		&market.RideRequestID,
-		&market.ProposedAmountMinor,
-		&market.Currency,
-		&bookingMode,
+		&proposedAmount,
+		&currency,
 		&status,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -35,9 +36,11 @@ func (r PostgresRepository) Market(ctx context.Context, rideRequestID uuid.UUID)
 	if err != nil {
 		return Market{}, err
 	}
-	if bookingMode != "offers" || status != "requested" {
+	if status != "requested" || !proposedAmount.Valid || !currency.Valid {
 		return Market{}, ErrRideNotOpen
 	}
+	market.ProposedAmountMinor = proposedAmount.Int64
+	market.Currency = currency.String
 	return market, nil
 }
 
@@ -48,21 +51,22 @@ func (r PostgresRepository) Upsert(ctx context.Context, rideRequestID, driverUse
 	}
 	defer tx.Rollback()
 
-	var actualCurrency string
+	var actualCurrency sql.NullString
+	var proposedAmount sql.NullInt64
 	var riderUserID uuid.UUID
-	var bookingMode, status string
+	var status string
 	if err := tx.QueryRowContext(ctx, `
-		SELECT currency, rider_user_id, booking_mode, status
+		SELECT currency, proposed_fare_minor, rider_user_id, status
 		FROM ride_requests
 		WHERE id = $1
 		FOR UPDATE
-	`, rideRequestID).Scan(&actualCurrency, &riderUserID, &bookingMode, &status); err != nil {
+	`, rideRequestID).Scan(&actualCurrency, &proposedAmount, &riderUserID, &status); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Offer{}, ErrRideNotFound
 		}
 		return Offer{}, err
 	}
-	if bookingMode != "offers" || status != "requested" || actualCurrency != currency {
+	if status != "requested" || !proposedAmount.Valid || !actualCurrency.Valid || actualCurrency.String != currency {
 		return Offer{}, ErrRideNotOpen
 	}
 	if hasTrip, err := rideHasTrip(ctx, tx, rideRequestID); err != nil {
@@ -138,19 +142,21 @@ func (r PostgresRepository) Upsert(ctx context.Context, rideRequestID, driverUse
 
 func (r PostgresRepository) ListForRider(ctx context.Context, rideRequestID, riderUserID uuid.UUID) ([]Offer, error) {
 	var ownedID uuid.UUID
-	var mode, status string
+	var status string
+	var proposedAmount sql.NullInt64
+	var currency sql.NullString
 	if err := r.db.QueryRowContext(ctx, `
-		SELECT rr.id, rr.booking_mode, rr.status
+		SELECT rr.id, rr.status, rr.proposed_fare_minor, rr.currency
 		FROM ride_requests rr
 		WHERE rr.id = $1 AND rr.rider_user_id = $2
 		  AND NOT EXISTS (SELECT 1 FROM trips t WHERE t.ride_request_id = rr.id)
-	`, rideRequestID, riderUserID).Scan(&ownedID, &mode, &status); err != nil {
+	`, rideRequestID, riderUserID).Scan(&ownedID, &status, &proposedAmount, &currency); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrRideNotFound
 		}
 		return nil, err
 	}
-	if mode != "offers" || status != "requested" {
+	if status != "requested" || !proposedAmount.Valid || !currency.Valid {
 		return nil, ErrRideNotOpen
 	}
 
@@ -195,19 +201,21 @@ func (r PostgresRepository) Reject(ctx context.Context, rideRequestID, riderUser
 	}
 	defer tx.Rollback()
 
-	var mode, rideStatus string
+	var rideStatus string
+	var proposedAmount sql.NullInt64
+	var currency sql.NullString
 	if err := tx.QueryRowContext(ctx, `
-		SELECT booking_mode, status
+		SELECT status, proposed_fare_minor, currency
 		FROM ride_requests
 		WHERE id = $1 AND rider_user_id = $2
 		FOR UPDATE
-	`, rideRequestID, riderUserID).Scan(&mode, &rideStatus); err != nil {
+	`, rideRequestID, riderUserID).Scan(&rideStatus, &proposedAmount, &currency); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Offer{}, ErrRideNotFound
 		}
 		return Offer{}, err
 	}
-	if mode != "offers" || rideStatus != "requested" {
+	if rideStatus != "requested" || !proposedAmount.Valid || !currency.Valid {
 		return Offer{}, ErrRideNotOpen
 	}
 	if hasTrip, err := rideHasTrip(ctx, tx, rideRequestID); err != nil {
