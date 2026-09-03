@@ -16,11 +16,6 @@ type fakeRepository struct {
 	operation string
 }
 
-func (f *fakeRepository) AcceptProposedFare(_ context.Context, rideRequestID, driverUserID uuid.UUID) (Trip, error) {
-	f.rideID, f.driverID, f.operation = rideRequestID, driverUserID, "accept_proposed_fare"
-	return f.trip, f.err
-}
-
 func (f *fakeRepository) SelectOffer(_ context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID) (Trip, error) {
 	f.rideID, f.riderID, f.driverID, f.operation = rideRequestID, riderUserID, driverUserID, "select_offer"
 	return f.trip, f.err
@@ -63,13 +58,6 @@ func TestServiceDelegatesMarketplaceAssignment(t *testing.T) {
 	driverID := uuid.New()
 	repository := &fakeRepository{trip: Trip{RideRequestID: rideID, RiderUserID: riderID, DriverUserID: driverID}}
 	service := NewService(repository)
-
-	if _, err := service.AcceptProposedFare(context.Background(), rideID, driverID); err != nil {
-		t.Fatalf("accept proposed fare: %v", err)
-	}
-	if repository.operation != "accept_proposed_fare" {
-		t.Fatalf("unexpected proposed fare delegation: %#v", repository)
-	}
 
 	if _, err := service.SelectOffer(context.Background(), rideID, riderID, driverID); err != nil {
 		t.Fatalf("select offer: %v", err)

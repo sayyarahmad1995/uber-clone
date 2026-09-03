@@ -114,35 +114,41 @@ The current location rules remain reusable:
 - Driver location must be fresh enough for the marketplace policy;
 - straight-line pickup distance may be used for MVP ordering and display;
 - deterministic tie-breaking is required;
-- active Driver commitments and Trips remain authoritative exclusions at assignment time.
+- active Trips remain authoritative exclusions at assignment time; pending offers do not reserve a Driver.
 
 A fixed pickup radius, service-area boundary, routing ETA, and PostGIS remain separate decisions and must not be invented without a concrete product requirement.
 
 ## Assignment invariant
 
-Automatic-candidate implementation may coexist temporarily while the code is reconciled, but the unified marketplace path must converge on Rider-selected assignment:
+The unified marketplace uses Rider-selected assignment:
 
 - at most one winning Driver per Ride Request;
 - at most one active Trip per Driver;
 - assignment-time Driver eligibility is revalidated atomically;
-- losing offers/candidates cannot create a second assignment;
+- losing offers cannot create a second assignment;
 - Trip execution is agnostic to how the Driver priced their offer.
 
 ## Implementation migration rule
 
-Existing `booking_mode` persistence and automatic-candidate endpoints are considered implementation debt, not a product contract to expand.
+Migration 016 removes `booking_mode` and `ride_driver_candidates`. Historical
+migrations remain unchanged. Runtime eligibility and lifecycle code use Trips
+and offers without candidate reservations.
 
-Until a focused migration removes or repurposes that distinction:
+- New Rider Ride Requests require a proposed fare.
+- Historical rides with no fare remain readable and excluded from marketplace
+  discovery/selection; no synthetic fare is backfilled.
+- Existing Trips and offers remain unchanged.
+- Pending candidates are retired without creating a Trip or offer.
+- An accepted, unreleased candidate must have a Trip for the same ride, Rider,
+  and Driver; otherwise migration stops for explicit data reconciliation.
+- Old API processes must be stopped before applying this schema removal.
 
-- do not expose booking-mode choice in the Rider UX or new Rider API contract;
-- new Rider Ride Requests require a proposed fare;
-- exact-fare Driver responses must not assign the Trip in the unified marketplace path;
-- prefer new APIs and read models that fit Rider-selected offers;
-- preserve backward compatibility only as necessary to migrate safely;
-- reuse existing geographic, offer, candidate, concurrency, and Trip logic where it still represents valid business invariants.
+See [the rollout guide](candidate-retirement-rollout.md).
 
 ## Consequences
 
 This model keeps the Rider experience simple while preserving Rider choice over fare, proximity, and vehicle. It also makes exact-fare acceptance and counteroffers one coherent Driver-offer concept instead of separate assignment strategies.
 
-The next implementation work should reconcile Rider creation, Driver ride discovery/responses, and Rider offer selection with this decision before adding more features to the legacy automatic-candidate abstraction.
+Rider creation, Driver responses, and Rider selection follow this decision. The
+remaining geographic discovery and Rider offer presentation work should build
+on this marketplace without restoring an automatic-candidate abstraction.

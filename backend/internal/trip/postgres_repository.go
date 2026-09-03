@@ -97,7 +97,7 @@ func (r PostgresRepository) Complete(ctx context.Context, rideRequestID, driverU
 			return Trip{}, err
 		}
 	case StatusCompleted:
-		// Idempotent completion; also repair a missing release marker below.
+		// Idempotent completion.
 	case StatusCancelled:
 		return Trip{}, ErrTripCancelled
 	default:
@@ -106,15 +106,6 @@ func (r PostgresRepository) Complete(ctx context.Context, rideRequestID, driverU
 
 	if result.CompletedAt == nil {
 		return Trip{}, errors.New("completed trip missing completed_at")
-	}
-	if _, err := tx.ExecContext(ctx, `
-		UPDATE ride_driver_candidates
-		SET released_at = COALESCE(released_at, $3)
-		WHERE ride_request_id = $1
-		  AND driver_user_id = $2
-		  AND status = 'accepted'
-	`, rideRequestID, driverUserID, *result.CompletedAt); err != nil {
-		return Trip{}, err
 	}
 
 	if err := tx.Commit(); err != nil {

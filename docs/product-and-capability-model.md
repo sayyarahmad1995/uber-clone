@@ -56,12 +56,14 @@ The Rider does not choose between separate automatic and offers products.
 
 Eligible Drivers receive or discover Ride Requests according to application-owned marketplace policy. For each actionable request, a Driver may:
 
-- accept the Rider proposed fare, allowing immediate assignment if the request and Driver are still eligible; or
+- accept the Rider proposed fare by creating or updating a pending offer at that fare; or
 - submit a counteroffer, which the Rider may accept or reject.
 
-Both paths converge on the same Trip assignment and Trip lifecycle.
+Both paths produce offers for Rider selection. Neither Driver response assigns
+a Trip. The Rider selects an offer, and the application revalidates the request
+and Driver atomically before assigning the Trip.
 
-This product behavior is defined in [ADR-0007: Unified Ride Request Marketplace Model](ADR-0007-ride-request-marketplace-model.md). Existing implementation-specific `booking_mode` state must not be treated as a Rider-facing capability or product mode.
+This product behavior is defined in [ADR-0007: Unified Ride Request Marketplace Model](ADR-0007-ride-request-marketplace-model.md). The legacy booking-mode column and candidate table are retired by migration 016.
 
 ## MVP capability boundary
 

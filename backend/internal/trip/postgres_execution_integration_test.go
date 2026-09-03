@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 )
@@ -57,7 +56,7 @@ func TestPostgresRepositoryStartIsIdempotent(t *testing.T) {
 	}
 }
 
-func TestPostgresRepositoryCompleteTransitionsAndReleasesCandidate(t *testing.T) {
+func TestPostgresRepositoryCompleteMakesDriverAvailableForAnotherSelection(t *testing.T) {
 	db := openTripIntegrationDB(t)
 	riderID := createTripIntegrationUser(t, db, "rider")
 	driverID := createTripIntegrationDriver(t, db)
@@ -79,20 +78,8 @@ func TestPostgresRepositoryCompleteTransitionsAndReleasesCandidate(t *testing.T)
 		t.Fatal("expected completed_at")
 	}
 
-	var releasedAt sql.NullTime
-	if err := db.QueryRow(`
-		SELECT released_at
-		FROM ride_driver_candidates
-		WHERE ride_request_id = $1 AND driver_user_id = $2
-	`, rideID, driverID).Scan(&releasedAt); err != nil {
-		t.Fatalf("select candidate release: %v", err)
-	}
-	if !releasedAt.Valid {
-		t.Fatal("expected accepted candidate to be released on completion")
-	}
-	if !releasedAt.Time.Equal(*completed.CompletedAt) {
-		t.Fatalf("expected released_at to equal completed_at, released=%v completed=%v", releasedAt.Time, *completed.CompletedAt)
-	}
+	nextRideID := createTripIntegrationRide(t, db, riderID)
+	createAcceptedTripFixture(t, db, nextRideID, riderID, driverID)
 }
 
 func TestPostgresRepositoryCompleteBeforeStartIsRejected(t *testing.T) {
@@ -175,13 +162,8 @@ func TestPostgresRepositoryCompleteIsIdempotent(t *testing.T) {
 
 func createAcceptedTripFixture(t *testing.T, db *sql.DB, rideID, riderID, driverID uuid.UUID) {
 	t.Helper()
-	createdAt := time.Now().UTC().Add(-time.Second)
-	decidedAt := time.Now().UTC()
-	insertTripIntegrationCandidate(t, db, rideID, driverID, createdAt, "accepted", &decidedAt, nil)
-	if _, err := db.Exec(`
-		INSERT INTO trips (ride_request_id, rider_user_id, driver_user_id, status, assigned_at)
-		VALUES ($1, $2, $3, 'assigned', $4)
-	`, rideID, riderID, driverID, decidedAt); err != nil {
-		t.Fatalf("insert assigned trip: %v", err)
+	insertTripIntegrationOffer(t, db, rideID, driverID)
+	if _, err := NewPostgresRepository(db).SelectOffer(context.Background(), rideID, riderID, driverID); err != nil {
+		t.Fatalf("select offer: %v", err)
 	}
 }

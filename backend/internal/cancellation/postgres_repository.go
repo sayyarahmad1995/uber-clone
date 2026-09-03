@@ -234,16 +234,6 @@ func cancelLocked(ctx context.Context, tx *sql.Tx, rideRequestID uuid.UUID, acto
 	}
 
 	if _, err := tx.ExecContext(ctx, `
-		UPDATE ride_driver_candidates
-		SET released_at = COALESCE(released_at, $2)
-		WHERE ride_request_id = $1
-		  AND status IN ('pending', 'accepted')
-		  AND released_at IS NULL
-	`, rideRequestID, cancelledAt); err != nil {
-		return Result{}, err
-	}
-
-	if _, err := tx.ExecContext(ctx, `
 		UPDATE ride_offers
 		SET status = 'closed', decided_at = $2, updated_at = NOW()
 		WHERE ride_request_id = $1

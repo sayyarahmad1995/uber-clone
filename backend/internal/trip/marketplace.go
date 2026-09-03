@@ -9,10 +9,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-func (r PostgresRepository) AcceptProposedFare(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Trip, error) {
-	return Trip{}, ErrMarketplaceNotApplicable
-}
-
 func (r PostgresRepository) SelectOffer(ctx context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID) (Trip, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {

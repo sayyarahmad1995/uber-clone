@@ -40,7 +40,7 @@ Eligible Drivers receive/discover the request
   ↓
 Driver accepts proposed fare OR sends counteroffer
   ↓
-If counteroffer: Rider accepts/rejects
+Rider selects an offer (original fare or counteroffer)
   ↓
 Trip assigned
   ↓
@@ -53,12 +53,13 @@ Trip completed
 Trip history
 ```
 
-There is one Rider ride-request experience. The Rider does not select an `automatic` or `offers` booking mode. Those terms may exist temporarily in legacy persistence while the implementation is reconciled, but they are not separate Rider products.
+There is one Rider ride-request experience. The Rider does not select an `automatic` or `offers` booking mode. Migration 016 retires the legacy booking-mode persistence.
 
 Driver commercial response is the differentiator:
 
-- accepting the Rider proposed fare may assign the Trip immediately;
-- submitting a counteroffer requires Rider acceptance before assignment.
+- accepting the Rider proposed fare creates a pending offer at that fare;
+- submitting a counteroffer creates a pending offer at a different allowed fare;
+- either response requires Rider selection before assignment.
 
 Geographic matching is marketplace policy used to determine which Drivers are eligible to receive/discover a request and how requests/Drivers are ranked. It is not a second Rider booking mode.
 
