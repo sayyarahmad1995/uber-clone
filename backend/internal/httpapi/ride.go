@@ -34,7 +34,6 @@ func (body createRideRequestBody) input() (ride.CreateInput, bool) {
 	return ride.CreateInput{
 		Pickup:       ride.Location{Latitude: *body.Pickup.Latitude, Longitude: *body.Pickup.Longitude},
 		Destination:  ride.Location{Latitude: *body.Destination.Latitude, Longitude: *body.Destination.Longitude},
-		BookingMode:  ride.BookingModeOffers,
 		ProposedFare: &ride.Money{AmountMinor: *body.ProposedFare.AmountMinor, Currency: *body.ProposedFare.Currency},
 	}, true
 }
@@ -58,9 +57,6 @@ func (api *API) createRideRequest(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case errors.Is(err, ride.ErrInvalidLocation):
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "pickup and destination coordinates are invalid"})
-		return
-	case errors.Is(err, ride.ErrInvalidBookingMode):
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "unable to create ride request"})
 		return
 	case errors.Is(err, ride.ErrInvalidFare):
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "proposed_fare must be positive and use a three-letter currency"})
