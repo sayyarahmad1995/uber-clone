@@ -61,8 +61,9 @@ func (r PostgresRepository) Discover(ctx context.Context, driverUserID uuid.UUID
 		LEFT JOIN ride_offers o
 		  ON o.ride_request_id = rr.id
 		 AND o.driver_user_id = $1
-		WHERE rr.booking_mode = 'offers'
-		  AND rr.status = 'requested'
+		WHERE rr.status = 'requested'
+		  AND rr.proposed_fare_minor IS NOT NULL
+		  AND rr.currency IS NOT NULL
 		  AND rr.rider_user_id <> $1
 		  AND NOT EXISTS (
 			SELECT 1 FROM trips t WHERE t.ride_request_id = rr.id
