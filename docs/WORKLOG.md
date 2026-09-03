@@ -6,9 +6,10 @@ The backend implements accounts/authentication, Driver operations, ride requests
 marketplace discovery and offers, Rider-selected assignment, Trip execution,
 cancellation, history, and Driver location storage/read access.
 
-PR #55 removed candidate influence from Rider selection and read models. This
-slice completes candidate retirement in the runtime, adds migration 016, and
-replaces candidate-based integration fixtures with Rider-selected offers.
+PR #56 completed candidate retirement and migration 016. This slice adds
+location-aware discovery, Rider offer comparison, and consistent geographic
+eligibility through offer submission and selection. See the
+[API contract](geographic-marketplace-api.md).
 
 Only Rider selection assigns a Trip. Accepting the Rider's proposed fare and
 counteroffering both create pending offers. A pending offer reserves neither
@@ -75,8 +76,9 @@ Worklog-only alignment PRs are intentionally omitted from the business-milestone
 - Exact-fare responses and counteroffers both create/update pending offers.
 - Drivers may offer on multiple rides; multiple Drivers may offer on one ride.
 - Rider selection locks and revalidates the request, offer, and Driver.
-- Driver capability, active profile, online state, vehicle, and active-Trip
-  exclusions govern operational eligibility.
+- Driver capability, active profile, online state, vehicle, fresh location, and
+  active-Trip exclusions govern marketplace eligibility. The Driver domain owns
+  the shared transactional check used by offers and Trip assignment.
 - At most one Trip exists per ride, and a Driver has at most one active Trip.
 - Competing offers on the selected ride close. The winning Driver's other offers
   cannot create a second active Trip; availability is rechecked on selection.
@@ -98,20 +100,24 @@ Worklog-only alignment PRs are intentionally omitted from the business-milestone
 - One latest location row is stored per Driver, separate from profile/vehicle.
 - Server-owned update timestamps support freshness decisions.
 - Rider location reads require ownership of the associated active ride/Trip.
-- The retired matching implementation used fresh locations and Haversine distance.
-  The current marketplace discovery SQL orders requests by creation time; it does
-  not yet apply geographic ranking or location freshness. Do not describe it as
-  nearby-Driver matching until that integration is implemented and verified.
+- Marketplace locations must be no older than two minutes and not in the future.
+- Discovery ranks all eligible requests by Haversine pickup distance before the
+  feed limit, with deterministic creation-time/UUID ties.
+- Rider comparison includes vehicle make/model/color, nullable pickup distance,
+  fare-match indication, and current selectability. Raw Driver coordinates and
+  license plates are not exposed before assignment.
+- Selection rechecks eligibility after acquiring locks. Offer views are snapshots;
+  temporary unavailability does not change pending offer status.
 - No arbitrary pickup radius, service boundary, same-city restriction, routing
   ETA, or PostGIS requirement has been introduced.
 
 ## Verification for this slice
 
-PostgreSQL integration tests cover fresh and existing-schema migrations,
-reapplication, preserved Trips/offers, fare constraints, and rollback when an
-accepted candidate is missing a matching Trip. Runtime tests cover concurrent
-selection, Driver availability checks, completion/cancellation, and the
-marketplace journey without candidate tables.
+PostgreSQL tests retain migration, assignment, completion, and cancellation
+coverage. This slice adds ranking-before-limit checks, geographic edge cases,
+consistent eligibility across discovery/responses/selection, Rider comparison,
+ownership, location refresh, and a concurrent location-update check. HTTP
+contract tests verify nullable distance and restricted pre-assignment fields.
 
 Use a dedicated database ending in `_test` and run `go test -p 1 ./...` and
 `go vet ./...` from `backend`. Without `TEST_DATABASE_URL`, database tests skip.
@@ -123,15 +129,11 @@ Accepted ADRs, `architecture-decisions.md`, `product-and-capability-model.md`,
 marketplace authority. Explicitly update the relevant decision before changing
 product behavior; implementation details must not redefine the product.
 
-## Next proposed business slice
+## Follow-up scope
 
-Bring geographic eligibility and pickup-distance ranking into the unified
-Driver discovery and Rider offer views. First settle the minimal API/read-model
-scope against ADR-0007, then reuse existing Driver location storage and ownership
-boundaries. Driver/vehicle presentation should expose only the fields needed
-for Rider choice. Routing ETA remains deferred.
-
-This is a proposed follow-up, not work implemented by the retirement slice.
+The geographic marketplace API is ready for client integration. The Flutter
+client and application-owned Driver names/photos remain separate slices; choose
+the next concrete user journey before adding providers or infrastructure.
 
 ## Deferred
 

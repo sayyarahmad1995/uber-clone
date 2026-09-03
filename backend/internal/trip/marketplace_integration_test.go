@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 )
 
 func TestPostgresSelectionHasOneWinner(t *testing.T) {
@@ -71,6 +72,65 @@ func TestPostgresSelectionHasOneWinner(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestPostgresSelectionRechecksLocationAfterLockWait(t *testing.T) {
+	db := openTripIntegrationDB(t)
+	riderID := createTripIntegrationUser(t, db, "rider")
+	driverID := createTripIntegrationDriver(t, db)
+	rideID := createTripIntegrationRide(t, db, riderID)
+	insertTripIntegrationOffer(t, db, rideID, driverID)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	blocker, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer blocker.Rollback()
+	var blockerPID int
+	if err := blocker.QueryRowContext(ctx, `SELECT pg_backend_pid()`).Scan(&blockerPID); err != nil {
+		t.Fatal(err)
+	}
+	// Leave the stale update uncommitted while selection starts against the
+	// previously fresh location, then make it visible after selection waits.
+	if _, err := blocker.ExecContext(ctx, `UPDATE driver_locations SET updated_at=statement_timestamp()-INTERVAL '3 minutes' WHERE driver_user_id=$1`, driverID); err != nil {
+		t.Fatal(err)
+	}
+	result := make(chan error, 1)
+	go func() { _, err := NewPostgresRepository(db).SelectOffer(ctx, rideID, riderID, driverID); result <- err }()
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		var waiting bool
+		if err := db.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE $1=ANY(pg_blocking_pids(pid)))`, blockerPID).Scan(&waiting); err != nil {
+			t.Fatal(err)
+		}
+		if waiting {
+			break
+		}
+		select {
+		case err := <-result:
+			t.Fatalf("selection did not lock location: %v", err)
+		case <-ctx.Done():
+			t.Fatal("selection never waited for location lock")
+		case <-ticker.C:
+		}
+	}
+	if err := blocker.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-result:
+		if !errors.Is(err, ErrDriverUnavailable) {
+			t.Fatalf("selection used pre-wait location: %v", err)
+		}
+	case <-ctx.Done():
+		t.Fatal("selection did not finish after location update")
+	}
+	var count int
+	if err := db.QueryRowContext(ctx, `SELECT count(*) FROM trips WHERE ride_request_id=$1`, rideID).Scan(&count); err != nil || count != 0 {
+		t.Fatalf("stale Driver was assigned: %d %v", count, err)
 	}
 }
 

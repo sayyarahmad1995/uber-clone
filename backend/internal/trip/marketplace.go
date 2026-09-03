@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/driver"
 )
 
 func (r PostgresRepository) SelectOffer(ctx context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID) (Trip, error) {
@@ -84,28 +85,15 @@ func (r PostgresRepository) SelectOffer(ctx context.Context, rideRequestID, ride
 }
 
 func lockEligibleMarketplaceDriver(ctx context.Context, tx *sql.Tx, driverUserID uuid.UUID) error {
-	var locked uuid.UUID
-	err := tx.QueryRowContext(ctx, `
-		SELECT p.user_id
-		FROM driver_profiles p
-		JOIN driver_vehicles v ON v.driver_user_id = p.user_id
-		JOIN user_capabilities c ON c.user_id = p.user_id AND c.capability = 'driver'
-		WHERE p.user_id = $1
-		  AND p.status = 'active'
-		  AND p.is_online = TRUE
-		  AND NOT EXISTS (
-			SELECT 1 FROM trips t
-			WHERE t.driver_user_id = p.user_id
-			  AND t.status IN ('assigned', 'in_progress')
-		  )
-		FOR UPDATE OF p
-	`, driverUserID).Scan(&locked)
-	if errors.Is(err, sql.ErrNoRows) {
+	eligible, err := driver.LockMarketplaceEligible(ctx, tx, driverUserID)
+	if err != nil {
+		return err
+	}
+	if !eligible {
 		return ErrDriverUnavailable
 	}
-	return err
+	return nil
 }
-
 func insertMarketplaceTrip(ctx context.Context, tx *sql.Tx, rideRequestID, riderUserID, driverUserID uuid.UUID) (Trip, error) {
 	var trip Trip
 	if err := tx.QueryRowContext(ctx, `

@@ -12,6 +12,10 @@ Drivers accepting the Rider's proposed fare create a pending offer. Only the
 Rider's selection assigns a Trip. See [the marketplace decision](docs/ADR-0007-ride-request-marketplace-model.md)
 and [the worklog](docs/WORKLOG.md) for scope and remaining work.
 
+The [geographic marketplace API](docs/geographic-marketplace-api.md) ranks requests
+by pickup distance and gives Riders vehicle, fare, distance, and availability
+details. Drivers need fresh location updates to discover requests or make offers.
+
 ## Run locally
 
 1. Start the stack:

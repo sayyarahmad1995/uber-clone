@@ -84,9 +84,9 @@ The Rider has one ride-request product flow. The Rider provides pickup, destinat
 
 Eligible Drivers receive or discover actionable Ride Requests according to application-owned marketplace eligibility, distribution, and ranking policy.
 
-A Driver may either accept the Rider proposed fare or submit a counteroffer. Exact-fare acceptance can assign immediately; a counteroffer requires Rider acceptance before assignment. Both paths converge on the same atomic Trip assignment and execution lifecycle.
+A Driver may either accept the Rider proposed fare or submit a counteroffer. Both responses create pending offers. Only explicit Rider selection assigns a Trip, after atomic eligibility and availability checks, as defined by ADR-0007.
 
-Existing `booking_mode` persistence is legacy incremental implementation debt and must not be expanded into a Rider-facing product concept. Geographic matching should be reused for marketplace eligibility/distribution/ranking rather than treated as a separate Rider-selected booking strategy.
+Migration 016 retired `booking_mode` and candidates. Geographic matching serves marketplace eligibility/distribution/ranking and Rider choice within the one ride-request flow.
 
 See [ADR-0007: Unified Ride Request Marketplace Model](ADR-0007-ride-request-marketplace-model.md) for the authoritative decision and migration rules.
 

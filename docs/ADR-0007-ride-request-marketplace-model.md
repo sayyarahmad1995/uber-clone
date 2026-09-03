@@ -118,6 +118,32 @@ The current location rules remain reusable:
 
 A fixed pickup radius, service-area boundary, routing ETA, and PostGIS remain separate decisions and must not be invented without a concrete product requirement.
 
+### Geographic marketplace slice contract
+
+- Reuse the established two-minute Driver location freshness window. A location
+  is fresh when its server timestamp is between the evaluation time minus two
+  minutes and the evaluation time, inclusive. Missing, older, or future-dated
+  locations do not qualify.
+- Discovery, fare responses, and Rider selection require Driver capability,
+  an active online profile, a vehicle, fresh location, and no active Trip.
+- Rank Driver discovery by straight-line pickup distance, then request creation
+  time (oldest first), then request UUID. Apply the feed limit after ranking all
+  eligible requests. There is no distance cutoff.
+- Rider offer views include current vehicle make/model/color, nullable pickup
+  distance in meters, a derived `matches_proposed_fare` flag, and `selectable`.
+  Stale/missing locations produce a null distance and a non-selectable offer.
+  Offer status/history is retained; temporary unavailability does not reject or
+  close a pending offer. A refreshed location may make it selectable again.
+- Rider lists place selectable offers first, then fare, distance (unknown last),
+  creation time, and Driver UUID. Only the owning Rider may read the view.
+- Before assignment, lock the Driver eligibility records and recheck freshness
+  and availability after lock acquisition. Read views are snapshots and do not
+  reserve a Driver or guarantee a later selection will succeed.
+- Before assignment, expose neither raw Driver coordinates nor license plates,
+  contact details, or provider identity. Names/photos remain deferred until
+  supported by an application-owned profile capability.
+- These fields describe distance, not arrival time; no ETA is derived from them.
+
 ## Assignment invariant
 
 The unified marketplace uses Rider-selected assignment:
