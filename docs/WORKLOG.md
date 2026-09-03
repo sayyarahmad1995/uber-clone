@@ -6,10 +6,14 @@ The backend implements accounts/authentication, Driver operations, ride requests
 marketplace discovery and offers, Rider-selected assignment, Trip execution,
 cancellation, history, and Driver location storage/read access.
 
-PR #56 completed candidate retirement and migration 016. This slice adds
+PR #56 completed candidate retirement and migration 016. PR #57 added
 location-aware discovery, Rider offer comparison, and consistent geographic
-eligibility through offer submission and selection. See the
-[API contract](geographic-marketplace-api.md).
+eligibility through offer submission and selection.
+
+This slice adds application-owned Driver public presentation data needed by the
+Rider comparison journey: Driver display name and vehicle model year. It keeps
+identity-provider traits and license plates outside the pre-assignment Rider view.
+See [Driver public presentation](driver-public-presentation.md).
 
 Only Rider selection assigns a Trip. Accepting the Rider's proposed fare and
 counteroffering both create pending offers. A pending offer reserves neither
@@ -61,6 +65,8 @@ The Flutter application is planned but is not yet present in this repository.
 - [x] Trip Execution PostgreSQL Integration Coverage — PR #40
 - [x] Cancellation PostgreSQL Integration Coverage — PR #42
 - [x] Automatic Candidate Reject Timeout Alignment — PR #44
+- [x] Legacy Candidate and Booking-Mode Retirement — PR #56
+- [x] Geographic Marketplace Discovery and Rider Comparison — PR #57
 
 Worklog-only alignment PRs are intentionally omitted from the business-milestone list.
 
@@ -103,21 +109,31 @@ Worklog-only alignment PRs are intentionally omitted from the business-milestone
 - Marketplace locations must be no older than two minutes and not in the future.
 - Discovery ranks all eligible requests by Haversine pickup distance before the
   feed limit, with deterministic creation-time/UUID ties.
-- Rider comparison includes vehicle make/model/color, nullable pickup distance,
-  fare-match indication, and current selectability. Raw Driver coordinates and
-  license plates are not exposed before assignment.
+- Rider comparison includes Driver display name when available, vehicle
+  make/model/model year/color, nullable pickup distance, fare-match indication,
+  and current selectability. Raw Driver coordinates and license plates are not
+  exposed before assignment.
 - Selection rechecks eligibility after acquiring locks. Offer views are snapshots;
   temporary unavailability does not change pending offer status.
 - No arbitrary pickup radius, service boundary, same-city restriction, routing
   ETA, or PostGIS requirement has been introduced.
 
+### Driver public presentation
+
+- Driver display name is application-owned public marketplace data, not an Ory
+  identity-provider trait read at comparison time.
+- New/re-onboarding requires a display name and vehicle model year in addition to
+  existing vehicle fields.
+- Migration 017 preserves legacy Driver rows with nullable presentation columns;
+  presentation completeness does not silently disable existing Drivers.
+- Driver and vehicle photos remain a separate media-backed slice. Do not store
+  arbitrary external photo URLs merely to avoid defining media ownership.
+
 ## Verification for this slice
 
-PostgreSQL tests retain migration, assignment, completion, and cancellation
-coverage. This slice adds ranking-before-limit checks, geographic edge cases,
-consistent eligibility across discovery/responses/selection, Rider comparison,
-ownership, location refresh, and a concurrent location-update check. HTTP
-contract tests verify nullable distance and restricted pre-assignment fields.
+PostgreSQL tests retain migration, assignment, completion, cancellation, and
+geographic marketplace coverage. Driver unit/HTTP contract tests cover display-name
+normalization, model-year validation, and the Rider public presentation projection.
 
 Use a dedicated database ending in `_test` and run `go test -p 1 ./...` and
 `go vet ./...` from `backend`. Without `TEST_DATABASE_URL`, database tests skip.
@@ -131,9 +147,14 @@ product behavior; implementation details must not redefine the product.
 
 ## Follow-up scope
 
-The geographic marketplace API is ready for client integration. The Flutter
-client and application-owned Driver names/photos remain separate slices; choose
-the next concrete user journey before adding providers or infrastructure.
+The next concrete backend presentation gap is media ownership for Driver and
+vehicle photos. Define the smallest application-owned upload/storage/read boundary
+before exposing photo references. ETA, ratings, and sophisticated media processing
+remain out of scope unless a concrete client journey requires them.
+
+After the backend Rider comparison contract is complete enough for the MVP client,
+start the shared Flutter application rather than continuing to accumulate backend-only
+features.
 
 ## Deferred
 
