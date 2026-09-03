@@ -17,15 +17,11 @@ var (
 const MaxFareMinor int64 = 1_000_000_000_000
 
 type Status string
-type BookingMode string
 type CancellationActor string
 
 const (
 	StatusRequested Status = "requested"
 	StatusCancelled Status = "cancelled"
-
-	BookingModeAutomatic BookingMode = "automatic"
-	BookingModeOffers    BookingMode = "offers"
 
 	CancellationActorRider  CancellationActor = "rider"
 	CancellationActorDriver CancellationActor = "driver"
@@ -52,7 +48,6 @@ type Request struct {
 	RiderUserID  uuid.UUID
 	Pickup       Location
 	Destination  Location
-	BookingMode  BookingMode
 	ProposedFare *Money
 	Status       Status
 	CreatedAt    time.Time
