@@ -5,33 +5,10 @@ import (
 	"database/sql"
 
 	"github.com/google/uuid"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/driver"
 )
 
 func (r PostgresRepository) Discover(ctx context.Context, driverUserID uuid.UUID, limit int) ([]DiscoveryItem, error) {
-	var eligible bool
-	if err := r.db.QueryRowContext(ctx, `
-		SELECT EXISTS (
-			SELECT 1
-			FROM driver_profiles p
-			JOIN driver_vehicles v ON v.driver_user_id = p.user_id
-			JOIN user_capabilities c ON c.user_id = p.user_id AND c.capability = 'driver'
-			WHERE p.user_id = $1
-			  AND p.status = 'active'
-			  AND p.is_online = TRUE
-			  AND NOT EXISTS (
-				SELECT 1
-				FROM trips t
-				WHERE t.driver_user_id = p.user_id
-				  AND t.status IN ('assigned', 'in_progress')
-			  )
-		)
-	`, driverUserID).Scan(&eligible); err != nil {
-		return nil, err
-	}
-	if !eligible {
-		return []DiscoveryItem{}, nil
-	}
-
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT
 			rr.id,
@@ -49,21 +26,28 @@ func (r PostgresRepository) Discover(ctx context.Context, driverUserID uuid.UUID
 			o.status,
 			o.created_at,
 			o.updated_at,
-			o.decided_at
+			o.decided_at,
+`+pickupDistanceSQL+` AS pickup_distance_meters
 		FROM ride_requests rr
+		JOIN driver_profiles p ON p.user_id = $1 AND p.status = 'active' AND p.is_online
+		JOIN driver_vehicles v ON v.driver_user_id = p.user_id
+		JOIN user_capabilities c ON c.user_id = p.user_id AND c.capability = 'driver'
+		JOIN driver_locations l ON l.driver_user_id = p.user_id
 		LEFT JOIN ride_offers o
 		  ON o.ride_request_id = rr.id
 		 AND o.driver_user_id = $1
 		WHERE rr.status = 'requested'
+		  AND l.updated_at BETWEEN statement_timestamp() - ($3 * INTERVAL '1 second') AND statement_timestamp()
+		  AND NOT EXISTS (SELECT 1 FROM trips active WHERE active.driver_user_id = p.user_id AND active.status IN ('assigned', 'in_progress'))
 		  AND rr.proposed_fare_minor IS NOT NULL
 		  AND rr.currency IS NOT NULL
 		  AND rr.rider_user_id <> $1
 		  AND NOT EXISTS (
 			SELECT 1 FROM trips t WHERE t.ride_request_id = rr.id
 		  )
-		ORDER BY rr.created_at DESC, rr.id DESC
+		ORDER BY pickup_distance_meters ASC, rr.created_at ASC, rr.id ASC
 		LIMIT $2
-	`, driverUserID, limit)
+	`, driverUserID, limit, driver.MarketplaceLocationMaxAge.Seconds())
 	if err != nil {
 		return nil, err
 	}
@@ -93,6 +77,7 @@ func (r PostgresRepository) Discover(ctx context.Context, driverUserID uuid.UUID
 			&offerCreatedAt,
 			&offerUpdatedAt,
 			&offerDecidedAt,
+			&item.PickupDistanceMeters,
 		); err != nil {
 			return nil, err
 		}

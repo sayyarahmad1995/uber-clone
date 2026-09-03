@@ -216,6 +216,9 @@ func createCancellationDriver(t *testing.T, db *sql.DB) uuid.UUID {
 	if _, err := db.Exec(`INSERT INTO driver_vehicles (id, driver_user_id, make, model, color, license_plate) VALUES ($1, $2, 'Test', 'Car', 'White', 'TEST')`, uuid.New(), userID); err != nil {
 		t.Fatalf("insert vehicle: %v", err)
 	}
+	if _, err := db.Exec(`INSERT INTO driver_locations (driver_user_id, latitude, longitude, updated_at) VALUES ($1, 24.86, 67.0, NOW())`, userID); err != nil {
+		t.Fatalf("insert location: %v", err)
+	}
 	return userID
 }
 

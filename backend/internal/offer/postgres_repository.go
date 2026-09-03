@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/driver"
 )
 
 type PostgresRepository struct{ db *sql.DB }
@@ -81,29 +82,13 @@ func (r PostgresRepository) Upsert(ctx context.Context, rideRequestID, driverUse
 		return Offer{}, ErrAmountOutOfRange
 	}
 
-	var eligible bool
-	if err := tx.QueryRowContext(ctx, `
-		SELECT EXISTS (
-			SELECT 1
-			FROM driver_profiles p
-			JOIN driver_vehicles v ON v.driver_user_id = p.user_id
-			JOIN user_capabilities c ON c.user_id = p.user_id AND c.capability = 'driver'
-			WHERE p.user_id = $1
-			  AND p.status = 'active'
-			  AND p.is_online = TRUE
-			  AND NOT EXISTS (
-				SELECT 1 FROM trips t
-				WHERE t.driver_user_id = p.user_id
-				  AND t.status IN ('assigned', 'in_progress')
-			  )
-		)
-	`, driverUserID).Scan(&eligible); err != nil {
+	eligible, err := driver.LockMarketplaceEligible(ctx, tx, driverUserID)
+	if err != nil {
 		return Offer{}, err
 	}
 	if !eligible {
 		return Offer{}, ErrDriverIneligible
 	}
-
 	var result Offer
 	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO ride_offers (ride_request_id, driver_user_id, amount_minor, currency, status, decided_at)
@@ -132,60 +117,6 @@ func (r PostgresRepository) Upsert(ctx context.Context, rideRequestID, driverUse
 		return Offer{}, err
 	}
 	return result, nil
-}
-
-func (r PostgresRepository) ListForRider(ctx context.Context, rideRequestID, riderUserID uuid.UUID) ([]Offer, error) {
-	var ownedID uuid.UUID
-	var status string
-	var proposedAmount sql.NullInt64
-	var currency sql.NullString
-	if err := r.db.QueryRowContext(ctx, `
-		SELECT rr.id, rr.status, rr.proposed_fare_minor, rr.currency
-		FROM ride_requests rr
-		WHERE rr.id = $1 AND rr.rider_user_id = $2
-		  AND NOT EXISTS (SELECT 1 FROM trips t WHERE t.ride_request_id = rr.id)
-	`, rideRequestID, riderUserID).Scan(&ownedID, &status, &proposedAmount, &currency); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrRideNotFound
-		}
-		return nil, err
-	}
-	if status != "requested" || !proposedAmount.Valid || !currency.Valid {
-		return nil, ErrRideNotOpen
-	}
-
-	rows, err := r.db.QueryContext(ctx, `
-		SELECT ride_request_id, driver_user_id, amount_minor, currency, status, created_at, updated_at, decided_at
-		FROM ride_offers
-		WHERE ride_request_id = $1
-		ORDER BY amount_minor ASC, created_at ASC, driver_user_id ASC
-	`, rideRequestID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	offers := make([]Offer, 0)
-	for rows.Next() {
-		var item Offer
-		if err := rows.Scan(
-			&item.RideRequestID,
-			&item.DriverUserID,
-			&item.AmountMinor,
-			&item.Currency,
-			&item.Status,
-			&item.CreatedAt,
-			&item.UpdatedAt,
-			&item.DecidedAt,
-		); err != nil {
-			return nil, err
-		}
-		offers = append(offers, item)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return offers, nil
 }
 
 func (r PostgresRepository) Reject(ctx context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID) (Offer, error) {

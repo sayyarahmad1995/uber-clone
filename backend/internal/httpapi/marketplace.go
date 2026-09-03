@@ -55,7 +55,7 @@ func (api *API) listRideOffers(w http.ResponseWriter, r *http.Request) {
 	}
 	items := make([]map[string]any, 0, len(results))
 	for _, result := range results {
-		items = append(items, rideOfferResponse(result))
+		items = append(items, riderOfferResponse(result))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"offers": items})
 }
@@ -161,15 +161,28 @@ func rideOfferResponse(result offer.Offer) map[string]any {
 
 func driverMarketplaceItemResponse(item offer.DiscoveryItem) map[string]any {
 	response := map[string]any{
-		"id":            item.RideRequestID,
-		"pickup":        map[string]float64{"latitude": item.Pickup.Latitude, "longitude": item.Pickup.Longitude},
-		"destination":   map[string]float64{"latitude": item.Destination.Latitude, "longitude": item.Destination.Longitude},
-		"proposed_fare": map[string]any{"amount_minor": item.ProposedFare.ProposedAmountMinor, "currency": item.ProposedFare.Currency},
-		"created_at":    item.CreatedAt,
-		"own_offer":     nil,
+		"id":                     item.RideRequestID,
+		"pickup":                 map[string]float64{"latitude": item.Pickup.Latitude, "longitude": item.Pickup.Longitude},
+		"destination":            map[string]float64{"latitude": item.Destination.Latitude, "longitude": item.Destination.Longitude},
+		"proposed_fare":          map[string]any{"amount_minor": item.ProposedFare.ProposedAmountMinor, "currency": item.ProposedFare.Currency},
+		"created_at":             item.CreatedAt,
+		"own_offer":              nil,
+		"pickup_distance_meters": item.PickupDistanceMeters,
 	}
 	if item.OwnOffer != nil {
 		response["own_offer"] = rideOfferResponse(*item.OwnOffer)
+	}
+	return response
+}
+
+func riderOfferResponse(item offer.RiderOffer) map[string]any {
+	response := rideOfferResponse(item.Offer)
+	response["pickup_distance_meters"] = item.PickupDistanceMeters
+	response["matches_proposed_fare"] = item.MatchesProposedFare
+	response["selectable"] = item.Selectable
+	response["vehicle"] = nil
+	if item.Vehicle != nil {
+		response["vehicle"] = map[string]string{"make": item.Vehicle.Make, "model": item.Vehicle.Model, "color": item.Vehicle.Color}
 	}
 	return response
 }

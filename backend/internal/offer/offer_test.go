@@ -38,7 +38,7 @@ func (f *fakeRepository) Upsert(_ context.Context, rideRequestID, driverUserID u
 	}, nil
 }
 
-func (f *fakeRepository) ListForRider(context.Context, uuid.UUID, uuid.UUID) ([]Offer, error) {
+func (f *fakeRepository) ListForRider(context.Context, uuid.UUID, uuid.UUID) ([]RiderOffer, error) {
 	return nil, nil
 }
 

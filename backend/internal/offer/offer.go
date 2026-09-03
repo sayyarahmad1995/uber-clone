@@ -45,13 +45,14 @@ type Location struct {
 }
 
 type DiscoveryItem struct {
-	RideRequestID uuid.UUID
-	RiderUserID   uuid.UUID
-	Pickup        Location
-	Destination   Location
-	ProposedFare  Market
-	CreatedAt     time.Time
-	OwnOffer      *Offer
+	PickupDistanceMeters float64
+	RideRequestID        uuid.UUID
+	RiderUserID          uuid.UUID
+	Pickup               Location
+	Destination          Location
+	ProposedFare         Market
+	CreatedAt            time.Time
+	OwnOffer             *Offer
 }
 
 type Offer struct {
@@ -65,6 +66,21 @@ type Offer struct {
 	DecidedAt     *time.Time
 }
 
+// RiderOffer is a comparison view; these values are not offer lifecycle state.
+type RiderOffer struct {
+	Offer
+	Vehicle              *VehicleSummary
+	PickupDistanceMeters *float64
+	MatchesProposedFare  bool
+	Selectable           bool
+}
+
+type VehicleSummary struct {
+	Make  string
+	Model string
+	Color string
+}
+
 type Submission struct {
 	Offer Offer
 	Trip  *trip.Trip
@@ -74,7 +90,7 @@ type Repository interface {
 	Market(context.Context, uuid.UUID) (Market, error)
 	Discover(context.Context, uuid.UUID, int) ([]DiscoveryItem, error)
 	Upsert(context.Context, uuid.UUID, uuid.UUID, int64, int64, int64, string) (Offer, error)
-	ListForRider(context.Context, uuid.UUID, uuid.UUID) ([]Offer, error)
+	ListForRider(context.Context, uuid.UUID, uuid.UUID) ([]RiderOffer, error)
 	Reject(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) (Offer, error)
 	Get(context.Context, uuid.UUID, uuid.UUID) (Offer, error)
 }
@@ -122,7 +138,7 @@ func (s Service) AcceptProposed(ctx context.Context, rideRequestID, driverUserID
 	return Submission{Offer: result}, nil
 }
 
-func (s Service) ListForRider(ctx context.Context, rideRequestID, riderUserID uuid.UUID) ([]Offer, error) {
+func (s Service) ListForRider(ctx context.Context, rideRequestID, riderUserID uuid.UUID) ([]RiderOffer, error) {
 	return s.repository.ListForRider(ctx, rideRequestID, riderUserID)
 }
 
