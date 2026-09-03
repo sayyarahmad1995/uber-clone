@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/database"
@@ -58,6 +57,9 @@ func createTripIntegrationDriver(t *testing.T, db *sql.DB) uuid.UUID {
 	if _, err := db.Exec(`INSERT INTO driver_profiles (user_id, status, is_online) VALUES ($1, 'active', TRUE)`, userID); err != nil {
 		t.Fatalf("insert driver profile: %v", err)
 	}
+	if _, err := db.Exec(`INSERT INTO driver_vehicles (id, driver_user_id, make, model, color, license_plate) VALUES ($1, $2, 'Test', 'Car', 'White', 'TEST')`, uuid.New(), userID); err != nil {
+		t.Fatalf("insert vehicle: %v", err)
+	}
 	return userID
 }
 
@@ -67,28 +69,26 @@ func createTripIntegrationRide(t *testing.T, db *sql.DB, riderUserID uuid.UUID) 
 	if _, err := db.Exec(`
 		INSERT INTO ride_requests (
 			id, rider_user_id, pickup_latitude, pickup_longitude,
-			destination_latitude, destination_longitude, status, booking_mode
+			destination_latitude, destination_longitude, status, proposed_fare_minor, currency
 		)
-		VALUES ($1, $2, 24.8610, 67.0010, 24.8800, 67.0200, 'requested', 'automatic')
+		VALUES ($1, $2, 24.8610, 67.0010, 24.8800, 67.0200, 'requested', 100000, 'PKR')
 	`, rideID, riderUserID); err != nil {
 		t.Fatalf("insert ride: %v", err)
 	}
 	t.Cleanup(func() {
 		_, _ = db.Exec(`DELETE FROM trips WHERE ride_request_id = $1`, rideID)
-		_, _ = db.Exec(`DELETE FROM ride_driver_candidates WHERE ride_request_id = $1`, rideID)
+		_, _ = db.Exec(`DELETE FROM ride_offers WHERE ride_request_id = $1`, rideID)
 		_, _ = db.Exec(`DELETE FROM ride_requests WHERE id = $1`, rideID)
 	})
 	return rideID
 }
 
-func insertTripIntegrationCandidate(t *testing.T, db *sql.DB, rideRequestID, driverUserID uuid.UUID, createdAt time.Time, status string, decidedAt, releasedAt *time.Time) {
+func insertTripIntegrationOffer(t *testing.T, db *sql.DB, rideRequestID, driverUserID uuid.UUID) {
 	t.Helper()
 	if _, err := db.Exec(`
-		INSERT INTO ride_driver_candidates (
-			ride_request_id, driver_user_id, status, created_at, decided_at, released_at
-		)
-		VALUES ($1, $2, $3, $4, $5, $6)
-	`, rideRequestID, driverUserID, status, createdAt, decidedAt, releasedAt); err != nil {
-		t.Fatalf("insert candidate: %v", err)
+		INSERT INTO ride_offers (ride_request_id, driver_user_id, amount_minor, currency)
+		VALUES ($1, $2, 100000, 'PKR')
+	`, rideRequestID, driverUserID); err != nil {
+		t.Fatalf("insert offer: %v", err)
 	}
 }

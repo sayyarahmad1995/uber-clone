@@ -1,28 +1,25 @@
 # Work Log
 
-## Purpose
+## Current status
 
-This file is the repository-level source of truth for meaningful project progress, the current stopping point, established architecture, and the next likely business slice.
+The backend implements accounts/authentication, Driver operations, ride requests,
+marketplace discovery and offers, Rider-selected assignment, Trip execution,
+cancellation, history, and Driver location storage/read access.
 
-Keep it concise. Detailed implementation and verification history belongs in the corresponding pull requests and commits.
+PR #55 removed candidate influence from Rider selection and read models. This
+slice completes candidate retirement in the runtime, adds migration 016, and
+replaces candidate-based integration fixtures with Rider-selected offers.
 
----
+Only Rider selection assigns a Trip. Accepting the Rider's proposed fare and
+counteroffering both create pending offers. A pending offer reserves neither
+the ride nor the Driver.
 
-## Current Status
+Migration 016 preserves existing Trips, offers, and legacy rides without fares.
+It stops if an accepted unreleased candidate has no matching Trip. See the
+[rollout guide](candidate-retirement-rollout.md) before upgrading an existing
+installation. Old API instances must be stopped for the schema removal.
 
-**Current engineering milestone:** Core ride lifecycle and marketplace foundations are implemented: Rider ride requests, Driver discovery/offers, geographic eligibility/ranking, Driver commitment rules, Trip execution, cancellation, and DB-backed transactional coverage.
-
-**Current architecture correction:** the product has one Rider Ride Request flow. The Rider supplies pickup, destination, and a proposed fare. The Rider does **not** choose between separate `automatic` and `offers` products. Eligible Drivers either accept the Rider proposed fare or submit a counteroffer. This is now authoritative in `ADR-0007-ride-request-marketplace-model.md`.
-
-Earlier implementation introduced `booking_mode = automatic | offers` to add marketplace behavior without breaking the existing candidate flow. That state remains temporarily as implementation debt, but future work must not deepen it into a Rider-facing product concept.
-
-**Current stopping point:** much of the existing backend logic remains reusable, but the next product work should reconcile Driver ride discovery/actionability with the unified marketplace model before expanding the legacy automatic-candidate abstraction.
-
-Geographic matching remains valid as marketplace infrastructure: active/online Driver eligibility, fresh location, Haversine pickup distance, deterministic ordering, active-candidate/Trip exclusions, and transactional assignment constraints. Its future business role is eligibility, distribution, and ranking of Ride Requests to Drivers rather than a separate Rider booking mode.
-
-Trip acceptance/assignment, Start, Complete, and cancellation are protected by PostgreSQL integration tests. Completion and cancellation release active Driver commitments while preserving history. Cancellation is idempotent and completed Trips cannot be cancelled.
-
-A dedicated `*_test` PostgreSQL database pattern protects repository integration tests from development-data contamination. No PostGIS, Redis dispatch worker, background timeout scheduler, or external maps/routing provider is required by the current MVP backend.
+The Flutter application is planned but is not yet present in this repository.
 
 ---
 
@@ -68,177 +65,91 @@ Worklog-only alignment PRs are intentionally omitted from the business-milestone
 
 ---
 
-## Current Product Model and Invariants
+## Current product model and invariants
 
-### Unified Ride Request marketplace
+### Marketplace and assignment
 
-- The Rider creates one Ride Request with pickup, destination, and proposed fare/currency.
-- The Rider is not asked to choose an automatic or offers booking mode.
-- Eligible Drivers receive or discover actionable Ride Requests according to marketplace policy.
-- A Driver may accept the Rider proposed fare or submit a counteroffer.
-- Exact-fare acceptance may assign immediately if the Driver and Ride Request are still eligible.
-- Counteroffers remain non-reserving until the Rider accepts one.
-- Rider acceptance of a counteroffer assigns atomically.
-- All assignment paths converge on the same Trip lifecycle and concurrency invariants.
-- Existing `booking_mode` persistence is migration debt; new Rider-facing behavior must not depend on choosing it.
+- One account supports Rider and Driver capabilities; identity is shared.
+- A new ride request requires pickup, destination, and proposed fare/currency.
+- There is no Rider booking-mode choice.
+- Exact-fare responses and counteroffers both create/update pending offers.
+- Drivers may offer on multiple rides; multiple Drivers may offer on one ride.
+- Rider selection locks and revalidates the request, offer, and Driver.
+- Driver capability, active profile, online state, vehicle, and active-Trip
+  exclusions govern operational eligibility.
+- At most one Trip exists per ride, and a Driver has at most one active Trip.
+- Competing offers on the selected ride close. The winning Driver's other offers
+  cannot create a second active Trip; availability is rechecked on selection.
+- There are no runtime candidate reservations, timeout rules, or release markers.
+- Legacy rides without fares remain readable but cannot enter the marketplace.
 
-### Geographic marketplace policy
+### Trip lifecycle
 
-- Driver must have Driver capability, an active profile, be online, have a vehicle, and not be actively committed elsewhere.
-- Driver location freshness is **2 minutes** for current geographic matching.
-- Missing or stale Driver location makes that Driver ineligible where geographic policy is applied.
-- Straight-line Haversine pickup distance is an acceptable MVP ordering mechanism.
-- Driver UUID provides deterministic tie-breaking.
-- A fixed pickup radius remains deferred until launch-area policy, dispatch data, or an ETA/acceptance target justifies it.
-- No city/same-city assumption should be encoded into matching.
-
-### Driver commitments and assignment
-
-- A Driver may have at most one active candidate/assignment commitment.
-- A Driver may have at most one active Trip with status `assigned` or `in_progress`.
-- Assignment-time Driver eligibility is revalidated atomically.
-- At most one Driver may win a Ride Request.
-- Losing candidates/offers cannot create a second Trip.
-- Released candidate history does not block future Driver participation.
-- Trip completion or cancellation releases the active Driver commitment while preserving history.
-
-### Legacy automatic-candidate timeout
-
-- The current automatic-candidate path has a **30-second response window**.
-- Timeout is lazy and transactional.
-- Matching, acceptance, and rejection consistently release expired pending candidates.
-- Accepted candidates do not expire; Trip lifecycle owns the commitment.
-- `released_at` is the release marker; no separate expired status exists.
-
-This behavior remains protected while we reconcile the implementation, but future product design should not assume a Rider-selected automatic mode.
-
-### Trip and cancellation lifecycle
-
-- Trip states are `assigned`, `in_progress`, `completed`, and `cancelled`.
-- Start transitions `assigned → in_progress` and is idempotent.
-- Complete requires an in-progress Trip and is idempotent once completed.
-- Completion releases the accepted Driver commitment at the completion timestamp.
-- Rider and assigned Driver cancellation converge on one transactional state change.
-- Cancellation releases pending/accepted commitments and closes pending offers for the cancelled ride.
-- Repeated cancellation is idempotent.
+- Trip states: `assigned`, `in_progress`, `completed`, and `cancelled`.
+- Start and completion are idempotent. Completion requires an in-progress Trip.
+- Rider and assigned Driver cancellation share transactional behavior.
+- Cancellation closes pending offers for that ride and is idempotent.
 - Completed Trips cannot be cancelled.
+- Completion/cancellation free the Driver through Trip status while preserving
+  history. No separate commitment lifecycle is needed.
 
-### Identity and capabilities
+### Location and geographic policy
 
-- One application account may hold multiple capabilities, including Rider and Driver.
-- Authentication is shared; Driver does not have a separate identity system.
-- Capability membership is separate from capability-specific operational state.
-- Rider/Driver capability switching must not be used to encode commercial ride strategy.
+- One latest location row is stored per Driver, separate from profile/vehicle.
+- Server-owned update timestamps support freshness decisions.
+- Rider location reads require ownership of the associated active ride/Trip.
+- The retired matching implementation used fresh locations and Haversine distance.
+  The current marketplace discovery SQL orders requests by creation time; it does
+  not yet apply geographic ranking or location freshness. Do not describe it as
+  nearby-Driver matching until that integration is implemented and verified.
+- No arbitrary pickup radius, service boundary, same-city restriction, routing
+  ETA, or PostGIS requirement has been introduced.
 
-### Driver location
+## Verification for this slice
 
-- Current location is volatile operational telemetry, stored separately from durable Driver profile/vehicle state.
-- One latest location row exists per Driver.
-- Server-owned `updated_at` is the freshness signal.
-- Rider reads resolve Driver location through an owned active Ride Request/Trip relationship.
-- Rider location responses expose location state, not Driver account identity.
+PostgreSQL integration tests cover fresh and existing-schema migrations,
+reapplication, preserved Trips/offers, fare constraints, and rollback when an
+accepted candidate is missing a matching Trip. Runtime tests cover concurrent
+selection, Driver availability checks, completion/cancellation, and the
+marketplace journey without candidate tables.
 
----
+Use a dedicated database ending in `_test` and run `go test -p 1 ./...` and
+`go vet ./...` from `backend`. Without `TEST_DATABASE_URL`, database tests skip.
 
-## Architecture Authority
+## Architecture authority
 
-Accepted ADRs, `architecture-decisions.md`, `product-and-capability-model.md`, `mvp-scope.md`, and this worklog are the implementation contract for the current MVP.
+Accepted ADRs, `architecture-decisions.md`, `product-and-capability-model.md`,
+`mvp-scope.md`, and this worklog describe the intended MVP. ADR-0007 is the
+marketplace authority. Explicitly update the relevant decision before changing
+product behavior; implementation details must not redefine the product.
 
-Before designing a new slice, check it against those documents. Do not silently allow implementation details to redefine the product model.
+## Next proposed business slice
 
-If code and documentation conflict, determine whether the code drifted or the product requirement changed. A genuine requirement change must explicitly update or supersede the relevant architecture decision before deeper implementation depends on it.
+Bring geographic eligibility and pickup-distance ranking into the unified
+Driver discovery and Rider offer views. First settle the minimal API/read-model
+scope against ADR-0007, then reuse existing Driver location storage and ownership
+boundaries. Driver/vehicle presentation should expose only the fields needed
+for Rider choice. Routing ETA remains deferred.
 
-The current marketplace authority is:
-
-- `ADR-0007-ride-request-marketplace-model.md`
-
----
-
-## Next Business Vertical Slice
-
-### Preferred: Unified Driver Ride Request Actionability
-
-Do **not** add a new Driver "current automatic candidate" product endpoint as previously planned. That would deepen the legacy split between automatic candidates and marketplace offers.
-
-The next slice should instead reconcile Driver-facing Ride Request discovery/actionability around the unified marketplace model.
-
-Target behavior:
-
-```text
-Rider creates Ride Request
-(pickup + destination + proposed fare)
-              |
-              v
-Eligible nearby Drivers receive/discover it
-              |
-      +-------+-------+
-      |               |
-      v               v
-Accept Rider fare   Submit counteroffer
-      |               |
-      |               v
-      |         Rider accepts/rejects
-      |               |
-      +-------+-------+
-              v
-             Trip
-```
-
-The implementation should reuse the good existing foundations rather than rewrite them unnecessarily:
-
-- Driver operational eligibility;
-- fresh-location/geographic ordering;
-- marketplace discovery;
-- exact-fare acceptance;
-- counteroffer creation/update;
-- Rider offer selection;
-- active Driver exclusivity;
-- atomic Trip assignment;
-- Trip/cancellation lifecycle.
-
-The slice should identify the smallest safe migration away from Rider-visible `booking_mode` semantics. Do not remove persistence compatibility recklessly; first establish the unified API/domain behavior, then migrate schema/legacy paths in focused steps.
-
-### Pickup-radius policy remains deferred
-
-Automatic/geographic matching currently has no fixed distance cutoff. A very distant but fresh Driver can technically remain eligible if no closer Driver exists.
-
-Do not invent an arbitrary number. A radius is an operating policy that should be justified by launch geography, observed dispatch behavior, or an explicit pickup-time/acceptance target.
-
-Service boundaries are a separate concern and must not become a hidden same-city rule. Future city-to-city or broader mobility products should remain possible without undoing premature schema assumptions.
-
----
+This is a proposed follow-up, not work implemented by the retirement slice.
 
 ## Deferred
 
-- Fixed pickup/search radius until justified by operating policy/data.
-- City/service-area and city-to-city product semantics.
-- PostGIS/geospatial indexing until scale/query behavior warrants it.
-- Routing/ETA/maps integration and geocoding.
-- Live location streaming and breadcrumb history.
-- Push notifications/subscriptions.
-- Redis/background dispatch workers until a concrete flow requires them.
-- Sophisticated payments until concretely required by an MVP slice.
-- Courier and freight capabilities.
-- Administrator operations.
-- Advanced dispatch queues and optimization.
-- Advanced cancellation fees/refunds/no-show policy.
-- Multi-round/chat negotiation.
-- CI/CD and Kubernetes.
-- iOS implementation.
-- Enterprise-level workflow/process infrastructure.
+- Fixed pickup/search radius and service areas until justified by launch policy.
+- Routing, ETA, maps, geocoding, and PostGIS.
+- Live location streaming, breadcrumbs, and push notifications.
+- Redis, background dispatch workers, and advanced dispatch optimization.
+- Sophisticated payments, cancellation fees, refunds, and no-show policy.
+- Courier, Freight, administrator operations, promotions, and analytics platforms.
+- Multi-round/chat negotiation, CI/CD, Kubernetes, and iOS implementation.
 
----
+## Working principles
 
-## Working Principles
-
-- Build the MVP incrementally using business vertical slices.
-- Finish and verify the current slice before expanding into the next one.
-- Keep this worklog aligned with actual merged state.
-- Keep `cmd/api` as composition root and business packages transport-neutral.
-- Prefer clean application-owned boundaries over provider-specific abstractions.
-- Do not introduce duplicated lifecycle state when an existing invariant is authoritative.
-- Add infrastructure only when a concrete business flow consumes it.
-- Preserve ownership/privacy boundaries and avoid identity leakage in read models.
-- Use persistence constraints for important singularity/exclusivity invariants, with application transactions providing business serialization.
-- Challenge premature abstractions, vendor lock-in, duplicated state, speculative enterprise complexity, and unvalidated business constants.
-- Treat implementation-only fields as implementation details; do not let them silently become product concepts.
+- Build small business slices and verify each before expanding scope.
+- Keep business domains transport-neutral and `cmd/api` as the composition root.
+- Use application-owned interfaces for external providers.
+- Enforce assignment invariants through transactions and database constraints.
+- Preserve ownership/privacy boundaries and avoid unnecessary identity exposure.
+- Add infrastructure only when a concrete flow needs it.
+- Keep this worklog aligned with the implementation and distinguish proposals
+  from completed behavior.

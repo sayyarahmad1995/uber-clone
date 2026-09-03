@@ -17,12 +17,12 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/trip"
 )
 
-func TestPostgresRepositoryCancelByRiderReleasesPendingCandidate(t *testing.T) {
+func TestPostgresRepositoryCancelByRiderClosesPendingOffer(t *testing.T) {
 	db := openCancellationIntegrationDB(t)
 	riderID := createCancellationUser(t, db, "rider")
 	driverID := createCancellationDriver(t, db)
-	rideID := createCancellationRide(t, db, riderID, "automatic")
-	insertCancellationCandidate(t, db, rideID, driverID, "pending", nil)
+	rideID := createCancellationRide(t, db, riderID)
+	insertCancellationOffer(t, db, rideID, driverID)
 
 	result, err := NewPostgresRepository(db).CancelByRider(context.Background(), rideID, riderID)
 	if err != nil {
@@ -32,15 +32,14 @@ func TestPostgresRepositoryCancelByRiderReleasesPendingCandidate(t *testing.T) {
 		t.Fatalf("unexpected cancellation result: %#v", result)
 	}
 	assertRideCancelledAt(t, db, rideID, "rider", result.CancelledAt)
-	assertCandidateReleasedAt(t, db, rideID, driverID, result.CancelledAt)
+	assertDriverAvailable(t, db, riderID, driverID)
 }
 
-func TestPostgresRepositoryCancelByRiderCancelsAssignedTripAndReleasesCandidate(t *testing.T) {
+func TestPostgresRepositoryCancelByRiderCancelsAssignedTripAndFreesDriver(t *testing.T) {
 	db := openCancellationIntegrationDB(t)
 	riderID := createCancellationUser(t, db, "rider")
 	driverID := createCancellationDriver(t, db)
-	rideID := createCancellationRide(t, db, riderID, "automatic")
-	insertCancellationCandidate(t, db, rideID, driverID, "accepted", nil)
+	rideID := createCancellationRide(t, db, riderID)
 	insertCancellationTrip(t, db, rideID, riderID, driverID, trip.StatusAssigned)
 
 	result, err := NewPostgresRepository(db).CancelByRider(context.Background(), rideID, riderID)
@@ -53,15 +52,14 @@ func TestPostgresRepositoryCancelByRiderCancelsAssignedTripAndReleasesCandidate(
 	if !result.Trip.CancelledAt.Equal(result.CancelledAt) {
 		t.Fatalf("expected ride/trip cancellation timestamps to match, ride=%v trip=%v", result.CancelledAt, result.Trip.CancelledAt)
 	}
-	assertCandidateReleasedAt(t, db, rideID, driverID, result.CancelledAt)
+	assertDriverAvailable(t, db, riderID, driverID)
 }
 
 func TestPostgresRepositoryCancelByDriverCancelsInProgressTrip(t *testing.T) {
 	db := openCancellationIntegrationDB(t)
 	riderID := createCancellationUser(t, db, "rider")
 	driverID := createCancellationDriver(t, db)
-	rideID := createCancellationRide(t, db, riderID, "automatic")
-	insertCancellationCandidate(t, db, rideID, driverID, "accepted", nil)
+	rideID := createCancellationRide(t, db, riderID)
 	insertCancellationTrip(t, db, rideID, riderID, driverID, trip.StatusInProgress)
 
 	result, err := NewPostgresRepository(db).CancelByDriver(context.Background(), rideID, driverID)
@@ -72,15 +70,14 @@ func TestPostgresRepositoryCancelByDriverCancelsInProgressTrip(t *testing.T) {
 		t.Fatalf("unexpected driver cancellation result: %#v", result)
 	}
 	assertRideCancelledAt(t, db, rideID, "driver", result.CancelledAt)
-	assertCandidateReleasedAt(t, db, rideID, driverID, result.CancelledAt)
+	assertDriverAvailable(t, db, riderID, driverID)
 }
 
 func TestPostgresRepositoryCancelIsIdempotent(t *testing.T) {
 	db := openCancellationIntegrationDB(t)
 	riderID := createCancellationUser(t, db, "rider")
 	driverID := createCancellationDriver(t, db)
-	rideID := createCancellationRide(t, db, riderID, "automatic")
-	insertCancellationCandidate(t, db, rideID, driverID, "accepted", nil)
+	rideID := createCancellationRide(t, db, riderID)
 	insertCancellationTrip(t, db, rideID, riderID, driverID, trip.StatusAssigned)
 	repository := NewPostgresRepository(db)
 
@@ -107,9 +104,7 @@ func TestPostgresRepositoryCancelCompletedTripIsRejectedWithoutMutation(t *testi
 	db := openCancellationIntegrationDB(t)
 	riderID := createCancellationUser(t, db, "rider")
 	driverID := createCancellationDriver(t, db)
-	rideID := createCancellationRide(t, db, riderID, "automatic")
-	releasedAt := time.Now().UTC().Add(-time.Second)
-	insertCancellationCandidate(t, db, rideID, driverID, "accepted", &releasedAt)
+	rideID := createCancellationRide(t, db, riderID)
 	insertCancellationTrip(t, db, rideID, riderID, driverID, trip.StatusCompleted)
 
 	var beforeCompletedAt time.Time
@@ -144,8 +139,8 @@ func TestPostgresRepositoryCancelClosesPendingOffersWithoutTouchingOtherRide(t *
 	riderID := createCancellationUser(t, db, "rider")
 	driverID := createCancellationDriver(t, db)
 	otherDriverID := createCancellationDriver(t, db)
-	rideID := createCancellationRide(t, db, riderID, "offers")
-	otherRideID := createCancellationRide(t, db, riderID, "offers")
+	rideID := createCancellationRide(t, db, riderID)
+	otherRideID := createCancellationRide(t, db, riderID)
 	insertCancellationOffer(t, db, rideID, driverID)
 	insertCancellationOffer(t, db, otherRideID, otherDriverID)
 
@@ -218,84 +213,51 @@ func createCancellationDriver(t *testing.T, db *sql.DB) uuid.UUID {
 	if _, err := db.Exec(`INSERT INTO driver_profiles (user_id, status, is_online) VALUES ($1, 'active', TRUE)`, userID); err != nil {
 		t.Fatalf("insert driver profile: %v", err)
 	}
+	if _, err := db.Exec(`INSERT INTO driver_vehicles (id, driver_user_id, make, model, color, license_plate) VALUES ($1, $2, 'Test', 'Car', 'White', 'TEST')`, uuid.New(), userID); err != nil {
+		t.Fatalf("insert vehicle: %v", err)
+	}
 	return userID
 }
 
-func createCancellationRide(t *testing.T, db *sql.DB, riderID uuid.UUID, bookingMode string) uuid.UUID {
+func createCancellationRide(t *testing.T, db *sql.DB, riderID uuid.UUID) uuid.UUID {
 	t.Helper()
 	rideID := uuid.New()
-	if bookingMode == "offers" {
-		if _, err := db.Exec(`
-			INSERT INTO ride_requests (
-				id, rider_user_id, pickup_latitude, pickup_longitude,
-				destination_latitude, destination_longitude, status,
-				booking_mode, proposed_fare_minor, currency
-			)
-			VALUES ($1, $2, 24.8610, 67.0010, 24.8800, 67.0200, 'requested', 'offers', 100000, 'PKR')
-		`, rideID, riderID); err != nil {
-			t.Fatalf("insert offers ride: %v", err)
-		}
-	} else {
-		if _, err := db.Exec(`
-			INSERT INTO ride_requests (
-				id, rider_user_id, pickup_latitude, pickup_longitude,
-				destination_latitude, destination_longitude, status, booking_mode
-			)
-			VALUES ($1, $2, 24.8610, 67.0010, 24.8800, 67.0200, 'requested', 'automatic')
-		`, rideID, riderID); err != nil {
-			t.Fatalf("insert automatic ride: %v", err)
-		}
+	if _, err := db.Exec(`
+		INSERT INTO ride_requests (id, rider_user_id, pickup_latitude, pickup_longitude,
+		    destination_latitude, destination_longitude, status, proposed_fare_minor, currency)
+		VALUES ($1, $2, 24.8610, 67.0010, 24.8800, 67.0200, 'requested', 100000, 'PKR')
+	`, rideID, riderID); err != nil {
+		t.Fatalf("insert ride: %v", err)
 	}
 	t.Cleanup(func() {
 		_, _ = db.Exec(`DELETE FROM trips WHERE ride_request_id = $1`, rideID)
 		_, _ = db.Exec(`DELETE FROM ride_offers WHERE ride_request_id = $1`, rideID)
-		_, _ = db.Exec(`DELETE FROM ride_driver_candidates WHERE ride_request_id = $1`, rideID)
 		_, _ = db.Exec(`DELETE FROM ride_requests WHERE id = $1`, rideID)
 	})
 	return rideID
 }
 
-func insertCancellationCandidate(t *testing.T, db *sql.DB, rideID, driverID uuid.UUID, status string, releasedAt *time.Time) {
-	t.Helper()
-	createdAt := time.Now().UTC().Add(-time.Second)
-	var decidedAt *time.Time
-	if status == "accepted" {
-		now := time.Now().UTC()
-		decidedAt = &now
-	}
-	if _, err := db.Exec(`
-		INSERT INTO ride_driver_candidates (ride_request_id, driver_user_id, status, created_at, decided_at, released_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
-	`, rideID, driverID, status, createdAt, decidedAt, releasedAt); err != nil {
-		t.Fatalf("insert candidate: %v", err)
-	}
-}
-
 func insertCancellationTrip(t *testing.T, db *sql.DB, rideID, riderID, driverID uuid.UUID, status trip.Status) time.Time {
 	t.Helper()
-	assignedAt := time.Now().UTC().Add(-2 * time.Second)
-	var startedAt *time.Time
-	var completedAt *time.Time
+	insertCancellationOffer(t, db, rideID, driverID)
+	repository := trip.NewPostgresRepository(db)
+	if _, err := repository.SelectOffer(context.Background(), rideID, riderID, driverID); err != nil {
+		t.Fatalf("select offer: %v", err)
+	}
 	if status == trip.StatusInProgress || status == trip.StatusCompleted {
-		started := time.Now().UTC().Add(-time.Second)
-		startedAt = &started
+		if _, err := repository.Start(context.Background(), rideID, driverID); err != nil {
+			t.Fatalf("start: %v", err)
+		}
 	}
 	if status == trip.StatusCompleted {
-		completed := time.Now().UTC()
-		completedAt = &completed
-	}
-	if _, err := db.Exec(`
-		INSERT INTO trips (ride_request_id, rider_user_id, driver_user_id, status, assigned_at, started_at, completed_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-	`, rideID, riderID, driverID, status, assignedAt, startedAt, completedAt); err != nil {
-		t.Fatalf("insert trip: %v", err)
-	}
-	if completedAt != nil {
-		return *completedAt
+		completed, err := repository.Complete(context.Background(), rideID, driverID)
+		if err != nil {
+			t.Fatalf("complete: %v", err)
+		}
+		return *completed.CompletedAt
 	}
 	return time.Time{}
 }
-
 func insertCancellationOffer(t *testing.T, db *sql.DB, rideID, driverID uuid.UUID) {
 	t.Helper()
 	if _, err := db.Exec(`
@@ -318,13 +280,8 @@ func assertRideCancelledAt(t *testing.T, db *sql.DB, rideID uuid.UUID, actor str
 	}
 }
 
-func assertCandidateReleasedAt(t *testing.T, db *sql.DB, rideID, driverID uuid.UUID, cancelledAt time.Time) {
+func assertDriverAvailable(t *testing.T, db *sql.DB, riderID, driverID uuid.UUID) {
 	t.Helper()
-	var releasedAt sql.NullTime
-	if err := db.QueryRow(`SELECT released_at FROM ride_driver_candidates WHERE ride_request_id = $1 AND driver_user_id = $2`, rideID, driverID).Scan(&releasedAt); err != nil {
-		t.Fatalf("select candidate release: %v", err)
-	}
-	if !releasedAt.Valid || !releasedAt.Time.Equal(cancelledAt) {
-		t.Fatalf("expected candidate release at cancellation time, released=%v cancelled=%v", releasedAt, cancelledAt)
-	}
+	nextRideID := createCancellationRide(t, db, riderID)
+	insertCancellationTrip(t, db, nextRideID, riderID, driverID, trip.StatusAssigned)
 }

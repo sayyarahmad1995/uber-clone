@@ -92,12 +92,6 @@ func (r PostgresRepository) Upsert(ctx context.Context, rideRequestID, driverUse
 			  AND p.status = 'active'
 			  AND p.is_online = TRUE
 			  AND NOT EXISTS (
-				SELECT 1 FROM ride_driver_candidates active
-				WHERE active.driver_user_id = p.user_id
-				  AND active.status IN ('pending', 'accepted')
-				  AND active.released_at IS NULL
-			  )
-			  AND NOT EXISTS (
 				SELECT 1 FROM trips t
 				WHERE t.driver_user_id = p.user_id
 				  AND t.status IN ('assigned', 'in_progress')
