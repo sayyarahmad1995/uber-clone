@@ -65,7 +65,7 @@ func TestCreateRideRequestBodyUsesUnifiedMarketplaceContract(t *testing.T) {
 		t.Fatalf("Decode returned error: %v", err)
 	}
 	input, ok := body.input()
-	if !ok || input.BookingMode != ride.BookingModeOffers || input.ProposedFare == nil || input.ProposedFare.AmountMinor != 70000 || input.ProposedFare.Currency != "PKR" {
+	if !ok || input.ProposedFare == nil || input.ProposedFare.AmountMinor != 70000 || input.ProposedFare.Currency != "PKR" {
 		t.Fatalf("unexpected input: %#v, complete=%v", input, ok)
 	}
 }

@@ -20,40 +20,32 @@ func (f *fakeRepository) Create(_ context.Context, riderUserID uuid.UUID, input 
 		RiderUserID:  riderUserID,
 		Pickup:       input.Pickup,
 		Destination:  input.Destination,
-		BookingMode:  input.BookingMode,
+		BookingMode:  BookingModeOffers,
 		ProposedFare: input.ProposedFare,
 		Status:       StatusRequested,
 	}
 	return f.created, nil
 }
 
-func TestCreateAutomaticRideRequestByDefault(t *testing.T) {
-	repo := &fakeRepository{}
-	service := NewService(repo)
-	request, err := service.Create(context.Background(), uuid.New(), CreateInput{
+func TestCreateRideRequestRequiresProposedFare(t *testing.T) {
+	service := NewService(&fakeRepository{})
+	_, err := service.Create(context.Background(), uuid.New(), CreateInput{
 		Pickup:      Location{},
 		Destination: Location{},
 	})
-	if err != nil {
-		t.Fatalf("Create returned error: %v", err)
-	}
-	if request.BookingMode != BookingModeAutomatic {
-		t.Fatalf("expected automatic booking mode, got %q", request.BookingMode)
-	}
-	if request.ProposedFare != nil {
-		t.Fatal("automatic request unexpectedly has proposed fare")
+	if !errors.Is(err, ErrInvalidFare) {
+		t.Fatalf("expected ErrInvalidFare, got %v", err)
 	}
 }
 
-func TestCreateOffersRideRequest(t *testing.T) {
+func TestCreateRideRequestNormalizesFareCurrency(t *testing.T) {
 	repo := &fakeRepository{}
 	service := NewService(repo)
-	fare := Money{AmountMinor: 70000, Currency: "pkr"}
+	fare := Money{AmountMinor: 70000, Currency: " pkr "}
 
 	request, err := service.Create(context.Background(), uuid.New(), CreateInput{
 		Pickup:       Location{},
 		Destination:  Location{},
-		BookingMode:  BookingModeOffers,
 		ProposedFare: &fare,
 	})
 	if err != nil {
@@ -62,19 +54,24 @@ func TestCreateOffersRideRequest(t *testing.T) {
 	if request.ProposedFare == nil || request.ProposedFare.AmountMinor != 70000 || request.ProposedFare.Currency != "PKR" {
 		t.Fatalf("unexpected proposed fare: %#v", request.ProposedFare)
 	}
+	if repo.input.ProposedFare == nil || repo.input.ProposedFare.Currency != "PKR" {
+		t.Fatalf("repository received unnormalized fare: %#v", repo.input.ProposedFare)
+	}
 }
 
 func TestCreateRejectsInvalidLocations(t *testing.T) {
+	fare := Money{AmountMinor: 100, Currency: "PKR"}
 	_, err := NewService(&fakeRepository{}).Create(context.Background(), uuid.New(), CreateInput{
-		Pickup:      Location{Latitude: 91},
-		Destination: Location{},
+		Pickup:       Location{Latitude: 91},
+		Destination:  Location{},
+		ProposedFare: &fare,
 	})
 	if !errors.Is(err, ErrInvalidLocation) {
 		t.Fatalf("expected ErrInvalidLocation, got %v", err)
 	}
 }
 
-func TestCreateOffersRequiresValidFare(t *testing.T) {
+func TestCreateRequiresValidFare(t *testing.T) {
 	service := NewService(&fakeRepository{})
 	tests := []*Money{
 		nil,
@@ -86,7 +83,6 @@ func TestCreateOffersRequiresValidFare(t *testing.T) {
 		_, err := service.Create(context.Background(), uuid.New(), CreateInput{
 			Pickup:       Location{},
 			Destination:  Location{},
-			BookingMode:  BookingModeOffers,
 			ProposedFare: fare,
 		})
 		if !errors.Is(err, ErrInvalidFare) {
