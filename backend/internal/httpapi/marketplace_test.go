@@ -2,9 +2,11 @@ package httpapi
 
 import (
 	"encoding/json"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/driver"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/offer"
 )
 
@@ -47,12 +49,35 @@ func TestRiderOfferComparisonContractAndPrivacy(t *testing.T) {
 	}
 }
 
+func TestLegacyPresentationUsesNullModelYear(t *testing.T) {
+	item := offer.RiderOffer{Vehicle: &offer.VehicleSummary{Make: "Toyota", Model: "Corolla", Color: "White"}, Selectable: true}
+	body, err := json.Marshal(riderOfferResponse(item))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var response map[string]any
+	if err := json.Unmarshal(body, &response); err != nil {
+		t.Fatal(err)
+	}
+	if response["driver"] != nil || response["vehicle"].(map[string]any)["model_year"] != nil || response["selectable"] != true {
+		t.Fatalf("legacy comparison contract: %s", body)
+	}
+	rr := httptest.NewRecorder()
+	writeDriver(rr, 200, driver.Profile{Vehicle: driver.Vehicle{Make: "Toyota", Model: "Corolla"}})
+	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response["vehicle"].(map[string]any)["model_year"] != nil {
+		t.Fatalf("legacy Driver contract: %s", rr.Body.String())
+	}
+}
+
 func TestRiderOfferComparisonKeepsUnavailablePresentationSnapshot(t *testing.T) {
 	item := offer.RiderOffer{
-		Offer:       offer.Offer{RideRequestID: uuid.New(), DriverUserID: uuid.New(), AmountMinor: 100000, Currency: "PKR", Status: offer.StatusPending},
-		Driver:      &offer.DriverSummary{DisplayName: "Driver"},
-		Vehicle:     &offer.VehicleSummary{Make: "Toyota", Model: "Corolla", ModelYear: 2024, Color: "White"},
-		Selectable:  false,
+		Offer:      offer.Offer{RideRequestID: uuid.New(), DriverUserID: uuid.New(), AmountMinor: 100000, Currency: "PKR", Status: offer.StatusPending},
+		Driver:     &offer.DriverSummary{DisplayName: "Driver"},
+		Vehicle:    &offer.VehicleSummary{Make: "Toyota", Model: "Corolla", ModelYear: 2024, Color: "White"},
+		Selectable: false,
 	}
 	body, err := json.Marshal(riderOfferResponse(item))
 	if err != nil {

@@ -189,7 +189,7 @@ func riderOfferResponse(item offer.RiderOffer) map[string]any {
 		response["vehicle"] = map[string]any{
 			"make":       item.Vehicle.Make,
 			"model":      item.Vehicle.Model,
-			"model_year": item.Vehicle.ModelYear,
+			"model_year": modelYearResponse(item.Vehicle.ModelYear),
 			"color":      item.Vehicle.Color,
 		}
 	}

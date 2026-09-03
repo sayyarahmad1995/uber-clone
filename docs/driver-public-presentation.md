@@ -40,6 +40,10 @@ logic to a specific storage vendor.
 }
 ```
 
-For legacy rows, `driver` may be null and `model_year` may be absent/unknown until the
-Driver updates onboarding data. Existing fare, distance, selectability, privacy, and
+For legacy rows, `driver` may be null and `vehicle.model_year` is null until the
+Driver updates onboarding data. Driver-owned profile responses also use null for an unknown model year. Existing fare, distance, selectability, privacy, and
 assignment semantics are unchanged.
+
+## Validation
+
+The full backend tests and static checks were run in WSL against isolated PostgreSQL 17. Added coverage verifies migration from schema 016 with existing Driver data, repeat migration, legacy eligibility, onboarding persistence, re-onboarding without resetting availability, Rider comparison, and null model-year responses.

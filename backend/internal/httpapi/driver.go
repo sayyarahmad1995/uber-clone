@@ -138,11 +138,19 @@ func writeDriver(w http.ResponseWriter, status int, profile driver.Profile) {
 			"id":            profile.Vehicle.ID,
 			"make":          profile.Vehicle.Make,
 			"model":         profile.Vehicle.Model,
-			"model_year":    profile.Vehicle.ModelYear,
+			"model_year":    modelYearResponse(profile.Vehicle.ModelYear),
 			"color":         profile.Vehicle.Color,
 			"license_plate": profile.Vehicle.LicensePlate,
 		},
 	})
+}
+
+// Zero is the internal legacy sentinel, not a real vehicle model year.
+func modelYearResponse(year int) any {
+	if year == 0 {
+		return nil
+	}
+	return year
 }
 
 func driverCurrentTripResponse(view drivertrip.View) map[string]any {
