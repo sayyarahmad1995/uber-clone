@@ -6,13 +6,12 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"github.com/sayyarahmad1995/uber-clone/backend/internal/offer"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/trip"
 )
 
 type tripTransitionFunc func(context.Context, uuid.UUID, uuid.UUID) (trip.Trip, error)
 
-func (api *API) acceptRideRequestCandidate(w http.ResponseWriter, r *http.Request) {
+func (api *API) acceptRideRequestFare(w http.ResponseWriter, r *http.Request) {
 	u, ok := api.requireDriverCapability(w, r)
 	if !ok {
 		return
@@ -22,41 +21,11 @@ func (api *API) acceptRideRequestCandidate(w http.ResponseWriter, r *http.Reques
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid ride_request_id"})
 		return
 	}
-	acceptance, err := api.trips.Accept(r.Context(), rideRequestID, u.ID)
-	if errors.Is(err, trip.ErrAssignmentNotFound) {
-		marketplaceAcceptance, marketplaceErr := api.offers.AcceptProposed(r.Context(), rideRequestID, u.ID)
-		if marketplaceErr == nil {
-			writeJSON(w, http.StatusOK, rideOfferResponse(marketplaceAcceptance.Offer))
-			return
-		}
-		if errors.Is(marketplaceErr, offer.ErrRideNotOpen) {
-			writeOfferError(w, marketplaceErr)
-			return
-		}
-		if !errors.Is(marketplaceErr, offer.ErrRideNotFound) {
-			if writeOfferError(w, marketplaceErr) {
-				return
-			}
-		}
-	}
-	switch {
-	case errors.Is(err, trip.ErrAssignmentNotFound):
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": "ride request candidate not found"})
-		return
-	case errors.Is(err, trip.ErrAssignmentResolved):
-		writeJSON(w, http.StatusConflict, map[string]string{"error": "ride request candidate already resolved"})
-		return
-	case err != nil:
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "unable to update ride request candidate"})
+	result, err := api.offers.AcceptProposed(r.Context(), rideRequestID, u.ID)
+	if writeOfferError(w, err) {
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"ride_request_id": acceptance.Trip.RideRequestID,
-		"driver_user_id":  acceptance.Trip.DriverUserID,
-		"status":          "accepted",
-		"created_at":      acceptance.CandidateCreatedAt,
-		"decided_at":      acceptance.CandidateDecidedAt,
-	})
+	writeJSON(w, http.StatusOK, rideOfferResponse(result.Offer))
 }
 
 func (api *API) startTrip(w http.ResponseWriter, r *http.Request) {
