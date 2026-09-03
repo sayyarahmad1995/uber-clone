@@ -21,29 +21,37 @@ const StatusActive Status = "active"
 type VehicleInput struct {
 	Make         string
 	Model        string
+	ModelYear    int
 	Color        string
 	LicensePlate string
+}
+
+type OnboardingInput struct {
+	DisplayName string
+	Vehicle     VehicleInput
 }
 
 type Vehicle struct {
 	ID           uuid.UUID
 	Make         string
 	Model        string
+	ModelYear    int
 	Color        string
 	LicensePlate string
 }
 
 type Profile struct {
-	UserID    uuid.UUID
-	Status    Status
-	IsOnline  bool
-	Vehicle   Vehicle
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	UserID      uuid.UUID
+	DisplayName string
+	Status      Status
+	IsOnline    bool
+	Vehicle     Vehicle
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 type Repository interface {
-	UpsertProfile(ctx context.Context, userID uuid.UUID, vehicle VehicleInput) (Profile, error)
+	UpsertProfile(ctx context.Context, userID uuid.UUID, input OnboardingInput) (Profile, error)
 	FindByUserID(ctx context.Context, userID uuid.UUID) (Profile, error)
 	SetOnline(ctx context.Context, userID uuid.UUID, online bool) (Profile, error)
 }
@@ -52,12 +60,14 @@ type Service struct{ repository Repository }
 
 func NewService(repository Repository) Service { return Service{repository: repository} }
 
-func (s Service) Onboard(ctx context.Context, userID uuid.UUID, vehicle VehicleInput) (Profile, error) {
-	vehicle = normalizeVehicle(vehicle)
-	if vehicle.Make == "" || vehicle.Model == "" || vehicle.Color == "" || vehicle.LicensePlate == "" {
+func (s Service) Onboard(ctx context.Context, userID uuid.UUID, input OnboardingInput) (Profile, error) {
+	input.DisplayName = strings.TrimSpace(input.DisplayName)
+	input.Vehicle = normalizeVehicle(input.Vehicle)
+	currentYear := time.Now().UTC().Year()
+	if input.DisplayName == "" || input.Vehicle.Make == "" || input.Vehicle.Model == "" || input.Vehicle.Color == "" || input.Vehicle.LicensePlate == "" || input.Vehicle.ModelYear < 1886 || input.Vehicle.ModelYear > currentYear+1 {
 		return Profile{}, ErrInvalidProfile
 	}
-	return s.repository.UpsertProfile(ctx, userID, vehicle)
+	return s.repository.UpsertProfile(ctx, userID, input)
 }
 
 func (s Service) Get(ctx context.Context, userID uuid.UUID) (Profile, error) {

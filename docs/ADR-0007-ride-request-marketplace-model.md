@@ -74,7 +74,7 @@ Rider choice is authoritative for marketplace assignment. Driver responses expre
 
 The Rider-facing offer view should be able to include:
 
-- Driver name and photo when profile support exists;
+- Application-owned Driver display name when available; photos await media support;
 - vehicle make/model and vehicle photo when available;
 - current pickup distance where geographic data is available;
 - offered fare;
@@ -129,7 +129,7 @@ A fixed pickup radius, service-area boundary, routing ETA, and PostGIS remain se
 - Rank Driver discovery by straight-line pickup distance, then request creation
   time (oldest first), then request UUID. Apply the feed limit after ranking all
   eligible requests. There is no distance cutoff.
-- Rider offer views include current vehicle make/model/color, nullable pickup
+- Rider offer views include current Driver display name and vehicle make/model/model year/color, nullable pickup
   distance in meters, a derived `matches_proposed_fare` flag, and `selectable`.
   Stale/missing locations produce a null distance and a non-selectable offer.
   Offer status/history is retained; temporary unavailability does not reject or
@@ -140,7 +140,7 @@ A fixed pickup radius, service-area boundary, routing ETA, and PostGIS remain se
   and availability after lock acquisition. Read views are snapshots and do not
   reserve a Driver or guarantee a later selection will succeed.
 - Before assignment, expose neither raw Driver coordinates nor license plates,
-  contact details, or provider identity. Names/photos remain deferred until
+  contact details, or provider identity. Photos remain deferred until
   supported by an application-owned profile capability.
 - These fields describe distance, not arrival time; no ETA is derived from them.
 
@@ -178,3 +178,5 @@ This model keeps the Rider experience simple while preserving Rider choice over 
 Rider creation, Driver responses, and Rider selection follow this decision. The
 remaining geographic discovery and Rider offer presentation work should build
 on this marketplace without restoring an automatic-candidate abstraction.
+
+Migration 017 adds nullable Driver display name and vehicle model year for legacy compatibility. New/re-onboarding requires both; missing presentation data does not disable legacy Drivers. Unknown model years are returned as null. See [Driver public presentation](driver-public-presentation.md).

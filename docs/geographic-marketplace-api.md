@@ -52,7 +52,7 @@ Rider gets the existing not-found response.
 
 The response exposes no raw Driver coordinates, license plate, contact details,
 or provider identity. Existing Driver identifiers remain for offer selection.
-Names/photos await application profile support. Precise active-Trip location
+Driver display names and vehicle model years are provided by the Driver public presentation slice. Photos await media support. Precise active-Trip location
 reads retain their existing ownership boundary.
 
 ## Responses and assignment
@@ -86,3 +86,5 @@ antimeridian/antipodal distances, stale/missing/future locations, offline/busy
 Drivers, missing vehicles/capabilities, fare matching, ownership, nullable
 comparison fields, location refresh, rejected-offer history, selection waiting
 on a location update, and existing concurrent assignment/lifecycle tests.
+
+Driver comparison also includes a nullable "driver" object with "display_name", and "vehicle.model_year" (null for legacy unknown years). See [Driver public presentation](driver-public-presentation.md).
