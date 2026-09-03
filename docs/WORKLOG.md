@@ -24,7 +24,9 @@ It stops if an accepted unreleased candidate has no matching Trip. See the
 [rollout guide](candidate-retirement-rollout.md) before upgrading an existing
 installation. Old API instances must be stopped for the schema removal.
 
-The Flutter application is planned but is not yet present in this repository.
+The shared Flutter Android application implements registration and verification,
+login, secure session restoration, account loading, Rider-first entry, capability
+switching for Driver-enabled accounts, and logout.
 
 ---
 
@@ -67,6 +69,8 @@ The Flutter application is planned but is not yet present in this repository.
 - [x] Automatic Candidate Reject Timeout Alignment — PR #44
 - [x] Legacy Candidate and Booking-Mode Retirement — PR #56
 - [x] Geographic Marketplace Discovery and Rider Comparison — PR #57
+- [x] Driver Public Presentation — PR #58
+- [x] Flutter Rider Entry Foundation
 
 Worklog-only alignment PRs are intentionally omitted from the business-milestone list.
 
@@ -129,6 +133,16 @@ Worklog-only alignment PRs are intentionally omitted from the business-milestone
 - Driver and vehicle photos remain a separate media-backed slice. Do not store
   arbitrary external photo URLs merely to avoid defining media ownership.
 
+### Flutter client entry
+
+- The client calls only application-owned APIs and does not expose Ory concepts.
+- An unexpired stored session is validated through `/v1/me` at startup.
+- Rider remains the default context, including after a new login.
+- Driver navigation is available only when the account owns that capability.
+- Session secrets use secure storage; capability preference uses simple preferences.
+- Android debug builds use the emulator host alias and allow local cleartext HTTP.
+  Release configuration requires an HTTPS API URL.
+
 ## Verification for this slice
 
 PostgreSQL tests retain migration, assignment, completion, cancellation, and
@@ -147,14 +161,11 @@ product behavior; implementation details must not redefine the product.
 
 ## Follow-up scope
 
-The next concrete backend presentation gap is media ownership for Driver and
-vehicle photos. Define the smallest application-owned upload/storage/read boundary
-before exposing photo references. ETA, ratings, and sophisticated media processing
-remain out of scope unless a concrete client journey requires them.
-
-After the backend Rider comparison contract is complete enough for the MVP client,
-start the shared Flutter application rather than continuing to accumulate backend-only
-features.
+The next vertical slice is Rider ride-request creation in Flutter using the existing
+pickup, destination, proposed-fare, and request-status contracts. Select concrete
+device-location and map packages only when that slice establishes their required
+behavior. Driver and vehicle media remains a later presentation slice; define an
+application-owned upload/storage/read boundary before exposing photo references.
 
 ## Deferred
 
