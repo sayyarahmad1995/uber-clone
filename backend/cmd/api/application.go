@@ -13,7 +13,6 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/httpapi"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/identity"
 	identitykratos "github.com/sayyarahmad1995/uber-clone/backend/internal/identity/kratos"
-	"github.com/sayyarahmad1995/uber-clone/backend/internal/matching"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/offer"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/database"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/migrations"
@@ -43,7 +42,7 @@ func newApplication(cfg config) (application, func(), error) {
 		cleanup()
 		return application{}, nil, fmt.Errorf("identity infrastructure initialization failed: %w", err)
 	}
-	tripService := trip.NewService(trip.NewPostgresRepository(db, matching.DefaultAutomaticCandidateResponseTimeout))
+	tripService := trip.NewService(trip.NewPostgresRepository(db))
 	api := httpapi.New(httpapi.Dependencies{
 		Users:           user.NewService(user.NewPostgresRepository(db)),
 		Drivers:         driver.NewService(driver.NewPostgresRepository(db)),
