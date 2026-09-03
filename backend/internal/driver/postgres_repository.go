@@ -13,7 +13,7 @@ type PostgresRepository struct{ db *sql.DB }
 
 func NewPostgresRepository(db *sql.DB) PostgresRepository { return PostgresRepository{db: db} }
 
-func (r PostgresRepository) UpsertProfile(ctx context.Context, userID uuid.UUID, vehicle VehicleInput) (Profile, error) {
+func (r PostgresRepository) UpsertProfile(ctx context.Context, userID uuid.UUID, input OnboardingInput) (Profile, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return Profile{}, err
@@ -22,23 +22,28 @@ func (r PostgresRepository) UpsertProfile(ctx context.Context, userID uuid.UUID,
 
 	now := time.Now().UTC()
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO driver_profiles (user_id, status, is_online, created_at, updated_at)
-		VALUES ($1, $2, FALSE, $3, $3)
-		ON CONFLICT (user_id) DO UPDATE SET status = EXCLUDED.status, updated_at = EXCLUDED.updated_at
-	`, userID, StatusActive, now); err != nil {
+		INSERT INTO driver_profiles (user_id, display_name, status, is_online, created_at, updated_at)
+		VALUES ($1, $2, $3, FALSE, $4, $4)
+		ON CONFLICT (user_id) DO UPDATE SET
+			display_name = EXCLUDED.display_name,
+			status = EXCLUDED.status,
+			updated_at = EXCLUDED.updated_at
+	`, userID, input.DisplayName, StatusActive, now); err != nil {
 		return Profile{}, err
 	}
 
+	vehicle := input.Vehicle
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO driver_vehicles (id, driver_user_id, make, model, color, license_plate, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
+		INSERT INTO driver_vehicles (id, driver_user_id, make, model, model_year, color, license_plate, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
 		ON CONFLICT (driver_user_id) DO UPDATE SET
 			make = EXCLUDED.make,
 			model = EXCLUDED.model,
+			model_year = EXCLUDED.model_year,
 			color = EXCLUDED.color,
 			license_plate = EXCLUDED.license_plate,
 			updated_at = EXCLUDED.updated_at
-	`, uuid.New(), userID, vehicle.Make, vehicle.Model, vehicle.Color, vehicle.LicensePlate, now); err != nil {
+	`, uuid.New(), userID, vehicle.Make, vehicle.Model, vehicle.ModelYear, vehicle.Color, vehicle.LicensePlate, now); err != nil {
 		return Profile{}, err
 	}
 
@@ -51,14 +56,14 @@ func (r PostgresRepository) UpsertProfile(ctx context.Context, userID uuid.UUID,
 func (r PostgresRepository) FindByUserID(ctx context.Context, userID uuid.UUID) (Profile, error) {
 	var p Profile
 	err := r.db.QueryRowContext(ctx, `
-		SELECT p.user_id, p.status, p.is_online, p.created_at, p.updated_at,
-		       v.id, v.make, v.model, v.color, v.license_plate
+		SELECT p.user_id, COALESCE(p.display_name, ''), p.status, p.is_online, p.created_at, p.updated_at,
+		       v.id, v.make, v.model, COALESCE(v.model_year, 0), v.color, v.license_plate
 		FROM driver_profiles p
 		JOIN driver_vehicles v ON v.driver_user_id = p.user_id
 		WHERE p.user_id = $1
 	`, userID).Scan(
-		&p.UserID, &p.Status, &p.IsOnline, &p.CreatedAt, &p.UpdatedAt,
-		&p.Vehicle.ID, &p.Vehicle.Make, &p.Vehicle.Model, &p.Vehicle.Color, &p.Vehicle.LicensePlate,
+		&p.UserID, &p.DisplayName, &p.Status, &p.IsOnline, &p.CreatedAt, &p.UpdatedAt,
+		&p.Vehicle.ID, &p.Vehicle.Make, &p.Vehicle.Model, &p.Vehicle.ModelYear, &p.Vehicle.Color, &p.Vehicle.LicensePlate,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Profile{}, ErrNotFound
