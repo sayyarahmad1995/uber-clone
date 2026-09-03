@@ -10,9 +10,8 @@ import (
 )
 
 var (
-	ErrInvalidLocation    = errors.New("invalid ride location")
-	ErrInvalidBookingMode = errors.New("invalid booking mode")
-	ErrInvalidFare        = errors.New("invalid proposed fare")
+	ErrInvalidLocation = errors.New("invalid ride location")
+	ErrInvalidFare     = errors.New("invalid proposed fare")
 )
 
 const MaxFareMinor int64 = 1_000_000_000_000
@@ -45,7 +44,6 @@ type Money struct {
 type CreateInput struct {
 	Pickup       Location
 	Destination  Location
-	BookingMode  BookingMode
 	ProposedFare *Money
 }
 
@@ -74,22 +72,10 @@ func (s Service) Create(ctx context.Context, riderUserID uuid.UUID, input Create
 	if !validLocation(input.Pickup) || !validLocation(input.Destination) {
 		return Request{}, ErrInvalidLocation
 	}
-	if input.BookingMode == "" {
-		input.BookingMode = BookingModeAutomatic
+	if input.ProposedFare == nil || !validMoney(*input.ProposedFare) {
+		return Request{}, ErrInvalidFare
 	}
-	switch input.BookingMode {
-	case BookingModeAutomatic:
-		if input.ProposedFare != nil {
-			return Request{}, ErrInvalidFare
-		}
-	case BookingModeOffers:
-		if input.ProposedFare == nil || !validMoney(*input.ProposedFare) {
-			return Request{}, ErrInvalidFare
-		}
-		input.ProposedFare.Currency = strings.ToUpper(strings.TrimSpace(input.ProposedFare.Currency))
-	default:
-		return Request{}, ErrInvalidBookingMode
-	}
+	input.ProposedFare.Currency = strings.ToUpper(strings.TrimSpace(input.ProposedFare.Currency))
 	return s.repository.Create(ctx, riderUserID, input)
 }
 
