@@ -58,9 +58,9 @@ func TestWriteCandidateDecisionUsesApplicationOwnedContract(t *testing.T) {
 	}
 }
 
-func TestCreateRideRequestBodyUsesApplicationOwnedContract(t *testing.T) {
+func TestCreateRideRequestBodyUsesUnifiedMarketplaceContract(t *testing.T) {
 	var body createRideRequestBody
-	err := json.NewDecoder(strings.NewReader(`{"pickup":{"latitude":24.8607,"longitude":67.0011},"destination":{"latitude":24.9056,"longitude":67.0822},"booking_mode":"offers","proposed_fare":{"amount_minor":70000,"currency":"PKR"}}`)).Decode(&body)
+	err := json.NewDecoder(strings.NewReader(`{"pickup":{"latitude":24.8607,"longitude":67.0011},"destination":{"latitude":24.9056,"longitude":67.0822},"proposed_fare":{"amount_minor":70000,"currency":"PKR"}}`)).Decode(&body)
 	if err != nil {
 		t.Fatalf("Decode returned error: %v", err)
 	}
@@ -72,7 +72,7 @@ func TestCreateRideRequestBodyUsesApplicationOwnedContract(t *testing.T) {
 
 func TestCreateRideRequestBodyRequiresCompleteLocations(t *testing.T) {
 	var body createRideRequestBody
-	if err := json.NewDecoder(strings.NewReader(`{"pickup":{"latitude":24.8607},"destination":{"latitude":24.9056,"longitude":67.0822}}`)).Decode(&body); err != nil {
+	if err := json.NewDecoder(strings.NewReader(`{"pickup":{"latitude":24.8607},"destination":{"latitude":24.9056,"longitude":67.0822},"proposed_fare":{"amount_minor":70000,"currency":"PKR"}}`)).Decode(&body); err != nil {
 		t.Fatal(err)
 	}
 	if _, ok := body.input(); ok {
@@ -80,9 +80,19 @@ func TestCreateRideRequestBodyRequiresCompleteLocations(t *testing.T) {
 	}
 }
 
-func TestCreateRideRequestBodyRequiresCompleteFareWhenPresent(t *testing.T) {
+func TestCreateRideRequestBodyRequiresProposedFare(t *testing.T) {
 	var body createRideRequestBody
-	if err := json.NewDecoder(strings.NewReader(`{"pickup":{"latitude":0,"longitude":0},"destination":{"latitude":0,"longitude":0},"booking_mode":"offers","proposed_fare":{"currency":"PKR"}}`)).Decode(&body); err != nil {
+	if err := json.NewDecoder(strings.NewReader(`{"pickup":{"latitude":0,"longitude":0},"destination":{"latitude":0,"longitude":0}}`)).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := body.input(); ok {
+		t.Fatal("input accepted missing proposed fare")
+	}
+}
+
+func TestCreateRideRequestBodyRequiresCompleteFare(t *testing.T) {
+	var body createRideRequestBody
+	if err := json.NewDecoder(strings.NewReader(`{"pickup":{"latitude":0,"longitude":0},"destination":{"latitude":0,"longitude":0},"proposed_fare":{"currency":"PKR"}}`)).Decode(&body); err != nil {
 		t.Fatal(err)
 	}
 	if _, ok := body.input(); ok {
@@ -92,7 +102,7 @@ func TestCreateRideRequestBodyRequiresCompleteFareWhenPresent(t *testing.T) {
 
 func TestCreateRideRequestBodyAllowsPresentZeroCoordinates(t *testing.T) {
 	var body createRideRequestBody
-	if err := json.NewDecoder(strings.NewReader(`{"pickup":{"latitude":0,"longitude":0},"destination":{"latitude":0,"longitude":0}}`)).Decode(&body); err != nil {
+	if err := json.NewDecoder(strings.NewReader(`{"pickup":{"latitude":0,"longitude":0},"destination":{"latitude":0,"longitude":0},"proposed_fare":{"amount_minor":1000,"currency":"PKR"}}`)).Decode(&body); err != nil {
 		t.Fatal(err)
 	}
 	input, ok := body.input()
@@ -106,6 +116,9 @@ func TestRideRequestStatusResponseWithoutTrip(t *testing.T) {
 	response := rideRequestStatusResponse(request, nil)
 	if response["trip"] != nil || response["id"] != request.ID {
 		t.Fatalf("unexpected response: %#v", response)
+	}
+	if _, exists := response["booking_mode"]; exists {
+		t.Fatal("unified Rider response must not expose booking_mode")
 	}
 }
 
