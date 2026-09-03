@@ -27,7 +27,6 @@ func TestRideRequestListResponseUsesStatusProjectionAndEmptyArray(t *testing.T) 
 		ID:           uuid.New(),
 		Pickup:       ride.Location{Latitude: 24.86, Longitude: 67.01},
 		Destination:  ride.Location{Latitude: 24.91, Longitude: 67.08},
-		BookingMode:  ride.BookingModeOffers,
 		ProposedFare: &ride.Money{AmountMinor: 100000, Currency: "PKR"},
 		Status:       ride.StatusRequested,
 		CreatedAt:    createdAt,
