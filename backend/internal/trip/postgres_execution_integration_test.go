@@ -17,7 +17,7 @@ func TestPostgresRepositoryStartTransitionsAssignedTrip(t *testing.T) {
 	rideID := createTripIntegrationRide(t, db, riderID)
 	createAcceptedTripFixture(t, db, rideID, riderID, driverID)
 
-	repository := NewPostgresRepository(db, integrationCandidateTimeout)
+	repository := NewPostgresRepository(db)
 	started, err := repository.Start(context.Background(), rideID, driverID)
 	if err != nil {
 		t.Fatalf("start: %v", err)
@@ -40,7 +40,7 @@ func TestPostgresRepositoryStartIsIdempotent(t *testing.T) {
 	rideID := createTripIntegrationRide(t, db, riderID)
 	createAcceptedTripFixture(t, db, rideID, riderID, driverID)
 
-	repository := NewPostgresRepository(db, integrationCandidateTimeout)
+	repository := NewPostgresRepository(db)
 	first, err := repository.Start(context.Background(), rideID, driverID)
 	if err != nil {
 		t.Fatalf("first start: %v", err)
@@ -64,7 +64,7 @@ func TestPostgresRepositoryCompleteTransitionsAndReleasesCandidate(t *testing.T)
 	rideID := createTripIntegrationRide(t, db, riderID)
 	createAcceptedTripFixture(t, db, rideID, riderID, driverID)
 
-	repository := NewPostgresRepository(db, integrationCandidateTimeout)
+	repository := NewPostgresRepository(db)
 	if _, err := repository.Start(context.Background(), rideID, driverID); err != nil {
 		t.Fatalf("start: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestPostgresRepositoryCompleteBeforeStartIsRejected(t *testing.T) {
 	rideID := createTripIntegrationRide(t, db, riderID)
 	createAcceptedTripFixture(t, db, rideID, riderID, driverID)
 
-	_, err := NewPostgresRepository(db, integrationCandidateTimeout).Complete(context.Background(), rideID, driverID)
+	_, err := NewPostgresRepository(db).Complete(context.Background(), rideID, driverID)
 	if !errors.Is(err, ErrTripNotStarted) {
 		t.Fatalf("expected ErrTripNotStarted, got %v", err)
 	}
@@ -124,7 +124,7 @@ func TestPostgresRepositoryStartAfterCompletionIsRejected(t *testing.T) {
 	rideID := createTripIntegrationRide(t, db, riderID)
 	createAcceptedTripFixture(t, db, rideID, riderID, driverID)
 
-	repository := NewPostgresRepository(db, integrationCandidateTimeout)
+	repository := NewPostgresRepository(db)
 	if _, err := repository.Start(context.Background(), rideID, driverID); err != nil {
 		t.Fatalf("start: %v", err)
 	}
@@ -153,7 +153,7 @@ func TestPostgresRepositoryCompleteIsIdempotent(t *testing.T) {
 	rideID := createTripIntegrationRide(t, db, riderID)
 	createAcceptedTripFixture(t, db, rideID, riderID, driverID)
 
-	repository := NewPostgresRepository(db, integrationCandidateTimeout)
+	repository := NewPostgresRepository(db)
 	if _, err := repository.Start(context.Background(), rideID, driverID); err != nil {
 		t.Fatalf("start: %v", err)
 	}

@@ -8,18 +8,12 @@ import (
 )
 
 type fakeRepository struct {
-	acceptance Acceptance
-	trip       Trip
-	err        error
-	rideID     uuid.UUID
-	riderID    uuid.UUID
-	driverID   uuid.UUID
-	operation  string
-}
-
-func (f *fakeRepository) Accept(_ context.Context, rideRequestID, driverUserID uuid.UUID) (Acceptance, error) {
-	f.rideID, f.driverID, f.operation = rideRequestID, driverUserID, "accept"
-	return f.acceptance, f.err
+	trip      Trip
+	err       error
+	rideID    uuid.UUID
+	riderID   uuid.UUID
+	driverID  uuid.UUID
+	operation string
 }
 
 func (f *fakeRepository) AcceptProposedFare(_ context.Context, rideRequestID, driverUserID uuid.UUID) (Trip, error) {
@@ -82,13 +76,5 @@ func TestServiceDelegatesMarketplaceAssignment(t *testing.T) {
 	}
 	if repository.operation != "select_offer" || repository.riderID != riderID {
 		t.Fatalf("unexpected offer selection delegation: %#v", repository)
-	}
-}
-
-func TestServiceAcceptancePreservesRepositoryBusinessError(t *testing.T) {
-	repository := &fakeRepository{err: ErrAssignmentResolved}
-	_, err := NewService(repository).Accept(context.Background(), uuid.New(), uuid.New())
-	if err != ErrAssignmentResolved {
-		t.Fatalf("expected ErrAssignmentResolved, got %v", err)
 	}
 }
