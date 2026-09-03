@@ -12,6 +12,8 @@ The product experience is a single Rider ride-request flow. A Rider chooses pick
 
 Earlier implementation slices introduced an internal `booking_mode` distinction (`automatic` / `offers`) so offer-marketplace behavior could be added without breaking the existing automatic-candidate flow. That distinction was useful as an incremental implementation mechanism, but it is not the intended Rider-facing product model.
 
+An earlier revision of this ADR also allowed a Driver who accepted the Rider proposed fare to assign the Trip immediately. Product review showed that this over-optimizes Driver response speed and can remove meaningful Rider choice: a farther Driver or a Driver with a less-preferred vehicle could win simply by responding first.
+
 ## Decision
 
 A Ride Request is one marketplace request with:
@@ -24,12 +26,14 @@ A Ride Request is one marketplace request with:
 
 Eligible Drivers receive or discover the Ride Request according to application-owned marketplace policy.
 
-For an actionable Ride Request, a Driver has two commercial responses:
+For an actionable Ride Request, a Driver submits one actionable commercial response:
 
-1. **Accept the Rider proposed fare.** This may assign the Trip immediately if the Driver and Ride Request are still eligible and unassigned.
-2. **Submit a counteroffer.** The Rider may accept or reject that offer. Accepting a counteroffer assigns the Trip atomically if the Driver and Ride Request are still eligible and unassigned.
+1. **Accept the Rider proposed fare.** This creates or updates a Driver offer at exactly the Rider proposed fare. It does not assign the Trip.
+2. **Submit a counteroffer.** This creates or updates a Driver offer at a different allowed fare. It does not assign the Trip.
 
-The Rider is not asked to choose an automatic or offers booking mode.
+The Rider sees actionable Driver offers and explicitly selects one. Rider selection is the assignment boundary: the selected Driver and Ride Request are revalidated atomically, and a Trip is created only if both remain eligible and available.
+
+An offer equal to the Rider proposed fare should be presented as accepting the Rider's price (for example, a `Your fare` label). This is presentation derived from the offer amount matching the Ride Request proposed fare; it is not a separate booking mode or assignment path.
 
 Conceptually:
 
@@ -46,73 +50,99 @@ and distributes/ranks the request
       v               v
 Driver accepts    Driver counteroffers
 Rider fare             |
-      |                 v
-      |           Rider accepts/rejects
       |                 |
       +--------+--------+
+               v
+       Rider sees offers
+       + Driver details
+       + vehicle details
+       + pickup distance
+               |
+               v
+        Rider selects one
+               |
+               v
+      atomic assignment
+               |
                v
               Trip
 ```
 
+## Rider choice and MVP presentation
+
+Rider choice is authoritative for marketplace assignment. Driver responses express willingness to serve the Ride Request; they do not reserve or own it.
+
+The Rider-facing offer view should be able to include:
+
+- Driver name and photo when profile support exists;
+- vehicle make/model and vehicle photo when available;
+- current pickup distance where geographic data is available;
+- offered fare;
+- a presentation marker when the offered fare equals the Rider proposed fare.
+
+Pickup ETA is explicitly deferred for the MVP. Straight-line geographic distance must not be presented as a trustworthy arrival-time estimate. Routing/traffic-based ETA remains a later capability.
+
 ## Marketplace competition invariant
 
-A counteroffer does not reserve the Ride Request and does not reserve the Driver for that Ride Request.
+A Driver offer does not reserve the Ride Request and does not reserve the Driver for that Ride Request.
 
-Until assignment commits successfully, the Ride Request remains competitively available to other eligible Drivers and the Rider may still act on pending counteroffers.
+Multiple Drivers may have pending offers on the same Ride Request. A Driver may also have pending offers on multiple Ride Requests because an offer is not an assignment.
 
-The first valid assignment transaction that successfully commits wins the Ride Request. Assignment can be created by either:
+Only Rider selection of an actionable Driver offer may create a Trip in the unified marketplace flow.
 
-- an eligible Driver accepting the Rider proposed fare; or
-- the Rider accepting an actionable Driver counteroffer.
+At Rider selection time the assignment transaction must revalidate that:
 
-Once one assignment commits:
+- the Ride Request is still open and unassigned;
+- the selected offer is still actionable;
+- the selected Driver remains operationally eligible;
+- the selected Driver has no conflicting active Trip or assignment commitment.
 
-- the Ride Request is no longer actionable for any other Driver;
-- all competing pending counteroffers become closed/non-actionable;
-- all competing acceptance attempts must fail without creating another Trip;
-- a later exact-fare acceptance cannot override an already committed counteroffer assignment;
-- a later Rider counteroffer acceptance cannot override an already committed exact-fare assignment.
+Once assignment commits:
 
-There is no artificial grace period or priority window between exact-fare acceptance and Rider counteroffer acceptance. Transactional commit order determines the winner. This keeps competition understandable and avoids hidden timing policy.
+- the Ride Request is no longer actionable for other Drivers;
+- competing pending offers become closed/non-actionable;
+- the winning Driver's other pending marketplace offers must not permit a second active Trip;
+- subsequent selections or Driver responses cannot create another Trip for the Ride Request.
 
 ## Geographic matching role
 
-Geographic matching remains valuable, but its business role is marketplace eligibility, distribution, and ranking rather than defining a separate Rider booking mode.
+Geographic matching remains valuable, but its business role is marketplace eligibility, distribution, ranking, and Rider decision support rather than defining a separate Rider booking mode.
 
 The current location rules remain reusable:
 
 - Driver must be operationally eligible;
 - Driver location must be fresh enough for the marketplace policy;
-- straight-line pickup distance may be used for MVP ordering;
+- straight-line pickup distance may be used for MVP ordering and display;
 - deterministic tie-breaking is required;
-- active Driver commitments and Trips remain authoritative exclusions.
+- active Driver commitments and Trips remain authoritative exclusions at assignment time.
 
 A fixed pickup radius, service-area boundary, routing ETA, and PostGIS remain separate decisions and must not be invented without a concrete product requirement.
 
 ## Assignment invariant
 
-Automatic-candidate and offer-selection implementation paths may coexist temporarily while the code is reconciled, but they must converge on one authoritative assignment boundary:
+Automatic-candidate implementation may coexist temporarily while the code is reconciled, but the unified marketplace path must converge on Rider-selected assignment:
 
 - at most one winning Driver per Ride Request;
 - at most one active Trip per Driver;
 - assignment-time Driver eligibility is revalidated atomically;
 - losing offers/candidates cannot create a second assignment;
-- Trip execution is agnostic to how the commercial agreement was reached.
+- Trip execution is agnostic to how the Driver priced their offer.
 
 ## Implementation migration rule
 
-Existing `booking_mode` persistence and endpoints are considered implementation debt, not a product contract to expand.
+Existing `booking_mode` persistence and automatic-candidate endpoints are considered implementation debt, not a product contract to expand.
 
 Until a focused migration removes or repurposes that distinction:
 
-- do not expose booking-mode choice in the Rider UX;
-- do not add new Rider-facing behavior that requires choosing `automatic` versus `offers`;
-- prefer new APIs and read models that fit the unified marketplace model;
+- do not expose booking-mode choice in the Rider UX or new Rider API contract;
+- new Rider Ride Requests require a proposed fare;
+- exact-fare Driver responses must not assign the Trip in the unified marketplace path;
+- prefer new APIs and read models that fit Rider-selected offers;
 - preserve backward compatibility only as necessary to migrate safely;
 - reuse existing geographic, offer, candidate, concurrency, and Trip logic where it still represents valid business invariants.
 
 ## Consequences
 
-This model keeps the Rider experience simple while allowing Driver price competition. It also avoids duplicating Ride Request and Trip models for different matching strategies.
+This model keeps the Rider experience simple while preserving Rider choice over fare, proximity, and vehicle. It also makes exact-fare acceptance and counteroffers one coherent Driver-offer concept instead of separate assignment strategies.
 
-The next implementation work should reconcile Driver ride discovery/actionability with this decision before adding more features to the legacy automatic-candidate abstraction.
+The next implementation work should reconcile Rider creation, Driver ride discovery/responses, and Rider offer selection with this decision before adding more features to the legacy automatic-candidate abstraction.
