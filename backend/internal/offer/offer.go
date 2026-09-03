@@ -69,16 +69,22 @@ type Offer struct {
 // RiderOffer is a comparison view; these values are not offer lifecycle state.
 type RiderOffer struct {
 	Offer
+	Driver               *DriverSummary
 	Vehicle              *VehicleSummary
 	PickupDistanceMeters *float64
 	MatchesProposedFare  bool
 	Selectable           bool
 }
 
+type DriverSummary struct {
+	DisplayName string
+}
+
 type VehicleSummary struct {
-	Make  string
-	Model string
-	Color string
+	Make      string
+	Model     string
+	ModelYear int
+	Color     string
 }
 
 type Submission struct {
