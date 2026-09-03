@@ -180,9 +180,18 @@ func riderOfferResponse(item offer.RiderOffer) map[string]any {
 	response["pickup_distance_meters"] = item.PickupDistanceMeters
 	response["matches_proposed_fare"] = item.MatchesProposedFare
 	response["selectable"] = item.Selectable
+	response["driver"] = nil
 	response["vehicle"] = nil
+	if item.Driver != nil {
+		response["driver"] = map[string]any{"display_name": item.Driver.DisplayName}
+	}
 	if item.Vehicle != nil {
-		response["vehicle"] = map[string]string{"make": item.Vehicle.Make, "model": item.Vehicle.Model, "color": item.Vehicle.Color}
+		response["vehicle"] = map[string]any{
+			"make":       item.Vehicle.Make,
+			"model":      item.Vehicle.Model,
+			"model_year": item.Vehicle.ModelYear,
+			"color":      item.Vehicle.Color,
+		}
 	}
 	return response
 }
