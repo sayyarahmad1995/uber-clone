@@ -10,16 +10,27 @@ import (
 )
 
 type onboardDriverRequest struct {
-	Vehicle struct {
+	DisplayName string `json:"display_name"`
+	Vehicle     struct {
 		Make         string `json:"make"`
 		Model        string `json:"model"`
+		ModelYear    int    `json:"model_year"`
 		Color        string `json:"color"`
 		LicensePlate string `json:"license_plate"`
 	} `json:"vehicle"`
 }
 
-func (r onboardDriverRequest) vehicleInput() driver.VehicleInput {
-	return driver.VehicleInput{Make: r.Vehicle.Make, Model: r.Vehicle.Model, Color: r.Vehicle.Color, LicensePlate: r.Vehicle.LicensePlate}
+func (r onboardDriverRequest) input() driver.OnboardingInput {
+	return driver.OnboardingInput{
+		DisplayName: r.DisplayName,
+		Vehicle: driver.VehicleInput{
+			Make:         r.Vehicle.Make,
+			Model:        r.Vehicle.Model,
+			ModelYear:    r.Vehicle.ModelYear,
+			Color:        r.Vehicle.Color,
+			LicensePlate: r.Vehicle.LicensePlate,
+		},
+	}
 }
 
 type driverAvailabilityRequest struct {
@@ -36,9 +47,9 @@ func (api *API) onboardDriver(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request"})
 		return
 	}
-	profile, err := api.drivers.Onboard(r.Context(), u.ID, body.vehicleInput())
+	profile, err := api.drivers.Onboard(r.Context(), u.ID, body.input())
 	if errors.Is(err, driver.ErrInvalidProfile) {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "vehicle make, model, color, and license_plate are required"})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "display_name and complete vehicle details including model_year are required"})
 		return
 	}
 	if err != nil {
@@ -119,8 +130,18 @@ func (api *API) listDriverTripHistory(w http.ResponseWriter, r *http.Request) {
 
 func writeDriver(w http.ResponseWriter, status int, profile driver.Profile) {
 	writeJSON(w, status, map[string]any{
-		"user_id": profile.UserID, "status": profile.Status, "is_online": profile.IsOnline,
-		"vehicle": map[string]any{"id": profile.Vehicle.ID, "make": profile.Vehicle.Make, "model": profile.Vehicle.Model, "color": profile.Vehicle.Color, "license_plate": profile.Vehicle.LicensePlate},
+		"user_id":      profile.UserID,
+		"display_name": profile.DisplayName,
+		"status":       profile.Status,
+		"is_online":    profile.IsOnline,
+		"vehicle": map[string]any{
+			"id":            profile.Vehicle.ID,
+			"make":          profile.Vehicle.Make,
+			"model":         profile.Vehicle.Model,
+			"model_year":    profile.Vehicle.ModelYear,
+			"color":         profile.Vehicle.Color,
+			"license_plate": profile.Vehicle.LicensePlate,
+		},
 	})
 }
 
