@@ -22,8 +22,8 @@ func (r PostgresRepository) Create(ctx context.Context, riderUserID uuid.UUID, i
 	var amount sql.NullInt64
 	var currency sql.NullString
 	err := r.db.QueryRowContext(ctx, `
-		INSERT INTO ride_requests (id,rider_user_id,pickup_latitude,pickup_longitude,destination_latitude,destination_longitude,proposed_fare_minor,currency,status)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+		INSERT INTO ride_requests (id,rider_user_id,pickup_latitude,pickup_longitude,destination_latitude,destination_longitude,booking_mode,proposed_fare_minor,currency,status)
+		VALUES ($1,$2,$3,$4,$5,$6,'offers',$7,$8,$9)
 		RETURNING id,rider_user_id,pickup_latitude,pickup_longitude,destination_latitude,destination_longitude,proposed_fare_minor,currency,status,created_at
 	`, uuid.New(), riderUserID, input.Pickup.Latitude, input.Pickup.Longitude, input.Destination.Latitude, input.Destination.Longitude, proposedAmount, proposedCurrency, StatusRequested).Scan(
 		&request.ID, &request.RiderUserID, &request.Pickup.Latitude, &request.Pickup.Longitude, &request.Destination.Latitude, &request.Destination.Longitude, &amount, &currency, &request.Status, &request.CreatedAt)
