@@ -19,6 +19,7 @@ class RideDashboardScaffold extends StatelessWidget {
     this.minPanelSize = 0.16,
     this.initialPanelSize = 0.34,
     this.maxPanelSize = 0.62,
+    this.snapPanel = false,
   }) : assert(minPanelSize > 0),
        assert(minPanelSize <= initialPanelSize),
        assert(initialPanelSize <= maxPanelSize),
@@ -31,6 +32,7 @@ class RideDashboardScaffold extends StatelessWidget {
   final double minPanelSize;
   final double initialPanelSize;
   final double maxPanelSize;
+  final bool snapPanel;
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +43,7 @@ class RideDashboardScaffold extends StatelessWidget {
 
         return Stack(
           children: [
-            Positioned.fill(child: map),
+            Positioned.fill(child: RepaintBoundary(child: map)),
             if (floatingStatus != null)
               Positioned(
                 top: AppSpacing.md,
@@ -53,7 +55,7 @@ class RideDashboardScaffold extends StatelessWidget {
                     alignment: Alignment.topCenter,
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 640),
-                      child: floatingStatus!,
+                      child: RepaintBoundary(child: floatingStatus!),
                     ),
                   ),
                 ),
@@ -64,14 +66,14 @@ class RideDashboardScaffold extends StatelessWidget {
                 bottom: controlBottom,
                 child: SafeArea(
                   top: false,
-                  child: mapControls!,
+                  child: RepaintBoundary(child: mapControls!),
                 ),
               ),
             DraggableScrollableSheet(
               minChildSize: minPanelSize,
               initialChildSize: initialPanelSize,
               maxChildSize: maxPanelSize,
-              snap: true,
+              snap: snapPanel,
               builder: (context, scrollController) {
                 return SafeArea(
                   top: false,
@@ -93,7 +95,9 @@ class RideDashboardScaffold extends StatelessWidget {
                           Radius.circular(AppRadii.xl),
                         ),
                         clipBehavior: Clip.antiAlias,
-                        child: panelBuilder(context, scrollController),
+                        child: RepaintBoundary(
+                          child: panelBuilder(context, scrollController),
+                        ),
                       ),
                     ),
                   ),
