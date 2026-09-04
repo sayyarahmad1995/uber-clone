@@ -18,7 +18,6 @@ class CapabilityHomeScreen extends ConsumerWidget {
     final account = controller.state.account!;
     final canDrive = account.capabilities.contains(Capability.driver);
     return Scaffold(
-      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: Text(capability == Capability.rider ? 'Rider' : 'Driver'),
         actions: [
