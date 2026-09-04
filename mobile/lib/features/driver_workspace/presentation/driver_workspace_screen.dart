@@ -20,57 +20,69 @@ class DriverWorkspaceScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tiles = ref.watch(mapTilesProvider);
     return RideDashboardScaffold(
-      maxPanelHeightFactor: 0.46,
+      minPanelSize: 0.16,
+      initialPanelSize: 0.30,
+      maxPanelSize: 0.46,
       map: RideMap(tiles: tiles),
       floatingStatus: const DashboardStatusCard(
         icon: Icons.local_taxi,
         title: 'Driver dashboard',
         message: 'Driver onboarding and marketplace panels will attach here.',
       ),
-      panel: _DriverFoundationPanel(accountID: accountID),
+      panelBuilder: (context, scrollController) => _DriverFoundationPanel(
+        accountID: accountID,
+        scrollController: scrollController,
+      ),
     );
   }
 }
 
 class _DriverFoundationPanel extends StatelessWidget {
-  const _DriverFoundationPanel({required this.accountID});
+  const _DriverFoundationPanel({
+    required this.accountID,
+    required this.scrollController,
+  });
 
   final String accountID;
+  final ScrollController scrollController;
 
   @override
-  Widget build(BuildContext context) => ListView(
-    shrinkWrap: true,
-    padding: const EdgeInsets.all(AppSpacing.md),
-    children: [
-      Text(
-        'Driver workspace',
-        style: Theme.of(context).textTheme.headlineSmall,
-      ),
-      const SizedBox(height: AppSpacing.xs),
-      Text('Account $accountID'),
-      const SizedBox(height: AppSpacing.md),
-      const _NextPanelStep(
-        icon: Icons.badge_outlined,
-        title: 'Onboarding panel',
-        message: 'Collect Driver and vehicle profile details.',
-      ),
-      const _NextPanelStep(
-        icon: Icons.power_settings_new,
-        title: 'Availability panel',
-        message: 'Let the Driver go online and offline.',
-      ),
-      const _NextPanelStep(
-        icon: Icons.near_me_outlined,
-        title: 'Location panel',
-        message: 'Publish current location before marketplace discovery.',
-      ),
-      const _NextPanelStep(
-        icon: Icons.format_list_bulleted,
-        title: 'Marketplace panel',
-        message: 'Show eligible Rider requests and offer actions.',
-      ),
-    ],
-  );
+  Widget build(BuildContext context) {
+    return ListView(
+      controller: scrollController,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      children: [
+        const DashboardPanelHandle(),
+        Text(
+          'Driver workspace',
+          style: Theme.of(context).textTheme.headlineSmall,
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text('Account $accountID'),
+        const SizedBox(height: AppSpacing.md),
+        const _NextPanelStep(
+          icon: Icons.badge_outlined,
+          title: 'Onboarding panel',
+          message: 'Collect Driver and vehicle profile details.',
+        ),
+        const _NextPanelStep(
+          icon: Icons.power_settings_new,
+          title: 'Availability panel',
+          message: 'Let the Driver go online and offline.',
+        ),
+        const _NextPanelStep(
+          icon: Icons.near_me_outlined,
+          title: 'Location panel',
+          message: 'Publish current location before marketplace discovery.',
+        ),
+        const _NextPanelStep(
+          icon: Icons.format_list_bulleted,
+          title: 'Marketplace panel',
+          message: 'Show eligible Rider requests and offer actions.',
+        ),
+      ],
+    );
+  }
 }
 
 class _NextPanelStep extends StatelessWidget {
