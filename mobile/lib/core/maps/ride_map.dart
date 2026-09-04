@@ -40,35 +40,37 @@ class RideMap extends StatelessWidget {
   final ValueChanged<LatLng>? onTap;
 
   @override
-  Widget build(BuildContext context) => FlutterMap(
-    options: MapOptions(
-      initialCenter: initialCenter,
-      initialZoom: initialZoom,
-      onTap: onTap == null ? null : (_, point) => onTap!(point),
-    ),
-    children: [
-      TileLayer(
-        urlTemplate: tiles.urlTemplate,
-        userAgentPackageName: tiles.userAgentPackageName,
+  Widget build(BuildContext context) {
+    return FlutterMap(
+      options: MapOptions(
+        initialCenter: initialCenter,
+        initialZoom: initialZoom,
+        onTap: onTap == null ? null : (_, point) => onTap!(point),
       ),
-      if (markers.isNotEmpty)
-        MarkerLayer(
-          markers: markers
-              .map(
-                (marker) => Marker(
-                  point: marker.point,
-                  width: 56,
-                  height: 56,
-                  child: _MapMarker(marker: marker),
-                ),
-              )
-              .toList(growable: false),
+      children: [
+        TileLayer(
+          urlTemplate: tiles.urlTemplate,
+          userAgentPackageName: tiles.userAgentPackageName,
         ),
-      RichAttributionWidget(
-        attributions: [TextSourceAttribution(tiles.attribution)],
-      ),
-    ],
-  );
+        if (markers.isNotEmpty)
+          MarkerLayer(
+            markers: markers
+                .map(
+                  (marker) => Marker(
+                    point: marker.point,
+                    width: 56,
+                    height: 56,
+                    child: _MapMarker(marker: marker),
+                  ),
+                )
+                .toList(growable: false),
+          ),
+        RichAttributionWidget(
+          attributions: [TextSourceAttribution(tiles.attribution)],
+        ),
+      ],
+    );
+  }
 }
 
 class _MapMarker extends StatelessWidget {
@@ -77,24 +79,26 @@ class _MapMarker extends StatelessWidget {
   final RideMapMarker marker;
 
   @override
-  Widget build(BuildContext context) => Tooltip(
-    message: marker.label ?? '',
-    child: DecoratedBox(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: const BorderRadius.all(Radius.circular(AppRadii.lg)),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black26,
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: marker.label ?? '',
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.all(Radius.circular(AppRadii.lg)),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 8,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.xs),
+          child: Icon(marker.icon, color: marker.color, size: 32),
+        ),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xs),
-        child: Icon(marker.icon, color: marker.color, size: 32),
-      ),
-    ),
-  );
+    );
+  }
 }
