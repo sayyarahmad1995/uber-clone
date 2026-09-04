@@ -37,6 +37,7 @@ PKR units to integer minor units before submission. The client sends no legacy
 
 ## Platform behavior
 
-Android declares coarse and fine location permissions. The client asks only when
-the Rider chooses current location and reports disabled services or denied access
-without preventing manual map selection.
+Android declares coarse and fine location permissions. The Rider dashboard requests
+current location when it opens so the map can focus automatically. The Rider may
+request it again with the map control or use it for pickup. Disabled services or
+denied access do not prevent manual map selection.
