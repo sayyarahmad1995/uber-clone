@@ -6,6 +6,7 @@ import '../../../core/dashboard/ride_dashboard_scaffold.dart';
 import '../../../core/maps/ride_map.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../application/rider_request_controller.dart';
 import '../domain/ride_request.dart';
 
 class RiderRequestScreen extends ConsumerStatefulWidget {
@@ -230,17 +231,21 @@ class _PointSummary extends StatelessWidget {
   final GeoPoint? point;
 
   @override
-  Widget build(BuildContext context) => ListTile(
-    dense: true,
-    contentPadding: EdgeInsets.zero,
-    leading: Icon(label == 'Pickup' ? Icons.my_location : Icons.flag),
-    title: Text(label),
-    subtitle: Text(
-      point == null
-          ? 'Not selected'
-          : '${point!.latitude.toStringAsFixed(5)}, ${point!.longitude.toStringAsFixed(5)}',
-    ),
-  );
+  Widget build(BuildContext context) {
+    final value = point;
+    return ListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(label == 'Pickup' ? Icons.my_location : Icons.flag),
+      title: Text(label),
+      subtitle: Text(
+        value == null
+            ? 'Not selected'
+            : '${value.latitude.toStringAsFixed(5)}, '
+                  '${value.longitude.toStringAsFixed(5)}',
+      ),
+    );
+  }
 }
 
 class _ActiveRequestPanel extends ConsumerWidget {
