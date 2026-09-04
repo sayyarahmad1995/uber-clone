@@ -102,7 +102,8 @@ When implementation and documentation conflict, determine whether the code drift
 
 Rider and Driver map-first surfaces use one shared dashboard panel interaction
 contract. Capability features supply content and business state without redefining
-panel sizes, drag ownership, scroll locking, or release-gated snap behavior.
+panel sizes, direct finger tracking, drag ownership, scroll locking, or
+release-gated snap behavior.
 
 See [ADR-0008: Dashboard Panel Interaction Contract](ADR-0008-dashboard-panel-interaction-contract.md)
 for the authoritative state machine and change-control rule.

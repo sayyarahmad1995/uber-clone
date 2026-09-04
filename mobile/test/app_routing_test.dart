@@ -61,6 +61,16 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.getSize(panel).height, collapsedHeight);
 
+    final shortGesture = await tester.startGesture(
+      tester.getCenter(find.text('Where are you going?')),
+    );
+    await shortGesture.moveBy(const Offset(0, -30));
+    await tester.pump();
+    expect(tester.getSize(panel).height, greaterThan(collapsedHeight));
+    await shortGesture.up();
+    await tester.pumpAndSettle();
+    expect(tester.getSize(panel).height, collapsedHeight);
+
     final maximizeGesture = await tester.startGesture(
       tester.getCenter(find.text('Where are you going?')),
     );

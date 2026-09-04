@@ -21,19 +21,23 @@ entry point for Rider and Driver task panels.
 - Driver panels start collapsed at 16 percent of available dashboard height.
 - Both expand to a maximum of 60 percent, leaving at least 40 percent of the map
   visible.
-- The top handle is the only surface that supports continuous panel resizing.
+- The top handle supports continuous panel resizing throughout its full range.
 - Releasing an upward handle drag snaps to the maximum extent. Releasing a
   downward handle drag snaps to the capability's collapsed extent.
 - Panel-body scrolling is locked at every extent below the maximum and unlocked
   only at the maximum extent.
-- From the collapsed state, an upward panel-body pull of at least 56 logical pixels
-  arms expansion. The panel remains collapsed until pointer release, then snaps to
-  the maximum extent.
+- From the collapsed state, an upward panel-body pull moves the panel continuously
+  with the pointer, providing direct visual feedback. A pull of at least 56 logical
+  pixels selects expansion; on pointer release, the panel snaps to the maximum
+  extent. A shorter pull snaps back to the collapsed extent.
 - At the maximum extent, content scrolls normally. A downward gesture that merely
   returns content to its top does not minimize the panel. A new downward pull that
-  begins at the top and reaches 56 logical pixels arms minimization.
-- Armed body transitions execute only on pointer release. Cancelled and
-  sub-threshold gestures do not change panel extent.
+  begins at the top moves the panel continuously with the pointer. Reaching 56
+  logical pixels selects minimization; on pointer release, the panel snaps to the
+  collapsed extent. A shorter pull snaps back to the maximum extent.
+- Body pulls provide continuous visual movement, but the final state transition
+  executes only on pointer release. A cancelled gesture returns to its starting
+  extent.
 - Panel transitions use the shared dashboard animation rather than feature-owned
   animations.
 
@@ -44,15 +48,15 @@ panel sizing or gesture policies.
 ## Change control
 
 Future Rider and Driver slices must reuse this contract. They must not override the
-collapsed sizes, maximum extent, gesture ownership, scroll lock, threshold, or
-release behavior as a local implementation choice. A different product requirement
-must be stated explicitly and this ADR must be updated or superseded before the
-shared behavior changes.
+collapsed sizes, maximum extent, direct finger tracking, gesture ownership, scroll
+lock, threshold, snap targets, animation, or release behavior as a local
+implementation choice. A different product requirement must be stated explicitly
+and this ADR must be updated or superseded before the shared behavior changes.
 
 ## Consequences
 
 - Map visibility and panel behavior remain consistent across capabilities.
 - Content controls cannot accidentally resize the panel.
-- Users can expand or minimize from the panel body through deliberate,
-  release-gated gestures.
+- Users see the panel follow their body gesture before a deliberate,
+  release-gated snap completes the transition.
 - Widget tests protect the state transitions as part of the client architecture.
