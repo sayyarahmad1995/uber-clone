@@ -22,7 +22,7 @@ class DriverWorkspaceScreen extends ConsumerWidget {
     return RideDashboardScaffold(
       minPanelSize: 0.16,
       initialPanelSize: 0.25,
-      maxPanelSize: 0.25,
+      maxPanelSize: 0.50,
       map: RideMap(tiles: tiles),
       floatingStatus: const DashboardStatusCard(
         icon: Icons.local_taxi,

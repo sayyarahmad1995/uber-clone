@@ -80,7 +80,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
     return RideDashboardScaffold(
       minPanelSize: 0.18,
       initialPanelSize: 0.25,
-      maxPanelSize: 0.25,
+      maxPanelSize: 0.50,
       map: RideMap(
         mapController: _mapController,
         tiles: tiles,

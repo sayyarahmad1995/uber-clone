@@ -52,7 +52,8 @@ void main() {
     final sheet = tester.widget<DraggableScrollableSheet>(
       find.byType(DraggableScrollableSheet),
     );
-    expect(sheet.maxChildSize, 0.25);
+    expect(sheet.initialChildSize, 0.25);
+    expect(sheet.maxChildSize, 0.50);
 
     await tester.tap(find.byTooltip('Center map on your location'));
     await tester.pumpAndSettle();
