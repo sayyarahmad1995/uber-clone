@@ -111,18 +111,6 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
   ];
 
   LatLng _latLng(GeoPoint point) => LatLng(point.latitude, point.longitude);
-
-  String _statusTitle(RideRequest request) {
-    final status = request.trip?.status ?? request.status;
-    return switch (status) {
-      'requested' => 'Looking for Driver offers',
-      'assigned' => 'Driver assigned',
-      'in_progress' => 'Trip in progress',
-      'completed' => 'Trip completed',
-      'cancelled' => 'Trip cancelled',
-      _ => 'Ride request updated',
-    };
-  }
 }
 
 class _LoadingPanel extends StatelessWidget {
