@@ -21,8 +21,8 @@ class DriverWorkspaceScreen extends ConsumerWidget {
     final tiles = ref.watch(mapTilesProvider);
     return RideDashboardScaffold(
       minPanelSize: 0.16,
-      initialPanelSize: 0.50,
-      maxPanelSize: 0.70,
+      initialPanelSize: 0.16,
+      maxPanelSize: 0.60,
       map: RideMap(tiles: tiles),
       floatingStatus: const DashboardStatusCard(
         icon: Icons.local_taxi,
@@ -52,7 +52,6 @@ class _DriverFoundationPanel extends StatelessWidget {
       controller: scrollController,
       padding: const EdgeInsets.all(AppSpacing.md),
       children: [
-        const DashboardPanelHandle(),
         Text(
           'Driver workspace',
           style: Theme.of(context).textTheme.headlineSmall,

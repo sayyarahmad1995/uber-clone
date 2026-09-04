@@ -11,7 +11,7 @@ typedef DashboardPanelBuilder = Widget Function(
 ///
 /// The shell keeps the map as the spatial base layer and lets business slices
 /// swap task panels without rebuilding each flow as an unrelated static page.
-class RideDashboardScaffold extends StatelessWidget {
+class RideDashboardScaffold extends StatefulWidget {
   const RideDashboardScaffold({
     super.key,
     required this.map,
@@ -19,13 +19,12 @@ class RideDashboardScaffold extends StatelessWidget {
     this.floatingStatus,
     this.mapControls,
     this.minPanelSize = 0.16,
-    this.initialPanelSize = 0.50,
-    this.maxPanelSize = 0.70,
-    this.snapPanel = false,
+    this.initialPanelSize = 0.16,
+    this.maxPanelSize = 0.60,
   }) : assert(minPanelSize > 0),
        assert(minPanelSize <= initialPanelSize),
        assert(initialPanelSize <= maxPanelSize),
-       assert(maxPanelSize <= 0.70);
+       assert(maxPanelSize <= 0.60);
 
   final Widget map;
   final DashboardPanelBuilder panelBuilder;
@@ -34,19 +33,50 @@ class RideDashboardScaffold extends StatelessWidget {
   final double minPanelSize;
   final double initialPanelSize;
   final double maxPanelSize;
-  final bool snapPanel;
+
+  @override
+  State<RideDashboardScaffold> createState() => _RideDashboardScaffoldState();
+}
+
+class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
+  final _contentScrollController = ScrollController();
+  late double _panelSize;
+  late double _dragStartSize;
+  bool _isDraggingPanel = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _panelSize = widget.initialPanelSize;
+    _dragStartSize = _panelSize;
+  }
+
+  @override
+  void didUpdateWidget(covariant RideDashboardScaffold oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.minPanelSize != widget.minPanelSize ||
+        oldWidget.maxPanelSize != widget.maxPanelSize) {
+      _panelSize = _panelSize.clamp(widget.minPanelSize, widget.maxPanelSize);
+    }
+  }
+
+  @override
+  void dispose() {
+    _contentScrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final minimumPanelHeight = constraints.maxHeight * minPanelSize;
+        final minimumPanelHeight = constraints.maxHeight * widget.minPanelSize;
         final controlBottom = minimumPanelHeight + AppSpacing.lg;
 
         return Stack(
           children: [
-            Positioned.fill(child: RepaintBoundary(child: map)),
-            if (floatingStatus != null)
+            Positioned.fill(child: RepaintBoundary(child: widget.map)),
+            if (widget.floatingStatus != null)
               Positioned(
                 top: AppSpacing.md,
                 left: AppSpacing.md,
@@ -57,27 +87,32 @@ class RideDashboardScaffold extends StatelessWidget {
                     alignment: Alignment.topCenter,
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 640),
-                      child: RepaintBoundary(child: floatingStatus!),
+                      child: RepaintBoundary(child: widget.floatingStatus!),
                     ),
                   ),
                 ),
               ),
-            if (mapControls != null)
+            if (widget.mapControls != null)
               Positioned(
                 right: AppSpacing.md,
                 bottom: controlBottom,
                 child: SafeArea(
                   top: false,
-                  child: RepaintBoundary(child: mapControls!),
+                  child: RepaintBoundary(child: widget.mapControls!),
                 ),
               ),
-            DraggableScrollableSheet(
-              minChildSize: minPanelSize,
-              initialChildSize: initialPanelSize,
-              maxChildSize: maxPanelSize,
-              snap: snapPanel,
-              builder: (context, scrollController) {
-                return SafeArea(
+            AnimatedPositioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: constraints.maxHeight * _panelSize,
+              duration: _isDraggingPanel
+                  ? Duration.zero
+                  : const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              child: SizedBox.expand(
+                key: const Key('dashboardPanel'),
+                child: SafeArea(
                   top: false,
                   minimum: const EdgeInsets.fromLTRB(
                     AppSpacing.md,
@@ -98,17 +133,102 @@ class RideDashboardScaffold extends StatelessWidget {
                         ),
                         clipBehavior: Clip.antiAlias,
                         child: RepaintBoundary(
-                          child: panelBuilder(context, scrollController),
+                          child: Column(
+                            children: [
+                              _PanelDragHandle(
+                                onDragStart: _startPanelDrag,
+                                onDragUpdate: (delta) =>
+                                    _resizePanel(delta, constraints.maxHeight),
+                                onDragEnd: _endPanelDrag,
+                                onDragCancel: _cancelPanelDrag,
+                              ),
+                              Expanded(
+                                child: widget.panelBuilder(
+                                  context,
+                                  _contentScrollController,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                );
-              },
+                ),
+              ),
             ),
           ],
         );
       },
+    );
+  }
+
+  void _resizePanel(double verticalDelta, double dashboardHeight) {
+    if (dashboardHeight <= 0) {
+      return;
+    }
+    setState(() {
+      _panelSize = (_panelSize - verticalDelta / dashboardHeight).clamp(
+        widget.minPanelSize,
+        widget.maxPanelSize,
+      );
+    });
+  }
+
+  void _startPanelDrag() {
+    setState(() {
+      _isDraggingPanel = true;
+      _dragStartSize = _panelSize;
+    });
+  }
+
+  void _endPanelDrag(double velocity) {
+    final movement = _panelSize - _dragStartSize;
+    final expand = velocity < -50 || (velocity.abs() <= 50 && movement > 0);
+    setState(() {
+      _isDraggingPanel = false;
+      _panelSize = expand ? widget.maxPanelSize : widget.minPanelSize;
+    });
+  }
+
+  void _cancelPanelDrag() {
+    final midpoint = (widget.minPanelSize + widget.maxPanelSize) / 2;
+    setState(() {
+      _isDraggingPanel = false;
+      _panelSize = _panelSize >= midpoint
+          ? widget.maxPanelSize
+          : widget.minPanelSize;
+    });
+  }
+}
+
+class _PanelDragHandle extends StatelessWidget {
+  const _PanelDragHandle({
+    required this.onDragStart,
+    required this.onDragUpdate,
+    required this.onDragEnd,
+    required this.onDragCancel,
+  });
+
+  final VoidCallback onDragStart;
+  final ValueChanged<double> onDragUpdate;
+  final ValueChanged<double> onDragEnd;
+  final VoidCallback onDragCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      key: const Key('dashboardPanelDragHandle'),
+      behavior: HitTestBehavior.opaque,
+      onVerticalDragStart: (_) => onDragStart(),
+      onVerticalDragUpdate: (details) => onDragUpdate(details.delta.dy),
+      onVerticalDragEnd: (details) => onDragEnd(details.primaryVelocity ?? 0),
+      onVerticalDragCancel: onDragCancel,
+      child: const SizedBox(
+        height: 44,
+        width: double.infinity,
+        child: DashboardPanelHandle(),
+      ),
     );
   }
 }
@@ -122,7 +242,6 @@ class DashboardPanelHandle extends StatelessWidget {
       child: Container(
         width: 44,
         height: 4,
-        margin: const EdgeInsets.only(bottom: AppSpacing.md),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.outlineVariant,
           borderRadius: const BorderRadius.all(Radius.circular(AppRadii.sm)),
