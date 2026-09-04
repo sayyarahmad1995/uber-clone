@@ -97,24 +97,40 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
             ? 'Tap the map to choose pickup and destination.'
             : 'Status updates appear in the ride panel below.',
       ),
-      panelBuilder: (context, scrollController) =>
-          state.loading && state.requests.isEmpty
-          ? _LoadingPanel(scrollController: scrollController)
-          : active == null
-          ? _RequestRidePanel(
-              scrollController: scrollController,
-              fare: _fare,
-              state: state,
-              selectingPickup: _selectingPickup,
-              onSelectionChanged: (value) =>
-                  setState(() => _selectingPickup = value),
-              onUseCurrentPickup: controller.useCurrentPickup,
-              onSubmit: _submit,
-            )
-          : _ActiveRequestPanel(
-              scrollController: scrollController,
-              request: active,
-            ),
+      panelBuilder: (context, scrollController) {
+        return _buildPanel(
+          scrollController: scrollController,
+          state: state,
+          active: active,
+          controller: controller,
+        );
+      },
+    );
+  }
+
+  Widget _buildPanel({
+    required ScrollController scrollController,
+    required RiderRequestState state,
+    required RideRequest? active,
+    required RiderRequestController controller,
+  }) {
+    if (state.loading && state.requests.isEmpty) {
+      return _LoadingPanel(scrollController: scrollController);
+    }
+    if (active == null) {
+      return _RequestRidePanel(
+        scrollController: scrollController,
+        fare: _fare,
+        state: state,
+        selectingPickup: _selectingPickup,
+        onSelectionChanged: (value) => setState(() => _selectingPickup = value),
+        onUseCurrentPickup: controller.useCurrentPickup,
+        onSubmit: _submit,
+      );
+    }
+    return _ActiveRequestPanel(
+      scrollController: scrollController,
+      request: active,
     );
   }
 
