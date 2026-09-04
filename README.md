@@ -6,7 +6,8 @@ An MVP ride-hailing platform.
 
 The Go backend implements account authentication, Driver operations, Rider ride
 requests, Driver offers, Rider-selected assignment, Trip execution, cancellation,
-and history. One shared Flutter client is planned; it is not yet in this repository.
+and history. The shared Flutter Android client now implements account entry,
+secure session restoration, Rider-first capability navigation, and logout.
 
 Drivers accepting the Rider's proposed fare create a pending offer. Only the
 Rider's selection assigns a Trip. See [the marketplace decision](docs/ADR-0007-ride-request-marketplace-model.md)
@@ -15,6 +16,9 @@ and [the worklog](docs/WORKLOG.md) for scope and remaining work.
 The [geographic marketplace API](docs/geographic-marketplace-api.md) ranks requests
 by pickup distance and gives Riders vehicle, fare, distance, and availability
 details. Drivers need fresh location updates to discover requests or make offers.
+
+See the [Flutter client architecture](docs/flutter-client-architecture.md) for
+the mobile boundaries and local configuration.
 
 ## Run locally
 
