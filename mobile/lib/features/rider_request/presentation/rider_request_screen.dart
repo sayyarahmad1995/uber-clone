@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -18,6 +19,7 @@ class RiderRequestScreen extends ConsumerStatefulWidget {
 
 class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
   final _fare = TextEditingController();
+  final _mapController = MapController();
   bool _selectingPickup = true;
 
   @override
@@ -39,6 +41,20 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
         .submit(amountMinor: (amount * 100).round(), currency: 'PKR');
   }
 
+  Future<void> _focusCurrentLocation() async {
+    try {
+      final point = await ref.read(deviceLocationProvider).current();
+      _mapController.move(_latLng(point), 15);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = ref.watch(riderRequestControllerProvider);
@@ -50,12 +66,16 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
         : _markersFor(active.pickup, active.destination);
 
     return RideDashboardScaffold(
-      maxPanelHeightFactor: active == null ? 0.70 : 0.58,
+      minPanelSize: 0.18,
+      initialPanelSize: active == null ? 0.38 : 0.30,
+      maxPanelSize: active == null ? 0.72 : 0.58,
       map: RideMap(
+        mapController: _mapController,
         tiles: tiles,
         markers: markers,
         onTap: active == null ? _handleMapTap : null,
       ),
+      mapControls: _MapFocusButton(onPressed: _focusCurrentLocation),
       floatingStatus: DashboardStatusCard(
         icon: active == null ? Icons.map_outlined : Icons.local_taxi,
         title: active == null ? 'Ride dashboard' : 'Active ride request',
@@ -63,10 +83,12 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
             ? 'Tap the map to choose pickup and destination.'
             : 'Status updates appear in the ride panel below.',
       ),
-      panel: state.loading && state.requests.isEmpty
-          ? const _LoadingPanel()
+      panelBuilder: (context, scrollController) =>
+          state.loading && state.requests.isEmpty
+          ? _LoadingPanel(scrollController: scrollController)
           : active == null
           ? _RequestRidePanel(
+              scrollController: scrollController,
               fare: _fare,
               state: state,
               selectingPickup: _selectingPickup,
@@ -75,7 +97,10 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
               onUseCurrentPickup: controller.useCurrentPickup,
               onSubmit: _submit,
             )
-          : _ActiveRequestPanel(request: active),
+          : _ActiveRequestPanel(
+              scrollController: scrollController,
+              request: active,
+            ),
     );
   }
 
@@ -113,18 +138,43 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
   LatLng _latLng(GeoPoint point) => LatLng(point.latitude, point.longitude);
 }
 
-class _LoadingPanel extends StatelessWidget {
-  const _LoadingPanel();
+class _MapFocusButton extends StatelessWidget {
+  const _MapFocusButton({required this.onPressed});
+
+  final Future<void> Function() onPressed;
 
   @override
-  Widget build(BuildContext context) => const Padding(
-    padding: EdgeInsets.all(AppSpacing.xl),
-    child: Center(child: CircularProgressIndicator()),
-  );
+  Widget build(BuildContext context) {
+    return FloatingActionButton.small(
+      heroTag: 'rider-current-location',
+      tooltip: 'Center map on your location',
+      onPressed: () => onPressed(),
+      child: const Icon(Icons.my_location),
+    );
+  }
+}
+
+class _LoadingPanel extends StatelessWidget {
+  const _LoadingPanel({required this.scrollController});
+
+  final ScrollController scrollController;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      controller: scrollController,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      children: const [
+        DashboardPanelHandle(),
+        SizedBox(height: 96, child: Center(child: CircularProgressIndicator())),
+      ],
+    );
+  }
 }
 
 class _RequestRidePanel extends StatelessWidget {
   const _RequestRidePanel({
+    required this.scrollController,
     required this.fare,
     required this.state,
     required this.selectingPickup,
@@ -133,6 +183,7 @@ class _RequestRidePanel extends StatelessWidget {
     required this.onSubmit,
   });
 
+  final ScrollController scrollController;
   final TextEditingController fare;
   final RiderRequestState state;
   final bool selectingPickup;
@@ -141,75 +192,78 @@ class _RequestRidePanel extends StatelessWidget {
   final Future<void> Function() onSubmit;
 
   @override
-  Widget build(BuildContext context) => ListView(
-    shrinkWrap: true,
-    padding: const EdgeInsets.all(AppSpacing.md),
-    children: [
-      Text(
-        'Where are you going?',
-        style: Theme.of(context).textTheme.headlineSmall,
-      ),
-      const SizedBox(height: AppSpacing.xs),
-      const Text(
-        'Choose pickup and destination, then propose the fare you want to pay.',
-      ),
-      const SizedBox(height: AppSpacing.sm),
-      SegmentedButton<bool>(
-        segments: const [
-          ButtonSegment(
-            value: true,
-            label: Text('Pickup'),
-            icon: Icon(Icons.my_location),
+  Widget build(BuildContext context) {
+    return ListView(
+      controller: scrollController,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      children: [
+        const DashboardPanelHandle(),
+        Text(
+          'Where are you going?',
+          style: Theme.of(context).textTheme.headlineSmall,
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        const Text(
+          'Choose pickup and destination, then propose the fare you want to pay.',
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        SegmentedButton<bool>(
+          segments: const [
+            ButtonSegment(
+              value: true,
+              label: Text('Pickup'),
+              icon: Icon(Icons.my_location),
+            ),
+            ButtonSegment(
+              value: false,
+              label: Text('Destination'),
+              icon: Icon(Icons.flag),
+            ),
+          ],
+          selected: {selectingPickup},
+          onSelectionChanged: (value) => onSelectionChanged(value.single),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        OutlinedButton.icon(
+          onPressed: state.locating ? null : () => onUseCurrentPickup(),
+          icon: state.locating
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.gps_fixed),
+          label: const Text('Use current location for pickup'),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        _PointSummary(label: 'Pickup', point: state.pickup),
+        _PointSummary(label: 'Destination', point: state.destination),
+        const SizedBox(height: AppSpacing.sm),
+        TextField(
+          key: const Key('fareField'),
+          controller: fare,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: const InputDecoration(
+            labelText: 'Your proposed fare',
+            prefixText: 'PKR ',
           ),
-          ButtonSegment(
-            value: false,
-            label: Text('Destination'),
-            icon: Icon(Icons.flag),
+        ),
+        if (state.error != null) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            state.error!,
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
           ),
         ],
-        selected: {selectingPickup},
-        onSelectionChanged: (value) => onSelectionChanged(value.single),
-      ),
-      const SizedBox(height: AppSpacing.sm),
-      OutlinedButton.icon(
-        onPressed: state.locating ? null : () => onUseCurrentPickup(),
-        icon: state.locating
-            ? const SizedBox.square(
-                dimension: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(Icons.gps_fixed),
-        label: const Text('Use current location for pickup'),
-      ),
-      const SizedBox(height: AppSpacing.xs),
-      _PointSummary(label: 'Pickup', point: state.pickup),
-      _PointSummary(label: 'Destination', point: state.destination),
-      const SizedBox(height: AppSpacing.sm),
-      TextField(
-        key: const Key('fareField'),
-        controller: fare,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        decoration: const InputDecoration(
-          labelText: 'Your proposed fare',
-          prefixText: 'PKR ',
-        ),
-      ),
-      if (state.error != null) ...[
-        const SizedBox(height: AppSpacing.sm),
-        Text(
-          state.error!,
-          style: TextStyle(color: Theme.of(context).colorScheme.error),
+        const SizedBox(height: AppSpacing.md),
+        FilledButton.icon(
+          key: const Key('requestRideButton'),
+          onPressed: state.submitting ? null : () => onSubmit(),
+          icon: const Icon(Icons.local_taxi),
+          label: Text(state.submitting ? 'Requesting…' : 'Request ride'),
         ),
       ],
-      const SizedBox(height: AppSpacing.md),
-      FilledButton.icon(
-        key: const Key('requestRideButton'),
-        onPressed: state.submitting ? null : () => onSubmit(),
-        icon: const Icon(Icons.local_taxi),
-        label: Text(state.submitting ? 'Requesting…' : 'Request ride'),
-      ),
-    ],
-  );
+    );
+  }
 }
 
 class _PointSummary extends StatelessWidget {
@@ -237,8 +291,12 @@ class _PointSummary extends StatelessWidget {
 }
 
 class _ActiveRequestPanel extends ConsumerWidget {
-  const _ActiveRequestPanel({required this.request});
+  const _ActiveRequestPanel({
+    required this.scrollController,
+    required this.request,
+  });
 
+  final ScrollController scrollController;
   final RideRequest request;
 
   @override
@@ -246,9 +304,10 @@ class _ActiveRequestPanel extends ConsumerWidget {
     final state = ref.watch(riderRequestControllerProvider).state;
     final status = request.trip?.status ?? request.status;
     return ListView(
+      controller: scrollController,
       padding: const EdgeInsets.all(AppSpacing.md),
-      shrinkWrap: true,
       children: [
+        const DashboardPanelHandle(),
         Text(
           _statusTitle(status),
           style: Theme.of(context).textTheme.headlineSmall,
