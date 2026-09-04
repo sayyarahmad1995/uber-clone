@@ -97,3 +97,12 @@ Architecture and product documents are part of the implementation contract.
 Future implementation must be checked against the accepted ADRs, this document, the product/capability model, MVP scope, and current worklog before a slice is designed. A code change must not silently redefine a documented business flow.
 
 When implementation and documentation conflict, determine whether the code drifted or the requirement truly changed. If the product requirement changed, update or supersede the relevant architecture decision explicitly before building deeper dependencies on the new model.
+
+## 13. Shared dashboard interaction
+
+Rider and Driver map-first surfaces use one shared dashboard panel interaction
+contract. Capability features supply content and business state without redefining
+panel sizes, drag ownership, scroll locking, or release-gated snap behavior.
+
+See [ADR-0008: Dashboard Panel Interaction Contract](ADR-0008-dashboard-panel-interaction-contract.md)
+for the authoritative state machine and change-control rule.

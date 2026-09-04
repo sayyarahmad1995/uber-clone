@@ -166,6 +166,8 @@ Worklog-only alignment PRs are intentionally omitted from the business-milestone
   Rider automatically; explicit controls can refocus the map or select pickup.
 - The Driver dashboard is a presentation foundation; onboarding, availability,
   location publishing, discovery, and offers remain follow-up business slices.
+- ADR-0008 makes shared panel sizing, handle dragging, scroll locking, thresholds,
+  and release-gated body gestures authoritative for future client slices.
 
 ## Verification for this slice
 

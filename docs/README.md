@@ -31,6 +31,7 @@ Future implementation must be checked against these documents before a slice is 
 
 - [Architecture Decisions](architecture-decisions.md)
 - [ADR-0007: Unified Ride Request Marketplace Model](ADR-0007-ride-request-marketplace-model.md)
+- [ADR-0008: Dashboard Panel Interaction Contract](ADR-0008-dashboard-panel-interaction-contract.md)
 - [Product and Capability Model](product-and-capability-model.md)
 - [Technology Stack](technology-stack.md)
 - [MVP Scope](mvp-scope.md)
