@@ -27,6 +27,7 @@ class RideMap extends StatelessWidget {
   const RideMap({
     super.key,
     required this.tiles,
+    this.mapController,
     this.markers = const [],
     this.initialCenter = const LatLng(24.8607, 67.0011),
     this.initialZoom = 12,
@@ -34,6 +35,7 @@ class RideMap extends StatelessWidget {
   });
 
   final MapTiles tiles;
+  final MapController? mapController;
   final List<RideMapMarker> markers;
   final LatLng initialCenter;
   final double initialZoom;
@@ -42,6 +44,7 @@ class RideMap extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FlutterMap(
+      mapController: mapController,
       options: MapOptions(
         initialCenter: initialCenter,
         initialZoom: initialZoom,
