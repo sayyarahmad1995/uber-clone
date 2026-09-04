@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uber_clone/app.dart';
@@ -49,6 +49,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(location.requestCount, 1);
+    final sheet = tester.widget<DraggableScrollableSheet>(
+      find.byType(DraggableScrollableSheet),
+    );
+    expect(sheet.maxChildSize, 0.25);
 
     await tester.tap(find.byTooltip('Center map on your location'));
     await tester.pumpAndSettle();

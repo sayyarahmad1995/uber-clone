@@ -60,6 +60,9 @@ map rendering, and `core/dashboard` owns the draggable task-panel shell. Feature
 screens supply business state, markers, controls, and panel contents without moving
 business behavior into those shared presentation components.
 
+Dashboard task panels occupy at most 25 percent of the available dashboard height.
+Longer workflows scroll inside the panel so the map remains the dominant surface.
+
 The Rider dashboard requests location during startup so the map can focus on the
 Rider automatically. On a first run, the platform may display its location-permission
 prompt as part of this startup behavior. Explicit current-location actions remain
