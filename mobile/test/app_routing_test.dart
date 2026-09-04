@@ -35,7 +35,9 @@ void main() {
     expect(find.text('Driver workspace'), findsOneWidget);
   });
 
-  testWidgets('Rider location remains user-triggered', (tester) async {
+  testWidgets('Rider dashboard focuses on device location at startup', (
+    tester,
+  ) async {
     final location = CountingDeviceLocation();
     await tester.pumpWidget(
       testApp(
@@ -46,12 +48,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(location.requestCount, 0);
+    expect(location.requestCount, 1);
 
     await tester.tap(find.byTooltip('Center map on your location'));
     await tester.pumpAndSettle();
 
-    expect(location.requestCount, 1);
+    expect(location.requestCount, 2);
   });
 }
 

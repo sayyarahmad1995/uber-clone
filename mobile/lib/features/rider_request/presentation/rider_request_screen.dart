@@ -23,6 +23,16 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
   bool _selectingPickup = true;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _focusCurrentLocation(showError: false);
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _fare.dispose();
     super.dispose();
@@ -41,7 +51,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
         .submit(amountMinor: (amount * 100).round(), currency: 'PKR');
   }
 
-  Future<void> _focusCurrentLocation() async {
+  Future<void> _focusCurrentLocation({bool showError = true}) async {
     try {
       final point = await ref.read(deviceLocationProvider).current();
       if (!mounted) {
@@ -49,7 +59,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
       }
       _mapController.move(_latLng(point), 15);
     } catch (error) {
-      if (!mounted) {
+      if (!mounted || !showError) {
         return;
       }
       ScaffoldMessenger.of(context)

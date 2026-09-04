@@ -162,7 +162,8 @@ Worklog-only alignment PRs are intentionally omitted from the business-milestone
 
 - Rider and Driver use shared map-first dashboard, map-rendering, and theme
   primitives while feature screens retain ownership of business behavior.
-- Device location permission is requested only after an explicit user action.
+- The Rider dashboard requests device location on startup to focus the map on the
+  Rider automatically; explicit controls can refocus the map or select pickup.
 - The Driver dashboard is a presentation foundation; onboarding, availability,
   location publishing, discovery, and offers remain follow-up business slices.
 

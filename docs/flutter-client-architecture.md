@@ -60,8 +60,9 @@ map rendering, and `core/dashboard` owns the draggable task-panel shell. Feature
 screens supply business state, markers, controls, and panel contents without moving
 business behavior into those shared presentation components.
 
-Location access remains explicit and user-triggered. Opening a dashboard does not
-request device permission; the `DeviceLocation` adapter is invoked only after the
-user chooses a current-location action. The Driver dashboard is currently a visual
-foundation and does not imply that onboarding, availability, location publishing,
-marketplace discovery, or offer behavior has been implemented.
+The Rider dashboard requests location during startup so the map can focus on the
+Rider automatically. On a first run, the platform may display its location-permission
+prompt as part of this startup behavior. Explicit current-location actions remain
+available for refocusing the map and selecting pickup. The Driver dashboard is
+currently a visual foundation and does not imply that onboarding, availability,
+location publishing, marketplace discovery, or offer behavior has been implemented.
