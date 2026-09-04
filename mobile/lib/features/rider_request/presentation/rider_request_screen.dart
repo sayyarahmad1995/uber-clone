@@ -58,10 +58,10 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
       ),
       floatingStatus: DashboardStatusCard(
         icon: active == null ? Icons.map_outlined : Icons.local_taxi,
-        title: active == null ? 'Ride dashboard' : _statusTitle(active),
+        title: active == null ? 'Ride dashboard' : 'Active ride request',
         message: active == null
             ? 'Tap the map to choose pickup and destination.'
-            : 'Refresh to pick up assignment or trip status changes.',
+            : _statusTitle(active),
       ),
       panel: state.loading && state.requests.isEmpty
           ? const _LoadingPanel()
