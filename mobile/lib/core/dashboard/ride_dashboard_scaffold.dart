@@ -40,8 +40,8 @@ class RideDashboardScaffold extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final controlBottom =
-            constraints.maxHeight * minPanelSize + keyboardInset + AppSpacing.lg;
+        final minimumPanelHeight = constraints.maxHeight * minPanelSize;
+        final controlBottom = minimumPanelHeight + keyboardInset + AppSpacing.lg;
 
         return Stack(
           children: [
@@ -158,30 +158,32 @@ class DashboardStatusCard extends StatelessWidget {
   final String message;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: Theme.of(context).colorScheme.surface,
-    elevation: 4,
-    shadowColor: Colors.black12,
-    borderRadius: const BorderRadius.all(Radius.circular(AppRadii.lg)),
-    child: Padding(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Row(
-        children: [
-          Icon(icon),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(title, style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: AppSpacing.xxs),
-                Text(message, style: Theme.of(context).textTheme.bodySmall),
-              ],
+  Widget build(BuildContext context) {
+    return Material(
+      color: Theme.of(context).colorScheme.surface,
+      elevation: 4,
+      shadowColor: Colors.black12,
+      borderRadius: const BorderRadius.all(Radius.circular(AppRadii.lg)),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Row(
+          children: [
+            Icon(icon),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(title, style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: AppSpacing.xxs),
+                  Text(message, style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
