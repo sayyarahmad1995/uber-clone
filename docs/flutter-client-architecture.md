@@ -60,9 +60,12 @@ map rendering, and `core/dashboard` owns the draggable task-panel shell. Feature
 screens supply business state, markers, controls, and panel contents without moving
 business behavior into those shared presentation components.
 
-Dashboard task panels open at 50 percent and expand to at most 70 percent of the
-available dashboard height. Longer workflows scroll inside that limit so the map
-remains visible.
+Dashboard task panels open in their collapsed state and expand to at most 60
+percent of the available dashboard height. Longer workflows scroll inside that
+limit so the map remains visible.
+
+Only the panel's top handle resizes it. Gestures within the panel body scroll its
+contents without changing the panel extent.
 
 The Rider dashboard requests location during startup so the map can focus on the
 Rider automatically. On a first run, the platform may display its location-permission

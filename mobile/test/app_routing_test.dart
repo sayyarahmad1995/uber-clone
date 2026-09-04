@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uber_clone/app.dart';
+import 'package:uber_clone/core/dashboard/ride_dashboard_scaffold.dart';
 import 'package:uber_clone/core/providers.dart';
 import 'package:uber_clone/features/authentication/data/auth_repository.dart';
 import 'package:uber_clone/features/rider_request/data/device_location.dart';
@@ -32,7 +33,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Driver'));
     await tester.pumpAndSettle();
-    expect(find.text('Driver workspace'), findsOneWidget);
+    expect(find.text('Driver dashboard'), findsOneWidget);
   });
 
   testWidgets('Rider dashboard focuses on device location at startup', (
@@ -49,11 +50,25 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(location.requestCount, 1);
-    final sheet = tester.widget<DraggableScrollableSheet>(
-      find.byType(DraggableScrollableSheet),
+    final panel = find.byKey(const Key('dashboardPanel'));
+    final dashboardHeight = tester
+        .getSize(find.byType(RideDashboardScaffold))
+        .height;
+    final collapsedHeight = tester.getSize(panel).height;
+    expect(collapsedHeight, moreOrLessEquals(dashboardHeight * 0.18));
+
+    await tester.drag(find.text('Where are you going?'), const Offset(0, -80));
+    await tester.pump();
+    expect(tester.getSize(panel).height, collapsedHeight);
+
+    await tester.drag(
+      find.byKey(const Key('dashboardPanelDragHandle')),
+      const Offset(0, -160),
     );
-    expect(sheet.initialChildSize, 0.50);
-    expect(sheet.maxChildSize, 0.70);
+    await tester.pump();
+    final expandedHeight = tester.getSize(panel).height;
+    expect(expandedHeight, greaterThan(collapsedHeight));
+    expect(expandedHeight, lessThanOrEqualTo(dashboardHeight * 0.60));
 
     await tester.tap(find.byTooltip('Center map on your location'));
     await tester.pumpAndSettle();

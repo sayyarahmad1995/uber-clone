@@ -79,8 +79,8 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
 
     return RideDashboardScaffold(
       minPanelSize: 0.18,
-      initialPanelSize: 0.50,
-      maxPanelSize: 0.70,
+      initialPanelSize: 0.18,
+      maxPanelSize: 0.60,
       map: RideMap(
         mapController: _mapController,
         tiles: tiles,
@@ -193,7 +193,6 @@ class _LoadingPanel extends StatelessWidget {
       controller: scrollController,
       padding: const EdgeInsets.all(AppSpacing.md),
       children: const [
-        DashboardPanelHandle(),
         SizedBox(height: 96, child: Center(child: CircularProgressIndicator())),
       ],
     );
@@ -225,7 +224,6 @@ class _RequestRidePanel extends StatelessWidget {
       controller: scrollController,
       padding: const EdgeInsets.all(AppSpacing.md),
       children: [
-        const DashboardPanelHandle(),
         Text(
           'Where are you going?',
           style: Theme.of(context).textTheme.headlineSmall,
@@ -335,7 +333,6 @@ class _ActiveRequestPanel extends ConsumerWidget {
       controller: scrollController,
       padding: const EdgeInsets.all(AppSpacing.md),
       children: [
-        const DashboardPanelHandle(),
         Text(
           _statusTitle(status),
           style: Theme.of(context).textTheme.headlineSmall,
