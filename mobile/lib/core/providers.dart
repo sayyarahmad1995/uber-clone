@@ -9,7 +9,11 @@ import '../features/authentication/presentation/login_screen.dart';
 import '../features/authentication/presentation/verification_screen.dart';
 import '../features/capabilities/presentation/capability_home_screen.dart';
 import '../features/capabilities/presentation/splash_screen.dart';
+import '../features/rider_request/application/rider_request_controller.dart';
+import '../features/rider_request/data/device_location.dart';
+import '../features/rider_request/data/ride_request_repository.dart';
 import 'config/app_config.dart';
+import 'maps/map_tiles.dart';
 import 'models/account.dart';
 import 'session/session_store.dart';
 
@@ -36,6 +40,25 @@ final authRepositoryProvider = Provider<AuthRepository>(
     ref.watch(sessionStoreProvider),
   ),
 );
+final mapTilesProvider = Provider<MapTiles>(
+  (ref) => const OpenStreetMapTiles(),
+);
+final deviceLocationProvider = Provider<DeviceLocation>(
+  (ref) => GeolocatorDeviceLocation(),
+);
+final rideRequestRepositoryProvider = Provider<RideRequestRepository>(
+  (ref) => ApiRideRequestRepository(
+    ref.watch(dioProvider),
+    ref.watch(sessionStoreProvider),
+  ),
+);
+final riderRequestControllerProvider =
+    ChangeNotifierProvider.autoDispose<RiderRequestController>(
+      (ref) => RiderRequestController(
+        ref.watch(rideRequestRepositoryProvider),
+        ref.watch(deviceLocationProvider),
+      ),
+    );
 final sessionControllerProvider = ChangeNotifierProvider<SessionController>(
   (ref) => SessionController(
     ref.watch(authRepositoryProvider),

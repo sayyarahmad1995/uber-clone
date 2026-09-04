@@ -43,3 +43,11 @@ is permitted only in Android debug builds; release builds require HTTPS.
 
 Android is the only generated platform. Maps, device location, WebSockets, push
 notifications, offline databases, and media providers remain outside this slice.
+
+## Rider request extension
+
+The Rider request slice introduces application-owned `DeviceLocation` and
+`MapTiles` ports. Geolocator and an attributed OpenStreetMap tile surface are the
+initial client adapters. Ride-domain models contain only coordinates and money;
+provider SDK types and tile configuration remain outside them. See
+[Flutter Rider ride request](flutter-rider-request.md).

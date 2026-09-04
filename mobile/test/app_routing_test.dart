@@ -18,7 +18,7 @@ void main() {
   testWidgets('restored account enters Rider by default', (tester) async {
     await tester.pumpWidget(testApp(FakeAuthRepository(account: riderAccount)));
     await tester.pumpAndSettle();
-    expect(find.text('Ready to request a ride'), findsOneWidget);
+    expect(find.text('Looking for Driver offers'), findsOneWidget);
     expect(find.text('Rider'), findsOneWidget);
   });
 
@@ -37,6 +37,10 @@ Widget testApp(AuthRepository repository) => ProviderScope(
   overrides: [
     authRepositoryProvider.overrideWithValue(repository),
     capabilityStoreProvider.overrideWithValue(MemoryCapabilityStore()),
+    rideRequestRepositoryProvider.overrideWithValue(
+      FakeRideRequestRepository(requests: [requestedRide]),
+    ),
+    deviceLocationProvider.overrideWithValue(const FakeDeviceLocation()),
   ],
   child: const UberCloneApp(),
 );
