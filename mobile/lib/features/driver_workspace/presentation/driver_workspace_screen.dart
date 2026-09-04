@@ -29,10 +29,12 @@ class DriverWorkspaceScreen extends ConsumerWidget {
         title: 'Driver dashboard',
         message: 'Driver onboarding and marketplace panels will attach here.',
       ),
-      panelBuilder: (context, scrollController) => _DriverFoundationPanel(
-        accountID: accountID,
-        scrollController: scrollController,
-      ),
+      panelBuilder: (context, scrollController, scrollEnabled) =>
+          _DriverFoundationPanel(
+            accountID: accountID,
+            scrollController: scrollController,
+            scrollEnabled: scrollEnabled,
+          ),
     );
   }
 }
@@ -41,15 +43,20 @@ class _DriverFoundationPanel extends StatelessWidget {
   const _DriverFoundationPanel({
     required this.accountID,
     required this.scrollController,
+    required this.scrollEnabled,
   });
 
   final String accountID;
   final ScrollController scrollController;
+  final bool scrollEnabled;
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       controller: scrollController,
+      physics: scrollEnabled
+          ? const ClampingScrollPhysics()
+          : const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.all(AppSpacing.md),
       children: [
         Text(

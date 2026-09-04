@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 typedef DashboardPanelBuilder = Widget Function(
   BuildContext context,
   ScrollController scrollController,
+  bool scrollEnabled,
 );
 
 /// Shared map-first dashboard shell for Rider and Driver workflows.
@@ -43,6 +44,11 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
   late double _panelSize;
   late double _dragStartSize;
   bool _isDraggingPanel = false;
+  bool _contentDragStartedAtTop = false;
+  bool _collapseScheduled = false;
+  double _collapsePullDistance = 0;
+
+  static const _collapsePullThreshold = 56.0;
 
   @override
   void initState() {
@@ -143,9 +149,13 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
                                 onDragCancel: _cancelPanelDrag,
                               ),
                               Expanded(
-                                child: widget.panelBuilder(
-                                  context,
-                                  _contentScrollController,
+                                child: NotificationListener<ScrollNotification>(
+                                  onNotification: _handlePanelScroll,
+                                  child: widget.panelBuilder(
+                                    context,
+                                    _contentScrollController,
+                                    _isPanelExpanded,
+                                  ),
                                 ),
                               ),
                             ],
@@ -199,6 +209,48 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
           ? widget.maxPanelSize
           : widget.minPanelSize;
     });
+  }
+
+  bool get _isPanelExpanded => (_panelSize - widget.maxPanelSize).abs() < 0.001;
+
+  bool _handlePanelScroll(ScrollNotification notification) {
+    if (!_isPanelExpanded) {
+      return false;
+    }
+    if (notification is ScrollStartNotification &&
+        notification.dragDetails != null) {
+      _contentDragStartedAtTop =
+          notification.metrics.pixels <=
+          notification.metrics.minScrollExtent + 0.5;
+      _collapsePullDistance = 0;
+      _collapseScheduled = false;
+    } else if (notification is OverscrollNotification &&
+        _contentDragStartedAtTop &&
+        notification.overscroll < 0) {
+      _collapsePullDistance += -notification.overscroll;
+      if (_collapsePullDistance >= _collapsePullThreshold &&
+          !_collapseScheduled) {
+        _collapseScheduled = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || !_collapseScheduled) {
+            return;
+          }
+          if (_contentScrollController.hasClients) {
+            _contentScrollController.jumpTo(
+              _contentScrollController.position.minScrollExtent,
+            );
+          }
+          setState(() {
+            _isDraggingPanel = false;
+            _panelSize = widget.minPanelSize;
+          });
+        });
+      }
+    } else if (notification is ScrollEndNotification) {
+      _contentDragStartedAtTop = false;
+      _collapsePullDistance = 0;
+    }
+    return false;
   }
 }
 

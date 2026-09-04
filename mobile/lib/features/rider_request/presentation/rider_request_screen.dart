@@ -95,9 +95,10 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
             ? 'Tap the map to choose pickup and destination.'
             : 'Status updates appear in the ride panel below.',
       ),
-      panelBuilder: (context, scrollController) {
+      panelBuilder: (context, scrollController, scrollEnabled) {
         return _buildPanel(
           scrollController: scrollController,
+          scrollEnabled: scrollEnabled,
           state: state,
           active: active,
           controller: controller,
@@ -108,16 +109,21 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
 
   Widget _buildPanel({
     required ScrollController scrollController,
+    required bool scrollEnabled,
     required RiderRequestState state,
     required RideRequest? active,
     required RiderRequestController controller,
   }) {
     if (state.loading && state.requests.isEmpty) {
-      return _LoadingPanel(scrollController: scrollController);
+      return _LoadingPanel(
+        scrollController: scrollController,
+        scrollEnabled: scrollEnabled,
+      );
     }
     if (active == null) {
       return _RequestRidePanel(
         scrollController: scrollController,
+        scrollEnabled: scrollEnabled,
         fare: _fare,
         state: state,
         selectingPickup: _selectingPickup,
@@ -128,6 +134,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
     }
     return _ActiveRequestPanel(
       scrollController: scrollController,
+      scrollEnabled: scrollEnabled,
       request: active,
     );
   }
@@ -183,14 +190,21 @@ class _MapFocusButton extends StatelessWidget {
 }
 
 class _LoadingPanel extends StatelessWidget {
-  const _LoadingPanel({required this.scrollController});
+  const _LoadingPanel({
+    required this.scrollController,
+    required this.scrollEnabled,
+  });
 
   final ScrollController scrollController;
+  final bool scrollEnabled;
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       controller: scrollController,
+      physics: scrollEnabled
+          ? const ClampingScrollPhysics()
+          : const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.all(AppSpacing.md),
       children: const [
         SizedBox(height: 96, child: Center(child: CircularProgressIndicator())),
@@ -202,6 +216,7 @@ class _LoadingPanel extends StatelessWidget {
 class _RequestRidePanel extends StatelessWidget {
   const _RequestRidePanel({
     required this.scrollController,
+    required this.scrollEnabled,
     required this.fare,
     required this.state,
     required this.selectingPickup,
@@ -211,6 +226,7 @@ class _RequestRidePanel extends StatelessWidget {
   });
 
   final ScrollController scrollController;
+  final bool scrollEnabled;
   final TextEditingController fare;
   final RiderRequestState state;
   final bool selectingPickup;
@@ -222,6 +238,9 @@ class _RequestRidePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView(
       controller: scrollController,
+      physics: scrollEnabled
+          ? const ClampingScrollPhysics()
+          : const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.all(AppSpacing.md),
       children: [
         Text(
@@ -319,10 +338,12 @@ class _PointSummary extends StatelessWidget {
 class _ActiveRequestPanel extends ConsumerWidget {
   const _ActiveRequestPanel({
     required this.scrollController,
+    required this.scrollEnabled,
     required this.request,
   });
 
   final ScrollController scrollController;
+  final bool scrollEnabled;
   final RideRequest request;
 
   @override
@@ -331,6 +352,9 @@ class _ActiveRequestPanel extends ConsumerWidget {
     final status = request.trip?.status ?? request.status;
     return ListView(
       controller: scrollController,
+      physics: scrollEnabled
+          ? const ClampingScrollPhysics()
+          : const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.all(AppSpacing.md),
       children: [
         Text(

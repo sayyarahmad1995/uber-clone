@@ -69,10 +69,19 @@ void main() {
     final expandedHeight = tester.getSize(panel).height;
     expect(expandedHeight, moreOrLessEquals(dashboardHeight * 0.60));
 
-    await tester.drag(
-      find.byKey(const Key('dashboardPanelDragHandle')),
-      const Offset(0, 160),
+    final panelList = find.descendant(
+      of: panel,
+      matching: find.byType(ListView),
     );
+    await tester.drag(panelList, const Offset(0, -300));
+    await tester.pumpAndSettle();
+    expect(tester.getSize(panel).height, expandedHeight);
+
+    await tester.drag(panelList, const Offset(0, 600));
+    await tester.pumpAndSettle();
+    expect(tester.getSize(panel).height, expandedHeight);
+
+    await tester.drag(panelList, const Offset(0, 100));
     await tester.pumpAndSettle();
     expect(tester.getSize(panel).height, collapsedHeight);
 
