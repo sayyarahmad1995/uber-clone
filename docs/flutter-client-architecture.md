@@ -69,6 +69,14 @@ contents without changing the panel extent. Releasing an upward handle drag snap
 the panel to its maximum extent; releasing a downward drag snaps it to its collapsed
 extent.
 
+Panel-body scrolling is locked below the maximum extent and unlocked once the panel
+finishes expanding. While expanded, a downward gesture scrolls content to the top;
+a fresh downward pull from the top past the interaction threshold minimizes the
+panel only after the user releases the gesture. Crossing the threshold while the
+finger remains down never changes the panel extent, and a cancelled gesture leaves
+the panel expanded. While collapsed, an upward body gesture uses the same threshold
+and release rule to maximize the panel without enabling content scrolling early.
+
 The Rider dashboard requests location during startup so the map can focus on the
 Rider automatically. On a first run, the platform may display its location-permission
 prompt as part of this startup behavior. Explicit current-location actions remain
