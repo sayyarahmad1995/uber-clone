@@ -39,7 +39,7 @@ class RideDashboardScaffold extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final controlBottom =
-            (constraints.maxHeight * minPanelSize) + AppSpacing.lg;
+            constraints.maxHeight * minPanelSize + AppSpacing.lg;
 
         return Stack(
           children: [
