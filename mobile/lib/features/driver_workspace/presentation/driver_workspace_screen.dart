@@ -21,8 +21,8 @@ class DriverWorkspaceScreen extends ConsumerWidget {
     final tiles = ref.watch(mapTilesProvider);
     return RideDashboardScaffold(
       minPanelSize: 0.16,
-      initialPanelSize: 0.30,
-      maxPanelSize: 0.46,
+      initialPanelSize: 0.50,
+      maxPanelSize: 0.70,
       map: RideMap(tiles: tiles),
       floatingStatus: const DashboardStatusCard(
         icon: Icons.local_taxi,

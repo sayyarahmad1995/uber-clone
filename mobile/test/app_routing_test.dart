@@ -1,9 +1,12 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uber_clone/app.dart';
 import 'package:uber_clone/core/providers.dart';
 import 'package:uber_clone/features/authentication/data/auth_repository.dart';
+import 'package:uber_clone/features/rider_request/data/device_location.dart';
+import 'package:uber_clone/features/rider_request/data/ride_request_repository.dart';
+import 'package:uber_clone/features/rider_request/domain/ride_request.dart';
 
 import 'test_doubles.dart';
 
@@ -31,16 +34,58 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Driver workspace'), findsOneWidget);
   });
+
+  testWidgets('Rider dashboard focuses on device location at startup', (
+    tester,
+  ) async {
+    final location = CountingDeviceLocation();
+    await tester.pumpWidget(
+      testApp(
+        FakeAuthRepository(account: riderAccount),
+        rideRequests: FakeRideRequestRepository(),
+        deviceLocation: location,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(location.requestCount, 1);
+    final sheet = tester.widget<DraggableScrollableSheet>(
+      find.byType(DraggableScrollableSheet),
+    );
+    expect(sheet.initialChildSize, 0.50);
+    expect(sheet.maxChildSize, 0.70);
+
+    await tester.tap(find.byTooltip('Center map on your location'));
+    await tester.pumpAndSettle();
+
+    expect(location.requestCount, 2);
+  });
 }
 
-Widget testApp(AuthRepository repository) => ProviderScope(
+Widget testApp(
+  AuthRepository repository, {
+  RideRequestRepository? rideRequests,
+  DeviceLocation? deviceLocation,
+}) => ProviderScope(
   overrides: [
     authRepositoryProvider.overrideWithValue(repository),
     capabilityStoreProvider.overrideWithValue(MemoryCapabilityStore()),
     rideRequestRepositoryProvider.overrideWithValue(
-      FakeRideRequestRepository(requests: [requestedRide]),
+      rideRequests ?? FakeRideRequestRepository(requests: [requestedRide]),
     ),
-    deviceLocationProvider.overrideWithValue(const FakeDeviceLocation()),
+    deviceLocationProvider.overrideWithValue(
+      deviceLocation ?? const FakeDeviceLocation(),
+    ),
   ],
   child: const UberCloneApp(),
 );
+
+class CountingDeviceLocation implements DeviceLocation {
+  int requestCount = 0;
+
+  @override
+  Future<GeoPoint> current() async {
+    requestCount++;
+    return const GeoPoint(latitude: 24.86, longitude: 67.01);
+  }
+}

@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
-typedef DashboardPanelBuilder =
-    Widget Function(BuildContext context, ScrollController scrollController);
+typedef DashboardPanelBuilder = Widget Function(
+  BuildContext context,
+  ScrollController scrollController,
+);
 
 /// Shared map-first dashboard shell for Rider and Driver workflows.
 ///
@@ -17,13 +19,13 @@ class RideDashboardScaffold extends StatelessWidget {
     this.floatingStatus,
     this.mapControls,
     this.minPanelSize = 0.16,
-    this.initialPanelSize = 0.34,
-    this.maxPanelSize = 0.62,
+    this.initialPanelSize = 0.50,
+    this.maxPanelSize = 0.70,
     this.snapPanel = false,
   }) : assert(minPanelSize > 0),
        assert(minPanelSize <= initialPanelSize),
        assert(initialPanelSize <= maxPanelSize),
-       assert(maxPanelSize <= 1);
+       assert(maxPanelSize <= 0.70);
 
   final Widget map;
   final DashboardPanelBuilder panelBuilder;

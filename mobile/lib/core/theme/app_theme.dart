@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// Product-level visual contract for the shared Rider/Driver client.
 ///
@@ -56,8 +57,16 @@ class AppTheme {
       useMaterial3: true,
       appBarTheme: const AppBarTheme(
         centerTitle: false,
+        backgroundColor: AppColors.background,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarColor: AppColors.background,
+          statusBarIconBrightness: Brightness.dark,
+          statusBarBrightness: Brightness.light,
+          systemStatusBarContrastEnforced: false,
+        ),
       ),
       cardTheme: const CardThemeData(
         margin: EdgeInsets.zero,

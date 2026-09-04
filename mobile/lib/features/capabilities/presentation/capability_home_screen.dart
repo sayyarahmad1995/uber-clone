@@ -20,6 +20,7 @@ class CapabilityHomeScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(capability == Capability.rider ? 'Rider' : 'Driver'),
+        notificationPredicate: (_) => false,
         actions: [
           IconButton(
             tooltip: 'Log out',

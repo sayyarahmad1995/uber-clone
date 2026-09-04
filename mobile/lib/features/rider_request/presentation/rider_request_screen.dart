@@ -26,10 +26,9 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
+      if (mounted) {
+        _focusCurrentLocation(showError: false);
       }
-      _focusCurrentLocation(showError: false);
     });
   }
 
@@ -63,9 +62,8 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
       if (!mounted || !showError) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error.toString())));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.toString())));
     }
   }
 
@@ -81,8 +79,8 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
 
     return RideDashboardScaffold(
       minPanelSize: 0.18,
-      initialPanelSize: active == null ? 0.38 : 0.30,
-      maxPanelSize: active == null ? 0.72 : 0.58,
+      initialPanelSize: 0.50,
+      maxPanelSize: 0.70,
       map: RideMap(
         mapController: _mapController,
         tiles: tiles,
