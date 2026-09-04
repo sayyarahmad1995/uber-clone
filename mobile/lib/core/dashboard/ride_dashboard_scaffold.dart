@@ -45,8 +45,9 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
   late double _dragStartSize;
   bool _isDraggingPanel = false;
   bool _contentDragStartedAtTop = false;
-  bool _collapseScheduled = false;
+  bool _contentDragStartedCollapsed = false;
   double _collapsePullDistance = 0;
+  double _expandPullDistance = 0;
 
   static const _collapsePullThreshold = 56.0;
 
@@ -149,8 +150,12 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
                                 onDragCancel: _cancelPanelDrag,
                               ),
                               Expanded(
-                                child: NotificationListener<ScrollNotification>(
-                                  onNotification: _handlePanelScroll,
+                                child: Listener(
+                                  onPointerDown: (_) => _startContentDrag(),
+                                  onPointerMove: (event) =>
+                                      _updateContentDrag(event.delta.dy),
+                                  onPointerUp: (_) => _releaseContentDrag(),
+                                  onPointerCancel: (_) => _cancelContentDrag(),
                                   child: widget.panelBuilder(
                                     context,
                                     _contentScrollController,
@@ -213,44 +218,67 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
 
   bool get _isPanelExpanded => (_panelSize - widget.maxPanelSize).abs() < 0.001;
 
-  bool _handlePanelScroll(ScrollNotification notification) {
-    if (!_isPanelExpanded) {
-      return false;
-    }
-    if (notification is ScrollStartNotification &&
-        notification.dragDetails != null) {
-      _contentDragStartedAtTop =
-          notification.metrics.pixels <=
-          notification.metrics.minScrollExtent + 0.5;
-      _collapsePullDistance = 0;
-      _collapseScheduled = false;
-    } else if (notification is OverscrollNotification &&
-        _contentDragStartedAtTop &&
-        notification.overscroll < 0) {
-      _collapsePullDistance += -notification.overscroll;
-      if (_collapsePullDistance >= _collapsePullThreshold &&
-          !_collapseScheduled) {
-        _collapseScheduled = true;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted || !_collapseScheduled) {
-            return;
-          }
-          if (_contentScrollController.hasClients) {
-            _contentScrollController.jumpTo(
-              _contentScrollController.position.minScrollExtent,
-            );
-          }
-          setState(() {
-            _isDraggingPanel = false;
-            _panelSize = widget.minPanelSize;
-          });
-        });
+  void _startContentDrag() {
+    _contentDragStartedCollapsed = !_isPanelExpanded;
+    _contentDragStartedAtTop =
+        _isPanelExpanded &&
+        _contentScrollController.hasClients &&
+        _contentScrollController.position.pixels <=
+            _contentScrollController.position.minScrollExtent + 0.5;
+    _collapsePullDistance = 0;
+    _expandPullDistance = 0;
+  }
+
+  void _updateContentDrag(double verticalDelta) {
+    if (_contentDragStartedCollapsed) {
+      if (verticalDelta < 0) {
+        _expandPullDistance += -verticalDelta;
+      } else if (verticalDelta > 0) {
+        _expandPullDistance = 0;
       }
-    } else if (notification is ScrollEndNotification) {
-      _contentDragStartedAtTop = false;
+      return;
+    }
+    if (!_contentDragStartedAtTop) {
+      return;
+    }
+    if (verticalDelta > 0) {
+      _collapsePullDistance += verticalDelta;
+    } else if (verticalDelta < 0) {
       _collapsePullDistance = 0;
     }
-    return false;
+  }
+
+  void _releaseContentDrag() {
+    final shouldExpand =
+        !_isPanelExpanded &&
+        _contentDragStartedCollapsed &&
+        _expandPullDistance >= _collapsePullThreshold;
+    final shouldCollapse =
+        _isPanelExpanded &&
+        _contentDragStartedAtTop &&
+        _collapsePullDistance >= _collapsePullThreshold;
+    _resetContentDrag();
+    if (!shouldExpand && !shouldCollapse) {
+      return;
+    }
+    if (_contentScrollController.hasClients) {
+      _contentScrollController.jumpTo(
+        _contentScrollController.position.minScrollExtent,
+      );
+    }
+    setState(() {
+      _isDraggingPanel = false;
+      _panelSize = shouldExpand ? widget.maxPanelSize : widget.minPanelSize;
+    });
+  }
+
+  void _cancelContentDrag() => _resetContentDrag();
+
+  void _resetContentDrag() {
+    _contentDragStartedAtTop = false;
+    _contentDragStartedCollapsed = false;
+    _collapsePullDistance = 0;
+    _expandPullDistance = 0;
   }
 }
 

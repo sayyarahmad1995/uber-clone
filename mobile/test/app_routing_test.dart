@@ -57,14 +57,18 @@ void main() {
     final collapsedHeight = tester.getSize(panel).height;
     expect(collapsedHeight, moreOrLessEquals(dashboardHeight * 0.18));
 
-    await tester.drag(find.text('Where are you going?'), const Offset(0, -80));
+    await tester.drag(find.text('Where are you going?'), const Offset(0, 80));
+    await tester.pumpAndSettle();
+    expect(tester.getSize(panel).height, collapsedHeight);
+
+    final maximizeGesture = await tester.startGesture(
+      tester.getCenter(find.text('Where are you going?')),
+    );
+    await maximizeGesture.moveBy(const Offset(0, -100));
     await tester.pump();
     expect(tester.getSize(panel).height, collapsedHeight);
 
-    await tester.drag(
-      find.byKey(const Key('dashboardPanelDragHandle')),
-      const Offset(0, -160),
-    );
+    await maximizeGesture.up();
     await tester.pumpAndSettle();
     final expandedHeight = tester.getSize(panel).height;
     expect(expandedHeight, moreOrLessEquals(dashboardHeight * 0.60));
@@ -81,7 +85,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.getSize(panel).height, expandedHeight);
 
-    await tester.drag(panelList, const Offset(0, 100));
+    final minimizeGesture = await tester.startGesture(
+      tester.getCenter(panelList),
+    );
+    await minimizeGesture.moveBy(const Offset(0, 100));
+    await tester.pump();
+    expect(tester.getSize(panel).height, expandedHeight);
+
+    await minimizeGesture.up();
     await tester.pumpAndSettle();
     expect(tester.getSize(panel).height, collapsedHeight);
 
