@@ -65,7 +65,9 @@ percent of the available dashboard height. Longer workflows scroll inside that
 limit so the map remains visible.
 
 Only the panel's top handle resizes it. Gestures within the panel body scroll its
-contents without changing the panel extent.
+contents without changing the panel extent. Releasing an upward handle drag snaps
+the panel to its maximum extent; releasing a downward drag snaps it to its collapsed
+extent.
 
 The Rider dashboard requests location during startup so the map can focus on the
 Rider automatically. On a first run, the platform may display its location-permission

@@ -65,10 +65,16 @@ void main() {
       find.byKey(const Key('dashboardPanelDragHandle')),
       const Offset(0, -160),
     );
-    await tester.pump();
+    await tester.pumpAndSettle();
     final expandedHeight = tester.getSize(panel).height;
-    expect(expandedHeight, greaterThan(collapsedHeight));
-    expect(expandedHeight, lessThanOrEqualTo(dashboardHeight * 0.60));
+    expect(expandedHeight, moreOrLessEquals(dashboardHeight * 0.60));
+
+    await tester.drag(
+      find.byKey(const Key('dashboardPanelDragHandle')),
+      const Offset(0, 160),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.getSize(panel).height, collapsedHeight);
 
     await tester.tap(find.byTooltip('Center map on your location'));
     await tester.pumpAndSettle();
