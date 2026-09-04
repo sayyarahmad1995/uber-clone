@@ -28,6 +28,10 @@ The shared Flutter Android application implements registration and verification,
 login, secure session restoration, account loading, Rider-first entry, capability
 switching for Driver-enabled accounts, and logout.
 
+The Rider client can now select pickup and destination on an interactive map, use
+device location for pickup, propose a PKR fare, create a ride request, restore and
+refresh request status, and cancel through the existing backend lifecycle.
+
 ---
 
 ## Completed Milestones
@@ -71,6 +75,7 @@ switching for Driver-enabled accounts, and logout.
 - [x] Geographic Marketplace Discovery and Rider Comparison — PR #57
 - [x] Driver Public Presentation — PR #58
 - [x] Flutter Rider Entry Foundation
+- [x] Flutter Rider Ride-Request Creation
 
 Worklog-only alignment PRs are intentionally omitted from the business-milestone list.
 
@@ -143,6 +148,16 @@ Worklog-only alignment PRs are intentionally omitted from the business-milestone
 - Android debug builds use the emulator host alias and allow local cleartext HTTP.
   Release configuration requires an HTTPS API URL.
 
+### Flutter Rider request
+
+- Ride models contain application coordinates and money, without provider types.
+- Device location and map tiles are behind client-owned ports selected at composition.
+- The Rider sends pickup, destination, and proposed fare through the one marketplace
+  request contract; no booking mode exists in the client.
+- Existing request state is restored from the backend and can be refreshed or
+  cancelled.
+- Routing, geocoding, address search, ETA, and service-area policy remain deferred.
+
 ## Verification for this slice
 
 PostgreSQL tests retain migration, assignment, completion, cancellation, and
@@ -161,11 +176,11 @@ product behavior; implementation details must not redefine the product.
 
 ## Follow-up scope
 
-The next vertical slice is Rider ride-request creation in Flutter using the existing
-pickup, destination, proposed-fare, and request-status contracts. Select concrete
-device-location and map packages only when that slice establishes their required
-behavior. Driver and vehicle media remains a later presentation slice; define an
-application-owned upload/storage/read boundary before exposing photo references.
+The next vertical slice is the Driver marketplace client: Driver onboarding state,
+availability and location publishing, geographic request discovery, and exact-fare
+acceptance or counteroffer creation. It must preserve the ADR-0007 rule that neither
+Driver response assigns a Trip. Rider offer comparison and selection follows as a
+separate client slice. Driver and vehicle media remains later presentation work.
 
 ## Deferred
 
