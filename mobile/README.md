@@ -24,8 +24,9 @@ New Rider and Driver workflows should use the shared map-first dashboard model:
 
 Dashboard panels follow the accepted interaction contract in
 `docs/ADR-0008-dashboard-panel-interaction-contract.md`. Future feature panels use
-the shared scaffold and must not redefine its sizing, scrolling, or gesture state
-machine without an explicit product decision that updates or supersedes the ADR.
+the shared scaffold and must not redefine its sizing, direct finger tracking,
+scrolling, snap animation, or gesture state machine without an explicit product
+decision that updates or supersedes the ADR.
 
 This keeps the MVP light while avoiding a future rewrite when the product grows
 from Rider request creation into Driver marketplace, offer selection, trip

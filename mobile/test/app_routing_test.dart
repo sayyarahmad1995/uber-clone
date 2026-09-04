@@ -61,12 +61,24 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.getSize(panel).height, collapsedHeight);
 
+    final shortGesture = await tester.startGesture(
+      tester.getCenter(find.text('Where are you going?')),
+    );
+    await shortGesture.moveBy(const Offset(0, -30));
+    await tester.pump();
+    expect(tester.getSize(panel).height, greaterThan(collapsedHeight));
+    await shortGesture.up();
+    await tester.pumpAndSettle();
+    expect(tester.getSize(panel).height, collapsedHeight);
+
     final maximizeGesture = await tester.startGesture(
       tester.getCenter(find.text('Where are you going?')),
     );
     await maximizeGesture.moveBy(const Offset(0, -100));
     await tester.pump();
-    expect(tester.getSize(panel).height, collapsedHeight);
+    final expandingHeight = tester.getSize(panel).height;
+    expect(expandingHeight, greaterThan(collapsedHeight));
+    expect(expandingHeight, lessThan(dashboardHeight * 0.60));
 
     await maximizeGesture.up();
     await tester.pumpAndSettle();
@@ -90,7 +102,9 @@ void main() {
     );
     await minimizeGesture.moveBy(const Offset(0, 100));
     await tester.pump();
-    expect(tester.getSize(panel).height, expandedHeight);
+    final minimizingHeight = tester.getSize(panel).height;
+    expect(minimizingHeight, lessThan(expandedHeight));
+    expect(minimizingHeight, greaterThan(collapsedHeight));
 
     await minimizeGesture.up();
     await tester.pumpAndSettle();

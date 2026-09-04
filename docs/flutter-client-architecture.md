@@ -64,18 +64,19 @@ Dashboard task panels open in their collapsed state and expand to at most 60
 percent of the available dashboard height. Longer workflows scroll inside that
 limit so the map remains visible.
 
-Only the panel's top handle resizes it. Gestures within the panel body scroll its
-contents without changing the panel extent. Releasing an upward handle drag snaps
-the panel to its maximum extent; releasing a downward drag snaps it to its collapsed
-extent.
+The panel's top handle supports continuous resizing. Eligible panel-body pulls also
+move the panel continuously with the finger so the gesture has direct visual
+feedback. Releasing an upward handle drag snaps the panel to its maximum extent;
+releasing a downward drag snaps it to its collapsed extent.
 
 Panel-body scrolling is locked below the maximum extent and unlocked once the panel
 finishes expanding. While expanded, a downward gesture scrolls content to the top;
-a fresh downward pull from the top past the interaction threshold minimizes the
-panel only after the user releases the gesture. Crossing the threshold while the
-finger remains down never changes the panel extent, and a cancelled gesture leaves
-the panel expanded. While collapsed, an upward body gesture uses the same threshold
-and release rule to maximize the panel without enabling content scrolling early.
+a fresh downward pull from the top moves the panel with the finger and selects
+minimization after crossing the interaction threshold. The panel snaps to the
+selected extent only after release; a shorter or cancelled pull returns it to the
+expanded extent. While collapsed, an upward body gesture uses the same tracking,
+threshold, and release rule to maximize the panel without enabling content
+scrolling early.
 
 The Rider dashboard requests location during startup so the map can focus on the
 Rider automatically. On a first run, the platform may display its location-permission
