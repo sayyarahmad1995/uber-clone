@@ -78,6 +78,11 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
         : _markersFor(active.pickup, active.destination);
 
     return RideDashboardScaffold(
+      panelIdentity: state.loading && state.requests.isEmpty
+          ? 'rider-loading'
+          : active == null
+          ? 'rider-request-form'
+          : 'rider-active-${active.id}',
       minPanelSize: 0.18,
       initialPanelSize: 0.18,
       maxPanelSize: 0.60,

@@ -56,6 +56,8 @@ void main() {
         .height;
     final collapsedHeight = tester.getSize(panel).height;
     expect(collapsedHeight, moreOrLessEquals(dashboardHeight * 0.18));
+    final mapControl = find.byTooltip('Center map on your location');
+    final collapsedControlY = tester.getCenter(mapControl).dy;
 
     await tester.drag(find.text('Where are you going?'), const Offset(0, 80));
     await tester.pumpAndSettle();
@@ -79,6 +81,22 @@ void main() {
     final expandingHeight = tester.getSize(panel).height;
     expect(expandingHeight, greaterThan(collapsedHeight));
     expect(expandingHeight, lessThan(dashboardHeight * 0.60));
+    expect(tester.getCenter(mapControl).dy, lessThan(collapsedControlY));
+
+    await maximizeGesture.moveBy(const Offset(0, -1000));
+    await tester.pump();
+    expect(
+      tester.getSize(panel).height,
+      moreOrLessEquals(dashboardHeight * 0.60),
+    );
+    expect(
+      tester
+          .widget<ListView>(
+            find.descendant(of: panel, matching: find.byType(ListView)),
+          )
+          .physics,
+      isA<NeverScrollableScrollPhysics>(),
+    );
 
     await maximizeGesture.up();
     await tester.pumpAndSettle();
@@ -88,6 +106,10 @@ void main() {
     final panelList = find.descendant(
       of: panel,
       matching: find.byType(ListView),
+    );
+    expect(
+      tester.widget<ListView>(panelList).physics,
+      isA<ClampingScrollPhysics>(),
     );
     await tester.drag(panelList, const Offset(0, -300));
     await tester.pumpAndSettle();
@@ -115,6 +137,66 @@ void main() {
 
     expect(location.requestCount, 2);
   });
+
+  testWidgets('dashboard resets scrolling when panel identity changes', (
+    tester,
+  ) async {
+    final dashboardKey = GlobalKey<_DashboardIdentityHarnessState>();
+    await tester.pumpWidget(
+      MaterialApp(home: _DashboardIdentityHarness(key: dashboardKey)),
+    );
+
+    final list = find.byKey(const Key('identityPanelList'));
+    await tester.drag(list, const Offset(0, -500));
+    await tester.pumpAndSettle();
+    expect(dashboardKey.currentState!.scrollController.offset, greaterThan(0));
+
+    dashboardKey.currentState!.showSecondPanel();
+    await tester.pump();
+
+    expect(dashboardKey.currentState!.scrollController.offset, 0);
+    expect(find.text('Panel two'), findsOneWidget);
+  });
+}
+
+class _DashboardIdentityHarness extends StatefulWidget {
+  const _DashboardIdentityHarness({super.key});
+
+  @override
+  State<_DashboardIdentityHarness> createState() =>
+      _DashboardIdentityHarnessState();
+}
+
+class _DashboardIdentityHarnessState extends State<_DashboardIdentityHarness> {
+  String _identity = 'one';
+  late ScrollController scrollController;
+
+  void showSecondPanel() => setState(() => _identity = 'two');
+
+  @override
+  Widget build(BuildContext context) {
+    return RideDashboardScaffold(
+      panelIdentity: _identity,
+      minPanelSize: 0.20,
+      initialPanelSize: 0.60,
+      maxPanelSize: 0.60,
+      map: const ColoredBox(color: Colors.blueGrey),
+      panelBuilder: (context, controller, scrollEnabled) {
+        scrollController = controller;
+        return ListView.builder(
+          key: const Key('identityPanelList'),
+          controller: controller,
+          physics: scrollEnabled
+              ? const ClampingScrollPhysics()
+              : const NeverScrollableScrollPhysics(),
+          itemCount: 40,
+          itemBuilder: (context, index) => ListTile(
+            title: Text(index == 0 ? 'Panel $_identity' : 'Item $index'),
+          ),
+        );
+      },
+    );
+  }
 }
 
 Widget testApp(

@@ -27,14 +27,14 @@ entry point for Rider and Driver task panels.
 - Panel-body scrolling is locked at every extent below the maximum and unlocked
   only at the maximum extent.
 - From the collapsed state, an upward panel-body pull moves the panel continuously
-  with the pointer, providing direct visual feedback. A pull of at least 56 logical
-  pixels selects expansion; on pointer release, the panel snaps to the maximum
+  with the pointer, providing direct visual feedback. Crossing the shared intent
+  threshold selects expansion; on pointer release, the panel snaps to the maximum
   extent. A shorter pull snaps back to the collapsed extent.
 - At the maximum extent, content scrolls normally. A downward gesture that merely
   returns content to its top does not minimize the panel. A new downward pull that
-  begins at the top moves the panel continuously with the pointer. Reaching 56
-  logical pixels selects minimization; on pointer release, the panel snaps to the
-  collapsed extent. A shorter pull snaps back to the maximum extent.
+  begins at the top moves the panel continuously with the pointer. Crossing the
+  shared intent threshold selects minimization; on pointer release, the panel
+  snaps to the collapsed extent. A shorter pull snaps back to the maximum extent.
 - Body pulls provide continuous visual movement, but the final state transition
   executes only on pointer release. A cancelled gesture returns to its starting
   extent.
@@ -49,9 +49,11 @@ panel sizing or gesture policies.
 
 Future Rider and Driver slices must reuse this contract. They must not override the
 collapsed sizes, maximum extent, direct finger tracking, gesture ownership, scroll
-lock, threshold, snap targets, animation, or release behavior as a local
-implementation choice. A different product requirement must be stated explicitly
-and this ADR must be updated or superseded before the shared behavior changes.
+lock, snap targets, or release behavior as a local implementation choice. UX tuning
+values such as the intent threshold and animation duration remain shared design
+constants protected by regression tests; feature slices cannot override them. A
+different interaction requirement must be stated explicitly and this ADR must be
+updated or superseded before the shared behavior changes.
 
 ## Consequences
 

@@ -20,6 +20,7 @@ class DriverWorkspaceScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tiles = ref.watch(mapTilesProvider);
     return RideDashboardScaffold(
+      panelIdentity: 'driver-foundation',
       minPanelSize: 0.16,
       initialPanelSize: 0.16,
       maxPanelSize: 0.60,

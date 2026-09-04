@@ -17,6 +17,7 @@ class RideDashboardScaffold extends StatefulWidget {
     super.key,
     required this.map,
     required this.panelBuilder,
+    required this.panelIdentity,
     this.floatingStatus,
     this.mapControls,
     this.minPanelSize = 0.16,
@@ -29,6 +30,7 @@ class RideDashboardScaffold extends StatefulWidget {
 
   final Widget map;
   final DashboardPanelBuilder panelBuilder;
+  final Object panelIdentity;
   final Widget? floatingStatus;
   final Widget? mapControls;
   final double minPanelSize;
@@ -44,6 +46,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
   late double _panelSize;
   late double _dragStartSize;
   bool _isDraggingPanel = false;
+  late bool _committedExpanded;
   bool _contentDragStartedAtTop = false;
   bool _contentDragStartedCollapsed = false;
   double _collapsePullDistance = 0;
@@ -56,6 +59,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
     super.initState();
     _panelSize = widget.initialPanelSize;
     _dragStartSize = _panelSize;
+    _committedExpanded = _isPanelExpanded;
   }
 
   @override
@@ -63,7 +67,15 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.minPanelSize != widget.minPanelSize ||
         oldWidget.maxPanelSize != widget.maxPanelSize) {
-      _panelSize = _panelSize.clamp(widget.minPanelSize, widget.maxPanelSize);
+      _panelSize = _committedExpanded
+          ? widget.maxPanelSize
+          : widget.minPanelSize;
+    }
+    if (oldWidget.panelIdentity != widget.panelIdentity &&
+        _contentScrollController.hasClients) {
+      _contentScrollController.jumpTo(
+        _contentScrollController.position.minScrollExtent,
+      );
     }
   }
 
@@ -77,8 +89,11 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final minimumPanelHeight = constraints.maxHeight * widget.minPanelSize;
-        final controlBottom = minimumPanelHeight + AppSpacing.lg;
+        final controlBottom =
+            constraints.maxHeight * _panelSize + AppSpacing.lg;
+        final transitionDuration = _isDraggingPanel
+            ? Duration.zero
+            : const Duration(milliseconds: 220);
 
         return Stack(
           children: [
@@ -100,9 +115,11 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
                 ),
               ),
             if (widget.mapControls != null)
-              Positioned(
+              AnimatedPositioned(
                 right: AppSpacing.md,
                 bottom: controlBottom,
+                duration: transitionDuration,
+                curve: Curves.easeOutCubic,
                 child: SafeArea(
                   top: false,
                   child: RepaintBoundary(child: widget.mapControls!),
@@ -113,9 +130,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
               right: 0,
               bottom: 0,
               height: constraints.maxHeight * _panelSize,
-              duration: _isDraggingPanel
-                  ? Duration.zero
-                  : const Duration(milliseconds: 220),
+              duration: transitionDuration,
               curve: Curves.easeOutCubic,
               child: SizedBox.expand(
                 key: const Key('dashboardPanel'),
@@ -161,7 +176,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
                                   child: widget.panelBuilder(
                                     context,
                                     _contentScrollController,
-                                    _isPanelExpanded,
+                                    _committedExpanded,
                                   ),
                                 ),
                               ),
@@ -205,6 +220,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
     setState(() {
       _isDraggingPanel = false;
       _panelSize = expand ? widget.maxPanelSize : widget.minPanelSize;
+      _committedExpanded = expand;
     });
   }
 
@@ -215,6 +231,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
       _panelSize = _panelSize >= midpoint
           ? widget.maxPanelSize
           : widget.minPanelSize;
+      _committedExpanded = _panelSize == widget.maxPanelSize;
     });
   }
 
@@ -223,7 +240,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
   void _startContentDrag() {
     _contentDragStartedCollapsed = _isPanelCollapsed;
     _contentDragStartedAtTop =
-        _isPanelExpanded &&
+        _committedExpanded &&
         _contentScrollController.hasClients &&
         _contentScrollController.position.pixels <=
             _contentScrollController.position.minScrollExtent + 0.5;
@@ -246,13 +263,12 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
         0.0,
         dashboardHeight * (widget.maxPanelSize - widget.minPanelSize),
       );
-      setState(() {
-        _panelSize =
-            (widget.minPanelSize + _expandPullDistance / dashboardHeight).clamp(
-              widget.minPanelSize,
-              widget.maxPanelSize,
-            );
-      });
+      _setPreviewPanelSize(
+        (widget.minPanelSize + _expandPullDistance / dashboardHeight).clamp(
+          widget.minPanelSize,
+          widget.maxPanelSize,
+        ),
+      );
       return;
     }
     if (!_contentDragStartedAtTop) {
@@ -262,13 +278,12 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
       0.0,
       dashboardHeight * (widget.maxPanelSize - widget.minPanelSize),
     );
-    setState(() {
-      _panelSize =
-          (widget.maxPanelSize - _collapsePullDistance / dashboardHeight).clamp(
-            widget.minPanelSize,
-            widget.maxPanelSize,
-          );
-    });
+    _setPreviewPanelSize(
+      (widget.maxPanelSize - _collapsePullDistance / dashboardHeight).clamp(
+        widget.minPanelSize,
+        widget.maxPanelSize,
+      ),
+    );
   }
 
   void _releaseContentDrag() {
@@ -298,6 +313,11 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
           : shouldCollapse
           ? widget.minPanelSize
           : returnSize;
+      if (shouldExpand) {
+        _committedExpanded = true;
+      } else if (shouldCollapse) {
+        _committedExpanded = false;
+      }
     });
   }
 
@@ -323,6 +343,13 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
 
   bool get _isPanelCollapsed =>
       (_panelSize - widget.minPanelSize).abs() < 0.001;
+
+  void _setPreviewPanelSize(double nextSize) {
+    if ((_panelSize - nextSize).abs() < 0.000001) {
+      return;
+    }
+    setState(() => _panelSize = nextSize);
+  }
 }
 
 class _PanelDragHandle extends StatelessWidget {
