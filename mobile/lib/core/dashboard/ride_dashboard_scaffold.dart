@@ -152,8 +152,10 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
                               Expanded(
                                 child: Listener(
                                   onPointerDown: (_) => _startContentDrag(),
-                                  onPointerMove: (event) =>
-                                      _updateContentDrag(event.delta.dy),
+                                  onPointerMove: (event) => _updateContentDrag(
+                                    event.delta.dy,
+                                    constraints.maxHeight,
+                                  ),
                                   onPointerUp: (_) => _releaseContentDrag(),
                                   onPointerCancel: (_) => _cancelContentDrag(),
                                   child: widget.panelBuilder(
@@ -219,7 +221,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
   bool get _isPanelExpanded => (_panelSize - widget.maxPanelSize).abs() < 0.001;
 
   void _startContentDrag() {
-    _contentDragStartedCollapsed = !_isPanelExpanded;
+    _contentDragStartedCollapsed = _isPanelCollapsed;
     _contentDragStartedAtTop =
         _isPanelExpanded &&
         _contentScrollController.hasClients &&
@@ -227,52 +229,90 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
             _contentScrollController.position.minScrollExtent + 0.5;
     _collapsePullDistance = 0;
     _expandPullDistance = 0;
+    if (_contentDragStartedCollapsed || _contentDragStartedAtTop) {
+      setState(() {
+        _isDraggingPanel = true;
+        _dragStartSize = _panelSize;
+      });
+    }
   }
 
-  void _updateContentDrag(double verticalDelta) {
+  void _updateContentDrag(double verticalDelta, double dashboardHeight) {
+    if (dashboardHeight <= 0) {
+      return;
+    }
     if (_contentDragStartedCollapsed) {
-      if (verticalDelta < 0) {
-        _expandPullDistance += -verticalDelta;
-      } else if (verticalDelta > 0) {
-        _expandPullDistance = 0;
-      }
+      _expandPullDistance = (_expandPullDistance - verticalDelta).clamp(
+        0.0,
+        dashboardHeight * (widget.maxPanelSize - widget.minPanelSize),
+      );
+      setState(() {
+        _panelSize =
+            (widget.minPanelSize + _expandPullDistance / dashboardHeight).clamp(
+              widget.minPanelSize,
+              widget.maxPanelSize,
+            );
+      });
       return;
     }
     if (!_contentDragStartedAtTop) {
       return;
     }
-    if (verticalDelta > 0) {
-      _collapsePullDistance += verticalDelta;
-    } else if (verticalDelta < 0) {
-      _collapsePullDistance = 0;
-    }
+    _collapsePullDistance = (_collapsePullDistance + verticalDelta).clamp(
+      0.0,
+      dashboardHeight * (widget.maxPanelSize - widget.minPanelSize),
+    );
+    setState(() {
+      _panelSize =
+          (widget.maxPanelSize - _collapsePullDistance / dashboardHeight).clamp(
+            widget.minPanelSize,
+            widget.maxPanelSize,
+          );
+    });
   }
 
   void _releaseContentDrag() {
     final shouldExpand =
-        !_isPanelExpanded &&
         _contentDragStartedCollapsed &&
         _expandPullDistance >= _collapsePullThreshold;
     final shouldCollapse =
-        _isPanelExpanded &&
         _contentDragStartedAtTop &&
         _collapsePullDistance >= _collapsePullThreshold;
+    final hadBodyPanelDrag =
+        _contentDragStartedCollapsed || _contentDragStartedAtTop;
+    final returnSize = _dragStartSize;
     _resetContentDrag();
-    if (!shouldExpand && !shouldCollapse) {
+    if (!hadBodyPanelDrag) {
       return;
     }
-    if (_contentScrollController.hasClients) {
+    if ((shouldExpand || shouldCollapse) &&
+        _contentScrollController.hasClients) {
       _contentScrollController.jumpTo(
         _contentScrollController.position.minScrollExtent,
       );
     }
     setState(() {
       _isDraggingPanel = false;
-      _panelSize = shouldExpand ? widget.maxPanelSize : widget.minPanelSize;
+      _panelSize = shouldExpand
+          ? widget.maxPanelSize
+          : shouldCollapse
+          ? widget.minPanelSize
+          : returnSize;
     });
   }
 
-  void _cancelContentDrag() => _resetContentDrag();
+  void _cancelContentDrag() {
+    final hadBodyPanelDrag =
+        _contentDragStartedCollapsed || _contentDragStartedAtTop;
+    final returnSize = _dragStartSize;
+    _resetContentDrag();
+    if (hadBodyPanelDrag) {
+      setState(() {
+        _isDraggingPanel = false;
+        _panelSize = returnSize;
+      });
+    }
+  }
 
   void _resetContentDrag() {
     _contentDragStartedAtTop = false;
@@ -280,6 +320,9 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
     _collapsePullDistance = 0;
     _expandPullDistance = 0;
   }
+
+  bool get _isPanelCollapsed =>
+      (_panelSize - widget.minPanelSize).abs() < 0.001;
 }
 
 class _PanelDragHandle extends StatelessWidget {
