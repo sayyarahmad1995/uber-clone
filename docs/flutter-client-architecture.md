@@ -60,7 +60,7 @@ map rendering, and `core/dashboard` owns the draggable task-panel shell. Feature
 screens supply business state, markers, controls, and panel contents without moving
 business behavior into those shared presentation components.
 
-Dashboard task panels open at 25 percent and expand to at most 50 percent of the
+Dashboard task panels open at 50 percent and expand to at most 70 percent of the
 available dashboard height. Longer workflows scroll inside that limit so the map
 remains visible.
 

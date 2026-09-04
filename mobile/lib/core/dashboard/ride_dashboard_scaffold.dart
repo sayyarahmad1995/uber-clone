@@ -19,13 +19,13 @@ class RideDashboardScaffold extends StatelessWidget {
     this.floatingStatus,
     this.mapControls,
     this.minPanelSize = 0.16,
-    this.initialPanelSize = 0.25,
-    this.maxPanelSize = 0.50,
+    this.initialPanelSize = 0.50,
+    this.maxPanelSize = 0.70,
     this.snapPanel = false,
   }) : assert(minPanelSize > 0),
        assert(minPanelSize <= initialPanelSize),
        assert(initialPanelSize <= maxPanelSize),
-       assert(maxPanelSize <= 0.50);
+       assert(maxPanelSize <= 0.70);
 
   final Widget map;
   final DashboardPanelBuilder panelBuilder;
