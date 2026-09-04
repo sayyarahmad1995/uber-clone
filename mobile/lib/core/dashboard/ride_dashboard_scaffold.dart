@@ -36,14 +36,24 @@ class RideDashboardScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final keyboardInset = MediaQuery.of(context).viewInsets.bottom;
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final controlBottom =
-            constraints.maxHeight * minPanelSize + AppSpacing.lg;
+            constraints.maxHeight * minPanelSize + keyboardInset + AppSpacing.lg;
 
         return Stack(
           children: [
-            Positioned.fill(child: RepaintBoundary(child: map)),
+            Positioned.fill(
+              child: RepaintBoundary(
+                child: MediaQuery.removeViewInsets(
+                  context: context,
+                  removeBottom: true,
+                  child: map,
+                ),
+              ),
+            ),
             if (floatingStatus != null)
               Positioned(
                 top: AppSpacing.md,
@@ -75,28 +85,33 @@ class RideDashboardScaffold extends StatelessWidget {
               maxChildSize: maxPanelSize,
               snap: snapPanel,
               builder: (context, scrollController) {
-                return SafeArea(
-                  top: false,
-                  minimum: const EdgeInsets.fromLTRB(
-                    AppSpacing.md,
-                    0,
-                    AppSpacing.md,
-                    AppSpacing.md,
-                  ),
-                  child: Align(
-                    alignment: Alignment.bottomCenter,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 640),
-                      child: Material(
-                        color: Theme.of(context).colorScheme.surface,
-                        elevation: 8,
-                        shadowColor: Colors.black26,
-                        borderRadius: const BorderRadius.all(
-                          Radius.circular(AppRadii.xl),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: RepaintBoundary(
-                          child: panelBuilder(context, scrollController),
+                return AnimatedPadding(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                  padding: EdgeInsets.only(bottom: keyboardInset),
+                  child: SafeArea(
+                    top: false,
+                    minimum: const EdgeInsets.fromLTRB(
+                      AppSpacing.md,
+                      0,
+                      AppSpacing.md,
+                      AppSpacing.md,
+                    ),
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 640),
+                        child: Material(
+                          color: Theme.of(context).colorScheme.surface,
+                          elevation: 8,
+                          shadowColor: Colors.black26,
+                          borderRadius: const BorderRadius.all(
+                            Radius.circular(AppRadii.xl),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: RepaintBoundary(
+                            child: panelBuilder(context, scrollController),
+                          ),
                         ),
                       ),
                     ),
