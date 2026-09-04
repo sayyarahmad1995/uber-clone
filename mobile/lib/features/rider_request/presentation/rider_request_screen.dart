@@ -61,7 +61,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
         title: active == null ? 'Ride dashboard' : 'Active ride request',
         message: active == null
             ? 'Tap the map to choose pickup and destination.'
-            : _statusTitle(active),
+            : 'Status updates appear in the ride panel below.',
       ),
       panel: state.loading && state.requests.isEmpty
           ? const _LoadingPanel()
