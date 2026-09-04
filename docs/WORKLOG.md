@@ -158,6 +158,14 @@ Worklog-only alignment PRs are intentionally omitted from the business-milestone
   cancelled.
 - Routing, geocoding, address search, ETA, and service-area policy remain deferred.
 
+### Flutter dashboard foundation
+
+- Rider and Driver use shared map-first dashboard, map-rendering, and theme
+  primitives while feature screens retain ownership of business behavior.
+- Device location permission is requested only after an explicit user action.
+- The Driver dashboard is a presentation foundation; onboarding, availability,
+  location publishing, discovery, and offers remain follow-up business slices.
+
 ## Verification for this slice
 
 PostgreSQL tests retain migration, assignment, completion, cancellation, and
@@ -185,7 +193,7 @@ separate client slice. Driver and vehicle media remains later presentation work.
 ## Deferred
 
 - Fixed pickup/search radius and service areas until justified by launch policy.
-- Routing, ETA, maps, geocoding, and PostGIS.
+- Routing, ETA, geocoding, and PostGIS.
 - Live location streaming, breadcrumbs, and push notifications.
 - Redis, background dispatch workers, and advanced dispatch optimization.
 - Sophisticated payments, cancellation fees, refunds, and no-show policy.

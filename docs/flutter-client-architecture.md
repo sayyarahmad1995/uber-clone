@@ -41,8 +41,8 @@ committed in `pubspec.lock`. `API_BASE_URL` is a compile-time definition and
 defaults to the Android emulator host alias `http://10.0.2.2:8080`. Cleartext HTTP
 is permitted only in Android debug builds; release builds require HTTPS.
 
-Android is the only generated platform. Maps, device location, WebSockets, push
-notifications, offline databases, and media providers remain outside this slice.
+Android is the only generated platform. WebSockets, push notifications, offline
+databases, and media providers remain outside the implemented client slices.
 
 ## Rider request extension
 
@@ -51,3 +51,17 @@ The Rider request slice introduces application-owned `DeviceLocation` and
 initial client adapters. Ride-domain models contain only coordinates and money;
 provider SDK types and tile configuration remain outside them. See
 [Flutter Rider ride request](flutter-rider-request.md).
+
+## Shared dashboard foundation
+
+Rider and Driver surfaces use a map-first dashboard composed from reusable client
+primitives. `core/theme` owns visual tokens, `core/maps` owns provider-independent
+map rendering, and `core/dashboard` owns the draggable task-panel shell. Feature
+screens supply business state, markers, controls, and panel contents without moving
+business behavior into those shared presentation components.
+
+Location access remains explicit and user-triggered. Opening a dashboard does not
+request device permission; the `DeviceLocation` adapter is invoked only after the
+user chooses a current-location action. The Driver dashboard is currently a visual
+foundation and does not imply that onboarding, availability, location publishing,
+marketplace discovery, or offer behavior has been implemented.
