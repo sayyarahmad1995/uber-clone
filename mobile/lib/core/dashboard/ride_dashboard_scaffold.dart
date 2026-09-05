@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
@@ -49,6 +50,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
   late bool _committedExpanded;
   bool _expansionSettled = false;
   int? _contentPointer;
+  int? _handlePointer;
   final Set<int> _controlPointers = {};
   bool _contentDragStartedAtTop = false;
   bool _contentDragStartedCollapsed = false;
@@ -82,6 +84,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
       _expansionSettled = false;
       _isDraggingPanel = false;
       _contentPointer = null;
+      _handlePointer = null;
       _resetContentDrag();
       if (_contentScrollController.hasClients) {
         _contentScrollController.jumpTo(
@@ -178,6 +181,19 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
                           child: Column(
                             children: [
                               _PanelDragHandle(
+                                onPointerDown: (pointer) {
+                                  if (_contentPointer != null ||
+                                      _handlePointer != null) {
+                                    return false;
+                                  }
+                                  _handlePointer = pointer;
+                                  return true;
+                                },
+                                onPointerFinished: (pointer) {
+                                  if (_handlePointer == pointer) {
+                                    _handlePointer = null;
+                                  }
+                                },
                                 onDragStart: _startPanelDrag,
                                 onDragUpdate: (delta) =>
                                     _resizePanel(delta, constraints.maxHeight),
@@ -188,6 +204,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
                                 child: Listener(
                                   onPointerDown: (event) {
                                     if (_contentPointer != null ||
+                                        _handlePointer != null ||
                                         _isDraggingPanel ||
                                         _controlPointers.contains(
                                           event.pointer,
@@ -247,7 +264,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
   }
 
   void _resizePanel(double verticalDelta, double dashboardHeight) {
-    if (dashboardHeight <= 0) {
+    if (_handlePointer == null || dashboardHeight <= 0) {
       return;
     }
     _setPreviewPanelSize(
@@ -259,7 +276,9 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
   }
 
   void _startPanelDrag() {
-    _contentPointer = null;
+    if (_handlePointer == null) {
+      return;
+    }
     _resetContentDrag();
     setState(() {
       _isDraggingPanel = true;
@@ -268,6 +287,9 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
   }
 
   void _endPanelDrag(double velocity) {
+    if (_handlePointer == null) {
+      return;
+    }
     final movement = _panelSize - _dragStartSize;
     final expand = velocity < -50 || (velocity.abs() <= 50 && movement > 0);
     setState(() {
@@ -279,6 +301,9 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
   }
 
   void _cancelPanelDrag() {
+    if (_handlePointer == null) {
+      return;
+    }
     final midpoint = (widget.minPanelSize + widget.maxPanelSize) / 2;
     setState(() {
       _isDraggingPanel = false;
@@ -430,12 +455,16 @@ class DashboardPanelControl extends StatelessWidget {
 
 class _PanelDragHandle extends StatelessWidget {
   const _PanelDragHandle({
+    required this.onPointerDown,
+    required this.onPointerFinished,
     required this.onDragStart,
     required this.onDragUpdate,
     required this.onDragEnd,
     required this.onDragCancel,
   });
 
+  final bool Function(int) onPointerDown;
+  final ValueChanged<int> onPointerFinished;
   final VoidCallback onDragStart;
   final ValueChanged<double> onDragUpdate;
   final ValueChanged<double> onDragEnd;
@@ -443,19 +472,55 @@ class _PanelDragHandle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return RawGestureDetector(
       key: const Key('dashboardPanelDragHandle'),
       behavior: HitTestBehavior.opaque,
-      onVerticalDragStart: (_) => onDragStart(),
-      onVerticalDragUpdate: (details) => onDragUpdate(details.delta.dy),
-      onVerticalDragEnd: (details) => onDragEnd(details.primaryVelocity ?? 0),
-      onVerticalDragCancel: onDragCancel,
+      gestures: {
+        _OwnedHandleDragRecognizer:
+            GestureRecognizerFactoryWithHandlers<_OwnedHandleDragRecognizer>(
+              _OwnedHandleDragRecognizer.new,
+              (recognizer) => recognizer
+                ..acquirePointer = onPointerDown
+                ..releasePointer = onPointerFinished
+                ..onStart = ((_) => onDragStart())
+                ..onUpdate = ((details) => onDragUpdate(details.delta.dy))
+                ..onEnd = ((details) => onDragEnd(details.primaryVelocity ?? 0))
+                ..onCancel = onDragCancel,
+            ),
+      },
       child: const SizedBox(
         height: 44,
         width: double.infinity,
         child: DashboardPanelHandle(),
       ),
     );
+  }
+}
+
+/// Only admitted pointer-down events enter Flutter's normal vertical recognizer.
+/// A rejected pointer is never tracked, so later moves/up/cancel cannot acquire
+/// ownership or invoke any drag callback after the original owner releases.
+class _OwnedHandleDragRecognizer extends VerticalDragGestureRecognizer {
+  late bool Function(int) acquirePointer;
+  late ValueChanged<int> releasePointer;
+  int? _pointer;
+
+  @override
+  void addPointer(PointerDownEvent event) {
+    if (_pointer == null &&
+        isPointerAllowed(event) &&
+        acquirePointer(event.pointer)) {
+      _pointer = event.pointer;
+      super.addPointer(event);
+    }
+  }
+
+  @override
+  void didStopTrackingLastPointer(int pointer) {
+    // End/cancel callbacks must run while this pointer still owns the panel.
+    super.didStopTrackingLastPointer(pointer);
+    releasePointer(pointer);
+    _pointer = null;
   }
 }
 
