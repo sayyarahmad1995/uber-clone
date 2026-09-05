@@ -12,6 +12,72 @@ import 'package:uber_clone/features/rider_request/domain/ride_request.dart';
 import 'test_doubles.dart';
 
 void main() {
+  for (final bodyReleasesFirst in [false, true]) {
+    for (final cancelHandle in [false, true]) {
+      testWidgets(
+        'rejected handle stays rejected: body releases first=$bodyReleasesFirst, cancel=$cancelHandle',
+        (tester) async {
+          final key = GlobalKey<_DashboardIdentityHarnessState>();
+          await tester.pumpWidget(
+            MaterialApp(home: _DashboardIdentityHarness(key: key)),
+          );
+          key.currentState!.showSecondPanel();
+          await tester.pumpAndSettle();
+          final panel = find.byKey(const Key('dashboardPanel'));
+          final handle = find.byKey(const Key('dashboardPanelDragHandle'));
+          final height = tester
+              .getSize(find.byType(RideDashboardScaffold))
+              .height;
+          final body = await tester.startGesture(
+            tester.getCenter(find.text('Panel two')),
+            pointer: 1,
+          );
+          await body.moveBy(const Offset(0, -80));
+          await tester.pump();
+          final preview = tester.getSize(panel).height;
+          expect(preview, greaterThan(height * 0.2));
+          expect(preview, lessThan(height * 0.6));
+          final rejected = await tester.startGesture(
+            tester.getCenter(handle),
+            pointer: 2,
+          );
+          await rejected.moveBy(const Offset(0, 30));
+          await rejected.moveBy(const Offset(0, 40));
+          await tester.pump();
+          expect(tester.getSize(panel).height, preview);
+          if (bodyReleasesFirst) {
+            await body.moveBy(const Offset(0, -20));
+            await body.up();
+            await tester.pumpAndSettle();
+            expect(tester.getSize(panel).height, height * 0.6);
+            await rejected.moveBy(const Offset(0, 90));
+            await tester.pump();
+            expect(tester.getSize(panel).height, height * 0.6);
+          }
+          if (cancelHandle) {
+            await rejected.cancel();
+          } else {
+            await rejected.up();
+          }
+          await tester.pumpAndSettle();
+          if (!bodyReleasesFirst) {
+            expect(tester.getSize(panel).height, preview);
+            await body.moveBy(const Offset(0, -20));
+            await tester.pump();
+            expect(tester.getSize(panel).height, preview + 20);
+            await body.up();
+            await tester.pumpAndSettle();
+          }
+          expect(tester.getSize(panel).height, height * 0.6);
+          // A fresh handle pointer still follows normal drag/snap behavior.
+          await tester.drag(handle, const Offset(0, 100));
+          await tester.pumpAndSettle();
+          expect(tester.getSize(panel).height, height * 0.2);
+        },
+      );
+    }
+  }
+
   testWidgets('signed-out startup routes to application login', (tester) async {
     await tester.pumpWidget(testApp(FakeAuthRepository()));
     await tester.pumpAndSettle();
