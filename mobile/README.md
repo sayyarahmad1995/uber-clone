@@ -41,12 +41,21 @@ The Android emulator reaches a backend running on the development computer at
 flutter run --dart-define=API_BASE_URL=https://api.example.com
 ```
 
-For iOS Simulator or a physical device, pass an environment-specific backend URL
-instead of relying on the Android emulator default:
+For iOS Simulator with the backend on the same Mac:
 
 ```bash
 flutter run --dart-define=API_BASE_URL=http://localhost:8080
 ```
+
+For a physical Android or iOS device, use the development computer's LAN IP
+address, with both devices on the same network. For example (replace the IP):
+
+```bash
+flutter run --dart-define=API_BASE_URL=http://192.168.1.100:8080
+```
+
+The backend port must be reachable from the phone; localhost refers to the phone
+itself on a physical device.
 
 If the iOS runner is not present locally, generate it from inside `mobile/` with:
 

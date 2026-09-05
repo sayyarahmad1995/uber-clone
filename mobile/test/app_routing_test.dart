@@ -120,7 +120,7 @@ void main() {
     expect(tester.getSize(panel).height, expandedHeight);
 
     final minimizeGesture = await tester.startGesture(
-      tester.getCenter(panelList),
+      tester.getCenter(find.text('Where are you going?')),
     );
     await minimizeGesture.moveBy(const Offset(0, 100));
     await tester.pump();
@@ -156,7 +156,83 @@ void main() {
 
     expect(dashboardKey.currentState!.scrollController.offset, 0);
     expect(find.text('Panel two'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(
+      tester.getSize(find.byKey(const Key('dashboardPanel'))).height,
+      tester.getSize(find.byType(RideDashboardScaffold)).height * 0.20,
+    );
+    expect(
+      tester.widget<ListView>(list).physics,
+      isA<NeverScrollableScrollPhysics>(),
+    );
   });
+
+  testWidgets('controls do not resize panel and retain taps and text input', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: _DashboardIdentityHarness()),
+    );
+    final panel = find.byKey(const Key('dashboardPanel'));
+    final height = tester.getSize(panel).height;
+    for (final key in ['panelButton', 'panelField']) {
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(Key(key))),
+      );
+      await gesture.moveBy(const Offset(0, 30));
+      await tester.pump();
+      expect(tester.getSize(panel).height, height);
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(tester.getSize(panel).height, height);
+    }
+    await tester.tap(find.byKey(const Key('panelButton')));
+    await tester.pumpAndSettle();
+    expect(find.text('Tapped'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('panelField')), '42');
+    expect(find.text('42'), findsOneWidget);
+  });
+
+  testWidgets(
+    'body drag owns one pointer and locks scrolling until snap finishes',
+    (tester) async {
+      final key = GlobalKey<_DashboardIdentityHarnessState>();
+      await tester.pumpWidget(
+        MaterialApp(home: _DashboardIdentityHarness(key: key)),
+      );
+      key.currentState!.showSecondPanel();
+      await tester.pumpAndSettle();
+      final panel = find.byKey(const Key('dashboardPanel'));
+      final list = find.byKey(const Key('identityPanelList'));
+      final first = await tester.startGesture(
+        tester.getCenter(find.text('Panel two')),
+        pointer: 1,
+      );
+      await first.moveBy(const Offset(0, -100));
+      await tester.pump();
+      final preview = tester.getSize(panel).height;
+      final second = await tester.startGesture(
+        tester.getCenter(find.text('Panel two')),
+        pointer: 2,
+      );
+      await second.moveBy(const Offset(0, 70));
+      await second.up();
+      await tester.pump();
+      expect(tester.getSize(panel).height, preview);
+      await first.up();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(
+        tester.widget<ListView>(list).physics,
+        isA<NeverScrollableScrollPhysics>(),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<ListView>(list).physics,
+        isA<ClampingScrollPhysics>(),
+      );
+    },
+  );
 }
 
 class _DashboardIdentityHarness extends StatefulWidget {
@@ -170,6 +246,7 @@ class _DashboardIdentityHarness extends StatefulWidget {
 class _DashboardIdentityHarnessState extends State<_DashboardIdentityHarness> {
   String _identity = 'one';
   late ScrollController scrollController;
+  bool tapped = false;
 
   void showSecondPanel() => setState(() => _identity = 'two');
 
@@ -190,9 +267,21 @@ class _DashboardIdentityHarnessState extends State<_DashboardIdentityHarness> {
               ? const ClampingScrollPhysics()
               : const NeverScrollableScrollPhysics(),
           itemCount: 40,
-          itemBuilder: (context, index) => ListTile(
-            title: Text(index == 0 ? 'Panel $_identity' : 'Item $index'),
-          ),
+          itemBuilder: (context, index) => index == 1
+              ? DashboardPanelControl(
+                  child: TextButton(
+                    key: const Key('panelButton'),
+                    onPressed: () => setState(() => tapped = true),
+                    child: Text(tapped ? 'Tapped' : 'Control'),
+                  ),
+                )
+              : index == 2
+              ? const DashboardPanelControl(
+                  child: TextField(key: Key('panelField')),
+                )
+              : ListTile(
+                  title: Text(index == 0 ? 'Panel $_identity' : 'Item $index'),
+                ),
         );
       },
     );
