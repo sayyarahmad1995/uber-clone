@@ -45,6 +45,14 @@ Feature panels own their content and business behavior. They receive the shared
 content controller and scroll-enabled state; they do not implement independent
 panel sizing or gesture policies.
 
+Changing `panelIdentity` resets the panel to its collapsed extent, locks scrolling,
+resets the scroll offset, and invalidates any ongoing body gesture. Expansion
+unlocks scrolling only after the snap animation completes (or immediately on
+release when the preview has already reached maximum). One pointer owns each
+body gesture; other pointers cannot move or release it. Feature panels wrap
+interactive controls in `DashboardPanelControl` so touches originating on those
+controls cannot resize the panel. This includes buttons and text inputs.
+
 ## Change control
 
 Future Rider and Driver slices must reuse this contract. They must not override the

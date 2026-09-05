@@ -194,6 +194,18 @@ acceptance or counteroffer creation. It must preserve the ADR-0007 rule that nei
 Driver response assigns a Trip. Rider offer comparison and selection follows as a
 separate client slice. Driver and vehicle media remains later presentation work.
 
+## Dashboard lifecycle cleanup
+
+Dashboard lifecycle cleanup: changing business panel identity now collapses the
+panel and resets scroll/drag state. Rider controls use the shared
+`DashboardPanelControl` exclusion wrapper; body gestures track one owning pointer.
+Content scrolling waits for expansion to finish, and handle updates skip unchanged
+extents. Regression coverage includes identity resets, control interaction,
+multiple pointers, and animation-time scroll locking. Physical-device API URL
+instructions now distinguish LAN addresses from simulator localhost.
+
+Validation: `flutter test --reporter expanded` passed all 16 tests.
+
 ## Deferred
 
 - Fixed pickup/search radius and service areas until justified by launch policy.

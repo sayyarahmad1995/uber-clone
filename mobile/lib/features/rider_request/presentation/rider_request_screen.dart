@@ -257,44 +257,50 @@ class _RequestRidePanel extends StatelessWidget {
           'Choose pickup and destination, then propose the fare you want to pay.',
         ),
         const SizedBox(height: AppSpacing.sm),
-        SegmentedButton<bool>(
-          segments: const [
-            ButtonSegment(
-              value: true,
-              label: Text('Pickup'),
-              icon: Icon(Icons.my_location),
-            ),
-            ButtonSegment(
-              value: false,
-              label: Text('Destination'),
-              icon: Icon(Icons.flag),
-            ),
-          ],
-          selected: {selectingPickup},
-          onSelectionChanged: (value) => onSelectionChanged(value.single),
+        DashboardPanelControl(
+          child: SegmentedButton<bool>(
+            segments: const [
+              ButtonSegment(
+                value: true,
+                label: Text('Pickup'),
+                icon: Icon(Icons.my_location),
+              ),
+              ButtonSegment(
+                value: false,
+                label: Text('Destination'),
+                icon: Icon(Icons.flag),
+              ),
+            ],
+            selected: {selectingPickup},
+            onSelectionChanged: (value) => onSelectionChanged(value.single),
+          ),
         ),
         const SizedBox(height: AppSpacing.sm),
-        OutlinedButton.icon(
-          onPressed: state.locating ? null : () => onUseCurrentPickup(),
-          icon: state.locating
-              ? const SizedBox.square(
-                  dimension: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.gps_fixed),
-          label: const Text('Use current location for pickup'),
+        DashboardPanelControl(
+          child: OutlinedButton.icon(
+            onPressed: state.locating ? null : () => onUseCurrentPickup(),
+            icon: state.locating
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.gps_fixed),
+            label: const Text('Use current location for pickup'),
+          ),
         ),
         const SizedBox(height: AppSpacing.xs),
         _PointSummary(label: 'Pickup', point: state.pickup),
         _PointSummary(label: 'Destination', point: state.destination),
         const SizedBox(height: AppSpacing.sm),
-        TextField(
-          key: const Key('fareField'),
-          controller: fare,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
-            labelText: 'Your proposed fare',
-            prefixText: 'PKR ',
+        DashboardPanelControl(
+          child: TextField(
+            key: const Key('fareField'),
+            controller: fare,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Your proposed fare',
+              prefixText: 'PKR ',
+            ),
           ),
         ),
         if (state.error != null) ...[
@@ -305,11 +311,13 @@ class _RequestRidePanel extends StatelessWidget {
           ),
         ],
         const SizedBox(height: AppSpacing.md),
-        FilledButton.icon(
-          key: const Key('requestRideButton'),
-          onPressed: state.submitting ? null : () => onSubmit(),
-          icon: const Icon(Icons.local_taxi),
-          label: Text(state.submitting ? 'Requesting…' : 'Request ride'),
+        DashboardPanelControl(
+          child: FilledButton.icon(
+            key: const Key('requestRideButton'),
+            onPressed: state.submitting ? null : () => onSubmit(),
+            icon: const Icon(Icons.local_taxi),
+            label: Text(state.submitting ? 'Requesting…' : 'Request ride'),
+          ),
         ),
       ],
     );
@@ -390,20 +398,24 @@ class _ActiveRequestPanel extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
-        OutlinedButton.icon(
-          onPressed: state.loading
-              ? null
-              : ref.read(riderRequestControllerProvider).refreshActive,
-          icon: const Icon(Icons.refresh),
-          label: const Text('Refresh status'),
+        DashboardPanelControl(
+          child: OutlinedButton.icon(
+            onPressed: state.loading
+                ? null
+                : ref.read(riderRequestControllerProvider).refreshActive,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Refresh status'),
+          ),
         ),
         if (status != 'completed' && status != 'cancelled') ...[
           const SizedBox(height: AppSpacing.xs),
-          TextButton(
-            onPressed: state.submitting
-                ? null
-                : () => _confirmCancellation(context, ref),
-            child: Text(state.submitting ? 'Cancelling…' : 'Cancel request'),
+          DashboardPanelControl(
+            child: TextButton(
+              onPressed: state.submitting
+                  ? null
+                  : () => _confirmCancellation(context, ref),
+              child: Text(state.submitting ? 'Cancelling…' : 'Cancel request'),
+            ),
           ),
         ],
         if (state.error != null) ...[
