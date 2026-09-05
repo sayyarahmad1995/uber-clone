@@ -18,7 +18,7 @@ class GeolocatorDeviceLocation implements DeviceLocation {
   Future<GeoPoint> current() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
       throw const LocationUnavailable(
-        'Turn on device location to use your current pickup.',
+        'Turn on device location to use your current position.',
       );
     }
     var permission = await Geolocator.checkPermission();
@@ -28,7 +28,7 @@ class GeolocatorDeviceLocation implements DeviceLocation {
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
       throw const LocationUnavailable(
-        'Location permission is required to use your current pickup.',
+        'Location permission is required to use your current position.',
       );
     }
     final position = await Geolocator.getCurrentPosition();

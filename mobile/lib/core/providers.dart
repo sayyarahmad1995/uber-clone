@@ -12,6 +12,8 @@ import '../features/capabilities/presentation/splash_screen.dart';
 import '../features/rider_request/application/rider_request_controller.dart';
 import '../features/rider_request/data/device_location.dart';
 import '../features/rider_request/data/ride_request_repository.dart';
+import '../features/driver_workspace/application/driver_controller.dart';
+import '../features/driver_workspace/data/driver_repository.dart';
 import 'config/app_config.dart';
 import 'maps/map_tiles.dart';
 import 'models/account.dart';
@@ -56,6 +58,19 @@ final riderRequestControllerProvider =
     ChangeNotifierProvider.autoDispose<RiderRequestController>(
       (ref) => RiderRequestController(
         ref.watch(rideRequestRepositoryProvider),
+        ref.watch(deviceLocationProvider),
+      ),
+    );
+final driverRepositoryProvider = Provider<DriverRepository>(
+  (ref) => ApiDriverRepository(
+    ref.watch(dioProvider),
+    ref.watch(sessionStoreProvider),
+  ),
+);
+final driverControllerProvider =
+    ChangeNotifierProvider.autoDispose<DriverController>(
+      (ref) => DriverController(
+        ref.watch(driverRepositoryProvider),
         ref.watch(deviceLocationProvider),
       ),
     );

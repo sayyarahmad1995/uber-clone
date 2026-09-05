@@ -22,6 +22,29 @@ class CapabilityHomeScreen extends ConsumerWidget {
         title: Text(capability == Capability.rider ? 'Rider' : 'Driver'),
         notificationPredicate: (_) => false,
         actions: [
+          if (!canDrive)
+            TextButton(
+              onPressed: controller.state.busy
+                  ? null
+                  : () async {
+                      final enabled = await controller.enableDriver();
+                      if (!context.mounted) return;
+                      if (enabled) {
+                        await controller.selectCapability(Capability.driver);
+                        if (context.mounted) context.go('/driver');
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              controller.state.error ??
+                                  'Unable to enable Driver access.',
+                            ),
+                          ),
+                        );
+                      }
+                    },
+              child: const Text('Become a Driver'),
+            ),
           IconButton(
             tooltip: 'Log out',
             onPressed: controller.state.busy ? null : controller.logout,

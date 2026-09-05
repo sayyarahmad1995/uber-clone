@@ -81,6 +81,7 @@ scrolling early.
 The Rider dashboard requests location during startup so the map can focus on the
 Rider automatically. On a first run, the platform may display its location-permission
 prompt as part of this startup behavior. Explicit current-location actions remain
-available for refocusing the map and selecting pickup. The Driver dashboard is
-currently a visual foundation and does not imply that onboarding, availability,
-location publishing, marketplace discovery, or offer behavior has been implemented.
+available for refocusing the map and selecting pickup. The Driver dashboard now
+supports profile setup/editing, availability, and explicit location publishing.
+Its controls reuse the shared panel contract. Marketplace discovery and offers
+remain the next client slice. See [Driver readiness](flutter-driver-readiness.md).

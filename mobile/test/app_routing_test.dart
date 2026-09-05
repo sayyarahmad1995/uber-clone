@@ -361,6 +361,7 @@ Widget testApp(
 }) => ProviderScope(
   overrides: [
     authRepositoryProvider.overrideWithValue(repository),
+    driverRepositoryProvider.overrideWithValue(FakeDriverRepository()),
     capabilityStoreProvider.overrideWithValue(MemoryCapabilityStore()),
     rideRequestRepositoryProvider.overrideWithValue(
       rideRequests ?? FakeRideRequestRepository(requests: [requestedRide]),
