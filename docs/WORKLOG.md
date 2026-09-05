@@ -76,6 +76,8 @@ refresh request status, and cancel through the existing backend lifecycle.
 - [x] Driver Public Presentation — PR #58
 - [x] Flutter Rider Entry Foundation
 - [x] Flutter Rider Ride-Request Creation
+- [x] Flutter Driver Setup and Readiness — same-account capability enablement,
+  profile editing, availability, and manual location publication
 
 Worklog-only alignment PRs are intentionally omitted from the business-milestone list.
 
@@ -164,8 +166,8 @@ Worklog-only alignment PRs are intentionally omitted from the business-milestone
   primitives while feature screens retain ownership of business behavior.
 - The Rider dashboard requests device location on startup to focus the map on the
   Rider automatically; explicit controls can refocus the map or select pickup.
-- The Driver dashboard is a presentation foundation; onboarding, availability,
-  location publishing, discovery, and offers remain follow-up business slices.
+- The Driver dashboard supports profile setup/editing, availability, and explicit
+  location publishing. Discovery and offers remain follow-up business slices.
 - ADR-0008 makes shared panel sizing, direct finger tracking, handle dragging,
   scroll locking, thresholds, and release-gated body snaps authoritative for future
   client slices.
@@ -188,9 +190,10 @@ product behavior; implementation details must not redefine the product.
 
 ## Follow-up scope
 
-The next vertical slice is the Driver marketplace client: Driver onboarding state,
-availability and location publishing, geographic request discovery, and exact-fare
-acceptance or counteroffer creation. It must preserve the ADR-0007 rule that neither
+The Driver marketplace client is split into readiness and marketplace slices.
+Readiness now enables Driver access on the existing account, profile setup/editing,
+availability, and manual location publishing. The next slice adds geographic request
+discovery and exact-fare acceptance or counteroffer creation. It must preserve the ADR-0007 rule that neither
 Driver response assigns a Trip. Rider offer comparison and selection follows as a
 separate client slice. Driver and vehicle media remains later presentation work.
 

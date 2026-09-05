@@ -10,12 +10,34 @@ abstract interface class AuthRepository {
   Future<String> register(String identifier, String password);
   Future<void> completeVerification(String verificationId, String code);
   Future<void> logout();
+  Future<Account> enableDriver();
 }
 
 class ApiAuthRepository implements AuthRepository {
   ApiAuthRepository(this._dio, this._sessions);
   final Dio _dio;
   final SessionStore _sessions;
+
+  @override
+  Future<Account> enableDriver() async {
+    final token = await _sessions.readValidToken();
+    if (token == null) {
+      throw const ApiException(
+        'authentication_required',
+        'Please sign in again.',
+        statusCode: 401,
+      );
+    }
+    try {
+      final response = await _dio.put<Map<String, dynamic>>(
+        '/v1/me/capabilities/driver',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      return Account.fromJson(response.data!);
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
 
   @override
   Future<Account?> restore() async {

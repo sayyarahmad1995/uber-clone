@@ -119,6 +119,19 @@ class SessionController extends ChangeNotifier {
     _set(_state.copyWith(capability: capability, clearError: true));
   }
 
+  Future<bool> enableDriver() async {
+    if (_state.busy || _state.status != SessionStatus.signedIn) return false;
+    _set(_state.copyWith(busy: true, clearError: true));
+    try {
+      final account = await _auth.enableDriver();
+      _set(_state.copyWith(account: account, busy: false));
+      return account.capabilities.contains(Capability.driver);
+    } catch (error) {
+      _set(_state.copyWith(busy: false, error: '$error'));
+      return false;
+    }
+  }
+
   Future<void> logout() async {
     _set(_state.copyWith(busy: true, clearError: true));
     try {

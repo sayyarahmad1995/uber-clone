@@ -1,4 +1,6 @@
 import 'package:uber_clone/core/models/account.dart';
+import 'package:uber_clone/features/driver_workspace/data/driver_repository.dart';
+import 'package:uber_clone/features/driver_workspace/domain/driver_profile.dart';
 import 'package:uber_clone/core/session/session_store.dart';
 import 'package:uber_clone/features/authentication/data/auth_repository.dart';
 import 'package:uber_clone/features/rider_request/data/device_location.dart';
@@ -25,6 +27,8 @@ class FakeAuthRepository implements AuthRepository {
   Future<void> completeVerification(String verificationId, String code) async {}
   @override
   Future<void> logout() async {}
+  @override
+  Future<Account> enableDriver() async => bothCapabilities;
 }
 
 class MemoryCapabilityStore implements CapabilityStore {
@@ -93,4 +97,55 @@ class FakeDeviceLocation implements DeviceLocation {
   final GeoPoint point;
   @override
   Future<GeoPoint> current() async => point;
+}
+
+const driverVehicle = DriverVehicle(
+  make: 'Toyota',
+  model: 'Corolla',
+  modelYear: 2024,
+  color: 'White',
+  licensePlate: 'ABC-123',
+);
+const driverProfile = DriverProfile(
+  userId: 'user-1',
+  displayName: 'Test Driver',
+  status: 'active',
+  isOnline: false,
+  vehicle: driverVehicle,
+);
+
+class FakeDriverRepository implements DriverRepository {
+  FakeDriverRepository({this.profile});
+  DriverProfile? profile;
+  final calls = <String>[];
+  bool failPublish = false;
+  bool failAvailability = false;
+  @override
+  Future<DriverProfile?> get() async => profile;
+  @override
+  Future<DriverProfile> onboard(String name, DriverVehicle vehicle) async {
+    calls.add('onboard');
+    return profile = driverProfile.copyWith(
+      displayName: name,
+      vehicle: vehicle,
+    );
+  }
+
+  @override
+  Future<DriverProfile> setOnline(bool online) async {
+    calls.add('online=$online');
+    if (failAvailability) throw Exception('Availability failed');
+    return profile = profile!.copyWith(isOnline: online);
+  }
+
+  @override
+  Future<PublishedDriverLocation> publishLocation(GeoPoint point) async {
+    calls.add('location');
+    if (failPublish) throw Exception('Location publish failed');
+    return PublishedDriverLocation(
+      latitude: point.latitude,
+      longitude: point.longitude,
+      updatedAt: DateTime.utc(2026, 9, 5),
+    );
+  }
 }

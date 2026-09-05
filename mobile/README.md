@@ -8,6 +8,13 @@ The Rider experience supports map-based pickup/destination selection, current
 device location for pickup, PKR fare proposals, request creation, status refresh,
 state restoration, and cancellation.
 
+Driver setup now supports enabling Driver access on the same account, saving and
+editing Driver/vehicle details, online/offline availability, and manual location
+publication. Going online publishes location first; going offline needs no location
+permission. Location freshness remains governed by the backend's two-minute rule.
+Marketplace discovery and offers follow in the next slice. See
+`docs/flutter-driver-readiness.md` for behavior and device checks.
+
 ## Client architecture direction
 
 The client is a cross-platform Flutter app. Product behavior belongs in `lib/`
