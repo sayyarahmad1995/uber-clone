@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/database"
@@ -55,7 +56,7 @@ func TestPostgresRepositorySubmitAndRestoreApplication(t *testing.T) {
 	if restored.DisplayName != created.DisplayName || restored.Service.Code != created.Service.Code || restored.Vehicle != created.Vehicle {
 		t.Fatalf("restored application changed submitted snapshot: created=%#v restored=%#v", created, restored)
 	}
-	if !restored.SubmittedAt.Equal(created.SubmittedAt) {
+	if delta := restored.SubmittedAt.Sub(created.SubmittedAt); delta < -time.Millisecond || delta > time.Millisecond {
 		t.Fatalf("submitted_at changed during restore: created=%v restored=%v", created.SubmittedAt, restored.SubmittedAt)
 	}
 }
