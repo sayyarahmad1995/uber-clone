@@ -32,13 +32,22 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen> {
     final application = onboarding?.application;
     final loading = !driver.loaded ||
         (profile == null && onboarding != null && !onboarding.loaded);
+    final onboardingFailed = !loading &&
+        profile == null &&
+        onboarding != null &&
+        onboarding.error != null &&
+        onboarding.services.isEmpty &&
+        application == null;
     final setup = !loading &&
+        !onboardingFailed &&
         profile == null &&
         (application == null || _reapplying);
 
     return RideDashboardScaffold(
       panelIdentity: loading
           ? 'driver-loading'
+          : onboardingFailed
+          ? 'driver-onboarding-error'
           : profile != null
           ? 'driver-readiness'
           : setup
@@ -62,6 +71,7 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen> {
         title: 'Driver dashboard',
         message: _statusMessage(
           loading: loading,
+          onboardingFailed: onboardingFailed,
           profile: profile,
           application: application,
         ),
@@ -71,14 +81,16 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen> {
             ? const ClampingScrollPhysics()
             : const NeverScrollableScrollPhysics();
 
-        if (loading) {
+        if (loading || onboardingFailed) {
           return _LoadingPanel(
             scrollController: scrollController,
             physics: physics,
             busy: driver.busy || (onboarding?.busy ?? false),
             error: driver.error ?? onboarding?.error,
             onRetry: () {
-              driver.load();
+              if (!driver.loaded || driver.error != null) {
+                driver.load();
+              }
               onboarding?.load();
             },
           );
@@ -135,10 +147,12 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen> {
 
   String _statusMessage({
     required bool loading,
+    required bool onboardingFailed,
     required DriverProfile? profile,
     required DriverOnboardingApplication? application,
   }) {
     if (loading) return 'Loading Driver status.';
+    if (onboardingFailed) return 'Unable to load Driver onboarding.';
     if (profile != null) {
       return profile.isOnline
           ? 'You are online. Keep your location updated.'
@@ -518,6 +532,8 @@ class _DriverSetupFormState extends State<_DriverSetupForm> {
           Text('Become a Driver', style: Theme.of(context).textTheme.headlineSmall),
           const Text('Choose one service for your first vehicle application.'),
           const SizedBox(height: AppSpacing.sm),
+          if (widget.services.isEmpty)
+            const Text('No Driver services are currently available.'),
           DashboardPanelControl(
             child: DropdownButtonFormField<String>(
               key: const Key('driver-service-field'),
@@ -531,7 +547,7 @@ class _DriverSetupFormState extends State<_DriverSetupForm> {
                     ),
                   )
                   .toList(growable: false),
-              onChanged: widget.busy
+              onChanged: widget.busy || widget.services.isEmpty
                   ? null
                   : (value) => setState(() => _serviceCode = value),
               validator: (value) => value == null ? 'Select a service' : null,
