@@ -85,6 +85,12 @@ void main() {
     expect(onboardingRepo.calls, contains('submit:comfort'));
     expect(driverRepo.profile, isNull);
     expect(find.text('Application under review'), findsOneWidget);
+
+    await tester.drag(
+      find.byKey(const Key('dashboardPanelDragHandle')),
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
     expect(find.text('Service: Comfort'), findsOneWidget);
   });
 
