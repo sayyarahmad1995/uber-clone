@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:uber_clone/core/providers.dart';
 import 'package:uber_clone/features/driver_workspace/presentation/driver_workspace_screen.dart';
 
@@ -16,20 +16,25 @@ void main() {
     await tester.tap(find.text('Become a Driver'));
     await tester.pumpAndSettle();
     expect(find.text('Driver dashboard'), findsOneWidget);
-    await tester.drag(find.byKey(const Key('dashboardPanelDragHandle')), const Offset(0, -300));
+    await tester.drag(
+      find.byKey(const Key('dashboardPanelDragHandle')),
+      const Offset(0, -300),
+    );
     await tester.pumpAndSettle();
-    expect(find.text('Driver setup'), findsOneWidget);
-    expect(find.text('Become a Driver'), findsNothing);
+    expect(find.text('Become a Driver'), findsOneWidget);
+    expect(find.text('Choose one service for your first vehicle application.'), findsOneWidget);
   });
 
-  testWidgets('Driver setup saves vehicle then resets to readiness panel', (
+  testWidgets('Driver onboarding submits selected service for review', (
     tester,
   ) async {
-    final repo = FakeDriverRepository();
+    final driverRepo = FakeDriverRepository();
+    final onboardingRepo = FakeDriverOnboardingRepository();
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          driverRepositoryProvider.overrideWithValue(repo),
+          driverRepositoryProvider.overrideWithValue(driverRepo),
+          driverOnboardingRepositoryProvider.overrideWithValue(onboardingRepo),
           deviceLocationProvider.overrideWithValue(const FakeDeviceLocation()),
         ],
         child: const MaterialApp(
@@ -43,6 +48,12 @@ void main() {
       const Offset(0, -300),
     );
     await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('driver-service-field')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Comfort').last);
+    await tester.pumpAndSettle();
+
     final values = [
       'Test Driver',
       'Toyota',
@@ -57,12 +68,42 @@ void main() {
       await tester.pumpAndSettle();
       await tester.enterText(field, values[i]);
     }
-    await tester.ensureVisible(find.text('Save Driver details'));
+
+    await tester.ensureVisible(find.text('Review application'));
+    await tester.tap(find.text('Review application'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Save Driver details'));
+    expect(onboardingRepo.calls, contains('precheck:comfort'));
+    expect(find.text('Review application'), findsOneWidget);
+    expect(find.text('Service: Comfort'), findsOneWidget);
+
+    await tester.tap(find.text('Submit for review'));
     await tester.pumpAndSettle();
-    expect(repo.profile!.vehicle, driverVehicle);
-    expect(find.text('Ready to go online'), findsOneWidget);
+
+    expect(onboardingRepo.calls, contains('submit:comfort'));
+    expect(driverRepo.profile, isNull);
+    expect(find.text('Application under review'), findsOneWidget);
+    expect(find.text('Service: Comfort'), findsOneWidget);
+  });
+
+  testWidgets('existing operational Driver can still go online', (
+    tester,
+  ) async {
+    final repo = FakeDriverRepository(profile: driverProfile);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          driverRepositoryProvider.overrideWithValue(repo),
+          driverOnboardingRepositoryProvider.overrideWithValue(
+            FakeDriverOnboardingRepository(),
+          ),
+          deviceLocationProvider.overrideWithValue(const FakeDeviceLocation()),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(body: DriverWorkspaceScreen(accountID: 'user-1')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
     await tester.drag(
       find.byKey(const Key('dashboardPanelDragHandle')),
       const Offset(0, -300),
@@ -71,6 +112,7 @@ void main() {
     await tester.ensureVisible(find.text('Go online'));
     await tester.tap(find.text('Go online'));
     await tester.pumpAndSettle();
+    expect(repo.calls.take(2), ['location', 'online=true']);
     expect(repo.profile!.isOnline, isTrue);
     expect(find.text('Go offline'), findsOneWidget);
   });
