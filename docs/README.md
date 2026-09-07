@@ -23,6 +23,7 @@ Future implementation must be checked against these documents before a slice is 
 - Initial Driver onboarding applies one vehicle to one Driver-selected service; later service applications reuse the same vehicle.
 - Operate online with one verified vehicle and one approved service at a time for the MVP.
 - Keep approved Driver/vehicle information authoritative until a submitted revision is approved.
+- Use a separate, narrow operator boundary for Driver onboarding approval/rejection; administrator review is not a Rider/Driver capability.
 - Use one shared client application.
 - Build Android first with clear boundaries for a later iOS implementation.
 - Use an external OIDC provider for authentication and authorization.
@@ -38,6 +39,8 @@ Future implementation must be checked against these documents before a slice is 
 - [ADR-0007: Unified Ride Request Marketplace Model](ADR-0007-ride-request-marketplace-model.md)
 - [ADR-0008: Dashboard Panel Interaction Contract](ADR-0008-dashboard-panel-interaction-contract.md)
 - [ADR-0009: Driver Service and Vehicle Eligibility Model](ADR-0009-driver-service-vehicle-eligibility.md)
+- [ADR-0010: Minimal Driver Onboarding Reviewer](ADR-0010-minimal-driver-onboarding-reviewer.md)
+- [Driver onboarding reviewer runbook](driver-onboarding-reviewer.md)
 - [Product and Capability Model](product-and-capability-model.md)
 - [Technology Stack](technology-stack.md)
 - [MVP Scope](mvp-scope.md)

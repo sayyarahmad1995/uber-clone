@@ -73,6 +73,10 @@ func (api *API) getDriver(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "unable to load driver"})
 		return
 	}
+	if profile.Status != driver.StatusActive {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "driver operational profile is not active"})
+		return
+	}
 	writeDriver(w, http.StatusOK, profile)
 }
 

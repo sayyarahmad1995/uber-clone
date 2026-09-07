@@ -16,7 +16,10 @@ var (
 
 type Status string
 
-const StatusActive Status = "active"
+const (
+	StatusApproved Status = "approved"
+	StatusActive   Status = "active"
+)
 
 type VehicleInput struct {
 	Make         string
