@@ -44,21 +44,25 @@ func newApplication(cfg config) (application, func(), error) {
 		return application{}, nil, fmt.Errorf("identity infrastructure initialization failed: %w", err)
 	}
 	tripService := trip.NewService(trip.NewPostgresRepository(db))
+	driverOnboardingRepository := driveronboarding.NewPostgresRepository(db)
 	api := httpapi.New(httpapi.Dependencies{
-		Users:            user.NewService(user.NewPostgresRepository(db)),
-		Drivers:          driver.NewService(driver.NewPostgresRepository(db)),
-		DriverOnboarding: driveronboarding.NewService(driveronboarding.NewPostgresRepository(db)),
-		DriverLocations:  driverlocation.NewService(driverlocation.NewPostgresRepository(db)),
-		DriverTrips:      drivertrip.NewService(drivertrip.NewPostgresRepository(db)),
-		RiderLocations:   riderlocation.NewService(riderlocation.NewPostgresRepository(db)),
-		Rides:            ride.NewService(ride.NewPostgresRepository(db)),
-		RideStatuses:     ridestatus.NewService(ridestatus.NewPostgresRepository(db)),
-		Cancellations:    cancellation.NewService(cancellation.NewPostgresRepository(db)),
-		Offers:           offer.NewService(offer.NewPostgresRepository(db), tripService),
-		Trips:            tripService,
-		DB:               db,
-		Identity:         identityProvider,
-		Auth:             auth.NewHandler(auth.NewService(authProvider)),
+		Users:                  user.NewService(user.NewPostgresRepository(db)),
+		Drivers:                driver.NewService(driver.NewPostgresRepository(db)),
+		DriverOnboarding:       driveronboarding.NewService(driverOnboardingRepository),
+		DriverOnboardingReview: driveronboarding.NewReviewService(driverOnboardingRepository),
+		DriverLocations:        driverlocation.NewService(driverlocation.NewPostgresRepository(db)),
+		DriverTrips:            drivertrip.NewService(drivertrip.NewPostgresRepository(db)),
+		RiderLocations:         riderlocation.NewService(riderlocation.NewPostgresRepository(db)),
+		Rides:                  ride.NewService(ride.NewPostgresRepository(db)),
+		RideStatuses:           ridestatus.NewService(ridestatus.NewPostgresRepository(db)),
+		Cancellations:          cancellation.NewService(cancellation.NewPostgresRepository(db)),
+		Offers:                 offer.NewService(offer.NewPostgresRepository(db), tripService),
+		Trips:                  tripService,
+		DB:                     db,
+		Identity:               identityProvider,
+		Auth:                   auth.NewHandler(auth.NewService(authProvider)),
+		AdminReviewUsername:    cfg.AdminReviewUsername,
+		AdminReviewPassword:    cfg.AdminReviewPassword,
 	})
 	return application{handler: api.Handler()}, cleanup, nil
 }

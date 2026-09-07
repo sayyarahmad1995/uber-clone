@@ -76,9 +76,11 @@ The initial scaling strategy is vertical scaling rather than a distributed multi
 
 ## 10. Administration
 
-Administrator operations are deferred.
+A complete administrator product remains deferred.
 
-Only administrative functionality that becomes a concrete dependency of an MVP vertical slice will be designed and implemented. A complete enterprise administration system is out of scope for the initial build.
+Only administrative functionality that becomes a concrete dependency of an MVP vertical slice will be designed and implemented. Driver onboarding approval/rejection is now such a dependency, so ADR-0010 authorizes a narrow internal reviewer surface for that workflow only.
+
+Administrator review is not modeled as a Rider/Driver account capability. The current reviewer authentication mechanism is temporary and internal; broader administrator identity, role management, analytics, support tooling, and unrelated operations remain out of scope.
 
 ## 11. Ride request marketplace model
 
@@ -132,3 +134,13 @@ post-window withdrawal by appeal are accepted product rules; their concrete revi
 and versioning implementation remains deferred until its vertical slice.
 
 See [ADR-0009: Driver Service and Vehicle Eligibility Model](ADR-0009-driver-service-vehicle-eligibility.md).
+
+## 15. Minimal Driver onboarding reviewer
+
+Driver onboarding approval/rejection uses a dedicated backend review service and a narrow internal reviewer surface defined by ADR-0010.
+
+Approval and rejection are transactional, backend-authoritative decisions. Approval promotes the submitted Driver/vehicle/service snapshot into approved records; rejection requires a reason and creates no operational records. Decided applications remain in history.
+
+Newly approved Drivers remain non-operational until the vehicle/service operating-context slice is implemented. The reviewer slice must not reactivate the legacy immediate-write or legacy online bypass.
+
+See [ADR-0010: Minimal Driver Onboarding Reviewer](ADR-0010-minimal-driver-onboarding-reviewer.md).

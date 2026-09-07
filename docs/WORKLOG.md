@@ -10,17 +10,24 @@ The shared Flutter Android client implements account entry, Rider-first capabili
 selection, Rider request creation/status/cancellation, the shared ADR-0008 map-first
 dashboard, and the initial Driver readiness flow from PR #69.
 
-The current slice replaces the new-Driver onboarding semantics from PR #69 with the
-ADR-0009 service-application model. A Driver chooses one service for the first
-vehicle, reviews the application, and submits it for review. The submitted data is
-stored separately from approved operational Driver/vehicle data and can be restored
-as pending, approved, or rejected state. The client no longer treats new onboarding
-submission as immediate creation or editing of an approved Driver profile.
+PR #70 introduces the ADR-0009 new-Driver onboarding application model. A Driver
+chooses one service for the first vehicle, reviews the application, and submits it
+for review. Submitted data remains separate from approved Driver/vehicle data and
+can be restored as pending, approved, or rejected state. The public legacy
+`PUT /v1/driver` write path is removed so Driver accounts cannot bypass review.
 
-This slice does **not** provide a public approval/rejection endpoint. Reviewer
-authorization and promotion of an approved application into operational
-Driver/vehicle/service state are the next backend foundation. The legacy one-vehicle
-operational path remains for existing Drivers until that transition is complete.
+The current reviewer slice implements the narrow administration dependency defined
+by ADR-0010. Reviewer routes are registered only when internal reviewer credentials
+are configured. A reviewer can list pending applications, inspect one application,
+approve it, or reject it with a required reason through a small server-rendered page
+or the protected reviewer API.
+
+Approval transactionally promotes the submitted snapshot into an approved Driver
+profile, vehicle, and explicit selected-service enrollment while retaining the
+application decision/history. Rejection creates no Driver/vehicle/service records.
+Newly approved profiles use status `approved`, not `active`, so the legacy online
+and marketplace paths cannot treat them as operational before the vehicle/service
+operating-context slice is implemented.
 
 Only Rider selection assigns a Trip. Accepting the Rider's proposed fare and
 counteroffering both create pending offers; neither reserves the ride or Driver.
@@ -87,6 +94,7 @@ Worklog-only alignment PRs are intentionally omitted from the business-milestone
 - `Driver` is an account capability.
 - Economy, Comfort, and similar ride services are not capabilities. They are
   service products associated with a Driver vehicle through eligibility/enrollment.
+- Administrator review is an operator responsibility, not an account capability.
 
 ### Driver onboarding and vehicle/service applications
 
@@ -96,10 +104,10 @@ Worklog-only alignment PRs are intentionally omitted from the business-milestone
 - Precheck can reject only deterministic rules represented by application policy;
   it must not invent final verification state.
 - Submission creates a separate application snapshot. It does not immediately
-  create or overwrite approved operational Driver/vehicle data.
+  create or overwrite approved Driver/vehicle data.
 - At most one initial onboarding application may be pending for a Driver.
-- A Driver who already has an operational Driver profile cannot submit another
-  initial onboarding application; later vehicles/services use dedicated flows.
+- A Driver who already has approved Driver records cannot submit another initial
+  onboarding application; later vehicles/services use dedicated flows.
 - A Driver may ultimately own multiple vehicles.
 - Vehicle verification and service enrollment are separate states.
 - Initial onboarding chooses one service. After approval, the same vehicle can
@@ -110,6 +118,23 @@ Worklog-only alignment PRs are intentionally omitted from the business-milestone
 
 See [ADR-0009](ADR-0009-driver-service-vehicle-eligibility.md).
 
+### Initial onboarding review
+
+- Initial onboarding review follows ADR-0010.
+- Reviewer routes are disabled unless both internal reviewer credentials are configured.
+- Approval/rejection is backend-authoritative and transactional.
+- Approval promotes exactly the submitted Driver/vehicle/service snapshot.
+- Approval creates one explicit enrollment for the selected service; implied lower
+  services are not silently enrolled.
+- Rejection requires a non-blank reason and creates no approved records.
+- A decided application cannot be decided again through the reviewer surface.
+- Reviewer identity and decision time are retained on the application.
+- Newly approved profiles are `approved` and offline, not `active`.
+- Approved-only profiles remain outside the legacy operational `/v1/driver`, online,
+  and marketplace path until the new operating-context slice is implemented.
+
+See [ADR-0010](ADR-0010-minimal-driver-onboarding-reviewer.md).
+
 ### Approved information and change governance
 
 - Approved Driver and vehicle information remains authoritative until a submitted
@@ -118,9 +143,9 @@ See [ADR-0009](ADR-0009-driver-service-vehicle-eligibility.md).
 - After submission, a server-owned cancellation window permits direct cancellation.
 - After that deadline, withdrawal requires an appeal.
 - Approval, rejection, cancellation, withdrawal, and historical versions are retained.
-- The concrete revision tables, review UI, cancellation endpoint, appeal workflow,
-  and administration tooling remain deferred. Current client code must not introduce
-  immediate-overwrite semantics in the meantime.
+- The current reviewer implements **initial onboarding decisions only**. The future
+  Driver/vehicle revision tables, cancellation endpoint, withdrawal appeal workflow,
+  and versioned-change reviewer UI remain deferred.
 
 ### Driver online operating context
 
@@ -134,9 +159,10 @@ See [ADR-0009](ADR-0009-driver-service-vehicle-eligibility.md).
   state, fresh location, and no conflicting active Trip or other applicable commitment.
 - Marketplace/offers/assignment/Trip history must preserve the vehicle/service
   context used at the time rather than following later Driver selections.
-- The current legacy operational Driver profile still stores one vehicle and does
-  not yet satisfy this target. Marketplace client expansion must wait for the
-  multi-vehicle/service operating foundation rather than deepen that assumption.
+- Existing legacy `active` Drivers still use the one-vehicle operational path.
+- Newly approved ADR-0009 Drivers intentionally cannot enter that legacy path.
+- Marketplace client expansion must wait for the multi-vehicle/service operating
+  foundation rather than deepen the legacy assumption.
 
 ### Marketplace and assignment
 
@@ -185,7 +211,7 @@ ADR-0007 remains authoritative for the Ride Request marketplace.
 
 ## Current slice implementation
 
-### Backend
+### Driver onboarding submission foundation
 
 Migration 018 introduces:
 
@@ -195,7 +221,7 @@ Migration 018 introduces:
 - Driver onboarding application snapshots with pending/approved/rejected status;
 - one-pending-initial-application protection.
 
-New application APIs:
+Application APIs:
 
 ```text
 GET  /v1/driver/services
@@ -206,9 +232,34 @@ POST /v1/driver/onboarding
 
 No endpoint allows a Driver to approve or reject their own application.
 
+### Minimal reviewer
+
+Migration 019:
+
+- adds `approved` as a non-operational Driver profile status;
+- records the reviewer identity on decided onboarding applications;
+- adds explicit approved vehicle/service enrollment persistence.
+
+Protected reviewer API:
+
+```text
+GET  /v1/admin/driver-onboarding-applications
+GET  /v1/admin/driver-onboarding-applications/{application_id}
+POST /v1/admin/driver-onboarding-applications/{application_id}/approve
+POST /v1/admin/driver-onboarding-applications/{application_id}/reject
+```
+
+The server-rendered reviewer is available at `/admin/driver-onboarding` only when
+`ADMIN_REVIEW_USERNAME` and `ADMIN_REVIEW_PASSWORD` are both configured. All reviewer
+responses are protected by HTTP Basic auth; mutation routes also reject explicit
+cross-origin requests. The current credentials are an internal MVP mechanism, not the
+long-term administrator identity architecture.
+
+See [Driver onboarding reviewer](driver-onboarding-reviewer.md).
+
 ### Flutter
 
-The Driver screen now distinguishes:
+The Driver screen distinguishes:
 
 - operational legacy Driver profile;
 - onboarding loading/error;
@@ -217,7 +268,11 @@ The Driver screen now distinguishes:
 
 The form selects one service, collects Driver/vehicle information, performs the
 server precheck, shows a final review dialog, and submits a pending application.
-Backend `error` text is now preserved when a separate `message` field is absent.
+Backend `error` text is preserved when a separate `message` field is absent.
+
+An approved-only profile remains hidden from the legacy operational Driver endpoint,
+so the mobile client continues to show the onboarding application as approved rather
+than exposing a non-functional legacy Go online control.
 
 ---
 
@@ -231,6 +286,9 @@ go vet ./...
 ```
 
 Database integration tests require the existing dedicated `_test` database setup.
+Reviewer integration coverage includes approval promotion, explicit service enrollment,
+no implied lower-service enrollment, rejection without operational records, and the
+active-only availability guard.
 
 Flutter verification to run from `mobile/`:
 
@@ -241,27 +299,25 @@ flutter analyze
 flutter test
 ```
 
-Physical-device verification remains required. The current execution environment
-used for this branch does not provide Flutter/Dart tooling or a reachable clone of
-the GitHub repository, so runtime/test success must not be claimed until those
-commands are run locally or in CI.
+Physical-device/reviewer verification remains required. The current execution
+environment used for this branch has Go but cannot clone the GitHub repository and
+does not provide Flutter/Dart tooling, so runtime/test success must not be claimed
+until the commands are run locally or in CI.
 
 ---
 
 ## Next implementation order
 
-1. Define the minimal authorized review boundary for onboarding decisions; do not
-   expose self-approval through Driver APIs.
-2. On approval, create/promote the approved Driver, vehicle, and first service
-   enrollment transactionally while preserving the submitted application history.
-3. Replace the database one-vehicle assumption with Driver → multiple vehicles.
-4. Add verified vehicle + approved service enrollment reads and operational selection.
-5. Require selected verified vehicle/service when going online and lock switching
-   until offline.
-6. Add capability-shell sidebar and read-only Driver/Vehicle management surfaces
+1. Validate the complete onboarding decision loop: phone submission → internal
+   reviewer approve/reject → phone refresh/re-entry → approved/rejected state.
+2. Replace the database one-vehicle assumption with Driver → multiple vehicles.
+3. Add approved vehicle + approved service enrollment reads and operational selection.
+4. Require selected approved vehicle/service when transitioning the Driver to
+   operational `active`/online state and lock switching until offline.
+5. Add capability-shell sidebar and read-only Driver/Vehicle management surfaces
    without changing ADR-0008 dashboard gestures.
-7. Run the physical-device gate.
-8. Then continue Driver marketplace/offers client work, Rider offer selection, and
+6. Run the broader physical-device gate for vehicle/service operation.
+7. Then continue Driver marketplace/offers client work, Rider offer selection, and
    Trip controls/history.
 
 The future approved-information revision/cancellation-window/withdrawal-appeal
@@ -274,7 +330,8 @@ slice follows when profile/vehicle change management becomes a concrete dependen
 Accepted ADRs, `architecture-decisions.md`, `product-and-capability-model.md`,
 `mvp-scope.md`, and this worklog describe the intended MVP. ADR-0007 is the Ride
 Request marketplace authority, ADR-0008 is the dashboard interaction authority,
-and ADR-0009 is the Driver service/vehicle/onboarding authority.
+ADR-0009 is the Driver service/vehicle/onboarding authority, and ADR-0010 is the
+initial Driver onboarding reviewer authority.
 
 Implementation must not silently redefine these product rules.
 
@@ -287,6 +344,8 @@ Implementation must not silently redefine these product rules.
 - Sophisticated payments, cancellation fees, refunds, and no-show policy.
 - Full administrator operations beyond the minimal review boundary needed by the
   current Driver application flow.
+- Proper administrator identity/role management beyond the temporary internal
+  reviewer credentials.
 - Complete versioned Driver/vehicle change review, cancellation-window, and appeal UI.
 - Courier, Freight, promotions, analytics platforms, multi-round/chat negotiation,
   CI/CD, Kubernetes, and iOS implementation.

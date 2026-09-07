@@ -162,5 +162,6 @@ func driverOnboardingResponse(application driveronboarding.Application) map[stri
 		"rejection_reason": application.RejectionReason,
 		"submitted_at":     application.SubmittedAt,
 		"decided_at":       application.DecidedAt,
+		"decided_by":       application.DecidedBy,
 	}
 }

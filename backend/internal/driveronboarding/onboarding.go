@@ -10,12 +10,14 @@ import (
 )
 
 var (
-	ErrInvalidApplication = errors.New("invalid driver onboarding application")
-	ErrServiceNotFound    = errors.New("driver service not found")
-	ErrPendingApplication = errors.New("driver onboarding application already pending")
-	ErrAlreadyOnboarded   = errors.New("driver onboarding already complete")
-	ErrNotFound           = errors.New("driver onboarding application not found")
-	ErrIneligible         = errors.New("vehicle is not eligible for selected service")
+	ErrInvalidApplication    = errors.New("invalid driver onboarding application")
+	ErrServiceNotFound       = errors.New("driver service not found")
+	ErrPendingApplication    = errors.New("driver onboarding application already pending")
+	ErrAlreadyOnboarded      = errors.New("driver onboarding already complete")
+	ErrNotFound              = errors.New("driver onboarding application not found")
+	ErrIneligible            = errors.New("vehicle is not eligible for selected service")
+	ErrInvalidReviewDecision = errors.New("invalid driver onboarding review decision")
+	ErrApplicationNotPending = errors.New("driver onboarding application is not pending")
 )
 
 type ApplicationStatus string
@@ -58,6 +60,7 @@ type Application struct {
 	RejectionReason string
 	SubmittedAt     time.Time
 	DecidedAt       *time.Time
+	DecidedBy       string
 }
 
 type PrecheckResult struct {
@@ -73,9 +76,22 @@ type Repository interface {
 	CreateApplication(ctx context.Context, userID uuid.UUID, input ApplicationInput, service ServiceOption) (Application, error)
 }
 
+type ReviewRepository interface {
+	ListPendingApplications(ctx context.Context) ([]Application, error)
+	FindApplicationByID(ctx context.Context, applicationID uuid.UUID) (Application, error)
+	ApproveApplication(ctx context.Context, applicationID uuid.UUID, reviewer string) (Application, error)
+	RejectApplication(ctx context.Context, applicationID uuid.UUID, reviewer, reason string) (Application, error)
+}
+
 type Service struct{ repository Repository }
 
+type ReviewService struct{ repository ReviewRepository }
+
 func NewService(repository Repository) Service { return Service{repository: repository} }
+
+func NewReviewService(repository ReviewRepository) ReviewService {
+	return ReviewService{repository: repository}
+}
 
 func (s Service) ListServices(ctx context.Context) ([]ServiceOption, error) {
 	return s.repository.ListServices(ctx)
@@ -115,6 +131,34 @@ func (s Service) Submit(ctx context.Context, userID uuid.UUID, input Application
 		return Application{}, ErrIneligible
 	}
 	return s.repository.CreateApplication(ctx, userID, input, precheck.Service)
+}
+
+func (s ReviewService) ListPending(ctx context.Context) ([]Application, error) {
+	return s.repository.ListPendingApplications(ctx)
+}
+
+func (s ReviewService) Get(ctx context.Context, applicationID uuid.UUID) (Application, error) {
+	if applicationID == uuid.Nil {
+		return Application{}, ErrNotFound
+	}
+	return s.repository.FindApplicationByID(ctx, applicationID)
+}
+
+func (s ReviewService) Approve(ctx context.Context, applicationID uuid.UUID, reviewer string) (Application, error) {
+	reviewer = strings.TrimSpace(reviewer)
+	if applicationID == uuid.Nil || reviewer == "" {
+		return Application{}, ErrInvalidReviewDecision
+	}
+	return s.repository.ApproveApplication(ctx, applicationID, reviewer)
+}
+
+func (s ReviewService) Reject(ctx context.Context, applicationID uuid.UUID, reviewer, reason string) (Application, error) {
+	reviewer = strings.TrimSpace(reviewer)
+	reason = strings.TrimSpace(reason)
+	if applicationID == uuid.Nil || reviewer == "" || reason == "" {
+		return Application{}, ErrInvalidReviewDecision
+	}
+	return s.repository.RejectApplication(ctx, applicationID, reviewer, reason)
 }
 
 func normalize(input ApplicationInput) ApplicationInput {
