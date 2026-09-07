@@ -22,7 +22,10 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Become a Driver'), findsOneWidget);
-    expect(find.text('Choose one service for your first vehicle application.'), findsOneWidget);
+    expect(
+      find.text('Choose one service for your first vehicle application.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('Driver onboarding submits selected service for review', (
@@ -73,7 +76,7 @@ void main() {
     await tester.tap(find.text('Review application'));
     await tester.pumpAndSettle();
     expect(onboardingRepo.calls, contains('precheck:comfort'));
-    expect(find.text('Review application'), findsOneWidget);
+    expect(find.byType(AlertDialog), findsOneWidget);
     expect(find.text('Service: Comfort'), findsOneWidget);
 
     await tester.tap(find.text('Submit for review'));
@@ -112,7 +115,7 @@ void main() {
     await tester.ensureVisible(find.text('Go online'));
     await tester.tap(find.text('Go online'));
     await tester.pumpAndSettle();
-    expect(repo.calls.take(2), ['location', 'online=true']);
+    expect(repo.calls.take(2).toList(), ['location', 'online=true']);
     expect(repo.profile!.isOnline, isTrue);
     expect(find.text('Go offline'), findsOneWidget);
   });
