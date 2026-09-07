@@ -17,69 +17,114 @@ class CapabilityHomeScreen extends ConsumerWidget {
     final controller = ref.watch(sessionControllerProvider);
     final account = controller.state.account!;
     final canDrive = account.capabilities.contains(Capability.driver);
+
+    Future<void> selectCapability(Capability next) async {
+      Navigator.of(context).pop();
+      if (next == capability) return;
+      await controller.selectCapability(next);
+      if (context.mounted) context.go('/${next.name}');
+    }
+
+    Future<void> enableDriver() async {
+      Navigator.of(context).pop();
+      final enabled = await controller.enableDriver();
+      if (!context.mounted) return;
+      if (enabled) {
+        await controller.selectCapability(Capability.driver);
+        if (context.mounted) context.go('/driver');
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            controller.state.error ?? 'Unable to enable Driver access.',
+          ),
+        ),
+      );
+    }
+
+    Future<void> logout() async {
+      Navigator.of(context).pop();
+      await controller.logout();
+    }
+
     return Scaffold(
+      drawer: Drawer(
+        child: SafeArea(
+          child: ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              DrawerHeader(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    const Icon(Icons.account_circle_outlined, size: 36),
+                    const SizedBox(height: 12),
+                    Text(
+                      capability == Capability.rider ? 'Rider' : 'Driver',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Account menu',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
+                ),
+              ),
+              ListTile(
+                key: const Key('drawerRider'),
+                leading: const Icon(Icons.person_outline),
+                title: const Text('Rider'),
+                selected: capability == Capability.rider,
+                onTap: controller.state.busy
+                    ? null
+                    : () => selectCapability(Capability.rider),
+              ),
+              if (canDrive)
+                ListTile(
+                  key: const Key('drawerDriver'),
+                  leading: const Icon(Icons.local_taxi_outlined),
+                  title: const Text('Driver'),
+                  selected: capability == Capability.driver,
+                  onTap: controller.state.busy
+                      ? null
+                      : () => selectCapability(Capability.driver),
+                )
+              else
+                ListTile(
+                  key: const Key('drawerBecomeDriver'),
+                  leading: const Icon(Icons.add_circle_outline),
+                  title: const Text('Become a Driver'),
+                  onTap: controller.state.busy ? null : enableDriver,
+                ),
+              const Divider(),
+              ListTile(
+                key: const Key('drawerLogout'),
+                leading: const Icon(Icons.logout),
+                title: const Text('Log out'),
+                onTap: controller.state.busy ? null : logout,
+              ),
+            ],
+          ),
+        ),
+      ),
       appBar: AppBar(
+        leading: Builder(
+          builder: (context) => IconButton(
+            key: const Key('capabilityMenuButton'),
+            tooltip: 'Open menu',
+            onPressed: Scaffold.of(context).openDrawer,
+            icon: const Icon(Icons.menu),
+          ),
+        ),
         title: Text(capability == Capability.rider ? 'Rider' : 'Driver'),
         notificationPredicate: (_) => false,
-        actions: [
-          if (!canDrive)
-            TextButton(
-              onPressed: controller.state.busy
-                  ? null
-                  : () async {
-                      final enabled = await controller.enableDriver();
-                      if (!context.mounted) return;
-                      if (enabled) {
-                        await controller.selectCapability(Capability.driver);
-                        if (context.mounted) context.go('/driver');
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              controller.state.error ??
-                                  'Unable to enable Driver access.',
-                            ),
-                          ),
-                        );
-                      }
-                    },
-              child: const Text('Become a Driver'),
-            ),
-          IconButton(
-            tooltip: 'Log out',
-            onPressed: controller.state.busy ? null : controller.logout,
-            icon: const Icon(Icons.logout),
-          ),
-        ],
       ),
       body: capability == Capability.rider
           ? const RiderRequestScreen()
           : DriverWorkspaceScreen(accountID: account.id),
-      bottomNavigationBar: canDrive
-          ? SafeArea(
-              minimum: const EdgeInsets.all(12),
-              child: SegmentedButton<Capability>(
-                segments: const [
-                  ButtonSegment(
-                    value: Capability.rider,
-                    label: Text('Rider'),
-                    icon: Icon(Icons.person),
-                  ),
-                  ButtonSegment(
-                    value: Capability.driver,
-                    label: Text('Driver'),
-                    icon: Icon(Icons.local_taxi),
-                  ),
-                ],
-                selected: {capability},
-                onSelectionChanged: (selection) async {
-                  final next = selection.single;
-                  await controller.selectCapability(next);
-                  if (context.mounted) context.go('/${next.name}');
-                },
-              ),
-            )
-          : null,
     );
   }
 }
