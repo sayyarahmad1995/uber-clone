@@ -8,12 +8,19 @@ The Rider experience supports map-based pickup/destination selection, current
 device location for pickup, PKR fare proposals, request creation, status refresh,
 state restoration, and cancellation.
 
-Driver setup now supports enabling Driver access on the same account, saving and
-editing Driver/vehicle details, online/offline availability, and manual location
-publication. Going online publishes location first; going offline needs no location
-permission. Location freshness remains governed by the backend's two-minute rule.
-Marketplace discovery and offers follow in the next slice. See
-`docs/flutter-driver-readiness.md` for behavior and device checks.
+Driver onboarding now follows the ADR-0009 service-application model. Enabling the
+Driver capability does not immediately create an operational Driver profile. A new
+Driver chooses one service, enters Driver and vehicle details, passes the available
+deterministic pre-eligibility checks, reviews the application, and submits it for
+review. Pending, approved, and rejected application states are restored from the
+backend. Submitted details do not become approved information immediately.
+
+The existing one-vehicle operational Driver path remains temporarily available for
+previously onboarded accounts. It preserves online/offline availability and manual
+location publication while the multi-vehicle/service operating foundation is built.
+Going online still publishes location first; going offline needs no location
+permission. New marketplace client work must not deepen the legacy one-vehicle
+assumption. See `docs/flutter-driver-readiness.md` and ADR-0009 for the target model.
 
 ## Client architecture direction
 
@@ -35,9 +42,15 @@ the shared scaffold and must not redefine its sizing, direct finger tracking,
 scrolling, snap animation, or gesture state machine without an explicit product
 decision that updates or supersedes the ADR.
 
+Driver/vehicle administration and service applications are distinct from dashboard
+operational state. Approved Driver/vehicle information must not be overwritten by a
+client edit. The future edit flow submits versioned changes under the governance
+rules in ADR-0009; the concrete review, cancellation-window, and appeal implementation
+is intentionally deferred.
+
 This keeps the MVP light while avoiding a future rewrite when the product grows
 from Rider request creation into Driver marketplace, offer selection, trip
-execution, and enterprise-grade surfaces.
+execution, and later administrative surfaces.
 
 ## Environments
 
