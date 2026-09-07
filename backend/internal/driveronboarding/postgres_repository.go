@@ -80,6 +80,21 @@ func (r PostgresRepository) LatestApplication(ctx context.Context, userID uuid.U
 }
 
 func (r PostgresRepository) CreateApplication(ctx context.Context, userID uuid.UUID, input ApplicationInput, service ServiceOption) (Application, error) {
+	var alreadyOnboarded bool
+	if err := r.db.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM driver_profiles WHERE user_id = $1
+			UNION ALL
+			SELECT 1 FROM driver_onboarding_applications
+			WHERE driver_user_id = $1 AND status = 'approved'
+		)
+	`, userID).Scan(&alreadyOnboarded); err != nil {
+		return Application{}, err
+	}
+	if alreadyOnboarded {
+		return Application{}, ErrAlreadyOnboarded
+	}
+
 	now := time.Now().UTC()
 	applicationID := uuid.New()
 	_, err := r.db.ExecContext(ctx, `
