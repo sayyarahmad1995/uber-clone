@@ -252,7 +252,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.getSize(panel).height, height);
     }
-    await tester.tap(find.byKey(const Key('panelButton'));
+    await tester.tap(find.byKey(const Key('panelButton')));
     await tester.pumpAndSettle();
     expect(find.text('Tapped'), findsOneWidget);
     await tester.enterText(find.byKey(const Key('panelField')), '42');
