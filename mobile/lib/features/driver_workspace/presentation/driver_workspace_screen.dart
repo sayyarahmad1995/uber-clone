@@ -537,7 +537,7 @@ class _DriverSetupFormState extends State<_DriverSetupForm> {
           DashboardPanelControl(
             child: DropdownButtonFormField<String>(
               key: const Key('driver-service-field'),
-              value: _serviceCode,
+              initialValue: _serviceCode,
               decoration: const InputDecoration(labelText: 'Service'),
               items: widget.services
                   .map(
