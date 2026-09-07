@@ -2,6 +2,8 @@ package httpapi
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -28,5 +30,19 @@ func TestDriverOnboardingRequestIncludesSelectedServiceAndVehicle(t *testing.T) 
 	}
 	if input.Vehicle.Make != "Toyota" || input.Vehicle.Model != "Corolla" || input.Vehicle.ModelYear != 2024 || input.Vehicle.Color != "White" || input.Vehicle.LicensePlate != "ABC-123" {
 		t.Fatalf("unexpected vehicle input: %#v", input.Vehicle)
+	}
+}
+
+func TestDriverProfileCannotBeWrittenThroughLegacyPublicRoute(t *testing.T) {
+	api := &API{}
+	mux := http.NewServeMux()
+	api.registerDriverRoutes(mux)
+
+	request := httptest.NewRequest(http.MethodPut, "/v1/driver", strings.NewReader(`{}`))
+	response := httptest.NewRecorder()
+	mux.ServeHTTP(response, request)
+
+	if response.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected PUT /v1/driver to be unavailable, got status %d", response.Code)
 	}
 }
