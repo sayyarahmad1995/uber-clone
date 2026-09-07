@@ -1,8 +1,10 @@
 import 'package:uber_clone/core/models/account.dart';
-import 'package:uber_clone/features/driver_workspace/data/driver_repository.dart';
-import 'package:uber_clone/features/driver_workspace/domain/driver_profile.dart';
 import 'package:uber_clone/core/session/session_store.dart';
 import 'package:uber_clone/features/authentication/data/auth_repository.dart';
+import 'package:uber_clone/features/driver_workspace/data/driver_onboarding_repository.dart';
+import 'package:uber_clone/features/driver_workspace/data/driver_repository.dart';
+import 'package:uber_clone/features/driver_workspace/domain/driver_onboarding.dart';
+import 'package:uber_clone/features/driver_workspace/domain/driver_profile.dart';
 import 'package:uber_clone/features/rider_request/data/device_location.dart';
 import 'package:uber_clone/features/rider_request/data/ride_request_repository.dart';
 import 'package:uber_clone/features/rider_request/domain/ride_request.dart';
@@ -114,6 +116,19 @@ const driverProfile = DriverProfile(
   vehicle: driverVehicle,
 );
 
+const economyService = DriverServiceOption(
+  code: 'economy',
+  displayName: 'Economy',
+  description: 'Vehicle eligibility is confirmed during review.',
+);
+const comfortService = DriverServiceOption(
+  code: 'comfort',
+  displayName: 'Comfort',
+  description:
+      'Vehicle condition and service eligibility are confirmed during review.',
+  impliedServiceCode: 'economy',
+);
+
 class FakeDriverRepository implements DriverRepository {
   FakeDriverRepository({this.profile});
   DriverProfile? profile;
@@ -146,6 +161,58 @@ class FakeDriverRepository implements DriverRepository {
       latitude: point.latitude,
       longitude: point.longitude,
       updatedAt: DateTime.utc(2026, 9, 5),
+    );
+  }
+}
+
+class FakeDriverOnboardingRepository implements DriverOnboardingRepository {
+  FakeDriverOnboardingRepository({
+    List<DriverServiceOption>? services,
+    this.application,
+  }) : services = services ?? const [economyService, comfortService];
+
+  final List<DriverServiceOption> services;
+  DriverOnboardingApplication? application;
+  final calls = <String>[];
+  bool precheckEligible = true;
+  List<String> precheckReasons = const [];
+
+  @override
+  Future<List<DriverServiceOption>> listServices() async => services;
+
+  @override
+  Future<DriverOnboardingApplication?> getLatest() async => application;
+
+  @override
+  Future<DriverOnboardingPrecheck> precheck({
+    required String displayName,
+    required String serviceCode,
+    required DriverVehicle vehicle,
+  }) async {
+    calls.add('precheck:$serviceCode');
+    final service = services.firstWhere((item) => item.code == serviceCode);
+    return DriverOnboardingPrecheck(
+      eligible: precheckEligible,
+      reasons: precheckReasons,
+      service: service,
+    );
+  }
+
+  @override
+  Future<DriverOnboardingApplication> submit({
+    required String displayName,
+    required String serviceCode,
+    required DriverVehicle vehicle,
+  }) async {
+    calls.add('submit:$serviceCode');
+    final service = services.firstWhere((item) => item.code == serviceCode);
+    return application = DriverOnboardingApplication(
+      id: 'application-1',
+      displayName: displayName,
+      status: 'pending',
+      service: service,
+      vehicle: vehicle,
+      submittedAt: DateTime.utc(2026, 9, 7),
     );
   }
 }

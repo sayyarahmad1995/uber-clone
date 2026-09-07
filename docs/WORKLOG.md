@@ -2,39 +2,32 @@
 
 ## Current status
 
-The backend implements accounts/authentication, Driver operations, ride requests,
-marketplace discovery and offers, Rider-selected assignment, Trip execution,
-cancellation, history, and Driver location storage/read access.
+The backend implements accounts/authentication, legacy Driver operations, ride
+requests, geographic marketplace discovery and offers, Rider-selected assignment,
+Trip execution, cancellation, history, and Driver location storage/read access.
 
-PR #56 completed candidate retirement and migration 016. PR #57 added
-location-aware discovery, Rider offer comparison, and consistent geographic
-eligibility through offer submission and selection.
+The shared Flutter Android client implements account entry, Rider-first capability
+selection, Rider request creation/status/cancellation, the shared ADR-0008 map-first
+dashboard, and the initial Driver readiness flow from PR #69.
 
-This slice adds application-owned Driver public presentation data needed by the
-Rider comparison journey: Driver display name and vehicle model year. It keeps
-identity-provider traits and license plates outside the pre-assignment Rider view.
-See [Driver public presentation](driver-public-presentation.md).
+The current slice replaces the new-Driver onboarding semantics from PR #69 with the
+ADR-0009 service-application model. A Driver chooses one service for the first
+vehicle, reviews the application, and submits it for review. The submitted data is
+stored separately from approved operational Driver/vehicle data and can be restored
+as pending, approved, or rejected state. The client no longer treats new onboarding
+submission as immediate creation or editing of an approved Driver profile.
+
+This slice does **not** provide a public approval/rejection endpoint. Reviewer
+authorization and promotion of an approved application into operational
+Driver/vehicle/service state are the next backend foundation. The legacy one-vehicle
+operational path remains for existing Drivers until that transition is complete.
 
 Only Rider selection assigns a Trip. Accepting the Rider's proposed fare and
-counteroffering both create pending offers. A pending offer reserves neither
-the ride nor the Driver.
-
-Migration 016 preserves existing Trips, offers, and legacy rides without fares.
-It stops if an accepted unreleased candidate has no matching Trip. See the
-[rollout guide](candidate-retirement-rollout.md) before upgrading an existing
-installation. Old API instances must be stopped for the schema removal.
-
-The shared Flutter Android application implements registration and verification,
-login, secure session restoration, account loading, Rider-first entry, capability
-switching for Driver-enabled accounts, and logout.
-
-The Rider client can now select pickup and destination on an interactive map, use
-device location for pickup, propose a PKR fare, create a ride request, restore and
-refresh request status, and cancel through the existing backend lifecycle.
+counteroffering both create pending offers; neither reserves the ride or Driver.
 
 ---
 
-## Completed Milestones
+## Completed milestones
 
 - [x] Deployment Foundation — PR #1
 - [x] User Entry and Rider Foundation — PR #2
@@ -74,10 +67,12 @@ refresh request status, and cancel through the existing backend lifecycle.
 - [x] Legacy Candidate and Booking-Mode Retirement — PR #56
 - [x] Geographic Marketplace Discovery and Rider Comparison — PR #57
 - [x] Driver Public Presentation — PR #58
-- [x] Flutter Rider Entry Foundation
-- [x] Flutter Rider Ride-Request Creation
-- [x] Flutter Driver Setup and Readiness — same-account capability enablement,
-  profile editing, availability, and manual location publication
+- [x] Flutter Rider Entry Foundation — PR #59
+- [x] Flutter Rider Ride-Request Creation — PR #60
+- [x] Shared Flutter Dashboard Foundation and Interaction Contract — PRs #61–#68
+- [x] Flutter Driver Setup and Readiness — PR #69; retained as a transitional
+  operational path for existing Drivers while ADR-0009 onboarding replaces its
+  immediate new-Driver setup semantics
 
 Worklog-only alignment PRs are intentionally omitted from the business-milestone list.
 
@@ -85,22 +80,76 @@ Worklog-only alignment PRs are intentionally omitted from the business-milestone
 
 ## Current product model and invariants
 
-### Marketplace and assignment
+### Identity, capability, service
 
 - One account supports Rider and Driver capabilities; identity is shared.
+- Rider remains the default capability.
+- `Driver` is an account capability.
+- Economy, Comfort, and similar ride services are not capabilities. They are
+  service products associated with a Driver vehicle through eligibility/enrollment.
+
+### Driver onboarding and vehicle/service applications
+
+- Initial onboarding applies one vehicle to one Driver-selected service.
+- Flow: Driver details → service → requirements → vehicle → deterministic precheck
+  → application review → submit → approved/rejected with reason.
+- Precheck can reject only deterministic rules represented by application policy;
+  it must not invent final verification state.
+- Submission creates a separate application snapshot. It does not immediately
+  create or overwrite approved operational Driver/vehicle data.
+- At most one initial onboarding application may be pending for a Driver.
+- A Driver who already has an operational Driver profile cannot submit another
+  initial onboarding application; later vehicles/services use dedicated flows.
+- A Driver may ultimately own multiple vehicles.
+- Vehicle verification and service enrollment are separate states.
+- Initial onboarding chooses one service. After approval, the same vehicle can
+  apply for additional services without being registered again.
+- Service hierarchy may establish derived technical eligibility but never silent
+  enrollment. For example, Comfort approval may make Economy eligible when the
+  catalog explicitly defines that implication; the Driver still chooses to add it.
+
+See [ADR-0009](ADR-0009-driver-service-vehicle-eligibility.md).
+
+### Approved information and change governance
+
+- Approved Driver and vehicle information remains authoritative until a submitted
+  revision is approved.
+- Local drafts are discardable.
+- After submission, a server-owned cancellation window permits direct cancellation.
+- After that deadline, withdrawal requires an appeal.
+- Approval, rejection, cancellation, withdrawal, and historical versions are retained.
+- The concrete revision tables, review UI, cancellation endpoint, appeal workflow,
+  and administration tooling remain deferred. Current client code must not introduce
+  immediate-overwrite semantics in the meantime.
+
+### Driver online operating context
+
+- Target MVP operating context is exactly one selected verified vehicle and one
+  selected approved service at a time.
+- If a vehicle has one approved service, the client may omit the redundant service selector.
+- Changing vehicle/service requires the Driver to go offline first.
+- Going online publishes current location before the online transition.
+- Going offline never requires location permission.
+- Marketplace eligibility additionally requires Driver capability/approval, online
+  state, fresh location, and no conflicting active Trip or other applicable commitment.
+- Marketplace/offers/assignment/Trip history must preserve the vehicle/service
+  context used at the time rather than following later Driver selections.
+- The current legacy operational Driver profile still stores one vehicle and does
+  not yet satisfy this target. Marketplace client expansion must wait for the
+  multi-vehicle/service operating foundation rather than deepen that assumption.
+
+### Marketplace and assignment
+
 - A new ride request requires pickup, destination, and proposed fare/currency.
 - There is no Rider booking-mode choice.
 - Exact-fare responses and counteroffers both create/update pending offers.
 - Drivers may offer on multiple rides; multiple Drivers may offer on one ride.
 - Rider selection locks and revalidates the request, offer, and Driver.
-- Driver capability, active profile, online state, vehicle, fresh location, and
-  active-Trip exclusions govern marketplace eligibility. The Driver domain owns
-  the shared transactional check used by offers and Trip assignment.
 - At most one Trip exists per ride, and a Driver has at most one active Trip.
-- Competing offers on the selected ride close. The winning Driver's other offers
-  cannot create a second active Trip; availability is rechecked on selection.
-- There are no runtime candidate reservations, timeout rules, or release markers.
+- Competing offers on the selected ride close.
 - Legacy rides without fares remain readable but cannot enter the marketplace.
+
+ADR-0007 remains authoritative for the Ride Request marketplace.
 
 ### Trip lifecycle
 
@@ -109,105 +158,125 @@ Worklog-only alignment PRs are intentionally omitted from the business-milestone
 - Rider and assigned Driver cancellation share transactional behavior.
 - Cancellation closes pending offers for that ride and is idempotent.
 - Completed Trips cannot be cancelled.
-- Completion/cancellation free the Driver through Trip status while preserving
-  history. No separate commitment lifecycle is needed.
 
 ### Location and geographic policy
 
 - One latest location row is stored per Driver, separate from profile/vehicle.
-- Server-owned update timestamps support freshness decisions.
-- Rider location reads require ownership of the associated active ride/Trip.
+- Server-owned timestamps support freshness decisions.
 - Marketplace locations must be no older than two minutes and not in the future.
-- Discovery ranks all eligible requests by Haversine pickup distance before the
-  feed limit, with deterministic creation-time/UUID ties.
-- Rider comparison includes Driver display name when available, vehicle
-  make/model/model year/color, nullable pickup distance, fare-match indication,
-  and current selectability. Raw Driver coordinates and license plates are not
-  exposed before assignment.
-- Selection rechecks eligibility after acquiring locks. Offer views are snapshots;
-  temporary unavailability does not change pending offer status.
-- No arbitrary pickup radius, service boundary, same-city restriction, routing
-  ETA, or PostGIS requirement has been introduced.
+- Discovery ranks eligible requests by Haversine pickup distance before the feed limit.
+- Raw Driver coordinates and license plates are not exposed before assignment.
+- No arbitrary pickup radius, service boundary, routing ETA, or PostGIS requirement
+  has been introduced.
 
-### Driver public presentation
-
-- Driver display name is application-owned public marketplace data, not an Ory
-  identity-provider trait read at comparison time.
-- New/re-onboarding requires a display name and vehicle model year in addition to
-  existing vehicle fields.
-- Migration 017 preserves legacy Driver rows with nullable presentation columns;
-  presentation completeness does not silently disable existing Drivers.
-- Driver and vehicle photos remain a separate media-backed slice. Do not store
-  arbitrary external photo URLs merely to avoid defining media ownership.
-
-### Flutter client entry
+### Flutter client
 
 - The client calls only application-owned APIs and does not expose Ory concepts.
-- An unexpired stored session is validated through `/v1/me` at startup.
-- Rider remains the default context, including after a new login.
-- Driver navigation is available only when the account owns that capability.
 - Session secrets use secure storage; capability preference uses simple preferences.
-- Android debug builds use the emulator host alias and allow local cleartext HTTP.
-  Release configuration requires an HTTPS API URL.
+- Rider and Driver use the shared ADR-0008 dashboard interaction contract.
+- New Driver onboarding loads the service catalog, restores the latest application,
+  runs server precheck, displays a review confirmation, and submits for review.
+- Pending/rejected/approved application state is shown from backend data.
+- The immediate `Edit Driver details` action was removed from the operational
+  dashboard because approved information must not be overwritten directly.
+- Existing operational Driver accounts retain the PR #69 readiness path temporarily.
 
-### Flutter Rider request
+---
 
-- Ride models contain application coordinates and money, without provider types.
-- Device location and map tiles are behind client-owned ports selected at composition.
-- The Rider sends pickup, destination, and proposed fare through the one marketplace
-  request contract; no booking mode exists in the client.
-- Existing request state is restored from the backend and can be refreshed or
-  cancelled.
-- Routing, geocoding, address search, ETA, and service-area policy remain deferred.
+## Current slice implementation
 
-### Flutter dashboard foundation
+### Backend
 
-- Rider and Driver use shared map-first dashboard, map-rendering, and theme
-  primitives while feature screens retain ownership of business behavior.
-- The Rider dashboard requests device location on startup to focus the map on the
-  Rider automatically; explicit controls can refocus the map or select pickup.
-- The Driver dashboard supports profile setup/editing, availability, and explicit
-  location publishing. Discovery and offers remain follow-up business slices.
-- ADR-0008 makes shared panel sizing, direct finger tracking, handle dragging,
-  scroll locking, thresholds, and release-gated body snaps authoritative for future
-  client slices.
+Migration 018 introduces:
 
-## Verification for this slice
+- an application-owned Driver service catalog;
+- initial Economy and Comfort catalog entries without invented model-year thresholds;
+- optional explicit service implication (`Comfort` may imply Economy eligibility);
+- Driver onboarding application snapshots with pending/approved/rejected status;
+- one-pending-initial-application protection.
 
-PostgreSQL tests retain migration, assignment, completion, cancellation, and
-geographic marketplace coverage. Driver unit/HTTP contract tests cover display-name
-normalization, model-year validation, and the Rider public presentation projection.
+New application APIs:
 
-Use a dedicated database ending in `_test` and run `go test -p 1 ./...` and
-`go vet ./...` from `backend`. Without `TEST_DATABASE_URL`, database tests skip.
+```text
+GET  /v1/driver/services
+GET  /v1/driver/onboarding
+POST /v1/driver/onboarding/precheck
+POST /v1/driver/onboarding
+```
+
+No endpoint allows a Driver to approve or reject their own application.
+
+### Flutter
+
+The Driver screen now distinguishes:
+
+- operational legacy Driver profile;
+- onboarding loading/error;
+- service/vehicle application form;
+- application pending/rejected/approved status.
+
+The form selects one service, collects Driver/vehicle information, performs the
+server precheck, shows a final review dialog, and submits a pending application.
+Backend `error` text is now preserved when a separate `message` field is absent.
+
+---
+
+## Verification
+
+Backend verification to run from `backend/`:
+
+```text
+go test -p 1 ./...
+go vet ./...
+```
+
+Database integration tests require the existing dedicated `_test` database setup.
+
+Flutter verification to run from `mobile/`:
+
+```text
+dart format --output=none --set-exit-if-changed lib test
+dart run build_runner build
+flutter analyze
+flutter test
+```
+
+Physical-device verification remains required. The current execution environment
+used for this branch does not provide Flutter/Dart tooling or a reachable clone of
+the GitHub repository, so runtime/test success must not be claimed until those
+commands are run locally or in CI.
+
+---
+
+## Next implementation order
+
+1. Define the minimal authorized review boundary for onboarding decisions; do not
+   expose self-approval through Driver APIs.
+2. On approval, create/promote the approved Driver, vehicle, and first service
+   enrollment transactionally while preserving the submitted application history.
+3. Replace the database one-vehicle assumption with Driver → multiple vehicles.
+4. Add verified vehicle + approved service enrollment reads and operational selection.
+5. Require selected verified vehicle/service when going online and lock switching
+   until offline.
+6. Add capability-shell sidebar and read-only Driver/Vehicle management surfaces
+   without changing ADR-0008 dashboard gestures.
+7. Run the physical-device gate.
+8. Then continue Driver marketplace/offers client work, Rider offer selection, and
+   Trip controls/history.
+
+The future approved-information revision/cancellation-window/withdrawal-appeal
+slice follows when profile/vehicle change management becomes a concrete dependency.
+
+---
 
 ## Architecture authority
 
 Accepted ADRs, `architecture-decisions.md`, `product-and-capability-model.md`,
-`mvp-scope.md`, and this worklog describe the intended MVP. ADR-0007 is the
-marketplace authority. Explicitly update the relevant decision before changing
-product behavior; implementation details must not redefine the product.
+`mvp-scope.md`, and this worklog describe the intended MVP. ADR-0007 is the Ride
+Request marketplace authority, ADR-0008 is the dashboard interaction authority,
+and ADR-0009 is the Driver service/vehicle/onboarding authority.
 
-## Follow-up scope
-
-The Driver marketplace client is split into readiness and marketplace slices.
-Readiness now enables Driver access on the existing account, profile setup/editing,
-availability, and manual location publishing. The next slice adds geographic request
-discovery and exact-fare acceptance or counteroffer creation. It must preserve the ADR-0007 rule that neither
-Driver response assigns a Trip. Rider offer comparison and selection follows as a
-separate client slice. Driver and vehicle media remains later presentation work.
-
-## Dashboard lifecycle cleanup
-
-Dashboard lifecycle cleanup: changing business panel identity now collapses the
-panel and resets scroll/drag state. Rider controls use the shared
-`DashboardPanelControl` exclusion wrapper; body gestures track one owning pointer.
-Content scrolling waits for expansion to finish, and handle updates skip unchanged
-extents. Regression coverage includes identity resets, control interaction,
-multiple pointers, and animation-time scroll locking. Physical-device API URL
-instructions now distinguish LAN addresses from simulator localhost.
-
-Validation: `flutter test --reporter expanded` passed all 16 tests.
+Implementation must not silently redefine these product rules.
 
 ## Deferred
 
@@ -216,16 +285,19 @@ Validation: `flutter test --reporter expanded` passed all 16 tests.
 - Live location streaming, breadcrumbs, and push notifications.
 - Redis, background dispatch workers, and advanced dispatch optimization.
 - Sophisticated payments, cancellation fees, refunds, and no-show policy.
-- Courier, Freight, administrator operations, promotions, and analytics platforms.
-- Multi-round/chat negotiation, CI/CD, Kubernetes, and iOS implementation.
+- Full administrator operations beyond the minimal review boundary needed by the
+  current Driver application flow.
+- Complete versioned Driver/vehicle change review, cancellation-window, and appeal UI.
+- Courier, Freight, promotions, analytics platforms, multi-round/chat negotiation,
+  CI/CD, Kubernetes, and iOS implementation.
 
 ## Working principles
 
 - Build small business slices and verify each before expanding scope.
 - Keep business domains transport-neutral and `cmd/api` as the composition root.
 - Use application-owned interfaces for external providers.
-- Enforce assignment invariants through transactions and database constraints.
-- Preserve ownership/privacy boundaries and avoid unnecessary identity exposure.
+- Enforce assignment and approval invariants transactionally where implemented.
+- Preserve ownership/privacy/history boundaries.
 - Add infrastructure only when a concrete flow needs it.
-- Keep this worklog aligned with the implementation and distinguish proposals
+- Keep this worklog aligned with implementation and distinguish target behavior
   from completed behavior.

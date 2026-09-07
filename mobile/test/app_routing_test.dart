@@ -362,6 +362,9 @@ Widget testApp(
   overrides: [
     authRepositoryProvider.overrideWithValue(repository),
     driverRepositoryProvider.overrideWithValue(FakeDriverRepository()),
+    driverOnboardingRepositoryProvider.overrideWithValue(
+      FakeDriverOnboardingRepository(),
+    ),
     capabilityStoreProvider.overrideWithValue(MemoryCapabilityStore()),
     rideRequestRepositoryProvider.overrideWithValue(
       rideRequests ?? FakeRideRequestRepository(requests: [requestedRide]),

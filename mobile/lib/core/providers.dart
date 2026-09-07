@@ -9,11 +9,13 @@ import '../features/authentication/presentation/login_screen.dart';
 import '../features/authentication/presentation/verification_screen.dart';
 import '../features/capabilities/presentation/capability_home_screen.dart';
 import '../features/capabilities/presentation/splash_screen.dart';
+import '../features/driver_workspace/application/driver_controller.dart';
+import '../features/driver_workspace/application/driver_onboarding_controller.dart';
+import '../features/driver_workspace/data/driver_onboarding_repository.dart';
+import '../features/driver_workspace/data/driver_repository.dart';
 import '../features/rider_request/application/rider_request_controller.dart';
 import '../features/rider_request/data/device_location.dart';
 import '../features/rider_request/data/ride_request_repository.dart';
-import '../features/driver_workspace/application/driver_controller.dart';
-import '../features/driver_workspace/data/driver_repository.dart';
 import 'config/app_config.dart';
 import 'maps/map_tiles.dart';
 import 'models/account.dart';
@@ -67,11 +69,23 @@ final driverRepositoryProvider = Provider<DriverRepository>(
     ref.watch(sessionStoreProvider),
   ),
 );
+final driverOnboardingRepositoryProvider = Provider<DriverOnboardingRepository>(
+  (ref) => ApiDriverOnboardingRepository(
+    ref.watch(dioProvider),
+    ref.watch(sessionStoreProvider),
+  ),
+);
 final driverControllerProvider =
     ChangeNotifierProvider.autoDispose<DriverController>(
       (ref) => DriverController(
         ref.watch(driverRepositoryProvider),
         ref.watch(deviceLocationProvider),
+      ),
+    );
+final driverOnboardingControllerProvider =
+    ChangeNotifierProvider.autoDispose<DriverOnboardingController>(
+      (ref) => DriverOnboardingController(
+        ref.watch(driverOnboardingRepositoryProvider),
       ),
     );
 final sessionControllerProvider = ChangeNotifierProvider<SessionController>(
