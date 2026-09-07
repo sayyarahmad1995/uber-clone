@@ -6,6 +6,7 @@ import '../../../core/dashboard/ride_dashboard_scaffold.dart';
 import '../../../core/maps/ride_map.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../application/driver_onboarding_controller.dart';
 import '../domain/driver_onboarding.dart';
 import '../domain/driver_profile.dart';
 
@@ -152,7 +153,7 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen> {
   }
 
   Future<void> _reviewAndSubmit({
-    required dynamic onboarding,
+    required DriverOnboardingController onboarding,
     required String name,
     required DriverServiceOption service,
     required DriverVehicle vehicle,
@@ -485,7 +486,7 @@ class _DriverSetupFormState extends State<_DriverSetupForm> {
   void didUpdateWidget(covariant _DriverSetupForm oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (_serviceCode == null && widget.services.isNotEmpty) {
-      setState(() => _serviceCode = widget.services.first.code);
+      _serviceCode = widget.services.first.code;
     }
   }
 
@@ -497,11 +498,16 @@ class _DriverSetupFormState extends State<_DriverSetupForm> {
     super.dispose();
   }
 
+  DriverServiceOption? get _selectedService {
+    for (final service in widget.services) {
+      if (service.code == _serviceCode) return service;
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final selectedService = widget.services
-        .where((service) => service.code == _serviceCode)
-        .firstOrNull;
+    final selectedService = _selectedService;
     return Form(
       key: _form,
       child: ListView(
