@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uber_clone/app.dart';
 import 'package:uber_clone/core/dashboard/ride_dashboard_scaffold.dart';
+import 'package:uber_clone/core/models/account.dart';
 import 'package:uber_clone/core/providers.dart';
 import 'package:uber_clone/features/authentication/data/auth_repository.dart';
 import 'package:uber_clone/features/rider_request/data/device_location.dart';
@@ -92,12 +93,37 @@ void main() {
     expect(find.text('Rider'), findsOneWidget);
   });
 
-  testWidgets('dual-capability account can switch to Driver', (tester) async {
+  testWidgets('dual-capability account switches through shell drawer', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       testApp(FakeAuthRepository(account: bothCapabilities)),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Driver'));
+
+    expect(find.byType(SegmentedButton<Capability>), findsNothing);
+    await tester.tap(find.byKey(const Key('capabilityMenuButton')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('drawerRider')), findsOneWidget);
+    expect(find.byKey(const Key('drawerDriver')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('drawerDriver')));
+    await tester.pumpAndSettle();
+    expect(find.text('Driver dashboard'), findsOneWidget);
+  });
+
+  testWidgets('Rider-only account enables Driver from shell drawer', (
+    tester,
+  ) async {
+    await tester.pumpWidget(testApp(FakeAuthRepository(account: riderAccount)));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('capabilityMenuButton')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('drawerBecomeDriver')), findsOneWidget);
+    expect(find.byKey(const Key('drawerDriver')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('drawerBecomeDriver')));
     await tester.pumpAndSettle();
     expect(find.text('Driver dashboard'), findsOneWidget);
   });
