@@ -42,6 +42,8 @@ The default capability is Rider.
 
 The initial product will implement only the capabilities required by the MVP. The architecture must leave a clear boundary for future capabilities such as Driver, Courier, and Freight without implementing those future business domains prematurely.
 
+Ride services such as Economy or Comfort are not account capabilities. They are operational service products that a Driver may offer using a specific approved vehicle/service enrollment.
+
 ## 6. Shared client application
 
 There is one shared mobile application for the user account.
@@ -107,3 +109,26 @@ release-gated snap behavior.
 
 See [ADR-0008: Dashboard Panel Interaction Contract](ADR-0008-dashboard-panel-interaction-contract.md)
 for the authoritative state machine and change-control rule.
+
+## 14. Driver services, vehicles, and approved information
+
+Driver onboarding, vehicle ownership, service eligibility, online operating context,
+and future approved-information changes follow ADR-0009.
+
+A Driver may register multiple vehicles. Initial onboarding applies one vehicle for
+one Driver-selected service. After approval, the same vehicle may apply for additional
+services without being registered again. Vehicle verification and service enrollment
+are separate concerns.
+
+For the MVP, an online Driver operates with one selected verified vehicle and one
+selected approved service at a time. Marketplace, offer, assignment, and Trip history
+must preserve the vehicle/service context that applied when the business action
+occurred.
+
+Driver and vehicle edits must not be designed as immediate replacement of approved
+information. Approved values remain authoritative until a submitted revision is
+approved. Draft discard, a server-owned post-submission cancellation window, and
+post-window withdrawal by appeal are accepted product rules; their concrete review
+and versioning implementation remains deferred until its vertical slice.
+
+See [ADR-0009: Driver Service and Vehicle Eligibility Model](ADR-0009-driver-service-vehicle-eligibility.md).
