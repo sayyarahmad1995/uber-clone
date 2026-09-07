@@ -39,8 +39,7 @@ class DriverOnboardingPrecheck {
   factory DriverOnboardingPrecheck.fromJson(Map<String, dynamic> json) =>
       DriverOnboardingPrecheck(
         eligible: json['eligible'] as bool,
-        reasons: (json['reasons'] as List<dynamic>? ?? const [])
-            .cast<String>(),
+        reasons: (json['reasons'] as List<dynamic>? ?? const []).cast<String>(),
         service: DriverServiceOption.fromJson(
           json['service'] as Map<String, dynamic>,
         ),

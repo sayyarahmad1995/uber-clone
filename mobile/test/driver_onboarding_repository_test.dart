@@ -18,16 +18,19 @@ void main() {
     repository = ApiDriverOnboardingRepository(dio, StaticSessionStore());
   });
 
-  test('loads service catalog and treats onboarding 404 as no application', () async {
-    final services = await repository.listServices();
-    expect(services.map((service) => service.code), ['economy', 'comfort']);
-    expect(adapter.request!.method, 'GET');
-    expect(adapter.request!.path, '/v1/driver/services');
+  test(
+    'loads service catalog and treats onboarding 404 as no application',
+    () async {
+      final services = await repository.listServices();
+      expect(services.map((service) => service.code), ['economy', 'comfort']);
+      expect(adapter.request!.method, 'GET');
+      expect(adapter.request!.path, '/v1/driver/services');
 
-    adapter.hasApplication = false;
-    expect(await repository.getLatest(), isNull);
-    expect(adapter.request!.path, '/v1/driver/onboarding');
-  });
+      adapter.hasApplication = false;
+      expect(await repository.getLatest(), isNull);
+      expect(adapter.request!.path, '/v1/driver/onboarding');
+    },
+  );
 
   test('precheck and submit use POST application contracts', () async {
     final precheck = await repository.precheck(

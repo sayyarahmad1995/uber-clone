@@ -13,7 +13,9 @@ class ApiException implements Exception {
     final errorText = body?['error'] as String?;
     return ApiException(
       errorText ?? 'request_failed',
-      body?['message'] as String? ?? errorText ?? 'Unable to complete the request.',
+      body?['message'] as String? ??
+          errorText ??
+          'Unable to complete the request.',
       statusCode: error.response?.statusCode,
     );
   }

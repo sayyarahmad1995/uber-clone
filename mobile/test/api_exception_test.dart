@@ -11,7 +11,9 @@ void main() {
         response: Response<Map<String, dynamic>>(
           requestOptions: request,
           statusCode: 409,
-          data: {'error': 'a Driver onboarding application is already under review'},
+          data: {
+            'error': 'a Driver onboarding application is already under review',
+          },
         ),
       ),
     );

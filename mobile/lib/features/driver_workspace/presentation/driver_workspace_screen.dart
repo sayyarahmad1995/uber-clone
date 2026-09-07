@@ -30,15 +30,18 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen> {
         ? ref.watch(driverOnboardingControllerProvider)
         : null;
     final application = onboarding?.application;
-    final loading = !driver.loaded ||
+    final loading =
+        !driver.loaded ||
         (profile == null && onboarding != null && !onboarding.loaded);
-    final onboardingFailed = !loading &&
+    final onboardingFailed =
+        !loading &&
         profile == null &&
         onboarding != null &&
         onboarding.error != null &&
         onboarding.services.isEmpty &&
         application == null;
-    final setup = !loading &&
+    final setup =
+        !loading &&
         !onboardingFailed &&
         profile == null &&
         (application == null || _reapplying);
@@ -161,7 +164,9 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen> {
     if (_reapplying || application == null) {
       return 'Choose a service and submit your vehicle for review.';
     }
-    if (application.isPending) return 'Your Driver application is under review.';
+    if (application.isPending) {
+      return 'Your Driver application is under review.';
+    }
     if (application.isRejected) return 'Your Driver application was rejected.';
     return 'Your Driver application is approved.';
   }
@@ -462,11 +467,8 @@ class _DriverSetupForm extends StatefulWidget {
   final String? error;
   final ScrollController scrollController;
   final ScrollPhysics physics;
-  final Future<void> Function(
-    String,
-    DriverServiceOption,
-    DriverVehicle,
-  ) onReview;
+  final Future<void> Function(String, DriverServiceOption, DriverVehicle)
+  onReview;
   final VoidCallback? onCancel;
 
   @override
@@ -529,7 +531,10 @@ class _DriverSetupFormState extends State<_DriverSetupForm> {
         physics: widget.physics,
         padding: const EdgeInsets.all(AppSpacing.md),
         children: [
-          Text('Become a Driver', style: Theme.of(context).textTheme.headlineSmall),
+          Text(
+            'Become a Driver',
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
           const Text('Choose one service for your first vehicle application.'),
           const SizedBox(height: AppSpacing.sm),
           if (widget.services.isEmpty)
@@ -557,9 +562,7 @@ class _DriverSetupFormState extends State<_DriverSetupForm> {
             const SizedBox(height: AppSpacing.sm),
             Text(selectedService.description),
             if (selectedService.minimumModelYear != null)
-              Text(
-                'Minimum model year: ${selectedService.minimumModelYear}',
-              ),
+              Text('Minimum model year: ${selectedService.minimumModelYear}'),
           ],
           for (var index = 0; index < _labels.length; index++)
             Padding(
@@ -574,7 +577,9 @@ class _DriverSetupFormState extends State<_DriverSetupForm> {
                       ? TextInputType.number
                       : TextInputType.text,
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) return 'Required';
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Required';
+                    }
                     if (index == 3) {
                       final year = int.tryParse(value.trim());
                       if (year == null ||

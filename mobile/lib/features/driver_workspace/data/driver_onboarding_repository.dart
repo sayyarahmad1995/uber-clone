@@ -69,9 +69,8 @@ class ApiDriverOnboardingRepository implements DriverOnboardingRepository {
     final body = await _request('/v1/driver/services');
     return (body['services'] as List<dynamic>)
         .map(
-          (value) => DriverServiceOption.fromJson(
-            value as Map<String, dynamic>,
-          ),
+          (value) =>
+              DriverServiceOption.fromJson(value as Map<String, dynamic>),
         )
         .toList(growable: false);
   }

@@ -124,7 +124,8 @@ const economyService = DriverServiceOption(
 const comfortService = DriverServiceOption(
   code: 'comfort',
   displayName: 'Comfort',
-  description: 'Vehicle condition and service eligibility are confirmed during review.',
+  description:
+      'Vehicle condition and service eligibility are confirmed during review.',
   impliedServiceCode: 'economy',
 );
 
