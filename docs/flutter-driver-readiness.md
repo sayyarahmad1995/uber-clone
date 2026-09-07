@@ -4,57 +4,110 @@ The Rider app bar offers **Become a Driver** to accounts without Driver capabili
 It calls `PUT /v1/me/capabilities/driver`, uses the returned account capabilities,
 and enters Driver on the same account. Login still defaults to Rider.
 
-The Driver feature owns its API repository, models, operation controller, and
-presentation. It reuses the existing application DeviceLocation port and coordinate
-model, Dio/session composition, map layer, and ADR-0008 dashboard unchanged.
+ADR-0009 supersedes the original one-vehicle onboarding semantics introduced by the
+first Driver-readiness slice. The current implementation is transitional until the
+service/vehicle onboarding foundation replaces it.
 
-## Profile lifecycle
+## Driver onboarding target
 
-`GET /v1/driver` restores profile and online status. Only 404 means onboarding is
-needed; other failures show retry rather than an empty form. Setup and editing use
-`PUT /v1/driver` with display name, vehicle make/model/year/color/license plate.
-Required fields and model year are validated locally and by the existing backend.
-Legacy null display names/model years remain readable and can be edited.
-Capability enablement is separate from profile creation; a failed setup can be retried.
+The client must distinguish the Driver account capability from ride services.
+Economy, Comfort, and similar products are not capabilities.
 
-## Availability and location
+Initial onboarding is:
 
-Going online obtains device location and calls `PUT /v1/driver/location` before
-`PUT /v1/driver/availability`. A permission or publish failure prevents the online
-write. Going offline never requires location access. The screen displays only
-server-confirmed availability; failed requests retain the last confirmed state
-and offer refresh/retry. Going offline does not cancel an existing Trip.
+```text
+Become a Driver
+  ↓
+Enter Driver details
+  ↓
+Choose one desired service
+  ↓
+Review service requirements
+  ↓
+Enter vehicle details
+  ↓
+Pre-eligibility check
+  ↓
+Review application
+  ↓
+Submit for review
+  ↓
+Approved / Rejected with reason
+```
 
-Location publishes on explicit actions only. There is no background tracking,
-timer, or automatic offline write on navigation/logout. Leaving during device
-lookup prevents subsequent writes; an already-sent request can still complete on
-the server. Re-entry restores server state. Updates are serialized to prevent
-duplicate taps and conflicting operations.
+Initial onboarding applies one vehicle to one service. After a service is approved,
+the same vehicle may apply for additional services without re-entering or duplicating
+its approved vehicle identity.
 
-The server-returned timestamp is shown as the last publication during this visit,
-not as proof of current marketplace eligibility. Backend freshness remains two
-minutes. This slice does not claim that being online alone makes a Driver eligible
-or that a pending offer assigns a Trip. Discovery and offers are the next slice.
+The client may perform deterministic pre-eligibility checks supplied by application
+policy, but it must not invent verification or approval state. Final service/vehicle
+state is backend-authoritative.
+
+## Vehicle and service readiness
+
+A Driver may own multiple vehicles. Vehicle verification and service enrollment are
+separate states. A verified vehicle may have one approved service, another pending,
+and another technically eligible but not enrolled.
+
+The client must not silently enroll a Driver in a lower service merely because a
+stricter service is approved. When the backend explicitly derives eligibility from a
+service hierarchy, the UI may offer a lightweight **Add service** action that still
+requires Driver intent.
+
+## Availability and operating context
+
+For the MVP, going online uses one backend-confirmed verified vehicle and one approved
+service for that vehicle.
+
+```text
+Select verified vehicle
+  ↓
+Select approved service
+  ↓
+Publish current location
+  ↓
+Go online
+```
+
+If the selected vehicle has exactly one approved service, the service selector may be
+omitted. Changing vehicle or service requires going offline first.
+
+Going online obtains device location and publishes it before the online transition.
+A permission or publish failure prevents the online write. Going offline never requires
+location access. The screen displays only server-confirmed operational state.
+
+Location publishes on explicit actions only. There is no background tracking, timer,
+or automatic offline write on navigation/logout in this slice. Backend freshness
+remains authoritative.
+
+## Approved information and future edits
+
+Driver and vehicle detail screens show approved information. A future edit flow must
+submit a revision instead of immediately replacing approved values.
+
+A local draft can be discarded. After submission, a server-owned cancellation window
+allows direct cancellation. Once that deadline expires, withdrawal requires an appeal.
+The concrete versioning/review/appeal implementation remains deferred, but current
+client work must not add immediate-overwrite semantics that conflict with ADR-0009.
 
 ## Dashboard contract
 
-Loading, setup/edit, and readiness have distinct panel identities. Transitions
-open collapsed; refresh and availability changes preserve readiness identity.
-Every panel control is wrapped in `DashboardPanelControl`. Panel geometry,
-thresholds, animation, pointer ownership, and scrolling remain in the shared shell.
+Operational controls stay on the Driver dashboard. Profile, vehicle, service-application,
+history, and settings navigation belong outside `RideDashboardScaffold`. ADR-0008 panel
+geometry, thresholds, animation, pointer ownership, and scrolling remain unchanged.
 
-## Device check
+## Next physical-device gate
 
-1. Sign in as a Rider, choose Become a Driver, and expand the setup panel.
-2. Save complete Driver and vehicle details; verify readiness opens collapsed.
-3. Go online with location permission granted; verify the confirmed online state.
-4. Update current location, then go offline with location disabled.
-5. Reopen Driver and confirm persisted details/status; edit and save details.
-6. Check denied permission and unavailable network errors, then retry.
+1. Sign in as Rider and choose Become a Driver.
+2. Enter Driver details, choose one service, and enter the first vehicle.
+3. Verify pre-eligibility feedback and application review before submission.
+4. Restore pending/approved/rejected application state from the backend.
+5. After approval, verify the vehicle appears with the approved service.
+6. Add a second service for the same vehicle without re-registering it.
+7. Add a second vehicle independently.
+8. Select only a verified vehicle and approved service for going online.
+9. Go online with location permission granted; verify location publication precedes availability.
+10. Go offline without requiring location permission.
+11. Verify Rider/Driver dashboard gesture behavior still satisfies ADR-0008.
 
-Automated coverage includes API contracts, legacy data, permission and server
-failures, duplicate operations, disposal during lookup, capability navigation,
-setup submission, and the existing shared dashboard regression suite.
-
-Validation: all 32 Flutter tests pass and `flutter analyze --no-pub` reports no
-issues. Physical-device verification of this slice remains pending.
+See [ADR-0009: Driver Service and Vehicle Eligibility Model](ADR-0009-driver-service-vehicle-eligibility.md).
