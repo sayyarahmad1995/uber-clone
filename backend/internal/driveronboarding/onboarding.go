@@ -13,6 +13,7 @@ var (
 	ErrInvalidApplication = errors.New("invalid driver onboarding application")
 	ErrServiceNotFound    = errors.New("driver service not found")
 	ErrPendingApplication = errors.New("driver onboarding application already pending")
+	ErrAlreadyOnboarded   = errors.New("driver onboarding already complete")
 	ErrNotFound           = errors.New("driver onboarding application not found")
 	ErrIneligible         = errors.New("vehicle is not eligible for selected service")
 )
