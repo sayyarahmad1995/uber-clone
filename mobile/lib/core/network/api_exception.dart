@@ -10,9 +10,10 @@ class ApiException implements Exception {
   factory ApiException.fromDio(DioException error) {
     final data = error.response?.data;
     final body = data is Map<String, dynamic> ? data : null;
+    final errorText = body?['error'] as String?;
     return ApiException(
-      body?['error'] as String? ?? 'request_failed',
-      body?['message'] as String? ?? 'Unable to complete the request.',
+      errorText ?? 'request_failed',
+      body?['message'] as String? ?? errorText ?? 'Unable to complete the request.',
       statusCode: error.response?.statusCode,
     );
   }
