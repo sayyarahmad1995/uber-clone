@@ -81,7 +81,7 @@ void main() {
       expect(find.text('2024'), findsOneWidget);
       expect(find.text('ABC-123'), findsOneWidget);
       expect(find.text('Comfort'), findsOneWidget);
-      expect(find.text('Onboarding application vehicle'), findsOneWidget);
+      expect(find.text('Driver onboarding application'), findsOneWidget);
     },
   );
 
