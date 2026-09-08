@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 class DashboardPanelSession extends ChangeNotifier {
@@ -15,7 +14,8 @@ class DashboardPanelSession extends ChangeNotifier {
   void reset() => setExpanded(false);
 }
 
-class DashboardPanelSessionScope extends InheritedNotifier<DashboardPanelSession> {
+class DashboardPanelSessionScope
+    extends InheritedNotifier<DashboardPanelSession> {
   const DashboardPanelSessionScope({
     super.key,
     required DashboardPanelSession session,
