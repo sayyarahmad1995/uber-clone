@@ -321,10 +321,9 @@ flutter analyze
 flutter test
 ```
 
-Physical-device/reviewer verification remains required. The current execution
-environment used for this branch has Go but cannot clone the GitHub repository and
-does not provide Flutter/Dart tooling, so runtime/test success must not be claimed
-until the commands are run locally or in CI.
+Flutter format, analysis, and test validation runs on Flutter 3.47.2 before
+physical-device validation. Device verification remains required for shell navigation,
+readability, back navigation, and confirming the shared dashboard behavior is unchanged.
 
 ---
 
