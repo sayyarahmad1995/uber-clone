@@ -131,8 +131,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final controlBottom =
-            constraints.maxHeight * _panelSize + AppSpacing.lg;
+        final panelHeight = constraints.maxHeight * _panelSize;
         final transitionDuration = _isDraggingPanel
             ? Duration.zero
             : const Duration(milliseconds: 220);
@@ -157,21 +156,28 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
                 ),
               ),
             if (widget.mapControls != null)
-              AnimatedPositioned(
+              Positioned(
                 right: AppSpacing.md,
-                bottom: controlBottom,
-                duration: transitionDuration,
-                curve: Curves.easeOutCubic,
-                child: SafeArea(
-                  top: false,
-                  child: RepaintBoundary(child: widget.mapControls!),
+                bottom: AppSpacing.lg,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween<double>(end: panelHeight),
+                  duration: transitionDuration,
+                  curve: Curves.easeOutCubic,
+                  builder: (context, panelOffset, child) => Transform.translate(
+                    offset: Offset(0, -panelOffset),
+                    child: child,
+                  ),
+                  child: SafeArea(
+                    top: false,
+                    child: RepaintBoundary(child: widget.mapControls!),
+                  ),
                 ),
               ),
             AnimatedPositioned(
               left: 0,
               right: 0,
               bottom: 0,
-              height: constraints.maxHeight * _panelSize,
+              height: panelHeight,
               onEnd: () {
                 if (_committedExpanded &&
                     !_isDraggingPanel &&
