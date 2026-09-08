@@ -163,3 +163,13 @@ Operational controls stay on their capability dashboard. The Drawer must not con
 The previous bottom Rider/Driver segmented switch is retired once the Drawer owns capability switching. Drawer entries must correspond to implemented destinations or real actions; placeholder or dead navigation items are not added merely to preview future information architecture.
 
 The Drawer is outside ADR-0008. Adding or changing shell navigation must not modify `RideDashboardScaffold` panel sizing, gesture ownership, scrolling, or snap behavior except through an explicit ADR-0008 contract change.
+
+## 17. Read-only Driver shell destinations
+
+Driver-capable accounts may open `Driver details` and `Vehicles` from the capability shell. These destinations are informational surfaces, not operational dashboard controls and not approved-information editing flows.
+
+The client reads the best currently authoritative Driver information available to it. Existing operational Drivers use the current `DriverProfile`. When the operational Driver read is intentionally unavailable for a pending, approved, or rejected onboarding Driver, the client uses the latest `DriverOnboardingApplication` snapshot instead of fabricating an operational profile.
+
+`Driver details` may show real Driver identity/status, availability when an operational profile exists, selected onboarding service, review reason, and submission/decision dates when those fields exist. `Vehicles` is plural to match the accepted multi-vehicle target, but this slice displays only the real currently available vehicle snapshot. It must not imply add/remove/switch/edit support before the backend multi-vehicle and approved-information workflows exist.
+
+Both surfaces remain read-only. Approved Driver/vehicle changes continue to follow ADR-0009 governance and must not be introduced as direct client-side overwrites.
