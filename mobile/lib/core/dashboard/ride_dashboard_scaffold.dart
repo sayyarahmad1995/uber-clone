@@ -60,6 +60,8 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
   bool _contentDragStartedCollapsed = false;
   double _collapsePullDistance = 0;
   double _expandPullDistance = 0;
+  Widget? _cachedPanelContent;
+  bool? _cachedPanelScrollEnabled;
 
   static const _collapsePullThreshold = 56.0;
 
@@ -93,6 +95,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
   @override
   void didUpdateWidget(covariant RideDashboardScaffold oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _invalidatePanelContent();
     if (oldWidget.minPanelSize != widget.minPanelSize ||
         oldWidget.maxPanelSize != widget.maxPanelSize) {
       _panelSize = _committedExpanded
@@ -263,9 +266,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
                                     _contentPointer = null;
                                     _cancelContentDrag();
                                   },
-                                  child: widget.panelBuilder(
-                                    context,
-                                    _contentScrollController,
+                                  child: _panelContentFor(
                                     _committedExpanded &&
                                         _expansionSettled &&
                                         !_isDraggingPanel,
@@ -285,6 +286,24 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
         );
       },
     );
+  }
+
+  Widget _panelContentFor(bool scrollEnabled) {
+    if (_cachedPanelContent == null ||
+        _cachedPanelScrollEnabled != scrollEnabled) {
+      _cachedPanelScrollEnabled = scrollEnabled;
+      _cachedPanelContent = _DashboardPanelContent(
+        builder: widget.panelBuilder,
+        scrollController: _contentScrollController,
+        scrollEnabled: scrollEnabled,
+      );
+    }
+    return _cachedPanelContent!;
+  }
+
+  void _invalidatePanelContent() {
+    _cachedPanelContent = null;
+    _cachedPanelScrollEnabled = null;
   }
 
   void _resizePanel(double verticalDelta, double dashboardHeight) {
@@ -481,6 +500,22 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
     _panelSession?.setExpanded(_committedExpanded);
     widget.onExpansionChanged?.call(_committedExpanded);
   }
+}
+
+class _DashboardPanelContent extends StatelessWidget {
+  const _DashboardPanelContent({
+    required this.builder,
+    required this.scrollController,
+    required this.scrollEnabled,
+  });
+
+  final DashboardPanelBuilder builder;
+  final ScrollController scrollController;
+  final bool scrollEnabled;
+
+  @override
+  Widget build(BuildContext context) =>
+      builder(context, scrollController, scrollEnabled);
 }
 
 /// Marks interactive content whose pointers must never resize the dashboard.
