@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:uber_clone/core/dashboard/ride_dashboard_scaffold.dart';
 import 'package:uber_clone/core/providers.dart';
 import 'package:uber_clone/features/driver_workspace/presentation/driver_workspace_screen.dart';
 
@@ -48,11 +49,16 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    final panel = find.byKey(const Key('dashboardPanel'));
+    final dashboardHeight = tester
+        .getSize(find.byType(RideDashboardScaffold))
+        .height;
     await tester.drag(
       find.byKey(const Key('dashboardPanelDragHandle')),
       const Offset(0, -300),
     );
     await tester.pumpAndSettle();
+    expect(tester.getSize(panel).height, dashboardHeight * 0.60);
 
     await tester.tap(find.byKey(const Key('driver-service-field')));
     await tester.pumpAndSettle();
@@ -87,12 +93,7 @@ void main() {
     expect(onboardingRepo.calls, contains('submit:comfort'));
     expect(driverRepo.profile, isNull);
     expect(find.text('Application under review'), findsOneWidget);
-
-    await tester.drag(
-      find.byKey(const Key('dashboardPanelDragHandle')),
-      const Offset(0, -300),
-    );
-    await tester.pumpAndSettle();
+    expect(tester.getSize(panel).height, dashboardHeight * 0.60);
     expect(find.text('Service: Comfort'), findsOneWidget);
   });
 
