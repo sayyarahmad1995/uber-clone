@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/dashboard/dashboard_panel_session.dart';
 import '../../../core/models/account.dart';
 import '../../../core/providers.dart';
 import '../../driver_workspace/presentation/driver_workspace_screen.dart';
@@ -15,6 +16,7 @@ class CapabilityHomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final controller = ref.watch(sessionControllerProvider);
+    final panelSession = ref.watch(dashboardPanelSessionProvider);
     final account = controller.state.account!;
     final canDrive = account.capabilities.contains(Capability.driver);
 
@@ -45,6 +47,7 @@ class CapabilityHomeScreen extends ConsumerWidget {
 
     Future<void> logout() async {
       Navigator.of(context).pop();
+      panelSession.reset();
       await controller.logout();
     }
 
@@ -122,9 +125,12 @@ class CapabilityHomeScreen extends ConsumerWidget {
         title: Text(capability == Capability.rider ? 'Rider' : 'Driver'),
         notificationPredicate: (_) => false,
       ),
-      body: capability == Capability.rider
-          ? const RiderRequestScreen()
-          : DriverWorkspaceScreen(accountID: account.id),
+      body: DashboardPanelSessionScope(
+        session: panelSession,
+        child: capability == Capability.rider
+            ? const RiderRequestScreen()
+            : DriverWorkspaceScreen(accountID: account.id),
+      ),
     );
   }
 }
