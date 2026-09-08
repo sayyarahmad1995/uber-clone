@@ -80,7 +80,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Vehicles'), findsOneWidget);
-      expect(ModalRoute.of(tester.element(find.text('Vehicles')))!.opaque, isFalse);
+      expect(
+        ModalRoute.of(tester.element(find.text('Vehicles')))!.opaque,
+        isFalse,
+      );
       expect(find.text('Toyota'), findsOneWidget);
       expect(find.text('Corolla'), findsOneWidget);
       expect(find.text('2024'), findsOneWidget);
