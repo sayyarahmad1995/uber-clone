@@ -8,7 +8,9 @@ Trip execution, cancellation, history, and Driver location storage/read access.
 
 The shared Flutter Android client implements account entry, Rider-first capability
 selection, Rider request creation/status/cancellation, the shared ADR-0008 map-first
-dashboard, and the initial Driver readiness flow from PR #69.
+dashboard, Driver onboarding/review state, and the capability-shell Drawer merged in
+PR #72. The current slice adds read-only Driver details and Vehicles destinations
+backed only by real operational-profile or onboarding-application data.
 
 PR #70 introduces the ADR-0009 new-Driver onboarding application model. A Driver
 chooses one service for the first vehicle, reviews the application, and submits it
@@ -80,6 +82,9 @@ counteroffering both create pending offers; neither reserves the ride or Driver.
 - [x] Flutter Driver Setup and Readiness — PR #69; retained as a transitional
   operational path for existing Drivers while ADR-0009 onboarding replaces its
   immediate new-Driver setup semantics
+- [x] Driver Service Onboarding Foundation — PR #70
+- [x] Minimal Driver Onboarding Reviewer — PR #71
+- [x] Capability Drawer Shell and Dashboard State Persistence — PR #72
 
 Worklog-only alignment PRs are intentionally omitted from the business-milestone list.
 
@@ -203,6 +208,10 @@ ADR-0007 remains authoritative for the Ride Request marketplace.
 - New Driver onboarding loads the service catalog, restores the latest application,
   runs server precheck, displays a review confirmation, and submits for review.
 - Pending/rejected/approved application state is shown from backend data.
+- The capability shell owns Rider/Driver switching, Driver enablement, real secondary
+  destinations, and logout; operational controls remain on the dashboard.
+- Read-only Driver details and Vehicles surfaces use the operational Driver profile
+  when available and otherwise fall back to the latest onboarding application.
 - The immediate `Edit Driver details` action was removed from the operational
   dashboard because approved information must not be overwritten directly.
 - Existing operational Driver accounts retain the PR #69 readiness path temporarily.
@@ -274,6 +283,19 @@ An approved-only profile remains hidden from the legacy operational Driver endpo
 so the mobile client continues to show the onboarding application as approved rather
 than exposing a non-functional legacy Go online control.
 
+### Capability shell and read-only Driver surfaces
+
+PR #72 moved secondary navigation into a standard Flutter Drawer, removed the bottom
+capability switch, and made committed dashboard extent persist across workflow and
+Rider/Driver transitions while keeping ADR-0008 gesture semantics intact.
+
+The current slice adds `Driver details` and `Vehicles` routes for Driver-capable
+accounts. These screens are read-only. They prefer real `DriverProfile` data for
+legacy operational Drivers and otherwise use the latest `DriverOnboardingApplication`
+snapshot, including approved-only Drivers intentionally hidden from `/v1/driver`.
+`Vehicles` remains plural to match the accepted target model but exposes no fake
+add/remove/switch/edit controls before the multi-vehicle backend exists.
+
 ---
 
 ## Verification
@@ -308,16 +330,14 @@ until the commands are run locally or in CI.
 
 ## Next implementation order
 
-1. Validate the complete onboarding decision loop: phone submission → internal
-   reviewer approve/reject → phone refresh/re-entry → approved/rejected state.
-2. Replace the database one-vehicle assumption with Driver → multiple vehicles.
+1. Validate and merge the current read-only Driver details and Vehicles shell slice.
+2. Replace the database one-vehicle assumption with Driver → multiple vehicles while
+   preserving historical vehicle associations.
 3. Add approved vehicle + approved service enrollment reads and operational selection.
 4. Require selected approved vehicle/service when transitioning the Driver to
    operational `active`/online state and lock switching until offline.
-5. Add capability-shell sidebar and read-only Driver/Vehicle management surfaces
-   without changing ADR-0008 dashboard gestures.
-6. Run the broader physical-device gate for vehicle/service operation.
-7. Then continue Driver marketplace/offers client work, Rider offer selection, and
+5. Run the broader physical-device gate for vehicle/service operation.
+6. Then continue Driver marketplace/offers client work, Rider offer selection, and
    Trip controls/history.
 
 The future approved-information revision/cancellation-window/withdrawal-appeal
