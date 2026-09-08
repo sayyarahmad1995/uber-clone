@@ -133,8 +133,10 @@ class CapabilityHomeScreen extends ConsumerWidget {
                     title: const Text('Vehicles'),
                     onTap: controller.state.busy
                         ? null
-                        : () =>
-                              openDestination(drawerContext, '/driver/vehicles'),
+                        : () => openDestination(
+                            drawerContext,
+                            '/driver/vehicles',
+                          ),
                   ),
                 ],
                 const Divider(),
