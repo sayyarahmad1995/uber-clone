@@ -14,9 +14,10 @@ class DriverDetailsScreen extends ConsumerWidget {
     final onboarding = ref.watch(driverOnboardingControllerProvider);
     final profile = driver.profile;
     final application = onboarding.application;
-    final loading =
-        !driver.loaded || (profile == null && !onboarding.loaded);
-    final error = profile == null ? driver.error ?? onboarding.error : driver.error;
+    final loading = !driver.loaded || (profile == null && !onboarding.loaded);
+    final error = profile == null
+        ? driver.error ?? onboarding.error
+        : driver.error;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Driver details')),
@@ -25,8 +26,7 @@ class DriverDetailsScreen extends ConsumerWidget {
         error: error,
         empty: profile == null && application == null,
         emptyTitle: 'No submitted Driver details yet',
-        emptyMessage:
-            'Complete Driver onboarding from the Driver dashboard to create Driver details.',
+        emptyMessage: 'Complete Driver onboarding from the Driver dashboard to create Driver details.',
         child: _DriverDetailsContent(
           profile: profile,
           application: application,
@@ -46,9 +46,10 @@ class DriverVehiclesScreen extends ConsumerWidget {
     final profile = driver.profile;
     final application = onboarding.application;
     final vehicle = profile?.vehicle ?? application?.vehicle;
-    final loading =
-        !driver.loaded || (profile == null && !onboarding.loaded);
-    final error = profile == null ? driver.error ?? onboarding.error : driver.error;
+    final loading = !driver.loaded || (profile == null && !onboarding.loaded);
+    final error = profile == null
+        ? driver.error ?? onboarding.error
+        : driver.error;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Vehicles')),
@@ -57,8 +58,7 @@ class DriverVehiclesScreen extends ConsumerWidget {
         error: error,
         empty: vehicle == null,
         emptyTitle: 'No vehicle submitted yet',
-        emptyMessage:
-            'Complete Driver onboarding from the Driver dashboard to submit a vehicle.',
+        emptyMessage: 'Complete Driver onboarding from the Driver dashboard to submit a vehicle.',
         child: vehicle == null
             ? const SizedBox.shrink()
             : _VehicleContent(
@@ -249,10 +249,7 @@ class _VehicleContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Current vehicle',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text('Current vehicle', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         Card(
           child: Column(

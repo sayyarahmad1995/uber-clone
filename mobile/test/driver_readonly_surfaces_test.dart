@@ -8,7 +8,9 @@ import 'package:uber_clone/features/driver_workspace/domain/driver_onboarding.da
 import 'test_doubles.dart';
 
 void main() {
-  testWidgets('Driver drawer exposes real read-only destinations', (tester) async {
+  testWidgets('Driver drawer exposes real read-only destinations', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       _testApp(
         accountHasDriver: true,
@@ -117,7 +119,9 @@ Widget _testApp({
         ),
       ),
       driverRepositoryProvider.overrideWithValue(driverRepository),
-      driverOnboardingRepositoryProvider.overrideWithValue(onboardingRepository),
+      driverOnboardingRepositoryProvider.overrideWithValue(
+        onboardingRepository,
+      ),
       capabilityStoreProvider.overrideWithValue(MemoryCapabilityStore()),
       rideRequestRepositoryProvider.overrideWithValue(
         FakeRideRequestRepository(requests: [requestedRide]),
