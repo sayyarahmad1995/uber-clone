@@ -17,7 +17,10 @@ class CapabilityHomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final controller = ref.watch(sessionControllerProvider);
     final panelSession = ref.watch(dashboardPanelSessionProvider);
-    final account = controller.state.account!;
+    final account = controller.state.account;
+    if (account == null) {
+      return const SizedBox.shrink();
+    }
     final canDrive = account.capabilities.contains(Capability.driver);
 
     Future<void> selectCapability(Capability next) async {
