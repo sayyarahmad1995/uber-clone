@@ -1,24 +1,31 @@
-name: Temporary Dart format capture
+name: Temporary Dart format apply
 
 on:
   push:
     branches:
       - feature/capability-drawer-shell
 
+permissions:
+  contents: write
+
 jobs:
   format:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: feature/capability-drawer-shell
       - uses: dart-lang/setup-dart@v1
         with:
           sdk: 3.13.2
-      - name: Capture canonical formatter output
+      - name: Apply canonical formatter output
         run: |
           dart format mobile/test/app_routing_test.dart
-          git diff -- mobile/test/app_routing_test.dart > /tmp/app-routing-format.patch
-          cat /tmp/app-routing-format.patch
-      - uses: actions/upload-artifact@v4
-        with:
-          name: app-routing-format
-          path: /tmp/app-routing-format.patch
+          if git diff --quiet -- mobile/test/app_routing_test.dart; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile/test/app_routing_test.dart
+          git commit -m "style: apply Dart formatter"
+          git push origin HEAD:feature/capability-drawer-shell
