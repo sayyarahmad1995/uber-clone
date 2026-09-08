@@ -47,8 +47,8 @@ class CapabilityHomeScreen extends ConsumerWidget {
 
     Future<void> logout() async {
       Navigator.of(context).pop();
-      panelSession.reset();
       await controller.logout();
+      panelSession.reset();
     }
 
     return Scaffold(
