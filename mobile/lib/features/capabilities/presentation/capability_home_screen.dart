@@ -84,7 +84,9 @@ class _CapabilityHomeScreenState extends ConsumerState<CapabilityHomeScreen> {
                     const Icon(Icons.account_circle_outlined, size: 36),
                     const SizedBox(height: 12),
                     Text(
-                      widget.capability == Capability.rider ? 'Rider' : 'Driver',
+                      widget.capability == Capability.rider
+                          ? 'Rider'
+                          : 'Driver',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: 4),
