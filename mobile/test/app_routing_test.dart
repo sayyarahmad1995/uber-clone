@@ -193,7 +193,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Welcome back'), findsOneWidget);
 
-    await tester.enterText(find.byKey(const Key('identifierField')), 'user@test');
+    await tester.enterText(
+      find.byKey(const Key('identifierField')),
+      'user@test',
+    );
     await tester.enterText(find.byKey(const Key('passwordField')), 'password');
     await tester.tap(find.byKey(const Key('submitButton')));
     await tester.pumpAndSettle();
