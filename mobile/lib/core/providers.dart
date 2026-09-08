@@ -152,11 +152,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/driver/details',
-        builder: (_, _) => const DriverDetailsScreen(),
+        pageBuilder: (_, state) => NoTransitionPage<void>(
+          key: state.pageKey,
+          child: const DriverDetailsScreen(),
+        ),
       ),
       GoRoute(
         path: '/driver/vehicles',
-        builder: (_, _) => const DriverVehiclesScreen(),
+        pageBuilder: (_, state) => NoTransitionPage<void>(
+          key: state.pageKey,
+          child: const DriverVehiclesScreen(),
+        ),
       ),
     ],
   );
