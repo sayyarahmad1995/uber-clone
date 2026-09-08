@@ -48,7 +48,10 @@ class CapabilityHomeScreen extends ConsumerWidget {
       );
     }
 
-    Future<void> openDestination(BuildContext drawerContext, String location) async {
+    Future<void> openDestination(
+      BuildContext drawerContext,
+      String location,
+    ) async {
       Navigator.of(drawerContext).pop();
       await drawerContext.push<void>(location);
       if (!drawerContext.mounted) return;
@@ -121,10 +124,8 @@ class CapabilityHomeScreen extends ConsumerWidget {
                     title: const Text('Driver details'),
                     onTap: controller.state.busy
                         ? null
-                        : () => openDestination(
-                            drawerContext,
-                            '/driver/details',
-                          ),
+                        : () =>
+                              openDestination(drawerContext, '/driver/details'),
                   ),
                   ListTile(
                     key: const Key('drawerVehicles'),
@@ -132,10 +133,8 @@ class CapabilityHomeScreen extends ConsumerWidget {
                     title: const Text('Vehicles'),
                     onTap: controller.state.busy
                         ? null
-                        : () => openDestination(
-                            drawerContext,
-                            '/driver/vehicles',
-                          ),
+                        : () =>
+                              openDestination(drawerContext, '/driver/vehicles'),
                   ),
                 ],
                 const Divider(),
