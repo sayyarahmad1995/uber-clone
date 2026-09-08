@@ -157,18 +157,14 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('drawerDriver')));
     await tester.pumpAndSettle();
-    dashboardHeight = tester
-        .getSize(find.byType(RideDashboardScaffold))
-        .height;
+    dashboardHeight = tester.getSize(find.byType(RideDashboardScaffold)).height;
     expect(tester.getSize(panel).height, dashboardHeight * 0.16);
 
     await tester.tap(find.byKey(const Key('capabilityMenuButton')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('drawerRider')));
     await tester.pumpAndSettle();
-    dashboardHeight = tester
-        .getSize(find.byType(RideDashboardScaffold))
-        .height;
+    dashboardHeight = tester.getSize(find.byType(RideDashboardScaffold)).height;
     expect(tester.getSize(panel).height, dashboardHeight * 0.18);
   });
 
@@ -202,9 +198,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Looking for Driver offers'), findsOneWidget);
-    dashboardHeight = tester
-        .getSize(find.byType(RideDashboardScaffold))
-        .height;
+    dashboardHeight = tester.getSize(find.byType(RideDashboardScaffold)).height;
     expect(tester.getSize(panel).height, dashboardHeight * 0.18);
   });
 
@@ -337,7 +331,10 @@ void main() {
       final list = find.byKey(const Key('identityPanelList'));
       await tester.drag(list, const Offset(0, -500));
       await tester.pumpAndSettle();
-      expect(dashboardKey.currentState!.scrollController.offset, greaterThan(0));
+      expect(
+        dashboardKey.currentState!.scrollController.offset,
+        greaterThan(0),
+      );
 
       dashboardKey.currentState!.showSecondPanel();
       await tester.pump();
