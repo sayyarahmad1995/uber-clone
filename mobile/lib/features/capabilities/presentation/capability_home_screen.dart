@@ -48,10 +48,7 @@ class CapabilityHomeScreen extends ConsumerWidget {
       );
     }
 
-    Future<void> openDestination(
-      BuildContext drawerContext,
-      String location,
-    ) async {
+    Future<void> openDestination(BuildContext drawerContext, String location) async {
       Navigator.of(drawerContext).pop();
       await drawerContext.push<void>(location);
       if (!drawerContext.mounted) return;
