@@ -17,6 +17,7 @@ import '../features/rider_request/application/rider_request_controller.dart';
 import '../features/rider_request/data/device_location.dart';
 import '../features/rider_request/data/ride_request_repository.dart';
 import 'config/app_config.dart';
+import 'dashboard/dashboard_panel_session.dart';
 import 'maps/map_tiles.dart';
 import 'models/account.dart';
 import 'session/session_store.dart';
@@ -47,6 +48,10 @@ final authRepositoryProvider = Provider<AuthRepository>(
 final mapTilesProvider = Provider<MapTiles>(
   (ref) => const OpenStreetMapTiles(),
 );
+final dashboardPanelSessionProvider =
+    ChangeNotifierProvider<DashboardPanelSession>(
+      (ref) => DashboardPanelSession(),
+    );
 final deviceLocationProvider = Provider<DeviceLocation>(
   (ref) => GeolocatorDeviceLocation(),
 );
