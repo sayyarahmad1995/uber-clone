@@ -30,6 +30,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Driver details'), findsOneWidget);
+    expect(
+      ModalRoute.of(tester.element(find.text('Driver details')))!.opaque,
+      isFalse,
+    );
     expect(find.text('Test Driver'), findsOneWidget);
     expect(find.text('Active'), findsOneWidget);
     expect(find.text('Offline'), findsOneWidget);
@@ -76,6 +80,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Vehicles'), findsOneWidget);
+      expect(ModalRoute.of(tester.element(find.text('Vehicles')))!.opaque, isFalse);
       expect(find.text('Toyota'), findsOneWidget);
       expect(find.text('Corolla'), findsOneWidget);
       expect(find.text('2024'), findsOneWidget);
