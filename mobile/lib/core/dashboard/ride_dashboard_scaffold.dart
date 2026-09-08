@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import 'dashboard_panel_session.dart';
 
 typedef DashboardPanelBuilder = Widget Function(
   BuildContext context,
@@ -51,6 +52,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
   bool _isDraggingPanel = false;
   late bool _committedExpanded;
   bool _expansionSettled = false;
+  DashboardPanelSession? _panelSession;
   int? _contentPointer;
   int? _handlePointer;
   final Set<int> _controlPointers = {};
@@ -68,6 +70,24 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
     _dragStartSize = _panelSize;
     _committedExpanded = _isPanelExpanded;
     _expansionSettled = _committedExpanded;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final session = DashboardPanelSessionScope.maybeOf(context);
+    if (!identical(_panelSession, session)) {
+      _panelSession = session;
+      if (session != null) {
+        _applySessionExtent(session.expanded);
+      }
+      return;
+    }
+    if (session != null &&
+        session.expanded != _committedExpanded &&
+        !_isDraggingPanel) {
+      _applySessionExtent(session.expanded);
+    }
   }
 
   @override
@@ -444,10 +464,22 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
     });
   }
 
+  void _applySessionExtent(bool expanded) {
+    _committedExpanded = expanded;
+    _panelSize = expanded ? widget.maxPanelSize : widget.minPanelSize;
+    _dragStartSize = _panelSize;
+    _expansionSettled = expanded;
+    _isDraggingPanel = false;
+    _contentPointer = null;
+    _handlePointer = null;
+    _controlPointers.clear();
+    _resetContentDrag();
+  }
+
   void _notifyExpansionChanged(bool previousExpanded) {
-    if (previousExpanded != _committedExpanded) {
-      widget.onExpansionChanged?.call(_committedExpanded);
-    }
+    if (previousExpanded == _committedExpanded) return;
+    _panelSession?.setExpanded(_committedExpanded);
+    widget.onExpansionChanged?.call(_committedExpanded);
   }
 }
 
