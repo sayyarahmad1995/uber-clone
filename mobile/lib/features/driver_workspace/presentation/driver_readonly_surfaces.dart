@@ -120,7 +120,7 @@ class _ReadOnlyBody extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Read-only. Approved Driver and vehicle information is not edited directly. Change-review workflow will be added in a later slice.',
+                    'Read-only. Approved Driver and vehicle information cannot be changed directly from this screen.',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ),
@@ -242,8 +242,8 @@ class _VehicleContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final contextLabel = profile != null
-        ? 'Operational Driver vehicle'
-        : 'Onboarding application vehicle';
+        ? 'Current Driver profile'
+        : 'Driver onboarding application';
     final status = profile?.status ?? application?.status;
 
     return Column(
@@ -301,7 +301,7 @@ class _VehicleContent extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'This screen is plural because the target model supports multiple vehicles. This slice shows only real currently available vehicle data and does not add, remove, switch, or edit vehicles.',
+          'Only your current submitted or approved vehicle is shown here. Adding, switching, or editing vehicles is not available yet.',
           style: Theme.of(context).textTheme.bodySmall,
         ),
       ],
