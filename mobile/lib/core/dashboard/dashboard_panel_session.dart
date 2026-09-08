@@ -22,10 +22,13 @@ class DashboardPanelSessionScope extends InheritedNotifier<DashboardPanelSession
     required super.child,
   }) : super(notifier: session);
 
+  static DashboardPanelSession? maybeOf(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<DashboardPanelSessionScope>()
+      ?.notifier;
+
   static DashboardPanelSession of(BuildContext context) {
-    final scope = context
-        .dependOnInheritedWidgetOfExactType<DashboardPanelSessionScope>();
-    assert(scope != null, 'DashboardPanelSessionScope is required.');
-    return scope!.notifier!;
+    final session = maybeOf(context);
+    assert(session != null, 'DashboardPanelSessionScope is required.');
+    return session!;
   }
 }
