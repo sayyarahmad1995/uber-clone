@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import 'dashboard_panel_session.dart';
 
 typedef DashboardPanelBuilder = Widget Function(
   BuildContext context,
@@ -24,6 +25,7 @@ class RideDashboardScaffold extends StatefulWidget {
     this.minPanelSize = 0.16,
     this.initialPanelSize = 0.16,
     this.maxPanelSize = 0.60,
+    this.onExpansionChanged,
   }) : assert(minPanelSize > 0),
        assert(minPanelSize <= initialPanelSize),
        assert(initialPanelSize <= maxPanelSize),
@@ -37,6 +39,7 @@ class RideDashboardScaffold extends StatefulWidget {
   final double minPanelSize;
   final double initialPanelSize;
   final double maxPanelSize;
+  final ValueChanged<bool>? onExpansionChanged;
 
   @override
   State<RideDashboardScaffold> createState() => _RideDashboardScaffoldState();
@@ -49,6 +52,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
   bool _isDraggingPanel = false;
   late bool _committedExpanded;
   bool _expansionSettled = false;
+  DashboardPanelSession? _panelSession;
   int? _contentPointer;
   int? _handlePointer;
   final Set<int> _controlPointers = {};
@@ -56,6 +60,8 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
   bool _contentDragStartedCollapsed = false;
   double _collapsePullDistance = 0;
   double _expandPullDistance = 0;
+  Widget? _cachedPanelContent;
+  bool? _cachedPanelScrollEnabled;
 
   static const _collapsePullThreshold = 56.0;
 
@@ -69,8 +75,27 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final session = DashboardPanelSessionScope.maybeOf(context);
+    if (!identical(_panelSession, session)) {
+      _panelSession = session;
+      if (session != null) {
+        _applySessionExtent(session.expanded);
+      }
+      return;
+    }
+    if (session != null &&
+        session.expanded != _committedExpanded &&
+        !_isDraggingPanel) {
+      _applySessionExtent(session.expanded);
+    }
+  }
+
+  @override
   void didUpdateWidget(covariant RideDashboardScaffold oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _invalidatePanelContent();
     if (oldWidget.minPanelSize != widget.minPanelSize ||
         oldWidget.maxPanelSize != widget.maxPanelSize) {
       _panelSize = _committedExpanded
@@ -78,13 +103,15 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
           : widget.minPanelSize;
     }
     if (oldWidget.panelIdentity != widget.panelIdentity) {
-      _panelSize = widget.minPanelSize;
+      _panelSize = _committedExpanded
+          ? widget.maxPanelSize
+          : widget.minPanelSize;
       _dragStartSize = _panelSize;
-      _committedExpanded = false;
-      _expansionSettled = false;
+      _expansionSettled = _committedExpanded;
       _isDraggingPanel = false;
       _contentPointer = null;
       _handlePointer = null;
+      _controlPointers.clear();
       _resetContentDrag();
       if (_contentScrollController.hasClients) {
         _contentScrollController.jumpTo(
@@ -104,8 +131,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final controlBottom =
-            constraints.maxHeight * _panelSize + AppSpacing.lg;
+        final panelHeight = constraints.maxHeight * _panelSize;
         final transitionDuration = _isDraggingPanel
             ? Duration.zero
             : const Duration(milliseconds: 220);
@@ -130,21 +156,28 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
                 ),
               ),
             if (widget.mapControls != null)
-              AnimatedPositioned(
+              Positioned(
                 right: AppSpacing.md,
-                bottom: controlBottom,
-                duration: transitionDuration,
-                curve: Curves.easeOutCubic,
-                child: SafeArea(
-                  top: false,
-                  child: RepaintBoundary(child: widget.mapControls!),
+                bottom: AppSpacing.lg,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween<double>(end: panelHeight),
+                  duration: transitionDuration,
+                  curve: Curves.easeOutCubic,
+                  builder: (context, panelOffset, child) => Transform.translate(
+                    offset: Offset(0, -panelOffset),
+                    child: child,
+                  ),
+                  child: SafeArea(
+                    top: false,
+                    child: RepaintBoundary(child: widget.mapControls!),
+                  ),
                 ),
               ),
             AnimatedPositioned(
               left: 0,
               right: 0,
               bottom: 0,
-              height: constraints.maxHeight * _panelSize,
+              height: panelHeight,
               onEnd: () {
                 if (_committedExpanded &&
                     !_isDraggingPanel &&
@@ -239,9 +272,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
                                     _contentPointer = null;
                                     _cancelContentDrag();
                                   },
-                                  child: widget.panelBuilder(
-                                    context,
-                                    _contentScrollController,
+                                  child: _panelContentFor(
                                     _committedExpanded &&
                                         _expansionSettled &&
                                         !_isDraggingPanel,
@@ -261,6 +292,24 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
         );
       },
     );
+  }
+
+  Widget _panelContentFor(bool scrollEnabled) {
+    if (_cachedPanelContent == null ||
+        _cachedPanelScrollEnabled != scrollEnabled) {
+      _cachedPanelScrollEnabled = scrollEnabled;
+      _cachedPanelContent = _DashboardPanelContent(
+        builder: widget.panelBuilder,
+        scrollController: _contentScrollController,
+        scrollEnabled: scrollEnabled,
+      );
+    }
+    return _cachedPanelContent!;
+  }
+
+  void _invalidatePanelContent() {
+    _cachedPanelContent = null;
+    _cachedPanelScrollEnabled = null;
   }
 
   void _resizePanel(double verticalDelta, double dashboardHeight) {
@@ -292,12 +341,14 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
     }
     final movement = _panelSize - _dragStartSize;
     final expand = velocity < -50 || (velocity.abs() <= 50 && movement > 0);
+    final previousExpanded = _committedExpanded;
     setState(() {
       _isDraggingPanel = false;
       _expansionSettled = expand && _isPanelExpanded;
       _panelSize = expand ? widget.maxPanelSize : widget.minPanelSize;
       _committedExpanded = expand;
     });
+    _notifyExpansionChanged(previousExpanded);
   }
 
   void _cancelPanelDrag() {
@@ -305,6 +356,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
       return;
     }
     final midpoint = (widget.minPanelSize + widget.maxPanelSize) / 2;
+    final previousExpanded = _committedExpanded;
     setState(() {
       _isDraggingPanel = false;
       _expansionSettled = _isPanelExpanded;
@@ -313,6 +365,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
           : widget.minPanelSize;
       _committedExpanded = _panelSize == widget.maxPanelSize;
     });
+    _notifyExpansionChanged(previousExpanded);
   }
 
   bool get _isPanelExpanded => (_panelSize - widget.maxPanelSize).abs() < 0.001;
@@ -384,6 +437,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
         _contentScrollController.position.minScrollExtent,
       );
     }
+    final previousExpanded = _committedExpanded;
     setState(() {
       _isDraggingPanel = false;
       _expansionSettled = _isPanelExpanded;
@@ -398,6 +452,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
         _committedExpanded = false;
       }
     });
+    _notifyExpansionChanged(previousExpanded);
   }
 
   void _cancelContentDrag() {
@@ -433,6 +488,40 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
       _panelSize = nextSize;
     });
   }
+
+  void _applySessionExtent(bool expanded) {
+    _committedExpanded = expanded;
+    _panelSize = expanded ? widget.maxPanelSize : widget.minPanelSize;
+    _dragStartSize = _panelSize;
+    _expansionSettled = expanded;
+    _isDraggingPanel = false;
+    _contentPointer = null;
+    _handlePointer = null;
+    _controlPointers.clear();
+    _resetContentDrag();
+  }
+
+  void _notifyExpansionChanged(bool previousExpanded) {
+    if (previousExpanded == _committedExpanded) return;
+    _panelSession?.setExpanded(_committedExpanded);
+    widget.onExpansionChanged?.call(_committedExpanded);
+  }
+}
+
+class _DashboardPanelContent extends StatelessWidget {
+  const _DashboardPanelContent({
+    required this.builder,
+    required this.scrollController,
+    required this.scrollEnabled,
+  });
+
+  final DashboardPanelBuilder builder;
+  final ScrollController scrollController;
+  final bool scrollEnabled;
+
+  @override
+  Widget build(BuildContext context) =>
+      builder(context, scrollController, scrollEnabled);
 }
 
 /// Marks interactive content whose pointers must never resize the dashboard.

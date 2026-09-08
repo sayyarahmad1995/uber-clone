@@ -109,6 +109,13 @@ contract. Capability features supply content and business state without redefini
 panel sizes, direct finger tracking, drag ownership, scroll locking, or
 release-gated snap behavior.
 
+The user's committed panel extent is shared presentation state for the signed-in app
+session. Expanded stays expanded across panel-content/business-state changes and
+Rider/Driver capability switches; collapsed stays collapsed using the target
+capability's own collapsed size. Content changes still reset panel content scroll and
+invalidate active gestures. Explicit logout resets the shared extent so a new session
+starts collapsed.
+
 See [ADR-0008: Dashboard Panel Interaction Contract](ADR-0008-dashboard-panel-interaction-contract.md)
 for the authoritative state machine and change-control rule.
 
@@ -144,3 +151,15 @@ Approval and rejection are transactional, backend-authoritative decisions. Appro
 Newly approved Drivers remain non-operational until the vehicle/service operating-context slice is implemented. The reviewer slice must not reactivate the legacy immediate-write or legacy online bypass.
 
 See [ADR-0010: Minimal Driver Onboarding Reviewer](ADR-0010-minimal-driver-onboarding-reviewer.md).
+
+## 16. Capability shell navigation
+
+Authenticated secondary navigation belongs to the capability shell, not to the Rider or Driver dashboard panel.
+
+`CapabilityHomeScreen` owns a standard Flutter `Drawer`. Rider/Driver capability switching, enabling Driver access, read-only account/Driver destinations as they become real, settings/history destinations when implemented, and logout belong to this shell-level navigation.
+
+Operational controls stay on their capability dashboard. The Drawer must not contain ride-request controls, Driver availability/location controls, marketplace actions, offers, assignment actions, or Trip controls.
+
+The previous bottom Rider/Driver segmented switch is retired once the Drawer owns capability switching. Drawer entries must correspond to implemented destinations or real actions; placeholder or dead navigation items are not added merely to preview future information architecture.
+
+The Drawer is outside ADR-0008. Adding or changing shell navigation must not modify `RideDashboardScaffold` panel sizing, gesture ownership, scrolling, or snap behavior except through an explicit ADR-0008 contract change.
