@@ -48,9 +48,14 @@ class CapabilityHomeScreen extends ConsumerWidget {
       );
     }
 
-    void openDestination(String location) {
-      Navigator.of(context).pop();
-      context.push(location);
+    Future<void> openDestination(
+      BuildContext drawerContext,
+      String location,
+    ) async {
+      Navigator.of(drawerContext).pop();
+      await drawerContext.push<void>(location);
+      if (!drawerContext.mounted) return;
+      Scaffold.maybeOf(drawerContext)?.openDrawer();
     }
 
     Future<void> logout() async {
@@ -60,83 +65,91 @@ class CapabilityHomeScreen extends ConsumerWidget {
     }
 
     return Scaffold(
-      drawer: Drawer(
-        child: SafeArea(
-          child: ListView(
-            padding: EdgeInsets.zero,
-            children: [
-              DrawerHeader(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    const Icon(Icons.account_circle_outlined, size: 36),
-                    const SizedBox(height: 12),
-                    Text(
-                      capability == Capability.rider ? 'Rider' : 'Driver',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Account menu',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ],
+      drawer: Builder(
+        builder: (drawerContext) => Drawer(
+          child: SafeArea(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                DrawerHeader(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      const Icon(Icons.account_circle_outlined, size: 36),
+                      const SizedBox(height: 12),
+                      Text(
+                        capability == Capability.rider ? 'Rider' : 'Driver',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Account menu',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              ListTile(
-                key: const Key('drawerRider'),
-                leading: const Icon(Icons.person_outline),
-                title: const Text('Rider'),
-                selected: capability == Capability.rider,
-                onTap: controller.state.busy
-                    ? null
-                    : () => selectCapability(Capability.rider),
-              ),
-              if (canDrive)
                 ListTile(
-                  key: const Key('drawerDriver'),
-                  leading: const Icon(Icons.local_taxi_outlined),
-                  title: const Text('Driver'),
-                  selected: capability == Capability.driver,
+                  key: const Key('drawerRider'),
+                  leading: const Icon(Icons.person_outline),
+                  title: const Text('Rider'),
+                  selected: capability == Capability.rider,
                   onTap: controller.state.busy
                       ? null
-                      : () => selectCapability(Capability.driver),
-                )
-              else
-                ListTile(
-                  key: const Key('drawerBecomeDriver'),
-                  leading: const Icon(Icons.add_circle_outline),
-                  title: const Text('Become a Driver'),
-                  onTap: controller.state.busy ? null : enableDriver,
+                      : () => selectCapability(Capability.rider),
                 ),
-              if (canDrive) ...[
+                if (canDrive)
+                  ListTile(
+                    key: const Key('drawerDriver'),
+                    leading: const Icon(Icons.local_taxi_outlined),
+                    title: const Text('Driver'),
+                    selected: capability == Capability.driver,
+                    onTap: controller.state.busy
+                        ? null
+                        : () => selectCapability(Capability.driver),
+                  )
+                else
+                  ListTile(
+                    key: const Key('drawerBecomeDriver'),
+                    leading: const Icon(Icons.add_circle_outline),
+                    title: const Text('Become a Driver'),
+                    onTap: controller.state.busy ? null : enableDriver,
+                  ),
+                if (canDrive) ...[
+                  const Divider(),
+                  ListTile(
+                    key: const Key('drawerDriverDetails'),
+                    leading: const Icon(Icons.badge_outlined),
+                    title: const Text('Driver details'),
+                    onTap: controller.state.busy
+                        ? null
+                        : () => openDestination(
+                            drawerContext,
+                            '/driver/details',
+                          ),
+                  ),
+                  ListTile(
+                    key: const Key('drawerVehicles'),
+                    leading: const Icon(Icons.directions_car_outlined),
+                    title: const Text('Vehicles'),
+                    onTap: controller.state.busy
+                        ? null
+                        : () => openDestination(
+                            drawerContext,
+                            '/driver/vehicles',
+                          ),
+                  ),
+                ],
                 const Divider(),
                 ListTile(
-                  key: const Key('drawerDriverDetails'),
-                  leading: const Icon(Icons.badge_outlined),
-                  title: const Text('Driver details'),
-                  onTap: controller.state.busy
-                      ? null
-                      : () => openDestination('/driver/details'),
-                ),
-                ListTile(
-                  key: const Key('drawerVehicles'),
-                  leading: const Icon(Icons.directions_car_outlined),
-                  title: const Text('Vehicles'),
-                  onTap: controller.state.busy
-                      ? null
-                      : () => openDestination('/driver/vehicles'),
+                  key: const Key('drawerLogout'),
+                  leading: const Icon(Icons.logout),
+                  title: const Text('Log out'),
+                  onTap: controller.state.busy ? null : logout,
                 ),
               ],
-              const Divider(),
-              ListTile(
-                key: const Key('drawerLogout'),
-                leading: const Icon(Icons.logout),
-                title: const Text('Log out'),
-                onTap: controller.state.busy ? null : logout,
-              ),
-            ],
+            ),
           ),
         ),
       ),
