@@ -273,7 +273,7 @@ class _VehicleContent extends StatelessWidget {
                 value: vehicle.make,
               ),
               _ReadOnlyTile(
-                icon: Icons.directions_car_filled_outlined,
+                icon: Icons.directions_car_filled,
                 label: 'Model',
                 value: vehicle.model,
               ),
