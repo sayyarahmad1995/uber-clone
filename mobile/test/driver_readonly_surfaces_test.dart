@@ -37,6 +37,12 @@ void main() {
     expect(find.text('Test Driver'), findsOneWidget);
     expect(find.text('Active'), findsOneWidget);
     expect(find.text('Offline'), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('drawerDriverDetails')), findsOneWidget);
+    expect(find.byKey(const Key('drawerVehicles')), findsOneWidget);
   });
 
   testWidgets(
@@ -74,8 +80,8 @@ void main() {
 
       await tester.pageBack();
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('capabilityMenuButton')));
-      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('drawerVehicles')), findsOneWidget);
       await tester.tap(find.byKey(const Key('drawerVehicles')));
       await tester.pumpAndSettle();
 
@@ -90,6 +96,12 @@ void main() {
       expect(find.text('ABC-123'), findsOneWidget);
       expect(find.text('Comfort'), findsOneWidget);
       expect(find.text('Driver onboarding application'), findsOneWidget);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('drawerDriverDetails')), findsOneWidget);
+      expect(find.byKey(const Key('drawerVehicles')), findsOneWidget);
     },
   );
 
