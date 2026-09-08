@@ -35,16 +35,16 @@ class _CapabilityHomeScreenState extends ConsumerState<CapabilityHomeScreen> {
       Navigator.of(context).pop();
       if (next == widget.capability) return;
       await controller.selectCapability(next);
-      if (mounted) context.go('/${next.name}');
+      if (context.mounted) context.go('/${next.name}');
     }
 
     Future<void> enableDriver() async {
       Navigator.of(context).pop();
       final enabled = await controller.enableDriver();
-      if (!mounted) return;
+      if (!context.mounted) return;
       if (enabled) {
         await controller.selectCapability(Capability.driver);
-        if (mounted) context.go('/driver');
+        if (context.mounted) context.go('/driver');
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
