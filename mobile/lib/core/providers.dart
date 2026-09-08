@@ -13,6 +13,7 @@ import '../features/driver_workspace/application/driver_controller.dart';
 import '../features/driver_workspace/application/driver_onboarding_controller.dart';
 import '../features/driver_workspace/data/driver_onboarding_repository.dart';
 import '../features/driver_workspace/data/driver_repository.dart';
+import '../features/driver_workspace/presentation/driver_readonly_surfaces.dart';
 import '../features/rider_request/application/rider_request_controller.dart';
 import '../features/rider_request/data/device_location.dart';
 import '../features/rider_request/data/ride_request_repository.dart';
@@ -124,7 +125,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             ? '/driver'
             : '/rider';
       }
-      if (location == '/driver' && !hasDriver) return '/rider';
+      if ((location == '/driver' || location.startsWith('/driver/')) &&
+          !hasDriver) {
+        return '/rider';
+      }
       return null;
     },
     routes: [
@@ -145,6 +149,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/driver',
         builder: (_, _) =>
             const CapabilityHomeScreen(capability: Capability.driver),
+      ),
+      GoRoute(
+        path: '/driver/details',
+        builder: (_, _) => const DriverDetailsScreen(),
+      ),
+      GoRoute(
+        path: '/driver/vehicles',
+        builder: (_, _) => const DriverVehiclesScreen(),
       ),
     ],
   );
