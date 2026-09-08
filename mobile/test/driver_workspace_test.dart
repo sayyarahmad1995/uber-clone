@@ -13,7 +13,9 @@ void main() {
   ) async {
     await tester.pumpWidget(testApp(FakeAuthRepository(account: riderAccount)));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Become a Driver'));
+    await tester.tap(find.byKey(const Key('capabilityMenuButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('drawerBecomeDriver')));
     await tester.pumpAndSettle();
     expect(find.text('Driver dashboard'), findsOneWidget);
     await tester.drag(
