@@ -29,6 +29,9 @@ void main() {
           final height = tester
               .getSize(find.byType(RideDashboardScaffold))
               .height;
+          await tester.drag(handle, const Offset(0, 100));
+          await tester.pumpAndSettle();
+          expect(tester.getSize(panel).height, height * 0.2);
           final body = await tester.startGesture(
             tester.getCenter(find.text('Panel two')),
             pointer: 1,
@@ -93,7 +96,7 @@ void main() {
     expect(find.text('Rider'), findsOneWidget);
   });
 
-  testWidgets('dual-capability account switches through shell drawer', (
+  testWidgets('dual-capability account preserves panel extent through drawer switch', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -102,6 +105,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(SegmentedButton<Capability>), findsNothing);
+    final panel = find.byKey(const Key('dashboardPanel'));
+    final handle = find.byKey(const Key('dashboardPanelDragHandle'));
+    var dashboardHeight = tester
+        .getSize(find.byType(RideDashboardScaffold))
+        .height;
+
+    await tester.drag(handle, const Offset(0, -300));
+    await tester.pumpAndSettle();
+    expect(tester.getSize(panel).height, dashboardHeight * 0.60);
+
     await tester.tap(find.byKey(const Key('capabilityMenuButton')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('drawerRider')), findsOneWidget);
@@ -110,6 +123,19 @@ void main() {
     await tester.tap(find.byKey(const Key('drawerDriver')));
     await tester.pumpAndSettle();
     expect(find.text('Driver dashboard'), findsOneWidget);
+    dashboardHeight = tester
+        .getSize(find.byType(RideDashboardScaffold))
+        .height;
+    expect(tester.getSize(panel).height, dashboardHeight * 0.60);
+
+    await tester.tap(find.byKey(const Key('capabilityMenuButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('drawerRider')));
+    await tester.pumpAndSettle();
+    dashboardHeight = tester
+        .getSize(find.byType(RideDashboardScaffold))
+        .height;
+    expect(tester.getSize(panel).height, dashboardHeight * 0.60);
   });
 
   testWidgets('Rider-only account enables Driver from shell drawer', (
@@ -230,7 +256,7 @@ void main() {
     expect(location.requestCount, 2);
   });
 
-  testWidgets('dashboard resets scrolling when panel identity changes', (
+  testWidgets('dashboard preserves extent and resets scrolling on identity change', (
     tester,
   ) async {
     final dashboardKey = GlobalKey<_DashboardIdentityHarnessState>();
@@ -251,11 +277,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       tester.getSize(find.byKey(const Key('dashboardPanel'))).height,
-      tester.getSize(find.byType(RideDashboardScaffold)).height * 0.20,
+      tester.getSize(find.byType(RideDashboardScaffold)).height * 0.60,
     );
     expect(
       tester.widget<ListView>(list).physics,
-      isA<NeverScrollableScrollPhysics>(),
+      isA<ClampingScrollPhysics>(),
     );
   });
 
@@ -296,6 +322,11 @@ void main() {
       await tester.pumpAndSettle();
       final panel = find.byKey(const Key('dashboardPanel'));
       final list = find.byKey(const Key('identityPanelList'));
+      await tester.drag(
+        find.byKey(const Key('dashboardPanelDragHandle')),
+        const Offset(0, 100),
+      );
+      await tester.pumpAndSettle();
       final first = await tester.startGesture(
         tester.getCenter(find.text('Panel two')),
         pointer: 1,
