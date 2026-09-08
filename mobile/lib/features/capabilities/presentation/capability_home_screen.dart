@@ -48,6 +48,11 @@ class CapabilityHomeScreen extends ConsumerWidget {
       );
     }
 
+    void openDestination(String location) {
+      Navigator.of(context).pop();
+      context.push(location);
+    }
+
     Future<void> logout() async {
       Navigator.of(context).pop();
       await controller.logout();
@@ -105,6 +110,25 @@ class CapabilityHomeScreen extends ConsumerWidget {
                   title: const Text('Become a Driver'),
                   onTap: controller.state.busy ? null : enableDriver,
                 ),
+              if (canDrive) ...[
+                const Divider(),
+                ListTile(
+                  key: const Key('drawerDriverDetails'),
+                  leading: const Icon(Icons.badge_outlined),
+                  title: const Text('Driver details'),
+                  onTap: controller.state.busy
+                      ? null
+                      : () => openDestination('/driver/details'),
+                ),
+                ListTile(
+                  key: const Key('drawerVehicles'),
+                  leading: const Icon(Icons.directions_car_outlined),
+                  title: const Text('Vehicles'),
+                  onTap: controller.state.busy
+                      ? null
+                      : () => openDestination('/driver/vehicles'),
+                ),
+              ],
               const Divider(),
               ListTile(
                 key: const Key('drawerLogout'),
