@@ -21,15 +21,9 @@ jobs:
       - name: Install dependencies
         working-directory: mobile
         run: flutter pub get
-      - name: Check formatting
+      - name: Print formatter diff
         working-directory: mobile
-        run: dart format --output=none --set-exit-if-changed lib test
-      - name: Analyze
-        working-directory: mobile
-        run: flutter analyze
-      - name: Direct-drag regression
-        working-directory: mobile
-        run: flutter test test/dashboard_panel_build_efficiency_test.dart
-      - name: Full tests
-        working-directory: mobile
-        run: flutter test
+        run: |
+          dart format test/app_routing_test.dart
+          git diff -- test/app_routing_test.dart
+          exit 1
