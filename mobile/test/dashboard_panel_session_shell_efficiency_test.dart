@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:uber_clone/core/dashboard/ride_dashboard_scaffold.dart';
 import 'package:uber_clone/core/providers.dart';
 
-import 'app_routing_test.dart' show riderAccount, testApp;
+import 'app_routing_test.dart' show testApp;
 import 'test_doubles.dart';
 
 void main() {
