@@ -31,17 +31,13 @@ jobs:
 
           scaffold = Path('mobile/lib/core/dashboard/ride_dashboard_scaffold.dart')
           text = scaffold.read_text()
-          old = '''                                  child: _panelContentFor(
-                                    _committedExpanded &&
+          old = '''_committedExpanded &&
                                         _expansionSettled &&
-                                        !_isDraggingPanel,
-                                  ),'''
-          new = '''                                  child: _panelContentFor(
-                                    _committedExpanded &&
+                                        !_isDraggingPanel'''
+          new = '''_committedExpanded &&
                                         _expansionSettled &&
                                         (!_isDraggingPanel ||
-                                            _contentDragStartedAtTop),
-                                  ),'''
+                                            _contentDragStartedAtTop)'''
           if old not in text:
               raise SystemExit('scaffold target not found')
           scaffold.write_text(text.replace(old, new, 1))
