@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
@@ -22,6 +23,8 @@ import 'dashboard/dashboard_panel_session.dart';
 import 'maps/map_tiles.dart';
 import 'models/account.dart';
 import 'session/session_store.dart';
+
+const _driverDetailTransitionDuration = Duration(milliseconds: 250);
 
 final dioProvider = Provider<Dio>(
   (ref) => Dio(
@@ -101,6 +104,32 @@ final sessionControllerProvider = ChangeNotifierProvider<SessionController>(
   ),
 );
 
+CustomTransitionPage<void> _driverDetailPage({
+  required LocalKey key,
+  required Widget child,
+}) {
+  return CustomTransitionPage<void>(
+    key: key,
+    opaque: false,
+    transitionDuration: _driverDetailTransitionDuration,
+    reverseTransitionDuration: _driverDetailTransitionDuration,
+    transitionsBuilder: (_, animation, _, child) {
+      final position = Tween<Offset>(
+        begin: const Offset(-1, 0),
+        end: Offset.zero,
+      ).animate(
+        CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        ),
+      );
+      return SlideTransition(position: position, child: child);
+    },
+    child: child,
+  );
+}
+
 final routerProvider = Provider<GoRouter>((ref) {
   final session = ref.watch(sessionControllerProvider.notifier);
   return GoRouter(
@@ -152,23 +181,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/driver/details',
-        pageBuilder: (_, state) => CustomTransitionPage<void>(
+        pageBuilder: (_, state) => _driverDetailPage(
           key: state.pageKey,
-          opaque: false,
-          transitionDuration: Duration.zero,
-          reverseTransitionDuration: Duration.zero,
-          transitionsBuilder: (_, _, _, child) => child,
           child: const DriverDetailsScreen(),
         ),
       ),
       GoRoute(
         path: '/driver/vehicles',
-        pageBuilder: (_, state) => CustomTransitionPage<void>(
+        pageBuilder: (_, state) => _driverDetailPage(
           key: state.pageKey,
-          opaque: false,
-          transitionDuration: Duration.zero,
-          reverseTransitionDuration: Duration.zero,
-          transitionsBuilder: (_, _, _, child) => child,
           child: const DriverVehiclesScreen(),
         ),
       ),
