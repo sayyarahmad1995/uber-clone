@@ -21,14 +21,12 @@ jobs:
       - name: Install dependencies
         working-directory: mobile
         run: flutter pub get
-      - name: Show formatting diff
+      - name: Check formatting
         working-directory: mobile
-        run: |
-          dart format lib test
-          git diff --exit-code -- lib test
+        run: dart format --output=none --set-exit-if-changed lib test
       - name: Analyze
         working-directory: mobile
         run: flutter analyze
-      - name: Test dashboard animation
+      - name: Test
         working-directory: mobile
-        run: flutter test test/dashboard_panel_build_efficiency_test.dart
+        run: flutter test
