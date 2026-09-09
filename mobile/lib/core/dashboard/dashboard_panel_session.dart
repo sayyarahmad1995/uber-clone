@@ -14,26 +14,21 @@ class DashboardPanelSession extends ChangeNotifier {
   void reset() => setExpanded(false);
 }
 
-class DashboardPanelSessionScope extends InheritedWidget {
+class DashboardPanelSessionScope
+    extends InheritedNotifier<DashboardPanelSession> {
   const DashboardPanelSessionScope({
     super.key,
-    required this.session,
+    required DashboardPanelSession session,
     required super.child,
-  });
-
-  final DashboardPanelSession session;
+  }) : super(notifier: session);
 
   static DashboardPanelSession? maybeOf(BuildContext context) => context
       .dependOnInheritedWidgetOfExactType<DashboardPanelSessionScope>()
-      ?.session;
+      ?.notifier;
 
   static DashboardPanelSession of(BuildContext context) {
     final session = maybeOf(context);
     assert(session != null, 'DashboardPanelSessionScope is required.');
     return session!;
   }
-
-  @override
-  bool updateShouldNotify(DashboardPanelSessionScope oldWidget) =>
-      !identical(session, oldWidget.session);
 }

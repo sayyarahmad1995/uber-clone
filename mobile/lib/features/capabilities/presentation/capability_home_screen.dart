@@ -16,7 +16,7 @@ class CapabilityHomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final controller = ref.watch(sessionControllerProvider);
-    final panelSession = ref.read(dashboardPanelSessionProvider);
+    final panelSession = ref.watch(dashboardPanelSessionProvider);
     final account = controller.state.account;
     if (account == null) {
       return const SizedBox.shrink();
