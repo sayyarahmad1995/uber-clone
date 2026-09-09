@@ -50,6 +50,9 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
   late double _panelSize;
   late double _dragStartSize;
   bool _isDraggingPanel = false;
+  double? _snapFromSize;
+  double? _snapToSize;
+  int _snapGeneration = 0;
   late bool _committedExpanded;
   bool _expansionSettled = false;
   DashboardPanelSession? _panelSession;
@@ -64,6 +67,9 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
   bool? _cachedPanelScrollEnabled;
 
   static const _collapsePullThreshold = 56.0;
+  static const _snapDuration = Duration(milliseconds: 220);
+
+  bool get _isSnappingPanel => _snapFromSize != null && _snapToSize != null;
 
   @override
   void initState() {
@@ -87,7 +93,8 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
     }
     if (session != null &&
         session.expanded != _committedExpanded &&
-        !_isDraggingPanel) {
+        !_isDraggingPanel &&
+        !_isSnappingPanel) {
       _applySessionExtent(session.expanded);
     }
   }
@@ -98,11 +105,13 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
     _invalidatePanelContent();
     if (oldWidget.minPanelSize != widget.minPanelSize ||
         oldWidget.maxPanelSize != widget.maxPanelSize) {
+      _clearPanelSnap();
       _panelSize = _committedExpanded
           ? widget.maxPanelSize
           : widget.minPanelSize;
     }
     if (oldWidget.panelIdentity != widget.panelIdentity) {
+      _clearPanelSnap();
       _panelSize = _committedExpanded
           ? widget.maxPanelSize
           : widget.minPanelSize;
@@ -131,10 +140,11 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final panelHeight = constraints.maxHeight * _panelSize;
+        final dashboardHeight = constraints.maxHeight;
+        final panelHeight = dashboardHeight * _panelSize;
         final transitionDuration = _isDraggingPanel
             ? Duration.zero
-            : const Duration(milliseconds: 220);
+            : _snapDuration;
 
         return Stack(
           children: [
@@ -173,124 +183,158 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
                   ),
                 ),
               ),
-            AnimatedPositioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: panelHeight,
-              onEnd: () {
-                if (_committedExpanded &&
-                    !_isDraggingPanel &&
-                    !_expansionSettled &&
-                    _isPanelExpanded) {
-                  setState(() => _expansionSettled = true);
-                }
-              },
-              duration: transitionDuration,
-              curve: Curves.easeOutCubic,
-              child: SizedBox.expand(
-                key: const Key('dashboardPanel'),
-                child: SafeArea(
-                  top: false,
-                  minimum: const EdgeInsets.fromLTRB(
-                    AppSpacing.md,
-                    0,
-                    AppSpacing.md,
-                    AppSpacing.md,
-                  ),
-                  child: Align(
-                    alignment: Alignment.bottomCenter,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 640),
-                      child: Material(
-                        color: Theme.of(context).colorScheme.surface,
-                        elevation: 8,
-                        shadowColor: Colors.black26,
-                        borderRadius: const BorderRadius.all(
-                          Radius.circular(AppRadii.xl),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: RepaintBoundary(
-                          child: Column(
-                            children: [
-                              _PanelDragHandle(
-                                onPointerDown: (pointer) {
-                                  if (_contentPointer != null ||
-                                      _handlePointer != null) {
-                                    return false;
-                                  }
-                                  _handlePointer = pointer;
-                                  return true;
-                                },
-                                onPointerFinished: (pointer) {
-                                  if (_handlePointer == pointer) {
-                                    _handlePointer = null;
-                                  }
-                                },
-                                onDragStart: _startPanelDrag,
-                                onDragUpdate: (delta) =>
-                                    _resizePanel(delta, constraints.maxHeight),
-                                onDragEnd: _endPanelDrag,
-                                onDragCancel: _cancelPanelDrag,
-                              ),
-                              Expanded(
-                                child: Listener(
-                                  onPointerDown: (event) {
-                                    if (_contentPointer != null ||
-                                        _handlePointer != null ||
-                                        _isDraggingPanel ||
-                                        _controlPointers.contains(
-                                          event.pointer,
-                                        )) {
-                                      return;
-                                    }
-                                    _contentPointer = event.pointer;
-                                    _startContentDrag();
-                                  },
-                                  onPointerMove: (event) {
-                                    if (_contentPointer != event.pointer) {
-                                      return;
-                                    }
-                                    _updateContentDrag(
-                                      event.delta.dy,
-                                      constraints.maxHeight,
-                                    );
-                                  },
-                                  onPointerUp: (event) {
-                                    _controlPointers.remove(event.pointer);
-                                    if (_contentPointer != event.pointer) {
-                                      return;
-                                    }
-                                    _contentPointer = null;
-                                    _releaseContentDrag();
-                                  },
-                                  onPointerCancel: (event) {
-                                    _controlPointers.remove(event.pointer);
-                                    if (_contentPointer != event.pointer) {
-                                      return;
-                                    }
-                                    _contentPointer = null;
-                                    _cancelContentDrag();
-                                  },
-                                  child: _panelContentFor(
-                                    _committedExpanded &&
-                                        _expansionSettled &&
-                                        !_isDraggingPanel,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+            if (_isSnappingPanel)
+              _buildSnappingPanel(context, dashboardHeight)
+            else
+              AnimatedPositioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: panelHeight,
+                onEnd: () {
+                  if (_committedExpanded &&
+                      !_isDraggingPanel &&
+                      !_expansionSettled &&
+                      _isPanelExpanded) {
+                    setState(() => _expansionSettled = true);
+                  }
+                },
+                duration: transitionDuration,
+                curve: Curves.easeOutCubic,
+                child: _buildPanelSurface(context, dashboardHeight),
               ),
-            ),
           ],
         );
       },
+    );
+  }
+
+  Widget _buildSnappingPanel(BuildContext context, double dashboardHeight) {
+    final fromSize = _snapFromSize!;
+    final toSize = _snapToSize!;
+    final layoutSize = fromSize > toSize ? fromSize : toSize;
+    final startOffset = toSize > fromSize
+        ? dashboardHeight * (toSize - fromSize)
+        : 0.0;
+    final endOffset = fromSize > toSize
+        ? dashboardHeight * (fromSize - toSize)
+        : 0.0;
+
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      height: dashboardHeight * layoutSize,
+      child: TweenAnimationBuilder<double>(
+        key: ValueKey(_snapGeneration),
+        tween: Tween<double>(begin: startOffset, end: endOffset),
+        duration: _snapDuration,
+        curve: Curves.easeOutCubic,
+        onEnd: _finishPanelSnap,
+        builder: (context, offset, child) => Transform.translate(
+          offset: Offset(0, offset),
+          child: child,
+        ),
+        child: _buildPanelSurface(context, dashboardHeight),
+      ),
+    );
+  }
+
+  Widget _buildPanelSurface(BuildContext context, double dashboardHeight) {
+    return SizedBox.expand(
+      key: const Key('dashboardPanel'),
+      child: SafeArea(
+        top: false,
+        minimum: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          0,
+          AppSpacing.md,
+          AppSpacing.md,
+        ),
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              elevation: 8,
+              shadowColor: Colors.black26,
+              borderRadius: const BorderRadius.all(Radius.circular(AppRadii.xl)),
+              clipBehavior: Clip.antiAlias,
+              child: RepaintBoundary(
+                child: Column(
+                  children: [
+                    _PanelDragHandle(
+                      onPointerDown: (pointer) {
+                        if (_contentPointer != null ||
+                            _handlePointer != null ||
+                            _isSnappingPanel) {
+                          return false;
+                        }
+                        _handlePointer = pointer;
+                        return true;
+                      },
+                      onPointerFinished: (pointer) {
+                        if (_handlePointer == pointer) {
+                          _handlePointer = null;
+                        }
+                      },
+                      onDragStart: _startPanelDrag,
+                      onDragUpdate: (delta) =>
+                          _resizePanel(delta, dashboardHeight),
+                      onDragEnd: _endPanelDrag,
+                      onDragCancel: _cancelPanelDrag,
+                    ),
+                    Expanded(
+                      child: Listener(
+                        onPointerDown: (event) {
+                          if (_contentPointer != null ||
+                              _handlePointer != null ||
+                              _isDraggingPanel ||
+                              _isSnappingPanel ||
+                              _controlPointers.contains(event.pointer)) {
+                            return;
+                          }
+                          _contentPointer = event.pointer;
+                          _startContentDrag();
+                        },
+                        onPointerMove: (event) {
+                          if (_contentPointer != event.pointer) {
+                            return;
+                          }
+                          _updateContentDrag(event.delta.dy, dashboardHeight);
+                        },
+                        onPointerUp: (event) {
+                          _controlPointers.remove(event.pointer);
+                          if (_contentPointer != event.pointer) {
+                            return;
+                          }
+                          _contentPointer = null;
+                          _releaseContentDrag();
+                        },
+                        onPointerCancel: (event) {
+                          _controlPointers.remove(event.pointer);
+                          if (_contentPointer != event.pointer) {
+                            return;
+                          }
+                          _contentPointer = null;
+                          _cancelContentDrag();
+                        },
+                        child: _panelContentFor(
+                          _committedExpanded &&
+                              _expansionSettled &&
+                              !_isDraggingPanel &&
+                              !_isSnappingPanel,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -325,7 +369,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
   }
 
   void _startPanelDrag() {
-    if (_handlePointer == null) {
+    if (_handlePointer == null || _isSnappingPanel) {
       return;
     }
     _resetContentDrag();
@@ -341,14 +385,10 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
     }
     final movement = _panelSize - _dragStartSize;
     final expand = velocity < -50 || (velocity.abs() <= 50 && movement > 0);
-    final previousExpanded = _committedExpanded;
-    setState(() {
-      _isDraggingPanel = false;
-      _expansionSettled = expand && _isPanelExpanded;
-      _panelSize = expand ? widget.maxPanelSize : widget.minPanelSize;
-      _committedExpanded = expand;
-    });
-    _notifyExpansionChanged(previousExpanded);
+    _startPanelSnap(
+      expand ? widget.maxPanelSize : widget.minPanelSize,
+      committedExpanded: expand,
+    );
   }
 
   void _cancelPanelDrag() {
@@ -356,16 +396,13 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
       return;
     }
     final midpoint = (widget.minPanelSize + widget.maxPanelSize) / 2;
-    final previousExpanded = _committedExpanded;
-    setState(() {
-      _isDraggingPanel = false;
-      _expansionSettled = _isPanelExpanded;
-      _panelSize = _panelSize >= midpoint
-          ? widget.maxPanelSize
-          : widget.minPanelSize;
-      _committedExpanded = _panelSize == widget.maxPanelSize;
-    });
-    _notifyExpansionChanged(previousExpanded);
+    final targetSize = _panelSize >= midpoint
+        ? widget.maxPanelSize
+        : widget.minPanelSize;
+    _startPanelSnap(
+      targetSize,
+      committedExpanded: targetSize == widget.maxPanelSize,
+    );
   }
 
   bool get _isPanelExpanded => (_panelSize - widget.maxPanelSize).abs() < 0.001;
@@ -437,22 +474,17 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
         _contentScrollController.position.minScrollExtent,
       );
     }
-    final previousExpanded = _committedExpanded;
-    setState(() {
-      _isDraggingPanel = false;
-      _expansionSettled = _isPanelExpanded;
-      _panelSize = shouldExpand
-          ? widget.maxPanelSize
-          : shouldCollapse
-          ? widget.minPanelSize
-          : returnSize;
-      if (shouldExpand) {
-        _committedExpanded = true;
-      } else if (shouldCollapse) {
-        _committedExpanded = false;
-      }
-    });
-    _notifyExpansionChanged(previousExpanded);
+    final targetSize = shouldExpand
+        ? widget.maxPanelSize
+        : shouldCollapse
+        ? widget.minPanelSize
+        : returnSize;
+    final targetExpanded = shouldExpand
+        ? true
+        : shouldCollapse
+        ? false
+        : _committedExpanded;
+    _startPanelSnap(targetSize, committedExpanded: targetExpanded);
   }
 
   void _cancelContentDrag() {
@@ -461,12 +493,49 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
     final returnSize = _dragStartSize;
     _resetContentDrag();
     if (hadBodyPanelDrag) {
-      setState(() {
-        _isDraggingPanel = false;
-        _expansionSettled = _isPanelExpanded;
-        _panelSize = returnSize;
-      });
+      _startPanelSnap(returnSize, committedExpanded: _committedExpanded);
     }
+  }
+
+  void _startPanelSnap(
+    double targetSize, {
+    required bool committedExpanded,
+  }) {
+    final fromSize = _panelSize;
+    final previousExpanded = _committedExpanded;
+    final shouldAnimate = (fromSize - targetSize).abs() >= 0.000001;
+
+    setState(() {
+      _isDraggingPanel = false;
+      _committedExpanded = committedExpanded;
+      _panelSize = targetSize;
+      _expansionSettled = false;
+      if (shouldAnimate) {
+        _snapFromSize = fromSize;
+        _snapToSize = targetSize;
+        _snapGeneration++;
+      } else {
+        _clearPanelSnap();
+        _expansionSettled = committedExpanded && _isPanelExpanded;
+      }
+    });
+    _notifyExpansionChanged(previousExpanded);
+  }
+
+  void _finishPanelSnap() {
+    if (!_isSnappingPanel || !mounted) {
+      return;
+    }
+    setState(() {
+      _clearPanelSnap();
+      _dragStartSize = _panelSize;
+      _expansionSettled = _committedExpanded && _isPanelExpanded;
+    });
+  }
+
+  void _clearPanelSnap() {
+    _snapFromSize = null;
+    _snapToSize = null;
   }
 
   void _resetContentDrag() {
@@ -490,6 +559,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
   }
 
   void _applySessionExtent(bool expanded) {
+    _clearPanelSnap();
     _committedExpanded = expanded;
     _panelSize = expanded ? widget.maxPanelSize : widget.minPanelSize;
     _dragStartSize = _panelSize;
