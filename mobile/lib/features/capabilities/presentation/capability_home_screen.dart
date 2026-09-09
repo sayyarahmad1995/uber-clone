@@ -49,8 +49,7 @@ class CapabilityHomeScreen extends ConsumerWidget {
     }
 
     void openDestination(String location) {
-      Navigator.of(context).pop();
-      context.push(location);
+      context.push<void>(location);
     }
 
     Future<void> logout() async {
