@@ -231,10 +231,8 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
         duration: _snapDuration,
         curve: Curves.easeOutCubic,
         onEnd: _finishPanelSnap,
-        builder: (context, offset, child) => Transform.translate(
-          offset: Offset(0, offset),
-          child: child,
-        ),
+        builder: (context, offset, child) =>
+            Transform.translate(offset: Offset(0, offset), child: child),
         child: _buildPanelSurface(context, dashboardHeight),
       ),
     );
@@ -259,7 +257,9 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
               color: Theme.of(context).colorScheme.surface,
               elevation: 8,
               shadowColor: Colors.black26,
-              borderRadius: const BorderRadius.all(Radius.circular(AppRadii.xl)),
+              borderRadius: const BorderRadius.all(
+                Radius.circular(AppRadii.xl),
+              ),
               clipBehavior: Clip.antiAlias,
               child: RepaintBoundary(
                 child: Column(
@@ -497,10 +497,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
     }
   }
 
-  void _startPanelSnap(
-    double targetSize, {
-    required bool committedExpanded,
-  }) {
+  void _startPanelSnap(double targetSize, {required bool committedExpanded}) {
     final fromSize = _panelSize;
     final previousExpanded = _committedExpanded;
     final shouldAnimate = (fromSize - targetSize).abs() >= 0.000001;
