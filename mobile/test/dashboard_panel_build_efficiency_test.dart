@@ -48,7 +48,7 @@ void main() {
     expect(panelBuilds, buildsBeforeDrag + 1);
   });
 
-  testWidgets('collapse snap uses paint-only intermediate motion', (
+  testWidgets('collapse snap stays bottom anchored through drag handoff', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -90,28 +90,36 @@ void main() {
     await tester.pump();
     final previewHeight = tester.getSize(panel).height;
     final previewTop = tester.getTopLeft(panel).dy;
+    final previewBottom = tester.getBottomLeft(panel).dy;
     final remainingDistance = minTop - previewTop;
+
+    expect(previewBottom, closeTo(dashboardBottom, 0.5));
 
     await drag.up();
     await tester.pump();
     expect(tester.getTopLeft(panel).dy, closeTo(previewTop, 0.5));
+    expect(tester.getBottomLeft(panel).dy, closeTo(dashboardBottom, 0.5));
 
     await tester.pump(const Duration(milliseconds: 16));
     final firstFrameTop = tester.getTopLeft(panel).dy;
     final firstFrameTravel = firstFrameTop - previewTop;
     expect(firstFrameTravel, greaterThanOrEqualTo(0));
     expect(firstFrameTravel, lessThan(remainingDistance * 0.08));
+    expect(tester.getBottomLeft(panel).dy, closeTo(dashboardBottom, 0.5));
 
     await tester.pump(const Duration(milliseconds: 64));
     final midAnimationHeight = tester.getSize(panel).height;
     final midAnimationTop = tester.getTopLeft(panel).dy;
 
-    expect(midAnimationHeight, closeTo(previewHeight, 0.5));
+    expect(midAnimationHeight, lessThan(previewHeight - 1));
+    expect(midAnimationHeight, greaterThan(minHeight + 1));
     expect(midAnimationTop, greaterThan(previewTop + 1));
     expect(midAnimationTop, lessThan(minTop - 1));
+    expect(tester.getBottomLeft(panel).dy, closeTo(dashboardBottom, 0.5));
 
     await tester.pumpAndSettle();
     expect(tester.getSize(panel).height, closeTo(minHeight, 0.5));
     expect(tester.getTopLeft(panel).dy, closeTo(minTop, 0.5));
+    expect(tester.getBottomLeft(panel).dy, closeTo(dashboardBottom, 0.5));
   });
 }
