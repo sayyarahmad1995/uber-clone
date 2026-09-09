@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uber_clone/core/dashboard/ride_dashboard_scaffold.dart';
-import 'package:uber_clone/core/providers.dart';
 
 import 'app_routing_test.dart' show testApp;
 import 'test_doubles.dart';
 
 void main() {
-  testWidgets('panel session changes do not rebuild the capability shell', (
+  testWidgets('committed panel snaps do not rebuild the capability shell', (
     tester,
   ) async {
     await tester.pumpWidget(testApp(FakeAuthRepository(account: riderAccount)));
@@ -26,18 +24,21 @@ void main() {
         .getSize(find.byType(RideDashboardScaffold))
         .height;
 
-    final container = ProviderScope.containerOf(
-      tester.element(find.byType(RideDashboardScaffold)),
+    await tester.drag(
+      find.byKey(const Key('dashboardPanelDragHandle')),
+      const Offset(0, -300),
     );
-    container.read(dashboardPanelSessionProvider).setExpanded(true);
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     final afterExpand = tester.widget<Scaffold>(shellScaffold);
     expect(identical(afterExpand, before), isTrue);
     expect(tester.getSize(panel).height, closeTo(dashboardHeight * 0.60, 0.5));
 
-    container.read(dashboardPanelSessionProvider).setExpanded(false);
-    await tester.pump();
+    await tester.drag(
+      find.byKey(const Key('dashboardPanelDragHandle')),
+      const Offset(0, 300),
+    );
+    await tester.pumpAndSettle();
 
     final afterCollapse = tester.widget<Scaffold>(shellScaffold);
     expect(identical(afterCollapse, before), isTrue);
