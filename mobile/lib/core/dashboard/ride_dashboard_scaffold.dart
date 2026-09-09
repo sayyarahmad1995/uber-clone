@@ -52,7 +52,6 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
   bool _isDraggingPanel = false;
   late bool _committedExpanded;
   bool _expansionSettled = false;
-  bool _animatePanelTransition = false;
   DashboardPanelSession? _panelSession;
   int? _contentPointer;
   int? _handlePointer;
@@ -65,7 +64,6 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
   bool? _cachedPanelScrollEnabled;
 
   static const _collapsePullThreshold = 56.0;
-  static const _panelTransitionDuration = Duration(milliseconds: 250);
 
   @override
   void initState() {
@@ -100,11 +98,9 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
     _invalidatePanelContent();
     if (oldWidget.minPanelSize != widget.minPanelSize ||
         oldWidget.maxPanelSize != widget.maxPanelSize) {
-      _animatePanelTransition = false;
       _panelSize = _committedExpanded
           ? widget.maxPanelSize
           : widget.minPanelSize;
-      _expansionSettled = _committedExpanded;
     }
     if (oldWidget.panelIdentity != widget.panelIdentity) {
       _panelSize = _committedExpanded
@@ -112,7 +108,6 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
           : widget.minPanelSize;
       _dragStartSize = _panelSize;
       _expansionSettled = _committedExpanded;
-      _animatePanelTransition = false;
       _isDraggingPanel = false;
       _contentPointer = null;
       _handlePointer = null;
@@ -137,12 +132,9 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final panelHeight = constraints.maxHeight * _panelSize;
-        final transitionDuration = _animatePanelTransition && !_isDraggingPanel
-            ? _panelTransitionDuration
-            : Duration.zero;
-        final transitionCurve = _committedExpanded
-            ? Curves.easeOutCubic
-            : Curves.easeInCubic;
+        final transitionDuration = _isDraggingPanel
+            ? Duration.zero
+            : const Duration(milliseconds: 220);
 
         return Stack(
           children: [
@@ -164,14 +156,21 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
                 ),
               ),
             if (widget.mapControls != null)
-              AnimatedPositioned(
+              Positioned(
                 right: AppSpacing.md,
-                bottom: AppSpacing.lg + panelHeight,
-                duration: transitionDuration,
-                curve: transitionCurve,
-                child: SafeArea(
-                  top: false,
-                  child: RepaintBoundary(child: widget.mapControls!),
+                bottom: AppSpacing.lg,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween<double>(end: panelHeight),
+                  duration: transitionDuration,
+                  curve: Curves.easeOutCubic,
+                  builder: (context, panelOffset, child) => Transform.translate(
+                    offset: Offset(0, -panelOffset),
+                    child: child,
+                  ),
+                  child: SafeArea(
+                    top: false,
+                    child: RepaintBoundary(child: widget.mapControls!),
+                  ),
                 ),
               ),
             AnimatedPositioned(
@@ -179,9 +178,16 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
               right: 0,
               bottom: 0,
               height: panelHeight,
+              onEnd: () {
+                if (_committedExpanded &&
+                    !_isDraggingPanel &&
+                    !_expansionSettled &&
+                    _isPanelExpanded) {
+                  setState(() => _expansionSettled = true);
+                }
+              },
               duration: transitionDuration,
-              curve: transitionCurve,
-              onEnd: _finishPanelTransition,
+              curve: Curves.easeOutCubic,
               child: SizedBox.expand(
                 key: const Key('dashboardPanel'),
                 child: SafeArea(
@@ -209,8 +215,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
                             children: [
                               _PanelDragHandle(
                                 onPointerDown: (pointer) {
-                                  if (_animatePanelTransition ||
-                                      _contentPointer != null ||
+                                  if (_contentPointer != null ||
                                       _handlePointer != null) {
                                     return false;
                                   }
@@ -231,8 +236,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
                               Expanded(
                                 child: Listener(
                                   onPointerDown: (event) {
-                                    if (_animatePanelTransition ||
-                                        _contentPointer != null ||
+                                    if (_contentPointer != null ||
                                         _handlePointer != null ||
                                         _isDraggingPanel ||
                                         _controlPointers.contains(
@@ -271,8 +275,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
                                   child: _panelContentFor(
                                     _committedExpanded &&
                                         _expansionSettled &&
-                                        (!_isDraggingPanel ||
-                                            _contentDragStartedAtTop),
+                                        !_isDraggingPanel,
                                   ),
                                 ),
                               ),
@@ -339,11 +342,13 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
     final movement = _panelSize - _dragStartSize;
     final expand = velocity < -50 || (velocity.abs() <= 50 && movement > 0);
     final previousExpanded = _committedExpanded;
-    _settlePanel(
-      targetSize: expand ? widget.maxPanelSize : widget.minPanelSize,
-      targetExpanded: expand,
-      previousExpanded: previousExpanded,
-    );
+    setState(() {
+      _isDraggingPanel = false;
+      _expansionSettled = expand && _isPanelExpanded;
+      _panelSize = expand ? widget.maxPanelSize : widget.minPanelSize;
+      _committedExpanded = expand;
+    });
+    _notifyExpansionChanged(previousExpanded);
   }
 
   void _cancelPanelDrag() {
@@ -351,15 +356,16 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
       return;
     }
     final midpoint = (widget.minPanelSize + widget.maxPanelSize) / 2;
-    final targetSize = _panelSize >= midpoint
-        ? widget.maxPanelSize
-        : widget.minPanelSize;
     final previousExpanded = _committedExpanded;
-    _settlePanel(
-      targetSize: targetSize,
-      targetExpanded: targetSize == widget.maxPanelSize,
-      previousExpanded: previousExpanded,
-    );
+    setState(() {
+      _isDraggingPanel = false;
+      _expansionSettled = _isPanelExpanded;
+      _panelSize = _panelSize >= midpoint
+          ? widget.maxPanelSize
+          : widget.minPanelSize;
+      _committedExpanded = _panelSize == widget.maxPanelSize;
+    });
+    _notifyExpansionChanged(previousExpanded);
   }
 
   bool get _isPanelExpanded => (_panelSize - widget.maxPanelSize).abs() < 0.001;
@@ -431,22 +437,22 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
         _contentScrollController.position.minScrollExtent,
       );
     }
-    final targetSize = shouldExpand
-        ? widget.maxPanelSize
-        : shouldCollapse
-        ? widget.minPanelSize
-        : returnSize;
-    final targetExpanded = shouldExpand
-        ? true
-        : shouldCollapse
-        ? false
-        : _committedExpanded;
     final previousExpanded = _committedExpanded;
-    _settlePanel(
-      targetSize: targetSize,
-      targetExpanded: targetExpanded,
-      previousExpanded: previousExpanded,
-    );
+    setState(() {
+      _isDraggingPanel = false;
+      _expansionSettled = _isPanelExpanded;
+      _panelSize = shouldExpand
+          ? widget.maxPanelSize
+          : shouldCollapse
+          ? widget.minPanelSize
+          : returnSize;
+      if (shouldExpand) {
+        _committedExpanded = true;
+      } else if (shouldCollapse) {
+        _committedExpanded = false;
+      }
+    });
+    _notifyExpansionChanged(previousExpanded);
   }
 
   void _cancelContentDrag() {
@@ -455,11 +461,11 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
     final returnSize = _dragStartSize;
     _resetContentDrag();
     if (hadBodyPanelDrag) {
-      _settlePanel(
-        targetSize: returnSize,
-        targetExpanded: _committedExpanded,
-        previousExpanded: _committedExpanded,
-      );
+      setState(() {
+        _isDraggingPanel = false;
+        _expansionSettled = _isPanelExpanded;
+        _panelSize = returnSize;
+      });
     }
   }
 
@@ -478,33 +484,8 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
       return;
     }
     setState(() {
-      _animatePanelTransition = false;
       _isDraggingPanel = true;
       _panelSize = nextSize;
-    });
-  }
-
-  void _settlePanel({
-    required double targetSize,
-    required bool targetExpanded,
-    required bool previousExpanded,
-  }) {
-    final animate = (_panelSize - targetSize).abs() > 0.000001;
-    setState(() {
-      _isDraggingPanel = false;
-      _panelSize = targetSize;
-      _committedExpanded = targetExpanded;
-      _animatePanelTransition = animate;
-      _expansionSettled = targetExpanded && !animate;
-    });
-    _notifyExpansionChanged(previousExpanded);
-  }
-
-  void _finishPanelTransition() {
-    if (!_animatePanelTransition) return;
-    setState(() {
-      _animatePanelTransition = false;
-      _expansionSettled = _committedExpanded && _isPanelExpanded;
     });
   }
 
@@ -513,7 +494,6 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
     _panelSize = expanded ? widget.maxPanelSize : widget.minPanelSize;
     _dragStartSize = _panelSize;
     _expansionSettled = expanded;
-    _animatePanelTransition = false;
     _isDraggingPanel = false;
     _contentPointer = null;
     _handlePointer = null;
