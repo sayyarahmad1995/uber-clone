@@ -48,7 +48,7 @@ void main() {
     expect(panelBuilds, buildsBeforeDrag + 1);
   });
 
-  testWidgets('collapse snap has intermediate animation frames', (
+  testWidgets('collapse snap uses paint-only intermediate motion', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -71,11 +71,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    final dashboard = find.byType(RideDashboardScaffold);
     final panel = find.byKey(const Key('dashboardPanel'));
-    final dashboardHeight = tester
-        .getSize(find.byType(RideDashboardScaffold))
-        .height;
+    final dashboardHeight = tester.getSize(dashboard).height;
+    final dashboardBottom = tester.getBottomLeft(dashboard).dy;
     final minHeight = dashboardHeight * 0.20;
+    final minTop = dashboardBottom - minHeight;
 
     await tester.drag(
       find.byKey(const Key('dashboardPanelDragHandle')),
@@ -88,16 +89,20 @@ void main() {
     await drag.moveBy(const Offset(0, 120));
     await tester.pump();
     final previewHeight = tester.getSize(panel).height;
+    final previewTop = tester.getTopLeft(panel).dy;
 
     await drag.up();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 80));
     final midAnimationHeight = tester.getSize(panel).height;
+    final midAnimationTop = tester.getTopLeft(panel).dy;
 
-    expect(midAnimationHeight, greaterThan(minHeight + 1));
-    expect(midAnimationHeight, lessThan(previewHeight - 1));
+    expect(midAnimationHeight, closeTo(previewHeight, 0.5));
+    expect(midAnimationTop, greaterThan(previewTop + 1));
+    expect(midAnimationTop, lessThan(minTop - 1));
 
     await tester.pumpAndSettle();
     expect(tester.getSize(panel).height, closeTo(minHeight, 0.5));
+    expect(tester.getTopLeft(panel).dy, closeTo(minTop, 0.5));
   });
 }
