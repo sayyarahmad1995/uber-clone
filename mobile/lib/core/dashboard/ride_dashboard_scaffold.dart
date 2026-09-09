@@ -154,11 +154,6 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold>
     return LayoutBuilder(
       builder: (context, constraints) {
         final dashboardHeight = constraints.maxHeight;
-        final panelHeight = dashboardHeight * _panelSize;
-        final layoutPanelHeight = dashboardHeight * _panelLayoutSize;
-        final transitionDuration = _isDraggingPanel
-            ? Duration.zero
-            : _snapDuration;
 
         return Stack(
           children: [
@@ -183,12 +178,10 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold>
               Positioned(
                 right: AppSpacing.md,
                 bottom: AppSpacing.lg,
-                child: TweenAnimationBuilder<double>(
-                  tween: Tween<double>(end: panelHeight),
-                  duration: transitionDuration,
-                  curve: Curves.easeOutCubic,
-                  builder: (context, panelOffset, child) => Transform.translate(
-                    offset: Offset(0, -panelOffset),
+                child: AnimatedBuilder(
+                  animation: _snapController,
+                  builder: (context, child) => Transform.translate(
+                    offset: Offset(0, -dashboardHeight * _visualPanelSize),
                     child: child,
                   ),
                   child: SafeArea(
@@ -201,11 +194,10 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold>
               left: 0,
               right: 0,
               bottom: 0,
-              height: layoutPanelHeight,
               child: AnimatedBuilder(
                 animation: _snapController,
-                builder: (context, child) => Transform.translate(
-                  offset: Offset(0, _panelSnapOffset(dashboardHeight)),
+                builder: (context, child) => SizedBox(
+                  height: dashboardHeight * _visualPanelSize,
                   child: child,
                 ),
                 child: _buildPanelSurface(context, dashboardHeight),
@@ -217,24 +209,13 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold>
     );
   }
 
-  double get _panelLayoutSize {
+  double get _visualPanelSize {
     if (!_isSnappingPanel) {
       return _panelSize;
     }
-    return _snapFromSize! > _snapToSize! ? _snapFromSize! : _snapToSize!;
-  }
-
-  double _panelSnapOffset(double dashboardHeight) {
-    if (!_isSnappingPanel) {
-      return 0;
-    }
     final fromSize = _snapFromSize!;
     final toSize = _snapToSize!;
-    final progress = _snapCurve.value;
-    if (toSize > fromSize) {
-      return dashboardHeight * (toSize - fromSize) * (1 - progress);
-    }
-    return dashboardHeight * (fromSize - toSize) * progress;
+    return fromSize + (toSize - fromSize) * _snapCurve.value;
   }
 
   Widget _buildPanelSurface(BuildContext context, double dashboardHeight) {
