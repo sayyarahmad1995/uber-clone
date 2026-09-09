@@ -48,7 +48,9 @@ void main() {
     expect(panelBuilds, buildsBeforeDrag + 1);
   });
 
-  testWidgets('collapse snap has intermediate animation frames', (tester) async {
+  testWidgets('collapse snap has intermediate animation frames', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         home: RideDashboardScaffold(
