@@ -114,16 +114,14 @@ CustomTransitionPage<void> _driverDetailPage({
     transitionDuration: _driverDetailTransitionDuration,
     reverseTransitionDuration: _driverDetailTransitionDuration,
     transitionsBuilder: (_, animation, _, child) {
-      final position = Tween<Offset>(
-        begin: const Offset(-1, 0),
-        end: Offset.zero,
-      ).animate(
-        CurvedAnimation(
-          parent: animation,
-          curve: Curves.easeOutCubic,
-          reverseCurve: Curves.easeInCubic,
-        ),
-      );
+      final position =
+          Tween<Offset>(begin: const Offset(-1, 0), end: Offset.zero).animate(
+            CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: Curves.easeInCubic,
+            ),
+          );
       return SlideTransition(position: position, child: child);
     },
     child: child,
