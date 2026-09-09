@@ -379,49 +379,45 @@ void main() {
     expect(find.text('42'), findsOneWidget);
   });
 
-  testWidgets(
-    'body drag owns one pointer and restores scrolling on release',
-    (tester) async {
-      final key = GlobalKey<_DashboardIdentityHarnessState>();
-      await tester.pumpWidget(
-        MaterialApp(home: _DashboardIdentityHarness(key: key)),
-      );
-      key.currentState!.showSecondPanel();
-      await tester.pumpAndSettle();
-      final panel = find.byKey(const Key('dashboardPanel'));
-      final list = find.byKey(const Key('identityPanelList'));
-      await tester.drag(
-        find.byKey(const Key('dashboardPanelDragHandle')),
-        const Offset(0, 100),
-      );
-      await tester.pumpAndSettle();
-      final first = await tester.startGesture(
-        tester.getCenter(find.text('Panel two')),
-        pointer: 1,
-      );
-      await first.moveBy(const Offset(0, -100));
-      await tester.pump();
-      final preview = tester.getSize(panel).height;
-      final second = await tester.startGesture(
-        tester.getCenter(find.text('Panel two')),
-        pointer: 2,
-      );
-      await second.moveBy(const Offset(0, 70));
-      await second.up();
-      await tester.pump();
-      expect(tester.getSize(panel).height, preview);
-      expect(
-        tester.widget<ListView>(list).physics,
-        isA<NeverScrollableScrollPhysics>(),
-      );
-      await first.up();
-      await tester.pump();
-      expect(
-        tester.widget<ListView>(list).physics,
-        isA<ClampingScrollPhysics>(),
-      );
-    },
-  );
+  testWidgets('body drag owns one pointer and restores scrolling on release', (
+    tester,
+  ) async {
+    final key = GlobalKey<_DashboardIdentityHarnessState>();
+    await tester.pumpWidget(
+      MaterialApp(home: _DashboardIdentityHarness(key: key)),
+    );
+    key.currentState!.showSecondPanel();
+    await tester.pumpAndSettle();
+    final panel = find.byKey(const Key('dashboardPanel'));
+    final list = find.byKey(const Key('identityPanelList'));
+    await tester.drag(
+      find.byKey(const Key('dashboardPanelDragHandle')),
+      const Offset(0, 100),
+    );
+    await tester.pumpAndSettle();
+    final first = await tester.startGesture(
+      tester.getCenter(find.text('Panel two')),
+      pointer: 1,
+    );
+    await first.moveBy(const Offset(0, -100));
+    await tester.pump();
+    final preview = tester.getSize(panel).height;
+    final second = await tester.startGesture(
+      tester.getCenter(find.text('Panel two')),
+      pointer: 2,
+    );
+    await second.moveBy(const Offset(0, 70));
+    await second.up();
+    await tester.pump();
+    expect(tester.getSize(panel).height, preview);
+    expect(
+      tester.widget<ListView>(list).physics,
+      isA<NeverScrollableScrollPhysics>(),
+    );
+    await first.up();
+    await tester.pump();
+    expect(tester.widget<ListView>(list).physics, isA<ClampingScrollPhysics>());
+  });
 }
 
 class _DashboardIdentityHarness extends StatefulWidget {
