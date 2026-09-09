@@ -271,7 +271,8 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
                                   child: _panelContentFor(
                                     _committedExpanded &&
                                         _expansionSettled &&
-                                        !_isDraggingPanel,
+                                        (!_isDraggingPanel ||
+                                            _contentDragStartedAtTop),
                                   ),
                                 ),
                               ),

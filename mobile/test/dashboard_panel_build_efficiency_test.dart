@@ -73,4 +73,70 @@ void main() {
     );
     expect(panelBuilds, buildsBeforeDrag + 1);
   });
+
+  testWidgets('expanded body drag keeps scroll mode stable while collapsing', (
+    tester,
+  ) async {
+    var panelBuilds = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RideDashboardScaffold(
+          panelIdentity: 'collapse-handoff',
+          minPanelSize: 0.20,
+          initialPanelSize: 0.60,
+          maxPanelSize: 0.60,
+          map: const ColoredBox(color: Colors.blueGrey),
+          panelBuilder: (context, scrollController, scrollEnabled) {
+            panelBuilds++;
+            return ListView(
+              key: const Key('collapseHandoffList'),
+              controller: scrollController,
+              physics: scrollEnabled
+                  ? const ClampingScrollPhysics()
+                  : const NeverScrollableScrollPhysics(),
+              children: const [SizedBox(height: 600)],
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final panel = find.byKey(const Key('dashboardPanel'));
+    final list = find.byKey(const Key('collapseHandoffList'));
+    final dashboardHeight = tester
+        .getSize(find.byType(RideDashboardScaffold))
+        .height;
+    final buildsBeforeDrag = panelBuilds;
+
+    expect(tester.widget<ListView>(list).physics, isA<ClampingScrollPhysics>());
+
+    final drag = await tester.startGesture(tester.getCenter(list));
+    await drag.moveBy(const Offset(0, 60));
+    await tester.pump();
+
+    final previewHeight = tester.getSize(panel).height;
+    expect(previewHeight, lessThan(dashboardHeight * 0.60));
+    expect(previewHeight, greaterThan(dashboardHeight * 0.20));
+    expect(tester.widget<ListView>(list).physics, isA<ClampingScrollPhysics>());
+    expect(panelBuilds, buildsBeforeDrag);
+
+    await drag.up();
+    await tester.pump();
+    expect(
+      tester.widget<ListView>(list).physics,
+      isA<NeverScrollableScrollPhysics>(),
+    );
+
+    await tester.pumpAndSettle();
+    expect(
+      tester.getSize(panel).height,
+      moreOrLessEquals(dashboardHeight * 0.20),
+    );
+    expect(
+      tester.widget<ListView>(list).physics,
+      isA<NeverScrollableScrollPhysics>(),
+    );
+  });
 }
