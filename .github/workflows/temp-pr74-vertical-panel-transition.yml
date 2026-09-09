@@ -1,0 +1,114 @@
+name: Temporary PR74 vertical dashboard transition
+
+on:
+  push:
+    branches:
+      - fix/drawer-detail-back-flow
+
+permissions:
+  contents: write
+
+jobs:
+  flutter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/drawer-detail-back-flow
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.2
+          channel: stable
+          cache: true
+      - name: Install dependencies
+        working-directory: mobile
+        run: flutter pub get
+      - name: Apply vertical transition
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('mobile/lib/core/dashboard/ride_dashboard_scaffold.dart')
+          text = path.read_text()
+
+          replacements = [
+          ("""  bool _isDraggingPanel = false;\n  late bool _committedExpanded;\n  bool _expansionSettled = false;\n""",
+           """  bool _isDraggingPanel = false;\n  late bool _committedExpanded;\n  bool _expansionSettled = false;\n  bool _animatePanelTransition = false;\n"""),
+          ("""  static const _collapsePullThreshold = 56.0;\n""",
+           """  static const _collapsePullThreshold = 56.0;\n  static const _panelTransitionDuration = Duration(milliseconds: 250);\n"""),
+          ("""    if (oldWidget.minPanelSize != widget.minPanelSize ||\n        oldWidget.maxPanelSize != widget.maxPanelSize) {\n      _panelSize = _committedExpanded\n          ? widget.maxPanelSize\n          : widget.minPanelSize;\n    }\n""",
+           """    if (oldWidget.minPanelSize != widget.minPanelSize ||\n        oldWidget.maxPanelSize != widget.maxPanelSize) {\n      _animatePanelTransition = false;\n      _panelSize = _committedExpanded\n          ? widget.maxPanelSize\n          : widget.minPanelSize;\n      _expansionSettled = _committedExpanded;\n    }\n"""),
+          ("""      _expansionSettled = _committedExpanded;\n      _isDraggingPanel = false;\n""",
+           """      _expansionSettled = _committedExpanded;\n      _animatePanelTransition = false;\n      _isDraggingPanel = false;\n"""),
+          ("""        final panelHeight = constraints.maxHeight * _panelSize;\n\n        return Stack(\n""",
+           """        final panelHeight = constraints.maxHeight * _panelSize;\n        final transitionDuration =\n            _animatePanelTransition && !_isDraggingPanel\n            ? _panelTransitionDuration\n            : Duration.zero;\n        final transitionCurve = _committedExpanded\n            ? Curves.easeOutCubic\n            : Curves.easeInCubic;\n\n        return Stack(\n"""),
+          ("""            if (widget.mapControls != null)\n              Positioned(\n                right: AppSpacing.md,\n                bottom: AppSpacing.lg,\n                child: Transform.translate(\n                  offset: Offset(0, -panelHeight),\n                  child: SafeArea(\n                    top: false,\n                    child: RepaintBoundary(child: widget.mapControls!),\n                  ),\n                ),\n              ),\n            Positioned(\n              left: 0,\n              right: 0,\n              bottom: 0,\n              height: panelHeight,\n""",
+           """            if (widget.mapControls != null)\n              AnimatedPositioned(\n                right: AppSpacing.md,\n                bottom: AppSpacing.lg + panelHeight,\n                duration: transitionDuration,\n                curve: transitionCurve,\n                child: SafeArea(\n                  top: false,\n                  child: RepaintBoundary(child: widget.mapControls!),\n                ),\n              ),\n            AnimatedPositioned(\n              left: 0,\n              right: 0,\n              bottom: 0,\n              height: panelHeight,\n              duration: transitionDuration,\n              curve: transitionCurve,\n              onEnd: _finishPanelTransition,\n"""),
+          ("""                                  if (_contentPointer != null ||\n                                      _handlePointer != null) {\n""",
+           """                                  if (_animatePanelTransition ||\n                                      _contentPointer != null ||\n                                      _handlePointer != null) {\n"""),
+          ("""                                    if (_contentPointer != null ||\n                                        _handlePointer != null ||\n                                        _isDraggingPanel ||\n""",
+           """                                    if (_animatePanelTransition ||\n                                        _contentPointer != null ||\n                                        _handlePointer != null ||\n                                        _isDraggingPanel ||\n"""),
+          ("""    final previousExpanded = _committedExpanded;\n    setState(() {\n      _isDraggingPanel = false;\n      _panelSize = expand ? widget.maxPanelSize : widget.minPanelSize;\n      _committedExpanded = expand;\n      _expansionSettled = expand;\n    });\n    _notifyExpansionChanged(previousExpanded);\n""",
+           """    final previousExpanded = _committedExpanded;\n    _settlePanel(\n      targetSize: expand ? widget.maxPanelSize : widget.minPanelSize,\n      targetExpanded: expand,\n      previousExpanded: previousExpanded,\n    );\n"""),
+          ("""    final previousExpanded = _committedExpanded;\n    setState(() {\n      _isDraggingPanel = false;\n      _panelSize = targetSize;\n      _committedExpanded = targetSize == widget.maxPanelSize;\n      _expansionSettled = _committedExpanded;\n    });\n    _notifyExpansionChanged(previousExpanded);\n""",
+           """    final previousExpanded = _committedExpanded;\n    _settlePanel(\n      targetSize: targetSize,\n      targetExpanded: targetSize == widget.maxPanelSize,\n      previousExpanded: previousExpanded,\n    );\n"""),
+          ("""    final previousExpanded = _committedExpanded;\n    setState(() {\n      _isDraggingPanel = false;\n      _panelSize = targetSize;\n      _committedExpanded = targetExpanded;\n      _expansionSettled =\n          targetExpanded && (targetSize - widget.maxPanelSize).abs() < 0.001;\n    });\n    _notifyExpansionChanged(previousExpanded);\n""",
+           """    final previousExpanded = _committedExpanded;\n    _settlePanel(\n      targetSize: targetSize,\n      targetExpanded: targetExpanded,\n      previousExpanded: previousExpanded,\n    );\n"""),
+          ("""    if (hadBodyPanelDrag) {\n      setState(() {\n        _isDraggingPanel = false;\n        _panelSize = returnSize;\n        _expansionSettled =\n            _committedExpanded &&\n            (returnSize - widget.maxPanelSize).abs() < 0.001;\n      });\n    }\n""",
+           """    if (hadBodyPanelDrag) {\n      _settlePanel(\n        targetSize: returnSize,\n        targetExpanded: _committedExpanded,\n        previousExpanded: _committedExpanded,\n      );\n    }\n"""),
+          ("""    setState(() {\n      _isDraggingPanel = true;\n      _panelSize = nextSize;\n    });\n  }\n\n  void _applySessionExtent(bool expanded) {\n""",
+           """    setState(() {\n      _animatePanelTransition = false;\n      _isDraggingPanel = true;\n      _panelSize = nextSize;\n    });\n  }\n\n  void _settlePanel({\n    required double targetSize,\n    required bool targetExpanded,\n    required bool previousExpanded,\n  }) {\n    final animate = (_panelSize - targetSize).abs() > 0.000001;\n    setState(() {\n      _isDraggingPanel = false;\n      _panelSize = targetSize;\n      _committedExpanded = targetExpanded;\n      _animatePanelTransition = animate;\n      _expansionSettled = targetExpanded && !animate;\n    });\n    _notifyExpansionChanged(previousExpanded);\n  }\n\n  void _finishPanelTransition() {\n    if (!_animatePanelTransition) return;\n    setState(() {\n      _animatePanelTransition = false;\n      _expansionSettled = _committedExpanded && _isPanelExpanded;\n    });\n  }\n\n  void _applySessionExtent(bool expanded) {\n"""),
+          ("""    _expansionSettled = expanded;\n    _isDraggingPanel = false;\n""",
+           """    _expansionSettled = expanded;\n    _animatePanelTransition = false;\n    _isDraggingPanel = false;\n"""),
+          ]
+
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit(f'missing scaffold replacement:\n{old}')
+              text = text.replace(old, new, 1)
+          path.write_text(text)
+
+          path = Path('mobile/test/app_routing_test.dart')
+          text = path.read_text()
+          old = """  testWidgets('body drag owns one pointer and restores scrolling on release', (\n    tester,\n  ) async {\n"""
+          new = """  testWidgets('body drag owns one pointer and locks scrolling until transition finishes', (\n    tester,\n  ) async {\n"""
+          if old not in text:
+              raise SystemExit('missing routing test name')
+          text = text.replace(old, new, 1)
+          old = """    await first.up();\n    await tester.pump();\n    expect(tester.widget<ListView>(list).physics, isA<ClampingScrollPhysics>());\n"""
+          new = """    await first.up();\n    await tester.pump();\n    expect(\n      tester.widget<ListView>(list).physics,\n      isA<NeverScrollableScrollPhysics>(),\n    );\n    await tester.pump(const Duration(milliseconds: 100));\n    expect(\n      tester.widget<ListView>(list).physics,\n      isA<NeverScrollableScrollPhysics>(),\n    );\n    await tester.pumpAndSettle();\n    expect(tester.widget<ListView>(list).physics, isA<ClampingScrollPhysics>());\n"""
+          if old not in text:
+              raise SystemExit('missing routing release expectation')
+          path.write_text(text.replace(old, new, 1))
+
+          path = Path('mobile/test/dashboard_panel_build_efficiency_test.dart')
+          text = path.read_text()
+          old = """    expect(panelBuilds, buildsBeforeDrag);\n\n    await drag.up();\n    await tester.pumpAndSettle();\n\n    expect(panelBuilds, buildsBeforeDrag + 1);\n"""
+          new = """    expect(panelBuilds, buildsBeforeDrag);\n\n    final panel = find.byKey(const Key('dashboardPanel'));\n    final previewHeight = tester.getSize(panel).height;\n    final bottomBeforeRelease = tester.getBottomLeft(panel).dy;\n    final dashboardHeight = tester\n        .getSize(find.byType(RideDashboardScaffold))\n        .height;\n\n    await drag.up();\n    await tester.pump();\n    await tester.pump(const Duration(milliseconds: 100));\n\n    final midTransitionHeight = tester.getSize(panel).height;\n    expect(midTransitionHeight, greaterThan(previewHeight));\n    expect(midTransitionHeight, lessThan(dashboardHeight * 0.60));\n    expect(\n      tester.getBottomLeft(panel).dy,\n      moreOrLessEquals(bottomBeforeRelease),\n    );\n\n    await tester.pumpAndSettle();\n\n    expect(tester.getSize(panel).height, moreOrLessEquals(dashboardHeight * 0.60));\n    expect(\n      tester.getBottomLeft(panel).dy,\n      moreOrLessEquals(bottomBeforeRelease),\n    );\n    expect(panelBuilds, buildsBeforeDrag + 1);\n"""
+          if old not in text:
+              raise SystemExit('missing build-efficiency release block')
+          path.write_text(text.replace(old, new, 1))
+          PY
+      - name: Format
+        working-directory: mobile
+        run: dart format lib test
+      - name: Check formatting
+        working-directory: mobile
+        run: dart format --output=none --set-exit-if-changed lib test
+      - name: Analyze
+        working-directory: mobile
+        run: flutter analyze
+      - name: Focused dashboard tests
+        working-directory: mobile
+        run: flutter test test/dashboard_panel_build_efficiency_test.dart test/app_routing_test.dart
+      - name: Full tests
+        working-directory: mobile
+        run: flutter test
+      - name: Commit transition and remove temporary workflow
+        run: |
+          rm .github/workflows/temp-pr74-vertical-panel-transition.yml
+          git config user.name "Sayyar Ahmad"
+          git config user.email "m.sayyarahmad1995@gmail.com"
+          git add mobile/lib/core/dashboard/ride_dashboard_scaffold.dart mobile/test/app_routing_test.dart mobile/test/dashboard_panel_build_efficiency_test.dart .github/workflows/temp-pr74-vertical-panel-transition.yml
+          git commit -m "Add vertical dashboard settle transition"
+          git push origin HEAD:fix/drawer-detail-back-flow
