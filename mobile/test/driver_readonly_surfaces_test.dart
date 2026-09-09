@@ -47,10 +47,7 @@ void main() {
     expect(shellScaffold.isDrawerOpen, isTrue);
     expect(find.text('Driver details'), findsNWidgets(2));
     expect(driverDetailsTitle, findsOneWidget);
-    expect(
-      ModalRoute.of(tester.element(driverDetailsTitle))!.opaque,
-      isFalse,
-    );
+    expect(ModalRoute.of(tester.element(driverDetailsTitle))!.opaque, isFalse);
     expect(find.text('Test Driver'), findsOneWidget);
     expect(find.text('Active'), findsOneWidget);
     expect(find.text('Offline'), findsOneWidget);
@@ -125,10 +122,7 @@ void main() {
       expect(shellScaffold.isDrawerOpen, isTrue);
       expect(find.text('Vehicles'), findsNWidgets(2));
       expect(vehiclesTitle, findsOneWidget);
-      expect(
-        ModalRoute.of(tester.element(vehiclesTitle))!.opaque,
-        isFalse,
-      );
+      expect(ModalRoute.of(tester.element(vehiclesTitle))!.opaque, isFalse);
       expect(find.text('Toyota'), findsOneWidget);
       expect(find.text('Corolla'), findsOneWidget);
       expect(find.text('2024'), findsOneWidget);
