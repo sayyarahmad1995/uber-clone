@@ -46,8 +46,11 @@ func normalizeOrigin(raw string) string {
 		return ""
 	}
 	parsed, err := url.Parse(trimmed)
+	if err != nil {
+		return trimmed
+	}
 	scheme := strings.ToLower(parsed.Scheme)
-	if err != nil || (scheme != "http" && scheme != "https") || parsed.Host == "" || parsed.User != nil || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
+	if (scheme != "http" && scheme != "https") || parsed.Host == "" || parsed.User != nil || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
 		return trimmed
 	}
 	host := strings.ToLower(parsed.Host)
