@@ -39,10 +39,16 @@ void main() {
     await tester.tap(find.byKey(const Key('drawerDriverDetails')));
     await tester.pumpAndSettle();
 
+    final driverDetailsTitle = find.descendant(
+      of: find.byType(AppBar),
+      matching: find.text('Driver details'),
+    );
+
     expect(shellScaffold.isDrawerOpen, isTrue);
-    expect(find.text('Driver details'), findsOneWidget);
+    expect(find.text('Driver details'), findsNWidgets(2));
+    expect(driverDetailsTitle, findsOneWidget);
     expect(
-      ModalRoute.of(tester.element(find.text('Driver details')))!.opaque,
+      ModalRoute.of(tester.element(driverDetailsTitle))!.opaque,
       isFalse,
     );
     expect(find.text('Test Driver'), findsOneWidget);
@@ -111,10 +117,16 @@ void main() {
       await tester.tap(find.byKey(const Key('drawerVehicles')));
       await tester.pumpAndSettle();
 
+      final vehiclesTitle = find.descendant(
+        of: find.byType(AppBar),
+        matching: find.text('Vehicles'),
+      );
+
       expect(shellScaffold.isDrawerOpen, isTrue);
-      expect(find.text('Vehicles'), findsOneWidget);
+      expect(find.text('Vehicles'), findsNWidgets(2));
+      expect(vehiclesTitle, findsOneWidget);
       expect(
-        ModalRoute.of(tester.element(find.text('Vehicles')))!.opaque,
+        ModalRoute.of(tester.element(vehiclesTitle))!.opaque,
         isFalse,
       );
       expect(find.text('Toyota'), findsOneWidget);
