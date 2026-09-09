@@ -84,7 +84,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold>
       });
     _snapCurve = CurvedAnimation(
       parent: _snapController,
-      curve: Curves.easeOutCubic,
+      curve: Curves.easeInOutCubic,
     );
     _panelSize = widget.initialPanelSize;
     _dragStartSize = _panelSize;
