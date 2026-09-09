@@ -90,10 +90,19 @@ void main() {
     await tester.pump();
     final previewHeight = tester.getSize(panel).height;
     final previewTop = tester.getTopLeft(panel).dy;
+    final remainingDistance = minTop - previewTop;
 
     await drag.up();
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 80));
+    expect(tester.getTopLeft(panel).dy, closeTo(previewTop, 0.5));
+
+    await tester.pump(const Duration(milliseconds: 16));
+    final firstFrameTop = tester.getTopLeft(panel).dy;
+    final firstFrameTravel = firstFrameTop - previewTop;
+    expect(firstFrameTravel, greaterThanOrEqualTo(0));
+    expect(firstFrameTravel, lessThan(remainingDistance * 0.08));
+
+    await tester.pump(const Duration(milliseconds: 64));
     final midAnimationHeight = tester.getSize(panel).height;
     final midAnimationTop = tester.getTopLeft(panel).dy;
 
