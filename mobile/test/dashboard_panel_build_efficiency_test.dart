@@ -42,9 +42,35 @@ void main() {
 
     expect(panelBuilds, buildsBeforeDrag);
 
+    final panel = find.byKey(const Key('dashboardPanel'));
+    final previewHeight = tester.getSize(panel).height;
+    final bottomBeforeRelease = tester.getBottomLeft(panel).dy;
+    final dashboardHeight = tester
+        .getSize(find.byType(RideDashboardScaffold))
+        .height;
+
     await drag.up();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    final midTransitionHeight = tester.getSize(panel).height;
+    expect(midTransitionHeight, greaterThan(previewHeight));
+    expect(midTransitionHeight, lessThan(dashboardHeight * 0.60));
+    expect(
+      tester.getBottomLeft(panel).dy,
+      moreOrLessEquals(bottomBeforeRelease),
+    );
+
     await tester.pumpAndSettle();
 
+    expect(
+      tester.getSize(panel).height,
+      moreOrLessEquals(dashboardHeight * 0.60),
+    );
+    expect(
+      tester.getBottomLeft(panel).dy,
+      moreOrLessEquals(bottomBeforeRelease),
+    );
     expect(panelBuilds, buildsBeforeDrag + 1);
   });
 }
