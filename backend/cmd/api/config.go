@@ -1,6 +1,11 @@
 package main
 
-import "os"
+import (
+	"net"
+	"net/url"
+	"os"
+	"strings"
+)
 
 type config struct {
 	Port                string
@@ -24,7 +29,7 @@ func loadConfig() config {
 		KratosAdminURL:      getenv("KRATOS_ADMIN_URL", "http://kratos:4434"),
 		AdminReviewUsername: os.Getenv("ADMIN_REVIEW_USERNAME"),
 		AdminReviewPassword: os.Getenv("ADMIN_REVIEW_PASSWORD"),
-		AdminReviewOrigin:   os.Getenv("ADMIN_REVIEW_ORIGIN"),
+		AdminReviewOrigin:   normalizeOrigin(os.Getenv("ADMIN_REVIEW_ORIGIN")),
 	}
 }
 
@@ -33,4 +38,26 @@ func getenv(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func normalizeOrigin(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+	parsed, err := url.Parse(trimmed)
+	scheme := strings.ToLower(parsed.Scheme)
+	if err != nil || (scheme != "http" && scheme != "https") || parsed.Host == "" || parsed.User != nil || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return trimmed
+	}
+	host := strings.ToLower(parsed.Host)
+	if hostname, port, err := net.SplitHostPort(parsed.Host); err == nil {
+		if (scheme == "https" && port == "443") || (scheme == "http" && port == "80") {
+			host = strings.ToLower(hostname)
+			if strings.Contains(hostname, ":") {
+				host = "[" + host + "]"
+			}
+		}
+	}
+	return scheme + "://" + host
 }
