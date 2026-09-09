@@ -8,21 +8,13 @@ import '../../../core/providers.dart';
 import '../../driver_workspace/presentation/driver_workspace_screen.dart';
 import '../../rider_request/presentation/rider_request_screen.dart';
 
-class CapabilityHomeScreen extends ConsumerStatefulWidget {
+class CapabilityHomeScreen extends ConsumerWidget {
   const CapabilityHomeScreen({super.key, required this.capability});
 
   final Capability capability;
 
   @override
-  ConsumerState<CapabilityHomeScreen> createState() =>
-      _CapabilityHomeScreenState();
-}
-
-class _CapabilityHomeScreenState extends ConsumerState<CapabilityHomeScreen> {
-  final _scaffoldKey = GlobalKey<ScaffoldState>();
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final controller = ref.watch(sessionControllerProvider);
     final panelSession = ref.watch(dashboardPanelSessionProvider);
     final account = controller.state.account;
@@ -33,7 +25,7 @@ class _CapabilityHomeScreenState extends ConsumerState<CapabilityHomeScreen> {
 
     Future<void> selectCapability(Capability next) async {
       Navigator.of(context).pop();
-      if (next == widget.capability) return;
+      if (next == capability) return;
       await controller.selectCapability(next);
       if (context.mounted) context.go('/${next.name}');
     }
@@ -56,11 +48,8 @@ class _CapabilityHomeScreenState extends ConsumerState<CapabilityHomeScreen> {
       );
     }
 
-    Future<void> openDestination(String location) async {
-      Navigator.of(context).pop();
-      await context.push<void>(location);
-      if (!mounted) return;
-      _scaffoldKey.currentState?.openDrawer();
+    void openDestination(String location) {
+      context.push<void>(location);
     }
 
     Future<void> logout() async {
@@ -70,7 +59,6 @@ class _CapabilityHomeScreenState extends ConsumerState<CapabilityHomeScreen> {
     }
 
     return Scaffold(
-      key: _scaffoldKey,
       drawer: Drawer(
         child: SafeArea(
           child: ListView(
@@ -84,9 +72,7 @@ class _CapabilityHomeScreenState extends ConsumerState<CapabilityHomeScreen> {
                     const Icon(Icons.account_circle_outlined, size: 36),
                     const SizedBox(height: 12),
                     Text(
-                      widget.capability == Capability.rider
-                          ? 'Rider'
-                          : 'Driver',
+                      capability == Capability.rider ? 'Rider' : 'Driver',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: 4),
@@ -101,7 +87,7 @@ class _CapabilityHomeScreenState extends ConsumerState<CapabilityHomeScreen> {
                 key: const Key('drawerRider'),
                 leading: const Icon(Icons.person_outline),
                 title: const Text('Rider'),
-                selected: widget.capability == Capability.rider,
+                selected: capability == Capability.rider,
                 onTap: controller.state.busy
                     ? null
                     : () => selectCapability(Capability.rider),
@@ -111,7 +97,7 @@ class _CapabilityHomeScreenState extends ConsumerState<CapabilityHomeScreen> {
                   key: const Key('drawerDriver'),
                   leading: const Icon(Icons.local_taxi_outlined),
                   title: const Text('Driver'),
-                  selected: widget.capability == Capability.driver,
+                  selected: capability == Capability.driver,
                   onTap: controller.state.busy
                       ? null
                       : () => selectCapability(Capability.driver),
@@ -162,12 +148,12 @@ class _CapabilityHomeScreenState extends ConsumerState<CapabilityHomeScreen> {
             icon: const Icon(Icons.menu),
           ),
         ),
-        title: Text(widget.capability == Capability.rider ? 'Rider' : 'Driver'),
+        title: Text(capability == Capability.rider ? 'Rider' : 'Driver'),
         notificationPredicate: (_) => false,
       ),
       body: DashboardPanelSessionScope(
         session: panelSession,
-        child: widget.capability == Capability.rider
+        child: capability == Capability.rider
             ? const RiderRequestScreen()
             : DriverWorkspaceScreen(accountID: account.id),
       ),
