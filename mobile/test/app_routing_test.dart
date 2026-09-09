@@ -380,7 +380,7 @@ void main() {
   });
 
   testWidgets(
-    'body drag owns one pointer and locks scrolling until snap finishes',
+    'body drag owns one pointer and restores scrolling on release',
     (tester) async {
       final key = GlobalKey<_DashboardIdentityHarnessState>();
       await tester.pumpWidget(
@@ -410,14 +410,12 @@ void main() {
       await second.up();
       await tester.pump();
       expect(tester.getSize(panel).height, preview);
-      await first.up();
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
       expect(
         tester.widget<ListView>(list).physics,
         isA<NeverScrollableScrollPhysics>(),
       );
-      await tester.pumpAndSettle();
+      await first.up();
+      await tester.pump();
       expect(
         tester.widget<ListView>(list).physics,
         isA<ClampingScrollPhysics>(),
