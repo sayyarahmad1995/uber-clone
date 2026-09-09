@@ -8,7 +8,7 @@ import 'package:uber_clone/features/driver_workspace/domain/driver_onboarding.da
 import 'test_doubles.dart';
 
 void main() {
-  testWidgets('Driver drawer exposes real read-only destinations', (
+  testWidgets('Driver drawer stays open beneath Driver details', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -20,15 +20,26 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    final shellScaffold = tester.state<ScaffoldState>(
+      find
+          .ancestor(
+            of: find.byKey(const Key('capabilityMenuButton')),
+            matching: find.byType(Scaffold),
+          )
+          .first,
+    );
+
     await tester.tap(find.byKey(const Key('capabilityMenuButton')));
     await tester.pumpAndSettle();
 
+    expect(shellScaffold.isDrawerOpen, isTrue);
     expect(find.byKey(const Key('drawerDriverDetails')), findsOneWidget);
     expect(find.byKey(const Key('drawerVehicles')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('drawerDriverDetails')));
     await tester.pumpAndSettle();
 
+    expect(shellScaffold.isDrawerOpen, isTrue);
     expect(find.text('Driver details'), findsOneWidget);
     expect(
       ModalRoute.of(tester.element(find.text('Driver details')))!.opaque,
@@ -41,6 +52,7 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
+    expect(shellScaffold.isDrawerOpen, isTrue);
     expect(find.byKey(const Key('drawerDriverDetails')), findsOneWidget);
     expect(find.byKey(const Key('drawerVehicles')), findsOneWidget);
   });
@@ -69,11 +81,23 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      final shellScaffold = tester.state<ScaffoldState>(
+        find
+            .ancestor(
+              of: find.byKey(const Key('capabilityMenuButton')),
+              matching: find.byType(Scaffold),
+            )
+            .first,
+      );
+
       await tester.tap(find.byKey(const Key('capabilityMenuButton')));
       await tester.pumpAndSettle();
+      expect(shellScaffold.isDrawerOpen, isTrue);
+
       await tester.tap(find.byKey(const Key('drawerDriverDetails')));
       await tester.pumpAndSettle();
 
+      expect(shellScaffold.isDrawerOpen, isTrue);
       expect(find.text('Approved Driver'), findsOneWidget);
       expect(find.text('Approved'), findsOneWidget);
       expect(find.text('Comfort'), findsOneWidget);
@@ -81,10 +105,13 @@ void main() {
       await tester.pageBack();
       await tester.pumpAndSettle();
 
+      expect(shellScaffold.isDrawerOpen, isTrue);
       expect(find.byKey(const Key('drawerVehicles')), findsOneWidget);
+
       await tester.tap(find.byKey(const Key('drawerVehicles')));
       await tester.pumpAndSettle();
 
+      expect(shellScaffold.isDrawerOpen, isTrue);
       expect(find.text('Vehicles'), findsOneWidget);
       expect(
         ModalRoute.of(tester.element(find.text('Vehicles')))!.opaque,
@@ -100,6 +127,7 @@ void main() {
       await tester.pageBack();
       await tester.pumpAndSettle();
 
+      expect(shellScaffold.isDrawerOpen, isTrue);
       expect(find.byKey(const Key('drawerDriverDetails')), findsOneWidget);
       expect(find.byKey(const Key('drawerVehicles')), findsOneWidget);
     },
