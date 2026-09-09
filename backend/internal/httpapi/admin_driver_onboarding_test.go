@@ -157,6 +157,43 @@ func TestAdminReviewerRejectsCrossSchemeMutation(t *testing.T) {
 	}
 }
 
+func TestAdminReviewerBehindHTTPSProxy(t *testing.T) {
+	for _, tc := range []struct {
+		name, action, origin, host, configured string
+		want                                   int
+	}{
+		{"reject", "reject", "https://application.test", "application.test", "https://application.test", http.StatusSeeOther},
+		{"approve", "approve", "https://application.test", "application.test", "https://application.test", http.StatusSeeOther},
+		{"other origin", "reject", "https://evil.test", "application.test", "https://application.test", http.StatusForbidden},
+		{"wrong scheme", "reject", "http://application.test", "application.test", "https://application.test", http.StatusForbidden},
+		{"wrong host", "reject", "https://application.test", "evil.test", "https://application.test", http.StatusForbidden},
+		{"invalid configuration", "reject", "https://application.test", "application.test", ":invalid", http.StatusForbidden},
+		{"untrusted forwarding header", "reject", "https://application.test", "application.test", "", http.StatusForbidden},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repository := &fakeDriverReviewRepository{application: pendingAdminReviewApplication()}
+			api := adminReviewTestAPI(repository)
+			api.adminReviewOrigin = tc.configured
+			request := httptest.NewRequest(http.MethodPost, "http://"+tc.host+"/admin/driver-onboarding/"+repository.application.ID.String()+"/"+tc.action, strings.NewReader("reason=Incomplete+documents"))
+			request.Header.Set("Origin", tc.origin)
+			request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			request.Header.Set("X-Forwarded-Proto", "https")
+			request.SetBasicAuth("reviewer", "secret")
+			response := httptest.NewRecorder()
+			api.routes().ServeHTTP(response, request)
+			if response.Code != tc.want {
+				t.Fatalf("expected %d, got %d: %s", tc.want, response.Code, response.Body.String())
+			}
+			if tc.want == http.StatusForbidden && repository.application.Status != driveronboarding.StatusPending {
+				t.Fatal("blocked request changed application")
+			}
+			if tc.want == http.StatusSeeOther && repository.application.Status == driveronboarding.StatusPending {
+				t.Fatal("accepted request did not apply decision")
+			}
+		})
+	}
+}
+
 func adminReviewTestAPI(repository *fakeDriverReviewRepository) *API {
 	return &API{
 		driverOnboardingReview: driveronboarding.NewReviewService(repository),

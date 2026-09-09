@@ -11,6 +11,7 @@ type config struct {
 	KratosAdminURL      string
 	AdminReviewUsername string
 	AdminReviewPassword string
+	AdminReviewOrigin   string
 }
 
 func loadConfig() config {
@@ -23,6 +24,7 @@ func loadConfig() config {
 		KratosAdminURL:      getenv("KRATOS_ADMIN_URL", "http://kratos:4434"),
 		AdminReviewUsername: os.Getenv("ADMIN_REVIEW_USERNAME"),
 		AdminReviewPassword: os.Getenv("ADMIN_REVIEW_PASSWORD"),
+		AdminReviewOrigin:   os.Getenv("ADMIN_REVIEW_ORIGIN"),
 	}
 }
 

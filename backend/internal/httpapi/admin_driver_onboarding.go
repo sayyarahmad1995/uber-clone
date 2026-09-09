@@ -194,7 +194,7 @@ func (api *API) adminDriverOnboardingDetail(w http.ResponseWriter, r *http.Reque
 }
 
 func (api *API) adminApproveDriverOnboarding(w http.ResponseWriter, r *http.Request) {
-	if !adminSameOrigin(r) {
+	if !api.adminSameOrigin(r) {
 		http.Error(w, "Invalid request origin", http.StatusForbidden)
 		return
 	}
@@ -210,7 +210,7 @@ func (api *API) adminApproveDriverOnboarding(w http.ResponseWriter, r *http.Requ
 }
 
 func (api *API) adminRejectDriverOnboarding(w http.ResponseWriter, r *http.Request) {
-	if !adminSameOrigin(r) {
+	if !api.adminSameOrigin(r) {
 		http.Error(w, "Invalid request origin", http.StatusForbidden)
 		return
 	}
@@ -286,7 +286,7 @@ func driverReviewErrorMessage(err error) string {
 	}
 }
 
-func adminSameOrigin(r *http.Request) bool {
+func (api *API) adminSameOrigin(r *http.Request) bool {
 	origin := strings.TrimSpace(r.Header.Get("Origin"))
 	if origin == "" {
 		return true
@@ -294,6 +294,14 @@ func adminSameOrigin(r *http.Request) bool {
 	parsed, err := url.Parse(origin)
 	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
 		return false
+	}
+	if api.adminReviewOrigin != "" {
+		// Use the configured public origin behind TLS termination, never client-supplied forwarding headers.
+		expected, err := url.Parse(api.adminReviewOrigin)
+		if err != nil || (expected.Scheme != "http" && expected.Scheme != "https") || expected.Host == "" || expected.User != nil || expected.Path != "" || expected.RawQuery != "" || expected.Fragment != "" {
+			return false
+		}
+		return strings.EqualFold(origin, api.adminReviewOrigin) && strings.EqualFold(expected.Host, r.Host)
 	}
 	return strings.EqualFold(parsed.Scheme, adminRequestScheme(r)) && strings.EqualFold(parsed.Host, r.Host)
 }

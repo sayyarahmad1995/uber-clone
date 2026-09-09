@@ -26,7 +26,7 @@ func (api *API) adminAuthenticated(handler http.HandlerFunc) http.Handler {
 
 func (api *API) adminMutation(handler http.HandlerFunc) http.Handler {
 	return api.adminAuthenticated(func(w http.ResponseWriter, r *http.Request) {
-		if !adminSameOrigin(r) {
+		if !api.adminSameOrigin(r) {
 			http.Error(w, "Invalid request origin", http.StatusForbidden)
 			return
 		}

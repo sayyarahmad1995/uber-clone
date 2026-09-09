@@ -70,6 +70,19 @@ Redis, CI/CD, Kubernetes, and other future infrastructure are intentionally not 
 
 ## Schema upgrades and tests
 
+### Admin reviewer behind an HTTPS proxy
+
+Set `ADMIN_REVIEW_USERNAME` and `ADMIN_REVIEW_PASSWORD` to enable the internal
+reviewer. When a reverse proxy terminates HTTPS, also set `ADMIN_REVIEW_ORIGIN`
+to the public origin, for example `https://api.example.com` (no trailing slash
+or path). Preserve the public Host header when forwarding requests to the API.
+Browser approval and rejection requests must match this origin and host;
+client-supplied forwarding headers do not determine the trusted origin.
+Leave the origin unset for direct local HTTP development. This setting does
+not enable HTTPS itself or replace reviewer authentication.
+
+### Database migrations
+
 The API applies pending migrations at startup. Migration 016 removes the legacy
 candidate table and booking-mode column; stop old API processes before upgrading.
 See [the retirement rollout guide](docs/candidate-retirement-rollout.md) for data

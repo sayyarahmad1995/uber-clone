@@ -37,6 +37,7 @@ type Dependencies struct {
 	Auth                   auth.Handler
 	AdminReviewUsername    string
 	AdminReviewPassword    string
+	AdminReviewOrigin      string
 }
 
 type API struct {
@@ -57,6 +58,7 @@ type API struct {
 	auth                   auth.Handler
 	adminReviewUsername    string
 	adminReviewPassword    string
+	adminReviewOrigin      string
 }
 
 func New(deps Dependencies) *API {
@@ -78,6 +80,7 @@ func New(deps Dependencies) *API {
 		auth:                   deps.Auth,
 		adminReviewUsername:    deps.AdminReviewUsername,
 		adminReviewPassword:    deps.AdminReviewPassword,
+		adminReviewOrigin:      deps.AdminReviewOrigin,
 	}
 }
 

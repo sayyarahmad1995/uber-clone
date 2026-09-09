@@ -63,6 +63,7 @@ func newApplication(cfg config) (application, func(), error) {
 		Auth:                   auth.NewHandler(auth.NewService(authProvider)),
 		AdminReviewUsername:    cfg.AdminReviewUsername,
 		AdminReviewPassword:    cfg.AdminReviewPassword,
+		AdminReviewOrigin:      cfg.AdminReviewOrigin,
 	})
 	return application{handler: api.Handler()}, cleanup, nil
 }
