@@ -101,6 +101,18 @@ class SessionController extends ChangeNotifier {
     }
   }
 
+  Future<String?> startVerification(String email) async {
+    _set(_state.copyWith(busy: true, clearError: true));
+    try {
+      final id = await _auth.startVerification(email);
+      _set(const SessionState(status: SessionStatus.signedOut));
+      return id;
+    } catch (error) {
+      _set(SessionState(status: SessionStatus.signedOut, error: '$error'));
+      return null;
+    }
+  }
+
   Future<bool> verify(String verificationId, String code) async {
     _set(_state.copyWith(busy: true, clearError: true));
     try {
