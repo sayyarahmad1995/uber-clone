@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/providers.dart';
+import 'verification_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -33,10 +34,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         _password.text,
       );
       if (challenge != null && mounted) {
-        context.push('/verify', extra: challenge);
+        context.push(
+          '/verify',
+          extra: VerificationRequest(
+            email: _identifier.text.trim(),
+            verificationId: challenge,
+          ),
+        );
       }
     } else {
       await controller.login(_identifier.text, _password.text);
+    }
+  }
+
+  Future<void> _startVerification() async {
+    final email = _identifier.text.trim();
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter your email first.')),
+      );
+      return;
+    }
+    final challenge = await ref
+        .read(sessionControllerProvider)
+        .startVerification(email);
+    if (challenge != null && mounted) {
+      context.push(
+        '/verify',
+        extra: VerificationRequest(email: email, verificationId: challenge),
+      );
     }
   }
 
@@ -126,6 +152,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             : 'New here? Create an account',
                       ),
                     ),
+                    if (!_registering)
+                      TextButton(
+                        key: const Key('verifyAccountButton'),
+                        onPressed: state.busy ? null : _startVerification,
+                        child: const Text('Verify your email'),
+                      ),
                   ],
                 ),
               ),
