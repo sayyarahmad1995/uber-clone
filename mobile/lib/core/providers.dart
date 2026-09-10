@@ -163,9 +163,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
       GoRoute(
         path: '/verify',
-        redirect: (_, state) => state.extra is String ? null : '/login',
+        redirect: (_, state) =>
+            state.extra is VerificationRequest ? null : '/login',
         builder: (_, state) =>
-            VerificationScreen(verificationId: state.extra! as String),
+            VerificationScreen(request: state.extra! as VerificationRequest),
       ),
       GoRoute(
         path: '/rider',
