@@ -34,13 +34,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         _password.text,
       );
       if (challenge != null && mounted) {
-        context.push(
-          '/verify',
-          extra: VerificationRequest(
-            email: _identifier.text.trim(),
-            verificationId: challenge,
-          ),
-        );
+        _openVerification(_identifier.text.trim(), challenge);
       }
     } else {
       await controller.login(_identifier.text, _password.text);
@@ -59,11 +53,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         .read(sessionControllerProvider)
         .startVerification(email);
     if (challenge != null && mounted) {
-      context.push(
-        '/verify',
-        extra: VerificationRequest(email: email, verificationId: challenge),
-      );
+      _openVerification(email, challenge);
     }
+  }
+
+  void _openVerification(String email, String verificationId) {
+    context.push(
+      Uri(
+        path: '/verify',
+        queryParameters: {
+          'email': email,
+          'verification_id': verificationId,
+        },
+      ).toString(),
+    );
   }
 
   @override
