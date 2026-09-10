@@ -152,7 +152,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             : 'New here? Create an account',
                       ),
                     ),
-                    if (!_registering)
+                    if (!_registering && state.verificationRequired)
                       TextButton(
                         key: const Key('verifyAccountButton'),
                         onPressed: state.busy ? null : _startVerification,
