@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uber_clone/core/models/account.dart';
+import 'package:uber_clone/core/network/api_exception.dart';
 import 'package:uber_clone/features/authentication/application/session_controller.dart';
 
 import 'test_doubles.dart';
@@ -26,6 +27,25 @@ void main() {
     expect(controller.state.status, SessionStatus.signedIn);
     expect(controller.state.capability, Capability.rider);
     expect(capabilities.value, Capability.rider);
+  });
+
+  test('unverified login exposes verification recovery', () async {
+    final controller = SessionController(
+      FakeAuthRepository(
+        loginError: const ApiException(
+          'verification_required',
+          'Account verification is required.',
+          statusCode: 403,
+        ),
+      ),
+      MemoryCapabilityStore(),
+    );
+    await controller.login('rider@example.com', 'password');
+    expect(controller.state.status, SessionStatus.signedOut);
+    expect(controller.state.verificationRequired, isTrue);
+
+    controller.clearError();
+    expect(controller.state.verificationRequired, isFalse);
   });
 
   test('cannot select a capability the account does not own', () async {
