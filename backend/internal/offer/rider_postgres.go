@@ -44,7 +44,13 @@ func (r PostgresRepository) ListForRider(ctx context.Context, rideRequestID, rid
 		FROM ride_requests rr
 		JOIN ride_offers o ON o.ride_request_id = rr.id
 		LEFT JOIN driver_profiles p ON p.user_id = o.driver_user_id
-		LEFT JOIN driver_vehicles v ON v.driver_user_id = p.user_id
+		LEFT JOIN LATERAL (
+			SELECT driver_user_id, make, model, model_year, color
+			FROM driver_vehicles
+			WHERE driver_user_id = p.user_id
+			ORDER BY created_at ASC, id ASC
+			LIMIT 1
+		) v ON TRUE
 		LEFT JOIN user_capabilities c ON c.user_id = p.user_id AND c.capability = 'driver'
 		LEFT JOIN driver_locations l ON l.driver_user_id = p.user_id
 		WHERE rr.id = $1 AND rr.rider_user_id = $2 AND rr.status = 'requested'
@@ -80,7 +86,6 @@ func (r PostgresRepository) ListForRider(ctx context.Context, rideRequestID, rid
 		if distance.Valid {
 			item.PickupDistanceMeters = &distance.Float64
 		}
-		items = append(items, item)
-	}
-	return items, rows.Err()
-}
+		items = append(item)
+	}‚\™]\›ˆ][\Ë›ÝÜË‘\œŠ
+BŸB
