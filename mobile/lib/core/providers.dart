@@ -1,3 +1,4 @@
+import '../features/driver_workspace/domain/registered_vehicle.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -78,6 +79,12 @@ final driverRepositoryProvider = Provider<DriverRepository>(
     ref.watch(sessionStoreProvider),
   ),
 );
+final driverVehiclesProvider = FutureProvider.autoDispose<List<RegisteredVehicle>>((ref) {
+  // Reload on account changes so records cannot survive an account switch.
+  final account = ref.watch(sessionControllerProvider.select((value) => value.state.account));
+  if (account == null) return Future.value(<RegisteredVehicle>[]);
+  return ref.watch(driverRepositoryProvider).listVehicles();
+});
 final driverOnboardingRepositoryProvider = Provider<DriverOnboardingRepository>(
   (ref) => ApiDriverOnboardingRepository(
     ref.watch(dioProvider),

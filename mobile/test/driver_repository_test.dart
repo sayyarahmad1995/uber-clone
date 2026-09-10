@@ -48,6 +48,15 @@ void main() {
     expect(location.updatedAt, DateTime.utc(2026, 9, 5));
     expect(adapter.request!.headers['Authorization'], 'Bearer session-token');
   });
+  test('vehicle list uses authenticated owner-scoped endpoint', () async {
+    final vehicles = await repo.listVehicles();
+    expect(vehicles, isEmpty);
+    expect(adapter.request!.path, '/v1/driver/vehicles');
+    expect(adapter.request!.method, 'GET');
+    expect(adapter.request!.headers['Authorization'], 'Bearer session-token');
+    adapter.status = 403;
+    await expectLater(repo.listVehicles(), throwsA(isA<ApiException>()));
+  });
   test('only profile 404 means onboarding required', () async {
     adapter.status = 404;
     expect(await repo.get(), isNull);
@@ -84,7 +93,9 @@ class DriverAdapter implements HttpClientAdapter {
     Future<void>? cancelFuture,
   ) async {
     request = options;
-    final Object data = options.path.endsWith('/capabilities/driver')
+    final Object data = options.path == '/v1/driver/vehicles'
+        ? {'vehicles': <Object>[]}
+        : options.path.endsWith('/capabilities/driver')
         ? {
             'id': 'user-1',
             'capabilities': ['rider', 'driver'],

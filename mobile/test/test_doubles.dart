@@ -1,3 +1,4 @@
+import 'package:uber_clone/features/driver_workspace/domain/registered_vehicle.dart';
 import 'package:uber_clone/core/models/account.dart';
 import 'package:uber_clone/core/session/session_store.dart';
 import 'package:uber_clone/features/authentication/data/auth_repository.dart';
@@ -136,7 +137,10 @@ const comfortService = DriverServiceOption(
 );
 
 class FakeDriverRepository implements DriverRepository {
-  FakeDriverRepository({this.profile});
+  FakeDriverRepository({this.profile, this.vehicles = const []});
+  List<RegisteredVehicle> vehicles;
+  @override
+  Future<List<RegisteredVehicle>> listVehicles() async => vehicles;
   DriverProfile? profile;
   final calls = <String>[];
   bool failPublish = false;
