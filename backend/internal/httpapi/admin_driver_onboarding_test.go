@@ -164,6 +164,7 @@ func TestAdminReviewerBehindHTTPSProxy(t *testing.T) {
 	}{
 		{"reject", "reject", "https://application.test", "application.test", "https://application.test", http.StatusSeeOther},
 		{"approve", "approve", "https://application.test", "application.test", "https://application.test", http.StatusSeeOther},
+		{"configured case differs", "reject", "https://application.test", "application.test", "HTTPS://APPLICATION.TEST", http.StatusSeeOther},
 		{"other origin", "reject", "https://evil.test", "application.test", "https://application.test", http.StatusForbidden},
 		{"wrong scheme", "reject", "http://application.test", "application.test", "https://application.test", http.StatusForbidden},
 		{"wrong host", "reject", "https://application.test", "evil.test", "https://application.test", http.StatusForbidden},
