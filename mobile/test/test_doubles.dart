@@ -26,6 +26,8 @@ class FakeAuthRepository implements AuthRepository {
   Future<String> register(String identifier, String password) async =>
       'challenge';
   @override
+  Future<String> startVerification(String email) async => 'challenge';
+  @override
   Future<void> completeVerification(String verificationId, String code) async {}
   @override
   Future<void> logout() async {}
