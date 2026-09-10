@@ -105,7 +105,8 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('verifyAccountButton')), findsNothing);
+    expect(find.text('Sign in'), findsOneWidget);
+    expect(find.text('Send verification email'), findsNothing);
 
     await tester.enterText(
       find.byKey(const Key('identifierField')),
@@ -115,8 +116,8 @@ void main() {
     await tester.tap(find.byKey(const Key('submitButton')));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('verifyAccountButton')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('verifyAccountButton')));
+    expect(find.text('Send verification email'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('submitButton')));
     await tester.pumpAndSettle();
 
     expect(find.text('Verify email'), findsOneWidget);
