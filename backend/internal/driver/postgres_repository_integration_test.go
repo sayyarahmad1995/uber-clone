@@ -147,3 +147,61 @@ func createDriverIntegrationUser(t *testing.T, db *sql.DB) uuid.UUID {
 	})
 	return userID
 }
+
+func TestPostgresRepositoryVehicleEnrollmentsAreExplicitAndOwnerScoped(t *testing.T) {
+	db := openDriverIntegrationDB(t)
+	repository := NewPostgresRepository(db)
+	owner := createDriverIntegrationUser(t, db)
+	other := createDriverIntegrationUser(t, db)
+	first, second, foreign := uuid.New(), uuid.New(), uuid.New()
+	for _, userID := range []uuid.UUID{owner, other} {
+		if _, err := db.Exec(`INSERT INTO driver_profiles (user_id, status) VALUES ($1, 'approved')`, userID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i, id := range []uuid.UUID{first, second, foreign} {
+		userID := owner
+		if i == 2 {
+			userID = other
+		}
+		if _, err := db.Exec(`INSERT INTO driver_vehicles (id, driver_user_id, make, model, color, license_plate, created_at)
+			VALUES ($1, $2, 'Toyota', 'Corolla', 'White', $3, NOW() + ($4 * INTERVAL '1 second'))`, id, userID, id.String(), i); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.Exec(`INSERT INTO driver_vehicle_service_enrollments (vehicle_id, service_code, approved_at, approved_by)
+		VALUES ($1, 'comfort', NOW(), 'reviewer'), ($2, 'economy', NOW(), 'reviewer')`, first, foreign); err != nil {
+		t.Fatal(err)
+	}
+	vehicles, err := repository.ListVehicles(context.Background(), owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(vehicles) != 2 || vehicles[0].ID != first || vehicles[1].ID != second {
+		t.Fatalf("unexpected owned vehicles: %#v", vehicles)
+	}
+	if len(vehicles[0].Enrollments) != 1 || vehicles[0].Enrollments[0].ServiceCode != "comfort" {
+		t.Fatalf("Comfort must not imply Economy enrollment: %#v", vehicles[0].Enrollments)
+	}
+	if vehicles[0].Enrollments[0].DisplayName != "Comfort" || vehicles[0].Enrollments[0].ApprovedAt.IsZero() || !vehicles[0].Enrollments[0].ServiceActive {
+		t.Fatalf("missing enrollment metadata: %#v", vehicles[0].Enrollments)
+	}
+	if vehicles[1].Enrollments == nil || len(vehicles[1].Enrollments) != 0 {
+		t.Fatalf("vehicle without enrollment must have an empty list: %#v", vehicles[1])
+	}
+	if _, err := db.Exec(`INSERT INTO driver_vehicle_service_enrollments (vehicle_id, service_code, approved_at, approved_by)
+		VALUES ($1, 'economy', NOW(), 'reviewer')`, first); err != nil {
+		t.Fatal(err)
+	}
+	vehicles, err = repository.ListVehicles(context.Background(), owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(vehicles) != 2 || len(vehicles[0].Enrollments) != 2 || vehicles[0].Enrollments[0].ServiceCode != "economy" {
+		t.Fatalf("multiple enrollments must not duplicate vehicles: %#v", vehicles)
+	}
+	empty, err := repository.ListVehicles(context.Background(), uuid.New())
+	if err != nil || empty == nil || len(empty) != 0 {
+		t.Fatalf("unknown owner should have an empty list: %#v, %v", empty, err)
+	}
+}

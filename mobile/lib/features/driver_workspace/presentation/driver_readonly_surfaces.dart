@@ -41,31 +41,43 @@ class DriverVehiclesScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final driver = ref.watch(driverControllerProvider);
+    final records = ref.watch(driverVehiclesProvider);
     final onboarding = ref.watch(driverOnboardingControllerProvider);
-    final profile = driver.profile;
     final application = onboarding.application;
-    final vehicle = profile?.vehicle ?? application?.vehicle;
-    final loading = !driver.loaded || (profile == null && !onboarding.loaded);
-    final error = profile == null
-        ? driver.error ?? onboarding.error
-        : driver.error;
-
     return Scaffold(
       appBar: AppBar(title: const Text('Vehicles')),
-      body: _ReadOnlyBody(
-        loading: loading,
-        error: error,
-        empty: vehicle == null,
-        emptyTitle: 'No vehicle submitted yet',
-        emptyMessage: 'Complete Driver onboarding from the Driver dashboard to submit a vehicle.',
-        child: vehicle == null
-            ? const SizedBox.shrink()
-            : _VehicleContent(
-                vehicle: vehicle,
-                profile: profile,
-                application: application,
-              ),
+      body: records.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stack) => Center(child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Unable to load vehicles'),
+            TextButton(onPressed: () => ref.invalidate(driverVehiclesProvider), child: const Text('Retry')),
+          ],
+        )),
+        data: (vehicles) => _ReadOnlyBody(
+          loading: vehicles.isEmpty && !onboarding.loaded,
+          error: onboarding.error,
+          empty: vehicles.isEmpty && application == null,
+          emptyTitle: 'No vehicle submitted yet',
+          emptyMessage: 'Complete Driver onboarding from the Driver dashboard to submit a vehicle.',
+          child: Column(children: [
+            for (final record in vehicles)
+              Card(key: ValueKey(record.id), child: Column(children: [
+                _ReadOnlyTile(icon: Icons.directions_car_outlined, label: 'Vehicle', value: '${record.vehicle.make} ${record.vehicle.model}'),
+                if (record.vehicle.modelYear != null)
+                  _ReadOnlyTile(icon: Icons.calendar_today_outlined, label: 'Model year', value: '${record.vehicle.modelYear}'),
+                _ReadOnlyTile(icon: Icons.palette_outlined, label: 'Color', value: record.vehicle.color),
+                _ReadOnlyTile(icon: Icons.pin_outlined, label: 'License plate', value: record.vehicle.licensePlate),
+                if (record.enrollments.isEmpty)
+                  const ListTile(title: Text('No approved service enrollments')),
+                for (final enrollment in record.enrollments)
+                  _ReadOnlyTile(icon: Icons.verified_outlined, label: 'Approved service', value: '${enrollment.displayName}${enrollment.serviceActive ? '' : ' (currently unavailable)'}'),
+              ])),
+            if (vehicles.isEmpty && application != null)
+              _VehicleContent(vehicle: application.vehicle, profile: null, application: application),
+          ]),
+        ),
       ),
     );
   }
@@ -249,7 +261,7 @@ class _VehicleContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Current vehicle', style: Theme.of(context).textTheme.titleMedium),
+        Text('Submitted vehicle', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         Card(
           child: Column(
@@ -301,7 +313,7 @@ class _VehicleContent extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Only your current submitted or approved vehicle is shown here. Adding, switching, or editing vehicles is not available yet.',
+          'This is your submitted application snapshot. Approved service enrollments are shown on registered vehicle records.',
           style: Theme.of(context).textTheme.bodySmall,
         ),
       ],

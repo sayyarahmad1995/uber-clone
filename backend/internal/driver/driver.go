@@ -34,7 +34,15 @@ type OnboardingInput struct {
 	Vehicle     VehicleInput
 }
 
+type ServiceEnrollment struct {
+	ServiceCode   string
+	DisplayName   string
+	ApprovedAt    time.Time
+	ServiceActive bool
+}
+
 type Vehicle struct {
+	Enrollments  []ServiceEnrollment
 	ID           uuid.UUID
 	Make         string
 	Model        string

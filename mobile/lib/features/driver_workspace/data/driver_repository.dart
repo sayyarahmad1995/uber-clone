@@ -4,9 +4,11 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/session/session_store.dart';
 import '../../rider_request/domain/ride_request.dart';
 import '../domain/driver_profile.dart';
+import '../domain/registered_vehicle.dart';
 
 abstract interface class DriverRepository {
   Future<DriverProfile?> get();
+  Future<List<RegisteredVehicle>> listVehicles();
   Future<DriverProfile> onboard(String displayName, DriverVehicle vehicle);
   Future<DriverProfile> setOnline(bool online);
   Future<PublishedDriverLocation> publishLocation(GeoPoint point);
@@ -42,6 +44,12 @@ class ApiDriverRepository implements DriverRepository {
     } on DioException catch (error) {
       throw ApiException.fromDio(error);
     }
+  }
+
+  @override
+  Future<List<RegisteredVehicle>> listVehicles() async {
+    final data = await _request('/v1/driver/vehicles');
+    return (data['vehicles'] as List).map((item) => RegisteredVehicle.fromJson(item as Map<String, dynamic>)).toList();
   }
 
   @override

@@ -97,10 +97,13 @@ func (r PostgresRepository) FindByUserID(ctx context.Context, userID uuid.UUID) 
 
 func (r PostgresRepository) ListVehicles(ctx context.Context, userID uuid.UUID) ([]Vehicle, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, make, model, COALESCE(model_year, 0), color, license_plate
-		FROM driver_vehicles
-		WHERE driver_user_id = $1
-		ORDER BY created_at ASC, id ASC
+		SELECT v.id, v.make, v.model, COALESCE(v.model_year, 0), v.color, v.license_plate,
+		       e.service_code, c.display_name, e.approved_at, c.is_active
+		FROM driver_vehicles v
+		LEFT JOIN driver_vehicle_service_enrollments e ON e.vehicle_id = v.id
+		LEFT JOIN driver_service_catalog c ON c.code = e.service_code
+		WHERE v.driver_user_id = $1
+		ORDER BY v.created_at ASC, v.id ASC, c.sort_order ASC, e.service_code ASC
 	`, userID)
 	if err != nil {
 		return nil, err
@@ -108,8 +111,12 @@ func (r PostgresRepository) ListVehicles(ctx context.Context, userID uuid.UUID) 
 	defer rows.Close()
 
 	vehicles := []Vehicle{}
+	indices := map[uuid.UUID]int{}
 	for rows.Next() {
 		var vehicle Vehicle
+		var code, name sql.NullString
+		var approved sql.NullTime
+		var active sql.NullBool
 		if err := rows.Scan(
 			&vehicle.ID,
 			&vehicle.Make,
@@ -117,10 +124,23 @@ func (r PostgresRepository) ListVehicles(ctx context.Context, userID uuid.UUID) 
 			&vehicle.ModelYear,
 			&vehicle.Color,
 			&vehicle.LicensePlate,
+			&code, &name, &approved, &active,
 		); err != nil {
 			return nil, err
 		}
-		vehicles = append(vehicles, vehicle)
+		index, exists := indices[vehicle.ID]
+		if !exists {
+			index = len(vehicles)
+			indices[vehicle.ID] = index
+			vehicle.Enrollments = []ServiceEnrollment{}
+			vehicles = append(vehicles, vehicle)
+		}
+		if code.Valid {
+			vehicles[index].Enrollments = append(vehicles[index].Enrollments, ServiceEnrollment{
+				ServiceCode: code.String, DisplayName: name.String,
+				ApprovedAt: approved.Time, ServiceActive: active.Bool,
+			})
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
