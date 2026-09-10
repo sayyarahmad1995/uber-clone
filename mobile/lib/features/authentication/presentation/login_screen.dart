@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/providers.dart';
+import 'verification_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -25,6 +26,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _submit() async {
+    final state = ref.read(sessionControllerProvider).state;
+    if (!_registering && state.verificationRequired) {
+      await _startVerification();
+      return;
+    }
     if (!_formKey.currentState!.validate()) return;
     final controller = ref.read(sessionControllerProvider);
     if (_registering) {
@@ -33,11 +39,39 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         _password.text,
       );
       if (challenge != null && mounted) {
-        context.push('/verify', extra: challenge);
+        _openVerification(_identifier.text.trim(), challenge);
       }
     } else {
       await controller.login(_identifier.text, _password.text);
     }
+  }
+
+  Future<void> _startVerification() async {
+    final email = _identifier.text.trim();
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter your email first.')),
+      );
+      return;
+    }
+    final challenge = await ref
+        .read(sessionControllerProvider)
+        .startVerification(email);
+    if (challenge != null && mounted) {
+      _openVerification(email, challenge);
+    }
+  }
+
+  void _openVerification(String email, String verificationId) {
+    context.push(
+      Uri(
+        path: '/verify',
+        queryParameters: {
+          'email': email,
+          'verification_id': verificationId,
+        },
+      ).toString(),
+    );
   }
 
   @override
@@ -111,7 +145,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               dimension: 20,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : Text(_registering ? 'Create account' : 'Sign in'),
+                          : Text(
+                              _registering
+                                  ? 'Create account'
+                                  : state.verificationRequired
+                                  ? 'Send verification email'
+                                  : 'Sign in',
+                            ),
                     ),
                     TextButton(
                       onPressed: state.busy

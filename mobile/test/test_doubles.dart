@@ -16,15 +16,21 @@ const bothCapabilities = Account(
 );
 
 class FakeAuthRepository implements AuthRepository {
-  FakeAuthRepository({this.account});
+  FakeAuthRepository({this.account, this.loginError});
   final Account? account;
+  final Object? loginError;
   @override
   Future<Account?> restore() async => account;
   @override
-  Future<Account> login(String identifier, String password) async => account!;
+  Future<Account> login(String identifier, String password) async {
+    if (loginError != null) throw loginError!;
+    return account!;
+  }
   @override
   Future<String> register(String identifier, String password) async =>
       'challenge';
+  @override
+  Future<String> startVerification(String email) async => 'challenge';
   @override
   Future<void> completeVerification(String verificationId, String code) async {}
   @override

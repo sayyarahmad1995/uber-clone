@@ -26,6 +26,20 @@ void main() {
     });
     expect(adapter.meAuthorization, 'Bearer session-token');
   });
+
+  test('start verification requests a fresh challenge for existing account', () async {
+    final adapter = ContractAdapter();
+    final repository = ApiAuthRepository(
+      Dio(BaseOptions(baseUrl: 'http://application.test'))
+        ..httpClientAdapter = adapter,
+      MemorySessionStore(),
+    );
+
+    final challenge = await repository.startVerification(' rider@example.com ');
+
+    expect(challenge, 'verification-challenge');
+    expect(adapter.verificationBody, {'email': 'rider@example.com'});
+  });
 }
 
 class MemorySessionStore implements SessionStore {
@@ -48,6 +62,7 @@ class MemorySessionStore implements SessionStore {
 
 class ContractAdapter implements HttpClientAdapter {
   Map<String, dynamic>? loginBody;
+  Map<String, dynamic>? verificationBody;
   String? meAuthorization;
 
   @override
@@ -62,6 +77,10 @@ class ContractAdapter implements HttpClientAdapter {
         'access_token': 'session-token',
         'expires_in': 3600,
       });
+    }
+    if (options.path == '/v1/auth/verify') {
+      verificationBody = Map<String, dynamic>.from(options.data as Map);
+      return jsonResponse(200, {'verification_id': 'verification-challenge'});
     }
     if (options.path == '/v1/me') {
       meAuthorization = options.headers['Authorization'] as String?;

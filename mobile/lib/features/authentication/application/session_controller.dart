@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/models/account.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/session/session_store.dart';
 import '../data/auth_repository.dart';
 
@@ -14,6 +15,7 @@ class SessionState {
     this.capability = Capability.rider,
     this.busy = false,
     this.error,
+    this.verificationRequired = false,
   });
   const SessionState.bootstrapping()
     : this(status: SessionStatus.bootstrapping);
@@ -22,6 +24,7 @@ class SessionState {
   final Capability capability;
   final bool busy;
   final String? error;
+  final bool verificationRequired;
 
   SessionState copyWith({
     SessionStatus? status,
@@ -29,6 +32,7 @@ class SessionState {
     Capability? capability,
     bool? busy,
     String? error,
+    bool? verificationRequired,
     bool clearError = false,
   }) => SessionState(
     status: status ?? this.status,
@@ -36,6 +40,9 @@ class SessionState {
     capability: capability ?? this.capability,
     busy: busy ?? this.busy,
     error: clearError ? null : error ?? this.error,
+    verificationRequired: clearError
+        ? false
+        : verificationRequired ?? this.verificationRequired,
   );
 }
 
@@ -83,6 +90,15 @@ class SessionController extends ChangeNotifier {
       await _capabilities.save(Capability.rider);
       _set(SessionState(status: SessionStatus.signedIn, account: account));
       return true;
+    } on ApiException catch (error) {
+      _set(
+        SessionState(
+          status: SessionStatus.signedOut,
+          error: error.message,
+          verificationRequired: error.code == 'verification_required',
+        ),
+      );
+      return false;
     } catch (error) {
       _set(SessionState(status: SessionStatus.signedOut, error: '$error'));
       return false;
@@ -93,6 +109,18 @@ class SessionController extends ChangeNotifier {
     _set(_state.copyWith(busy: true, clearError: true));
     try {
       final id = await _auth.register(identifier, password);
+      _set(const SessionState(status: SessionStatus.signedOut));
+      return id;
+    } catch (error) {
+      _set(SessionState(status: SessionStatus.signedOut, error: '$error'));
+      return null;
+    }
+  }
+
+  Future<String?> startVerification(String email) async {
+    _set(_state.copyWith(busy: true, clearError: true));
+    try {
+      final id = await _auth.startVerification(email);
       _set(const SessionState(status: SessionStatus.signedOut));
       return id;
     } catch (error) {

@@ -8,6 +8,7 @@ abstract interface class AuthRepository {
   Future<Account?> restore();
   Future<Account> login(String identifier, String password);
   Future<String> register(String identifier, String password);
+  Future<String> startVerification(String email);
   Future<void> completeVerification(String verificationId, String code);
   Future<void> logout();
   Future<Account> enableDriver();
@@ -83,6 +84,19 @@ class ApiAuthRepository implements AuthRepository {
       final response = await _dio.post<Map<String, dynamic>>(
         '/v1/auth/register',
         data: {'identifier': identifier.trim(), 'password': password},
+      );
+      return VerificationChallenge.fromJson(response.data!).verificationId;
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  @override
+  Future<String> startVerification(String email) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/v1/auth/verify',
+        data: {'email': email.trim()},
       );
       return VerificationChallenge.fromJson(response.data!).verificationId;
     } on DioException catch (error) {

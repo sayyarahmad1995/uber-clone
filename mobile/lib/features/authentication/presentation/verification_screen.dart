@@ -4,9 +4,19 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/providers.dart';
 
-class VerificationScreen extends ConsumerStatefulWidget {
-  const VerificationScreen({super.key, required this.verificationId});
+class VerificationRequest {
+  const VerificationRequest({
+    required this.email,
+    required this.verificationId,
+  });
+
+  final String email;
   final String verificationId;
+}
+
+class VerificationScreen extends ConsumerStatefulWidget {
+  const VerificationScreen({super.key, required this.request});
+  final VerificationRequest request;
 
   @override
   ConsumerState<VerificationScreen> createState() => _VerificationScreenState();
@@ -14,6 +24,13 @@ class VerificationScreen extends ConsumerStatefulWidget {
 
 class _VerificationScreenState extends ConsumerState<VerificationScreen> {
   final _code = TextEditingController();
+  late String _verificationId;
+
+  @override
+  void initState() {
+    super.initState();
+    _verificationId = widget.request.verificationId;
+  }
 
   @override
   void dispose() {
@@ -25,12 +42,27 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
     if (_code.text.trim().isEmpty) return;
     final ok = await ref
         .read(sessionControllerProvider)
-        .verify(widget.verificationId, _code.text);
+        .verify(_verificationId, _code.text);
     if (ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Email verified. Sign in to continue.')),
       );
       context.go('/login');
+    }
+  }
+
+  Future<void> _resend() async {
+    final challenge = await ref
+        .read(sessionControllerProvider)
+        .startVerification(widget.request.email);
+    if (challenge != null && mounted) {
+      setState(() {
+        _verificationId = challenge;
+        _code.clear();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('A new verification code was sent.')),
+      );
     }
   }
 
@@ -48,7 +80,9 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text('Enter the verification code sent to your email.'),
+                Text(
+                  'Enter the verification code sent to ${widget.request.email}.',
+                ),
                 const SizedBox(height: 16),
                 TextField(
                   key: const Key('verificationCodeField'),
@@ -73,6 +107,11 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                 FilledButton(
                   onPressed: state.busy ? null : _verify,
                   child: const Text('Verify'),
+                ),
+                TextButton(
+                  key: const Key('resendVerificationButton'),
+                  onPressed: state.busy ? null : _resend,
+                  child: const Text('Send a new code'),
                 ),
               ],
             ),

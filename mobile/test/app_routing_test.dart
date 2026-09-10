@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:uber_clone/app.dart';
 import 'package:uber_clone/core/dashboard/ride_dashboard_scaffold.dart';
 import 'package:uber_clone/core/models/account.dart';
+import 'package:uber_clone/core/network/api_exception.dart';
 import 'package:uber_clone/core/providers.dart';
 import 'package:uber_clone/features/authentication/data/auth_repository.dart';
 import 'package:uber_clone/features/rider_request/data/device_location.dart';
@@ -87,6 +88,53 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Welcome back'), findsOneWidget);
     expect(find.text('Sign in'), findsOneWidget);
+  });
+
+  testWidgets('signed-out user can restart verification after unverified login', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      testApp(
+        FakeAuthRepository(
+          loginError: const ApiException(
+            'verification_required',
+            'Account verification is required.',
+            statusCode: 403,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Sign in'), findsOneWidget);
+    expect(find.text('Send verification email'), findsNothing);
+
+    await tester.enterText(
+      find.byKey(const Key('identifierField')),
+      'rider@example.com',
+    );
+    await tester.enterText(find.byKey(const Key('passwordField')), 'password');
+    await tester.tap(find.byKey(const Key('submitButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Send verification email'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('submitButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Verify email'), findsOneWidget);
+    expect(
+      find.text('Enter the verification code sent to rider@example.com.'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('verificationCodeField')), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const Key('verificationCodeField')),
+      '123456',
+    );
+    await tester.tap(find.text('Verify'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Welcome back'), findsOneWidget);
   });
 
   testWidgets('restored account enters Rider by default', (tester) async {
