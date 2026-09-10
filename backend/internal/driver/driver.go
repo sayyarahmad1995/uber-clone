@@ -56,6 +56,7 @@ type Profile struct {
 type Repository interface {
 	UpsertProfile(ctx context.Context, userID uuid.UUID, input OnboardingInput) (Profile, error)
 	FindByUserID(ctx context.Context, userID uuid.UUID) (Profile, error)
+	ListVehicles(ctx context.Context, userID uuid.UUID) ([]Vehicle, error)
 	SetOnline(ctx context.Context, userID uuid.UUID, online bool) (Profile, error)
 }
 
@@ -75,6 +76,10 @@ func (s Service) Onboard(ctx context.Context, userID uuid.UUID, input Onboarding
 
 func (s Service) Get(ctx context.Context, userID uuid.UUID) (Profile, error) {
 	return s.repository.FindByUserID(ctx, userID)
+}
+
+func (s Service) ListVehicles(ctx context.Context, userID uuid.UUID) ([]Vehicle, error) {
+	return s.repository.ListVehicles(ctx, userID)
 }
 
 func (s Service) SetOnline(ctx context.Context, userID uuid.UUID, online bool) (Profile, error) {

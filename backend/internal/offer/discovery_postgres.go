@@ -30,7 +30,6 @@ func (r PostgresRepository) Discover(ctx context.Context, driverUserID uuid.UUID
 `+pickupDistanceSQL+` AS pickup_distance_meters
 		FROM ride_requests rr
 		JOIN driver_profiles p ON p.user_id = $1 AND p.status = 'active' AND p.is_online
-		JOIN driver_vehicles v ON v.driver_user_id = p.user_id
 		JOIN user_capabilities c ON c.user_id = p.user_id AND c.capability = 'driver'
 		JOIN driver_locations l ON l.driver_user_id = p.user_id
 		LEFT JOIN ride_offers o
@@ -42,6 +41,7 @@ func (r PostgresRepository) Discover(ctx context.Context, driverUserID uuid.UUID
 		  AND rr.proposed_fare_minor IS NOT NULL
 		  AND rr.currency IS NOT NULL
 		  AND rr.rider_user_id <> $1
+		  AND EXISTS (SELECT 1 FROM driver_vehicles v WHERE v.driver_user_id = p.user_id)
 		  AND NOT EXISTS (
 			SELECT 1 FROM trips t WHERE t.ride_request_id = rr.id
 		  )

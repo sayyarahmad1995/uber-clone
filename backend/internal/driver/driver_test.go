@@ -39,6 +39,13 @@ func (f *fakeRepository) FindByUserID(_ context.Context, _ uuid.UUID) (Profile, 
 	return f.profile, nil
 }
 
+func (f *fakeRepository) ListVehicles(_ context.Context, _ uuid.UUID) ([]Vehicle, error) {
+	if f.profile.UserID == uuid.Nil {
+		return nil, ErrNotFound
+	}
+	return []Vehicle{f.profile.Vehicle}, nil
+}
+
 func (f *fakeRepository) SetOnline(_ context.Context, userID uuid.UUID, online bool) (Profile, error) {
 	if f.profile.UserID == uuid.Nil {
 		return Profile{}, ErrNotFound
