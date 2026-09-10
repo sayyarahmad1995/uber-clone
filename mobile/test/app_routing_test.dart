@@ -125,6 +125,15 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const Key('verificationCodeField')), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const Key('verificationCodeField')),
+      '123456',
+    );
+    await tester.tap(find.text('Verify'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Welcome back'), findsOneWidget);
   });
 
   testWidgets('restored account enters Rider by default', (tester) async {
