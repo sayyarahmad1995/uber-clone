@@ -89,6 +89,27 @@ void main() {
     expect(find.text('Sign in'), findsOneWidget);
   });
 
+  testWidgets('signed-out user can restart email verification from login', (
+    tester,
+  ) async {
+    await tester.pumpWidget(testApp(FakeAuthRepository()));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('identifierField')),
+      'rider@example.com',
+    );
+    await tester.tap(find.byKey(const Key('verifyAccountButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Verify email'), findsOneWidget);
+    expect(
+      find.text('Enter the verification code sent to rider@example.com.'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('verificationCodeField')), findsOneWidget);
+  });
+
   testWidgets('restored account enters Rider by default', (tester) async {
     await tester.pumpWidget(testApp(FakeAuthRepository(account: riderAccount)));
     await tester.pumpAndSettle();
