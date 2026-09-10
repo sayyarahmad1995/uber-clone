@@ -163,10 +163,21 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
       GoRoute(
         path: '/verify',
-        redirect: (_, state) =>
-            state.extra is VerificationRequest ? null : '/login',
-        builder: (_, state) =>
-            VerificationScreen(request: state.extra! as VerificationRequest),
+        redirect: (_, state) {
+          final query = state.uri.queryParameters;
+          return query['email'] != null && query['verification_id'] != null
+              ? null
+              : '/login';
+        },
+        builder: (_, state) {
+          final query = state.uri.queryParameters;
+          return VerificationScreen(
+            request: VerificationRequest(
+              email: query['email']!,
+              verificationId: query['verification_id']!,
+            ),
+          );
+        },
       ),
       GoRoute(
         path: '/rider',
