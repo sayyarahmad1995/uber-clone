@@ -86,6 +86,7 @@ func (r PostgresRepository) ListForRider(ctx context.Context, rideRequestID, rid
 		if distance.Valid {
 			item.PickupDistanceMeters = &distance.Float64
 		}
-		items = append(item)
-	}‚\™]\›ˆ][\Ë›ÝÜË‘\œŠ
-BŸB
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
