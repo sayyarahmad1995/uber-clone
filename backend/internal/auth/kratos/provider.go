@@ -106,9 +106,15 @@ func (p *Provider) StartVerification(ctx context.Context, email string) (auth.Ve
 }
 
 func (p *Provider) CompleteVerification(ctx context.Context, challengeID, code string) error {
-	err := p.submitFlow(ctx, "/self-service/verification", challengeID, map[string]any{"method": "code", "code": code}, nil)
-	if err == nil {
+	var result struct {
+		State string `json:"state"`
+	}
+	err := p.submitFlow(ctx, "/self-service/verification", challengeID, map[string]any{"method": "code", "code": code}, &result)
+	if err == nil && result.State == "passed_challenge" {
 		return nil
+	}
+	if err == nil {
+		return auth.ErrVerificationInvalid
 	}
 	if isClientFailure(err) {
 		return auth.ErrVerificationInvalid
