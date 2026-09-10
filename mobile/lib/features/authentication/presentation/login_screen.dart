@@ -26,6 +26,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _submit() async {
+    final state = ref.read(sessionControllerProvider).state;
+    if (!_registering && state.verificationRequired) {
+      await _startVerification();
+      return;
+    }
     if (!_formKey.currentState!.validate()) return;
     final controller = ref.read(sessionControllerProvider);
     if (_registering) {
@@ -140,7 +145,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               dimension: 20,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : Text(_registering ? 'Create account' : 'Sign in'),
+                          : Text(
+                              _registering
+                                  ? 'Create account'
+                                  : state.verificationRequired
+                                  ? 'Send verification email'
+                                  : 'Sign in',
+                            ),
                     ),
                     TextButton(
                       onPressed: state.busy
@@ -155,12 +166,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             : 'New here? Create an account',
                       ),
                     ),
-                    if (!_registering && state.verificationRequired)
-                      TextButton(
-                        key: const Key('verifyAccountButton'),
-                        onPressed: state.busy ? null : _startVerification,
-                        child: const Text('Verify your email'),
-                      ),
                   ],
                 ),
               ),
