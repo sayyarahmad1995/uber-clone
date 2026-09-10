@@ -37,4 +37,15 @@ void main() {
     await controller.selectCapability(Capability.driver);
     expect(controller.state.capability, Capability.rider);
   });
+
+  test('starts verification for an existing signed-out account', () async {
+    final controller = SessionController(
+      FakeAuthRepository(),
+      MemoryCapabilityStore(),
+    );
+    final challenge = await controller.startVerification('rider@example.com');
+    expect(challenge, 'challenge');
+    expect(controller.state.status, SessionStatus.signedOut);
+    expect(controller.state.busy, isFalse);
+  });
 }
