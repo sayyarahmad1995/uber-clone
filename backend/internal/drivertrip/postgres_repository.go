@@ -23,7 +23,7 @@ func (r PostgresRepository) GetCurrent(ctx context.Context, driverUserID uuid.UU
 			rr.destination_longitude,
 			t.status,
 			t.assigned_at,
-			t.started_at, t.operation_context
+			t.started_at, COALESCE(t.operation_context, 'null'::jsonb)
 		FROM trips t
 		JOIN ride_requests rr ON rr.id = t.ride_request_id
 		WHERE t.driver_user_id = $1
@@ -59,7 +59,7 @@ func (r PostgresRepository) ListHistory(ctx context.Context, driverUserID uuid.U
 			t.assigned_at,
 			t.started_at,
 			t.completed_at,
-			t.cancelled_at, t.operation_context
+			t.cancelled_at, COALESCE(t.operation_context, 'null'::jsonb)
 		FROM trips t
 		JOIN ride_requests rr ON rr.id = t.ride_request_id
 		WHERE t.driver_user_id = $1

@@ -34,7 +34,7 @@ func (r PostgresRepository) Start(ctx context.Context, rideRequestID, driverUser
 			UPDATE trips
 			SET status = 'in_progress', started_at = NOW()
 			WHERE ride_request_id = $1 AND driver_user_id = $2
-			RETURNING ride_request_id, rider_user_id, driver_user_id, status, assigned_at, started_at, completed_at, operation_context, cancelled_at
+			RETURNING ride_request_id, rider_user_id, driver_user_id, status, assigned_at, started_at, completed_at, COALESCE(operation_context, 'null'::jsonb), cancelled_at
 		`, rideRequestID, driverUserID).Scan(
 			&result.RideRequestID,
 			&result.RiderUserID,
@@ -84,7 +84,7 @@ func (r PostgresRepository) Complete(ctx context.Context, rideRequestID, driverU
 			UPDATE trips
 			SET status = 'completed', completed_at = NOW()
 			WHERE ride_request_id = $1 AND driver_user_id = $2
-			RETURNING ride_request_id, rider_user_id, driver_user_id, status, assigned_at, started_at, completed_at, operation_context, cancelled_at
+			RETURNING ride_request_id, rider_user_id, driver_user_id, status, assigned_at, started_at, completed_at, COALESCE(operation_context, 'null'::jsonb), cancelled_at
 		`, rideRequestID, driverUserID).Scan(
 			&result.RideRequestID,
 			&result.RiderUserID,
@@ -118,7 +118,7 @@ func (r PostgresRepository) Complete(ctx context.Context, rideRequestID, driverU
 
 func selectTrip(ctx context.Context, tx *sql.Tx, rideRequestID, driverUserID uuid.UUID, forUpdate bool) (Trip, error) {
 	query := `
-		SELECT ride_request_id, rider_user_id, driver_user_id, status, assigned_at, started_at, completed_at, operation_context, cancelled_at
+		SELECT ride_request_id, rider_user_id, driver_user_id, status, assigned_at, started_at, completed_at, COALESCE(operation_context, 'null'::jsonb), cancelled_at
 		FROM trips
 		WHERE ride_request_id = $1 AND driver_user_id = $2
 	`

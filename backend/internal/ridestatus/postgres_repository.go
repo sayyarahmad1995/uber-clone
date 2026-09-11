@@ -69,6 +69,8 @@ func scanView(row scanner) (View, error) {
 	return view, nil
 }
 
+// A LEFT JOIN without a Trip returns SQL NULL. json.RawMessage accepts JSON
+// bytes, so project JSON null rather than asking database/sql to scan SQL NULL.
 const viewColumns = `
 	rr.id,
 	rr.rider_user_id,
@@ -87,7 +89,7 @@ const viewColumns = `
 	t.assigned_at,
 	t.started_at,
 	t.completed_at,
-	t.cancelled_at, t.operation_context, rr.service_code`
+	t.cancelled_at, COALESCE(t.operation_context, 'null'::jsonb), rr.service_code`
 
 func (r PostgresRepository) GetOwned(ctx context.Context, rideRequestID, riderUserID uuid.UUID) (View, error) {
 	view, err := scanView(r.db.QueryRowContext(ctx, `SELECT `+viewColumns+` FROM ride_requests rr LEFT JOIN trips t ON t.ride_request_id = rr.id WHERE rr.id = $1 AND rr.rider_user_id = $2`, rideRequestID, riderUserID))

@@ -112,7 +112,7 @@ func insertMarketplaceTrip(ctx context.Context, tx *sql.Tx, rideRequestID, rider
 		INSERT INTO trips (ride_request_id, rider_user_id, driver_user_id, assigned_at, operation_context)
         SELECT $1, $2, $3, NOW(), operation_context FROM ride_offers
         WHERE ride_request_id=$1 AND driver_user_id=$3
-		RETURNING ride_request_id, rider_user_id, driver_user_id, status, assigned_at, started_at, completed_at, operation_context
+		RETURNING ride_request_id, rider_user_id, driver_user_id, status, assigned_at, started_at, completed_at, COALESCE(operation_context, 'null'::jsonb)
 	`, rideRequestID, riderUserID, driverUserID).Scan(
 		&trip.RideRequestID,
 		&trip.RiderUserID,
@@ -146,7 +146,7 @@ func closeCompetingOffers(ctx context.Context, tx *sql.Tx, rideRequestID, select
 func selectTripByRide(ctx context.Context, tx *sql.Tx, rideRequestID uuid.UUID) (Trip, bool, error) {
 	var trip Trip
 	err := tx.QueryRowContext(ctx, `
-		SELECT ride_request_id, rider_user_id, driver_user_id, status, assigned_at, started_at, completed_at, operation_context
+		SELECT ride_request_id, rider_user_id, driver_user_id, status, assigned_at, started_at, completed_at, COALESCE(operation_context, 'null'::jsonb)
 		FROM trips
 		WHERE ride_request_id = $1
 	`, rideRequestID).Scan(
