@@ -19,6 +19,7 @@ class FlowFake implements RideFlowRepository {
   bool locationFails = false;
   bool selectable = true;
   Json? lastData;
+  bool? lastPut;
   Completer<void>? blocked;
   @override
   Future<Json> get(String path) async {
@@ -41,6 +42,7 @@ class FlowFake implements RideFlowRepository {
   Future<void> act(String path, {Json? data, bool put = false}) async {
     actions++;
     lastData = data;
+    lastPut = put;
     ride = {'id': 'ride', 'status': 'requested', 'trip': {'status':'assigned'}};
     if (loseResponse) throw const ApiException('network_error', 'Response lost');
   }
@@ -112,14 +114,24 @@ void main() {
     repo.blocked!.complete();
     await Future<void>.delayed(Duration.zero);
   });
-  test('commands cannot overlap an in-flight reload', () async {
+  test('counteroffer waits for an in-flight reload instead of being dropped', () async {
     final repo = FlowFake()..blocked=Completer<void>();
     final flow = RideFlowController(repo,rideId:'ride');
-    await flow.act('/accept');
-    expect(repo.actions,0);
-    flow.dispose();
-    repo.blocked!.complete();
     await Future<void>.delayed(Duration.zero);
+    expect(flow.busy,isTrue);
+    final action = flow.act(
+      '/v1/driver/ride-requests/ride/offer',
+      data:{'amount_minor':11500},
+      put:true,
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(repo.actions,0);
+    repo.blocked!.complete();
+    await action;
+    expect(repo.actions,1);
+    expect(repo.lastData,{'amount_minor':11500});
+    expect(repo.lastPut,isTrue);
+    flow.dispose();
   });
   test('fare parsing is exact and rejects non-finite or excess precision input', () {
     expect(parseFareMinor('100.01'),10001);
