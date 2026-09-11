@@ -1,4 +1,9 @@
 import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uber_clone/core/providers.dart';
+import 'package:uber_clone/features/rider_request/application/rider_request_controller.dart';
+import 'test_doubles.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uber_clone/core/network/api_exception.dart';
 import 'package:uber_clone/features/ride_flow/ride_flow_controller.dart';
@@ -11,6 +16,8 @@ class FlowFake implements RideFlowRepository {
   int reads = 0;
   int actions = 0;
   bool loseResponse = false;
+  bool selectable = true;
+  Json? lastData;
   Completer<void>? blocked;
   @override
   Future<Json> get(String path) async {
@@ -20,7 +27,7 @@ class FlowFake implements RideFlowRepository {
       if (trip == null) throw const ApiException('missing', 'No trip', statusCode: 404);
       return trip!;
     }
-    if (path.endsWith('/offers')) return {'offers': [{'driver_user_id':'driver','selectable':true}]};
+    if (path.endsWith('/offers')) return {'offers': [{'driver_user_id':'driver','selectable':selectable,'status':'pending','fare':{'amount_minor':10000,'currency':'PKR'},'updated_at':'2026-09-11T00:00:00Z'}]};
     if (path.endsWith('/driver-location')) throw const ApiException('missing','No location', statusCode:404);
     if (path.endsWith('/trips')) return {'trips': []};
     if (path.contains('/marketplace/')) return {'ride_requests': []};
@@ -29,11 +36,34 @@ class FlowFake implements RideFlowRepository {
   @override
   Future<void> act(String path, {Json? data, bool put = false}) async {
     actions++;
+    lastData = data;
     ride = {'id': 'ride', 'status': 'requested', 'trip': {'status':'assigned'}};
     if (loseResponse) throw const ApiException('network_error', 'Response lost');
   }
 }
 void main() {
+  testWidgets('Rider confirms exact displayed revision and unavailable offers cannot be selected', (tester) async {
+    final repo = FlowFake();
+    final flow = RideFlowController(repo, rideId:'ride');
+    await tester.pumpWidget(ProviderScope(overrides: [
+      rideFlowControllerProvider('ride').overrideWith((ref) => flow),
+      riderRequestControllerProvider.overrideWith((ref) => RiderRequestController(FakeRideRequestRepository(), FakeDeviceLocation())),
+    ], child: const MaterialApp(home: Scaffold(body: SingleChildScrollView(child: RideFlowPanel(rideId:'ride'))))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton,'Choose Driver'));
+    await tester.pumpAndSettle();
+    expect(repo.actions,0);
+    await tester.tap(find.descendant(of:find.byType(AlertDialog),matching:find.widgetWithText(FilledButton,'Choose Driver')));
+    await tester.pumpAndSettle();
+    expect(repo.actions,1);
+    expect(repo.lastData,{'updated_at':'2026-09-11T00:00:00Z'});
+    repo.ride={'id':'ride','status':'requested','trip':null};
+    repo.selectable=false;
+    await flow.refresh();
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilledButton>(find.widgetWithText(FilledButton,'Choose Driver')).onPressed,isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
   test('lost acceptance response reloads authoritative assignment without claiming success', () async {
     final repo = FlowFake()..loseResponse=true;
     final flow = RideFlowController(repo,rideId:'ride');

@@ -64,3 +64,18 @@ func TestMarketplaceFailsClosedWithoutEnrollment(t *testing.T) {
  if _,err := offers.Accept(ctx,rideID,rider,driverID); !errors.Is(err,offer.ErrDriverIneligible) { t.Fatalf("revoked approval assigned: %v",err) }
  if _,err := offers.AcceptProposed(ctx,rideID,driverID); !errors.Is(err,offer.ErrDriverIneligible) { t.Fatalf("legacy driver offered: %v",err) }
 }
+
+func TestRiderMustAcceptTheDisplayedOfferRevision(t *testing.T) {
+ db := openCancellationIntegrationDB(t)
+ ctx := context.Background()
+ rider := createCancellationUser(t,db,"rider")
+ driverID := createCancellationDriver(t,db)
+ rideID := createCancellationRide(t,db,rider)
+ offers := geoOffers(db)
+ first,err := offers.AcceptProposed(ctx,rideID,driverID)
+ if err != nil { t.Fatal(err) }
+ second,err := offers.Submit(ctx,rideID,driverID,120000)
+ if err != nil { t.Fatal(err) }
+ if _,err := offers.Accept(ctx,rideID,rider,driverID,first.Offer.UpdatedAt); !errors.Is(err,offer.ErrOfferNotActionable) { t.Fatalf("accepted a revised fare: %v",err) }
+ if _,err := offers.Accept(ctx,rideID,rider,driverID,second.Offer.UpdatedAt); err != nil { t.Fatal(err) }
+}
