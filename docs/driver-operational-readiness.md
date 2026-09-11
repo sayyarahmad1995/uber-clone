@@ -25,3 +25,9 @@ Selection and availability acquire the Driver profile lock also used by marketpl
 - Two sessions racing selection and availability do not bypass the profile lock.
 
 CI runs backend tests against PostgreSQL 17 and Flutter tests. Physical device acceptance still requires the developer's devices. Server deployment must explicitly use its `.env.dev` and `docker-compose.dev.yml` configuration; no server-specific files are committed here.
+
+## Foreground presence
+
+Online availability is temporary foreground presence, not a preference restored at startup. The foreground Driver controller republishes location every 20 seconds while online. Backgrounding requests offline; a new controller session also clears any old online flag before showing the restored selection. Permission-dialog inactive events do not themselves end presence.
+
+Force termination and lost connectivity cannot reliably send offline requests. The API expires online flags after the existing two-minute location freshness window; cleanup runs every ten seconds and reads also reconcile expired presence. Marketplace already rejects stale location immediately at its deadline. Late location heartbeats cannot turn an expired Driver back online. Expiry does not cancel trips or remove the saved operating selection.

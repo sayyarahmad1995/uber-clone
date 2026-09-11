@@ -19,7 +19,29 @@ class DriverWorkspaceScreen extends ConsumerStatefulWidget {
       _DriverWorkspaceScreenState();
 }
 
-class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen> {
+class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Inactive can be a permission dialog; only actual background states end presence.
+    if (state == AppLifecycleState.resumed) {
+      ref.read(driverControllerProvider).setForeground(true);
+    } else if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden || state == AppLifecycleState.detached) {
+      ref.read(driverControllerProvider).setForeground(false);
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
   bool _reapplying = false;
 
   @override

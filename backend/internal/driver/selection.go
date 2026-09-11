@@ -34,6 +34,7 @@ func (s Service) SelectOperation(ctx context.Context, id, vehicle uuid.UUID, ser
 }
 
 func (r PostgresRepository) OperatingState(ctx context.Context, id uuid.UUID) (OperatingState, error) {
+    if err := r.expirePresence(ctx,id); err != nil { return OperatingState{}, err }
     var state OperatingState
     var vehicle, service sql.NullString
     var valid bool
@@ -58,6 +59,7 @@ func (r PostgresRepository) OperatingState(ctx context.Context, id uuid.UUID) (O
 }
 
 func (r PostgresRepository) SelectOperation(ctx context.Context, id, vehicle uuid.UUID, service string) (OperatingState, error) {
+    if err := r.expirePresence(ctx,id); err != nil { return OperatingState{}, err }
     tx, err := r.db.BeginTx(ctx, nil)
     if err != nil { return OperatingState{}, err }
     defer tx.Rollback()

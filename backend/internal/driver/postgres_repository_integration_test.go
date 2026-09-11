@@ -243,3 +243,17 @@ func TestOperatingSelectionAndAvailability(t *testing.T) {
     if _,err:=db.Exec(`DELETE FROM driver_vehicle_service_enrollments WHERE vehicle_id=$1`,vehicle);err!=nil { t.Fatal(err) }
     if _,err:=repo.SetOnline(context.Background(),id,true);!errors.Is(err,ErrSelectionInvalid) { t.Fatalf("revoked enrollment accepted: %v",err) }
 }
+
+func TestPresenceExpiryPreservesFreshAndClearsStale(t *testing.T) {
+    db:=openDriverIntegrationDB(t)
+    id:=createDriverIntegrationUser(t,db)
+    repo:=NewPostgresRepository(db)
+    if _,err:=db.Exec(`INSERT INTO driver_profiles(user_id,status,is_online) VALUES ($1,'active',TRUE)`,id);err!=nil { t.Fatal(err) }
+    if _,err:=db.Exec(`INSERT INTO driver_locations(driver_user_id,latitude,longitude,updated_at) VALUES ($1,24,67,NOW())`,id);err!=nil { t.Fatal(err) }
+    if err:=repo.ExpirePresence(context.Background());err!=nil { t.Fatal(err) }
+    var online bool
+    if err:=db.QueryRow(`SELECT is_online FROM driver_profiles WHERE user_id=$1`,id).Scan(&online);err!=nil || !online { t.Fatalf("fresh presence expired: %v",err) }
+    if _,err:=db.Exec(`UPDATE driver_locations SET updated_at=NOW()-INTERVAL '3 minutes' WHERE driver_user_id=$1`,id);err!=nil { t.Fatal(err) }
+    if err:=repo.ExpirePresence(context.Background());err!=nil { t.Fatal(err) }
+    if err:=db.QueryRow(`SELECT is_online FROM driver_profiles WHERE user_id=$1`,id).Scan(&online);err!=nil || online { t.Fatalf("stale presence remained online: %v",err) }
+}

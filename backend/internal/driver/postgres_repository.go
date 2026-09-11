@@ -73,6 +73,7 @@ func (r PostgresRepository) UpsertProfile(ctx context.Context, userID uuid.UUID,
 }
 
 func (r PostgresRepository) FindByUserID(ctx context.Context, userID uuid.UUID) (Profile, error) {
+ if err := r.expirePresence(ctx,userID); err != nil { return Profile{}, err }
 	var p Profile
 	err := r.db.QueryRowContext(ctx, `
 		SELECT p.user_id, COALESCE(p.display_name, ''), p.status, p.is_online, p.created_at, p.updated_at,
