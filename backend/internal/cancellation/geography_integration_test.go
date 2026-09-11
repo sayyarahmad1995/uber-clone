@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+ driverops "github.com/sayyarahmad1995/uber-clone/backend/internal/driver"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/driverlocation"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/offer"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/trip"
@@ -189,9 +190,19 @@ func TestRiderComparisonRefreshOwnershipAndHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	view, err = offers.ListForRider(ctx, ride, rider)
-	if err != nil || !view[0].Selectable || view[0].DriverUserID != stale {
-		t.Fatalf("refresh did not restore pending offer: %+v %v", view, err)
-	}
+    if err != nil || len(view)!=3 || view[2].DriverUserID!=stale || view[2].Selectable {
+        t.Fatalf("late heartbeat revived expired presence: %+v %v",view,err)
+    }
+    var vehicleID uuid.UUID
+    if err:=db.QueryRow(`SELECT id FROM driver_vehicles WHERE driver_user_id=$1`,stale).Scan(&vehicleID);err!=nil { t.Fatal(err) }
+    geoExec(t,db,`INSERT INTO driver_vehicle_service_enrollments(vehicle_id,service_code,approved_at,approved_by) VALUES ($1,'economy',NOW(),'reviewer')`,vehicleID)
+    drivers:=driverops.NewPostgresRepository(db)
+    if _,err:=drivers.SelectOperation(ctx,stale,vehicleID,"economy");err!=nil { t.Fatal(err) }
+    if _,err:=drivers.SetOnline(ctx,stale,true);err!=nil { t.Fatal(err) }
+    view,err=offers.ListForRider(ctx,ride,rider)
+    if err != nil || !view[0].Selectable || view[0].DriverUserID != stale {
+        t.Fatalf("explicit Go Online did not restore pending offer: %+v %v",view,err)
+    }
 	if _, err := offers.Reject(ctx, ride, rider, near); err != nil {
 		t.Fatal(err)
 	}
