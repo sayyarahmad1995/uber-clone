@@ -22,6 +22,7 @@ type rideFareRequest struct {
 }
 
 type createRideRequestBody struct {
+	ServiceCode string `json:"service_code"`
 	Pickup       *rideLocationRequest `json:"pickup"`
 	Destination  *rideLocationRequest `json:"destination"`
 	ProposedFare *rideFareRequest     `json:"proposed_fare"`
@@ -32,6 +33,7 @@ func (body createRideRequestBody) input() (ride.CreateInput, bool) {
 		return ride.CreateInput{}, false
 	}
 	return ride.CreateInput{
+		ServiceCode: body.ServiceCode,
 		Pickup:       ride.Location{Latitude: *body.Pickup.Latitude, Longitude: *body.Pickup.Longitude},
 		Destination:  ride.Location{Latitude: *body.Destination.Latitude, Longitude: *body.Destination.Longitude},
 		ProposedFare: &ride.Money{AmountMinor: *body.ProposedFare.AmountMinor, Currency: *body.ProposedFare.Currency},
@@ -55,6 +57,9 @@ func (api *API) createRideRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	request, err := api.rides.Create(r.Context(), u.ID, input)
 	switch {
+	case errors.Is(err, ride.ErrInvalidService):
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "selected service is unavailable"})
+		return
 	case errors.Is(err, ride.ErrInvalidLocation):
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "pickup and destination coordinates are invalid"})
 		return
@@ -105,6 +110,7 @@ func (api *API) getRideRequestStatus(w http.ResponseWriter, r *http.Request) {
 
 func writeRideRequest(w http.ResponseWriter, status int, request ride.Request) {
 	response := map[string]any{
+		"service_code": request.ServiceCode,
 		"id":            request.ID,
 		"rider_user_id": request.RiderUserID,
 		"pickup":        map[string]any{"latitude": request.Pickup.Latitude, "longitude": request.Pickup.Longitude},
@@ -128,6 +134,7 @@ func rideRequestListResponse(views []ridestatus.View) map[string]any {
 
 func rideRequestStatusResponse(request ride.Request, assignedTrip *trip.Trip) map[string]any {
 	response := map[string]any{
+		"service_code": request.ServiceCode,
 		"id":          request.ID,
 		"pickup":      map[string]any{"latitude": request.Pickup.Latitude, "longitude": request.Pickup.Longitude},
 		"destination": map[string]any{"latitude": request.Destination.Latitude, "longitude": request.Destination.Longitude},
@@ -144,6 +151,7 @@ func rideRequestStatusResponse(request ride.Request, assignedTrip *trip.Trip) ma
 	}
 	if assignedTrip != nil {
 		response["trip"] = map[string]any{
+			"operation_context": assignedTrip.OperationContext,
 			"driver_user_id": assignedTrip.DriverUserID,
 			"status":         assignedTrip.Status,
 			"assigned_at":    assignedTrip.AssignedAt,

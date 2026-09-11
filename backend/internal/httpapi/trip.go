@@ -73,6 +73,7 @@ func writeTrip(w http.ResponseWriter, result trip.Trip) {
 
 func tripResponse(result trip.Trip) map[string]any {
 	return map[string]any{
+		"operation_context": result.OperationContext,
 		"ride_request_id": result.RideRequestID,
 		"rider_user_id":   result.RiderUserID,
 		"driver_user_id":  result.DriverUserID,

@@ -2,6 +2,7 @@ package trip
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -28,6 +29,7 @@ const (
 )
 
 type Trip struct {
+	OperationContext json.RawMessage
 	RideRequestID uuid.UUID
 	RiderUserID   uuid.UUID
 	DriverUserID  uuid.UUID
