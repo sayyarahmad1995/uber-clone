@@ -230,6 +230,16 @@ func TestOperatingSelectionAndAvailability(t *testing.T) {
     if err!=nil || !profile.IsOnline || profile.Status!=StatusActive { t.Fatalf("approved Driver cannot go online: %#v %v",profile,err) }
     if _,err:=repo.SelectOperation(context.Background(),id,vehicle,"economy");!errors.Is(err,ErrSelectionLocked) { t.Fatalf("online selection allowed: %v",err) }
     if _,err:=repo.SetOnline(context.Background(),id,false);err!=nil { t.Fatal(err) }
+    rider:=createDriverIntegrationUser(t,db)
+    rideID:=uuid.New()
+    if _,err:=db.Exec(`INSERT INTO ride_requests(id,rider_user_id,pickup_latitude,pickup_longitude,destination_latitude,destination_longitude,status)
+        VALUES ($1,$2,24,67,25,68,'requested')`,rideID,rider);err!=nil { t.Fatal(err) }
+    t.Cleanup(func(){ db.Exec(`DELETE FROM trips WHERE ride_request_id=$1`,rideID); db.Exec(`DELETE FROM ride_requests WHERE id=$1`,rideID) })
+    if _,err:=db.Exec(`INSERT INTO trips(ride_request_id,rider_user_id,driver_user_id,status,assigned_at) VALUES ($1,$2,$3,'assigned',NOW())`,rideID,rider,id);err!=nil { t.Fatal(err) }
+    if _,err:=repo.SelectOperation(context.Background(),id,vehicle,"economy");!errors.Is(err,ErrSelectionLocked) { t.Fatalf("trip selection allowed: %v",err) }
+    if _,err:=repo.SetOnline(context.Background(),id,true);!errors.Is(err,ErrTripActive) { t.Fatalf("trip online allowed: %v",err) }
+    if _,err:=repo.SetOnline(context.Background(),id,false);err!=nil { t.Fatalf("offline blocked by trip: %v",err) }
+    if _,err:=db.Exec(`DELETE FROM trips WHERE ride_request_id=$1`,rideID);err!=nil { t.Fatal(err) }
     if _,err:=db.Exec(`DELETE FROM driver_vehicle_service_enrollments WHERE vehicle_id=$1`,vehicle);err!=nil { t.Fatal(err) }
     if _,err:=repo.SetOnline(context.Background(),id,true);!errors.Is(err,ErrSelectionInvalid) { t.Fatalf("revoked enrollment accepted: %v",err) }
 }

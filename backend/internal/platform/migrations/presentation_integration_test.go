@@ -32,8 +32,8 @@ func TestPresentationUpgradePreservesLegacyDriver(t *testing.T) {
 	if err := db.QueryRow(`SELECT p.display_name,v.model_year,p.is_online,v.make,v.license_plate FROM driver_profiles p JOIN driver_vehicles v ON v.driver_user_id=p.user_id WHERE p.user_id=$1`, id).Scan(&name, &year, &online, &make, &plate); err != nil {
 		t.Fatal(err)
 	}
-	if name.Valid || year.Valid || !online || make != "Toyota" || plate != "ABC-123" {
-		t.Fatal("legacy Driver data changed during upgrade")
+	if name.Valid || year.Valid || online || make != "Toyota" || plate != "ABC-123" {
+		t.Fatal("legacy details changed or readiness migration failed to reset online state")
 	}
 	if _, err := db.Exec(`UPDATE driver_profiles SET display_name=' ' WHERE user_id=$1`, id); err == nil {
 		t.Fatal("blank name accepted")
