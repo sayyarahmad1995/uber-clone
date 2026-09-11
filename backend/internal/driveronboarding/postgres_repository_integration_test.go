@@ -170,7 +170,7 @@ func TestPostgresReviewApprovePromotesExactSnapshotAndServiceEnrollment(t *testi
 	if profileStatus != "approved" || isOnline || displayName != application.DisplayName {
 		t.Fatalf("unexpected promoted Driver profile: status=%s online=%v display_name=%q", profileStatus, isOnline, displayName)
 	}
-	if _, err := driver.NewPostgresRepository(db).SetOnline(context.Background(), userID, true); !errors.Is(err, driver.ErrNotFound) {
+	if _, err := driver.NewPostgresRepository(db).SetOnline(context.Background(), userID, true); !errors.Is(err, driver.ErrSelectionInvalid) {
 		t.Fatalf("approved Driver bypassed active-only availability guard: %v", err)
 	}
 

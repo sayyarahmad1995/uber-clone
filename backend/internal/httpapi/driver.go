@@ -73,10 +73,7 @@ func (api *API) getDriver(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "unable to load driver"})
 		return
 	}
-	if profile.Status != driver.StatusActive {
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": "driver operational profile is not active"})
-		return
-	}
+
 	writeDriver(w, http.StatusOK, profile)
 }
 
@@ -91,6 +88,10 @@ func (api *API) setDriverAvailability(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	profile, err := api.drivers.SetOnline(r.Context(), u.ID, body.IsOnline)
+	if errors.Is(err, driver.ErrSelectionInvalid) || errors.Is(err, driver.ErrLocationRequired) || errors.Is(err, driver.ErrTripActive) {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error()})
+		return
+	}
 	if errors.Is(err, driver.ErrNotFound) {
 		writeJSON(w, http.StatusConflict, map[string]string{"error": "driver onboarding is required before changing availability"})
 		return

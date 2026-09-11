@@ -1,3 +1,4 @@
+import 'package:uber_clone/features/driver_workspace/domain/operating_state.dart';
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -18,6 +19,45 @@ void main() {
     return controller;
   }
 
+  test('new app session starts offline even if previous session was online', () async {
+    final repo = FakeDriverRepository(profile: driverProfile.copyWith(isOnline: true));
+    final controller = await create(repo);
+    expect(controller.profile!.isOnline, isFalse);
+    expect(repo.calls, ['online=false']);
+    expect(controller.operation!.serviceCode, 'economy');
+  });
+  test('background requests offline and resume does not restore online', () async {
+    final repo = FakeDriverRepository(profile: driverProfile);
+    final controller = await create(repo);
+    await controller.setOnline(true);
+    controller.setForeground(false);
+    await Future<void>.delayed(Duration.zero);
+    expect(controller.profile!.isOnline, isFalse);
+    controller.setForeground(true);
+    await Future<void>.delayed(Duration.zero);
+    expect(controller.profile!.isOnline, isFalse);
+  });
+  test('background during location lookup cannot turn Driver online', () async {
+    final repo = FakeDriverRepository(profile: driverProfile);
+    final pending = PendingLocation();
+    final controller = await create(repo, pending);
+    final operation = controller.setOnline(true);
+    controller.setForeground(false);
+    pending.result.complete(const GeoPoint(latitude:24,longitude:67));
+    await operation;
+    expect(repo.calls, isEmpty);
+  });
+  test('missing selection blocks location and online writes', () async {
+    final repo = FakeDriverRepository(profile: driverProfile)..operation = const OperatingState();
+    final controller = await create(repo);
+    await controller.setOnline(true);
+    expect(repo.calls, isEmpty);
+    expect(controller.error, contains('Select an approved'));
+    await controller.selectOperation('owned', 'economy');
+    expect(controller.operation!.vehicleId, 'owned');
+    await controller.load();
+    expect(controller.operation!.serviceCode, 'economy');
+  });
   test('missing profile loads setup, onboarding persists profile', () async {
     final repo = FakeDriverRepository();
     final controller = await create(repo);
