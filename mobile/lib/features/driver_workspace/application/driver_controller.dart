@@ -23,6 +23,7 @@ class DriverController extends ChangeNotifier {
     if (hasActiveTrip == active) return;
     hasActiveTrip = active;
     _scheduleHeartbeat();
+    unawaited(load());
   }
   bool loaded = false;
   bool busy = false;

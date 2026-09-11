@@ -142,6 +142,7 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen> w
             physics: physics,
             onAvailabilityChanged: driver.setOnline,
             selectionValid: driver.operation?.valid == true,
+            activeTrip: trip != null,
             onPublishLocation: driver.publishLocation,
             onRefresh: driver.load,
           );
@@ -409,12 +410,14 @@ class _DriverReadinessPanel extends StatelessWidget {
     required this.physics,
     required this.onAvailabilityChanged,
     required this.selectionValid,
+    required this.activeTrip,
     required this.onPublishLocation,
     required this.onRefresh,
   });
 
   final DriverProfile profile;
   final bool selectionValid;
+  final bool activeTrip;
   final PublishedDriverLocation? location;
   final bool busy;
   final String? error;
@@ -431,7 +434,7 @@ class _DriverReadinessPanel extends StatelessWidget {
     padding: const EdgeInsets.all(AppSpacing.md),
     children: [
       Text(
-        profile.isOnline ? 'You are online' : selectionValid ? 'Ready to go online' : 'Choose your operating vehicle',
+        activeTrip ? 'Your active trip' : profile.isOnline ? 'You are online' : selectionValid ? 'Ready to go online' : 'Choose your operating vehicle',
         style: Theme.of(context).textTheme.headlineSmall,
       ),
       const SizedBox(height: AppSpacing.sm),
@@ -440,12 +443,12 @@ class _DriverReadinessPanel extends StatelessWidget {
             ? profile.displayName!
             : 'Driver profile',
       ),
-      const RideFlowPanel(),
-      const OperatingSelectionControl(),
+      if (activeTrip) const RideFlowPanel(),
+      if (!activeTrip) const OperatingSelectionControl(),
       const SizedBox(height: AppSpacing.md),
       DashboardPanelControl(
         child: FilledButton.icon(
-          onPressed: busy || (!profile.isOnline && !selectionValid)
+          onPressed: busy || (!profile.isOnline && (!selectionValid || activeTrip))
               ? null
               : () => onAvailabilityChanged(!profile.isOnline),
           icon: const Icon(Icons.power_settings_new),
@@ -453,6 +456,7 @@ class _DriverReadinessPanel extends StatelessWidget {
         ),
       ),
 
+      if (!activeTrip) const RideFlowPanel(),
       const SizedBox(height: AppSpacing.sm),
       Text(
         location == null

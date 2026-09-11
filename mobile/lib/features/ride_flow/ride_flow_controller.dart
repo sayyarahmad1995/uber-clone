@@ -38,6 +38,9 @@ class RideFlowController extends ChangeNotifier {
   Future<void> _load() async {
     if (driver) {
       final trip = await _optional('/v1/driver/trip');
+      if (_disposed) return;
+      current = trip;
+      loaded = true;
       final feed = trip == null ? await repository.get('/v1/driver/marketplace/ride-requests') : <String,dynamic>{};
       final past = await repository.get('/v1/driver/trips');
       if (_disposed) return;
@@ -49,7 +52,11 @@ class RideFlowController extends ChangeNotifier {
       final active = ride['trip'] != null && !['completed','cancelled'].contains(ride['trip']['status']);
       final comparison = ride['trip'] == null && ride['status'] == 'requested'
         ? await repository.get('/v1/ride-requests/$rideId/offers') : <String,dynamic>{};
-      final position = active ? await _optional('/v1/ride-requests/$rideId/driver-location') : null;
+      Json? position;
+      if (active) {
+        try { position = await _optional('/v1/ride-requests/$rideId/driver-location'); }
+        catch (_) { error = 'Driver location is unavailable. Trip status is up to date.'; }
+      }
       if (_disposed) return;
       current = ride;
       offers = _list(comparison, 'offers');

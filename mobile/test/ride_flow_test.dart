@@ -16,6 +16,7 @@ class FlowFake implements RideFlowRepository {
   int reads = 0;
   int actions = 0;
   bool loseResponse = false;
+  bool locationFails = false;
   bool selectable = true;
   Json? lastData;
   Completer<void>? blocked;
@@ -28,7 +29,10 @@ class FlowFake implements RideFlowRepository {
       return trip!;
     }
     if (path.endsWith('/offers')) return {'offers': [{'driver_user_id':'driver','selectable':selectable,'status':'pending','fare':{'amount_minor':10000,'currency':'PKR'},'updated_at':'2026-09-11T00:00:00Z'}]};
-    if (path.endsWith('/driver-location')) throw const ApiException('missing','No location', statusCode:404);
+    if (path.endsWith('/driver-location')) {
+      if (locationFails) throw const ApiException('failed','Location failed',statusCode:500);
+      throw const ApiException('missing','No location', statusCode:404);
+    }
     if (path.endsWith('/trips')) return {'trips': []};
     if (path.contains('/marketplace/')) return {'ride_requests': []};
     return ride;
@@ -73,6 +77,16 @@ void main() {
     expect(flow.status,'assigned');
     expect(flow.offers,isEmpty);
     expect(flow.error,contains('Response lost'));
+    expect(flow.location,isNull);
+    flow.dispose();
+  });
+  test('location failure does not hide assigned Rider trip', () async {
+    final repo=FlowFake()..locationFails=true;
+    repo.ride={'id':'ride','status':'requested','trip':{'status':'assigned'}};
+    final flow=RideFlowController(repo,rideId:'ride');
+    await Future<void>.delayed(Duration.zero);
+    expect(flow.status,'assigned');
+    expect(flow.loaded,isTrue);
     expect(flow.location,isNull);
     flow.dispose();
   });
