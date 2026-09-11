@@ -23,6 +23,7 @@ class RideFlowController extends ChangeNotifier {
   bool _disposed = false;
   bool _foreground = true;
   Timer? _timer;
+  Completer<void>? _idle;
   String? get status {
     if (driver) return current?['status'] as String?;
     return (current?['trip']?['status'] ?? current?['status']) as String?;
@@ -76,17 +77,31 @@ class RideFlowController extends ChangeNotifier {
       rethrow;
     }
     await _load();
-  });
+  }, waitForBusy: true);
 
-  Future<void> _run(Future<void> Function() task) async {
-    if (busy || _disposed || !_foreground) return;
+  Future<void> _run(Future<void> Function() task, {bool waitForBusy = false}) async {
+    if (_disposed || !_foreground) return;
+    if (waitForBusy) {
+      while (busy && !_disposed && _foreground) {
+        final idle = _idle;
+        if (idle == null) break;
+        await idle.future;
+      }
+    } else if (busy) {
+      return;
+    }
+    if (_disposed || !_foreground) return;
     _timer?.cancel();
+    final idle = Completer<void>();
+    _idle = idle;
     busy = true;
     error = null;
     notifyListeners();
     try { await task(); } catch (e) { error = '$e'; }
     finally {
       busy = false;
+      if (!idle.isCompleted) idle.complete();
+      if (identical(_idle, idle)) _idle = null;
       if (!_disposed) { notifyListeners(); _schedule(); }
     }
   }
