@@ -268,8 +268,8 @@ func insertCancellationTrip(t *testing.T, db *sql.DB, rideID, riderID, driverID 
 func insertCancellationOffer(t *testing.T, db *sql.DB, rideID, driverID uuid.UUID) {
 	t.Helper()
 	if _, err := db.Exec(`
-		INSERT INTO ride_offers (ride_request_id, driver_user_id, amount_minor, currency, status)
-		VALUES ($1, $2, 90000, 'PKR', 'pending')
+		INSERT INTO ride_offers (ride_request_id, driver_user_id, amount_minor, currency, status, operation_context)
+		SELECT $1, $2, 90000, 'PKR', 'pending', jsonb_build_object('vehicle_id',vehicle_id,'service_code',service_code) FROM driver_operating_selections WHERE driver_user_id=$2
 	`, rideID, driverID); err != nil {
 		t.Fatalf("insert ride offer: %v", err)
 	}

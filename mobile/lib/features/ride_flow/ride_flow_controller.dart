@@ -23,8 +23,10 @@ class RideFlowController extends ChangeNotifier {
   bool _disposed = false;
   bool _foreground = true;
   Timer? _timer;
-  String? get status => driver ? current?['status'] as String? :
-    (current?['trip']?['status'] ?? current?['status']) as String?;
+  String? get status {
+    if (driver) return current?['status'] as String?;
+    return (current?['trip']?['status'] ?? current?['status']) as String?;
+  }
 
   Future<Json?> _optional(String path) async {
     try { return await repository.get(path); }

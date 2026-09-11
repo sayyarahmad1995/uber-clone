@@ -2,6 +2,7 @@ package trip
 
 import (
 	"context"
+	"time"
 	"database/sql"
 	"errors"
 
@@ -10,7 +11,7 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/driver"
 )
 
-func (r PostgresRepository) SelectOffer(ctx context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID) (Trip, error) {
+func (r PostgresRepository) SelectOffer(ctx context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID, expectedVersion ...time.Time) (Trip, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return Trip{}, err
@@ -45,18 +46,19 @@ func (r PostgresRepository) SelectOffer(ctx context.Context, rideRequestID, ride
 	}
 
 	var offerStatus string
+	var offerVersion time.Time
 	if err := tx.QueryRowContext(ctx, `
-		SELECT status
+		SELECT status, updated_at
 		FROM ride_offers
 		WHERE ride_request_id = $1 AND driver_user_id = $2
 		FOR UPDATE
-	`, rideRequestID, driverUserID).Scan(&offerStatus); err != nil {
+	`, rideRequestID, driverUserID).Scan(&offerStatus, &offerVersion); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Trip{}, ErrMarketplaceOfferGone
 		}
 		return Trip{}, err
 	}
-	if offerStatus != "pending" {
+	if offerStatus != "pending" || (len(expectedVersion) > 0 && !offerVersion.Equal(expectedVersion[0])) {
 		return Trip{}, ErrMarketplaceOfferGone
 	}
 

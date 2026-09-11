@@ -18,7 +18,7 @@ class RiderRequestScreen extends ConsumerStatefulWidget {
   ConsumerState<RiderRequestScreen> createState() => _RiderRequestScreenState();
 }
 
-class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
+class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> with WidgetsBindingObserver {
   final _fare = TextEditingController();
   final _mapController = MapController();
   bool _selectingPickup = true;
@@ -26,6 +26,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _focusCurrentLocation(showError: false);
@@ -35,10 +36,20 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _fare.dispose();
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final id = ref.read(riderRequestControllerProvider).state.active?.id;
+    if (id == null) return;
+    if (state == AppLifecycleState.resumed) ref.read(rideFlowControllerProvider(id)).setForeground(true);
+    if ([AppLifecycleState.paused, AppLifecycleState.hidden, AppLifecycleState.detached].contains(state)) {
+      ref.read(rideFlowControllerProvider(id)).setForeground(false);
+    }
+  }
   Future<void> _submit() async {
     final amount = parseFareMinor(_fare.text);
     if (amount == null) {

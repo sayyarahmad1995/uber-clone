@@ -139,20 +139,20 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel> with WidgetsBindi
           if (offer['pickup_distance_meters'] is num) Text('${((offer['pickup_distance_meters'] as num)/1000).toStringAsFixed(1)} km to pickup · straight-line distance'),
           if (offer['selectable'] != true) Text(offer['status'] == 'pending' ? 'Driver currently unavailable' : '${offer['status']}'),
           FilledButton(onPressed: flow.busy || offer['selectable'] != true ? null : () =>
-            _confirm(flow, '/v1/ride-requests/${widget.rideId}/offers/${offer['driver_user_id']}/accept', 'Choose this Driver?', 'Agree to ${fareText(offer['fare'])} for this ride.', 'Choose Driver'), child: const Text('Choose Driver')),
+            _confirm(flow, '/v1/ride-requests/${widget.rideId}/offers/${offer['driver_user_id']}/accept', 'Choose this Driver?', 'Agree to ${fareText(offer['fare'])} for this ride.', 'Choose Driver', data: {'updated_at': offer['updated_at']}), child: const Text('Choose Driver')),
           if (offer['status'] == 'pending') TextButton(onPressed: flow.busy ? null : () => flow.act(
             '/v1/ride-requests/${widget.rideId}/offers/${offer['driver_user_id']}/reject'), child: const Text('Reject offer')),
         ]))),
     ];
   }
 
-  Future<void> _confirm(RideFlowController flow, String path, String title, String message, String action) async {
+  Future<void> _confirm(RideFlowController flow, String path, String title, String message, String action, {Json? data}) async {
     final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
       title: Text(title), content: Text(message), actions: [
         TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Back')),
         FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(action)),
       ]));
-    if (confirmed == true && mounted) await flow.act(path);
+    if (confirmed == true && mounted) await flow.act(path, data: data);
   }
 
   Future<void> _counter(RideFlowController flow, Json request) async {

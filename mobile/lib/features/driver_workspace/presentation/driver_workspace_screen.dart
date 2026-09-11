@@ -32,8 +32,10 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen> w
     // Inactive can be a permission dialog; only actual background states end presence.
     if (state == AppLifecycleState.resumed) {
       ref.read(driverControllerProvider).setForeground(true);
+      if (ref.read(driverControllerProvider).profile != null) ref.read(rideFlowControllerProvider("driver")).setForeground(true);
     } else if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden || state == AppLifecycleState.detached) {
       ref.read(driverControllerProvider).setForeground(false);
+      if (ref.read(driverControllerProvider).profile != null) ref.read(rideFlowControllerProvider("driver")).setForeground(false);
     }
   }
 
@@ -51,6 +53,9 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen> w
     final profile = driver.profile;
     final location = driver.location;
     final trip = profile == null ? null : ref.watch(rideFlowControllerProvider('driver')).current;
+    if (profile != null) ref.listen(rideFlowControllerProvider('driver'), (_, flow) {
+      if (flow.loaded && !flow.busy) driver.setActiveTrip(flow.current != null);
+    });
     final onboarding = driver.loaded && profile == null
         ? ref.watch(driverOnboardingControllerProvider)
         : null;
