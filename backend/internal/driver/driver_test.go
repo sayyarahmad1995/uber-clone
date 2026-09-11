@@ -120,3 +120,6 @@ func TestSetOnlineRequiresExistingDriverProfile(t *testing.T) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
 }
+
+func (f *fakeRepository) OperatingState(context.Context, uuid.UUID) (OperatingState, error) { return OperatingState{}, nil }
+func (f *fakeRepository) SelectOperation(context.Context, uuid.UUID, uuid.UUID, string) (OperatingState, error) { return OperatingState{}, nil }

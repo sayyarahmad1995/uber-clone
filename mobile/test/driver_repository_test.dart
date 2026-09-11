@@ -57,6 +57,15 @@ void main() {
     adapter.status = 403;
     await expectLater(repo.listVehicles(), throwsA(isA<ApiException>()));
   });
+  test('operating selection persists through authenticated endpoints', () async {
+    final selected = await repo.selectOperation('owned', 'economy');
+    expect(selected.valid, isTrue);
+    expect(adapter.request!.method, 'PUT');
+    expect(adapter.request!.data, {'vehicle_id':'owned','service_code':'economy'});
+    final restored = await repo.operatingState();
+    expect(adapter.request!.method, 'GET');
+    expect(restored.vehicleId, 'owned');
+  });
   test('only profile 404 means onboarding required', () async {
     adapter.status = 404;
     expect(await repo.get(), isNull);
@@ -93,7 +102,9 @@ class DriverAdapter implements HttpClientAdapter {
     Future<void>? cancelFuture,
   ) async {
     request = options;
-    final Object data = options.path == '/v1/driver/vehicles'
+    final Object data = options.path == '/v1/driver/operating-selection'
+        ? {'selection': {'vehicle_id':'owned', 'service_code':'economy', 'valid':true}, 'can_change':true}
+        : options.path == '/v1/driver/vehicles'
         ? {'vehicles': <Object>[]}
         : options.path.endsWith('/capabilities/driver')
         ? {

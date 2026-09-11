@@ -93,10 +93,10 @@ final driverOnboardingRepositoryProvider = Provider<DriverOnboardingRepository>(
 );
 final driverControllerProvider =
     ChangeNotifierProvider.autoDispose<DriverController>(
-      (ref) => DriverController(
-        ref.watch(driverRepositoryProvider),
-        ref.watch(deviceLocationProvider),
-      ),
+      (ref) {
+        ref.watch(sessionControllerProvider.select((value) => value.state.account?.id));
+        return DriverController(ref.watch(driverRepositoryProvider), ref.watch(deviceLocationProvider));
+      },
     );
 final driverOnboardingControllerProvider =
     ChangeNotifierProvider.autoDispose<DriverOnboardingController>(

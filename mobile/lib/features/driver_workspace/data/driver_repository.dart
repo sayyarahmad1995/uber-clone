@@ -1,3 +1,4 @@
+import '../domain/operating_state.dart';
 import 'package:dio/dio.dart';
 
 import '../../../core/network/api_exception.dart';
@@ -8,6 +9,8 @@ import '../domain/registered_vehicle.dart';
 
 abstract interface class DriverRepository {
   Future<DriverProfile?> get();
+  Future<OperatingState> operatingState();
+  Future<OperatingState> selectOperation(String vehicleId, String serviceCode);
   Future<List<RegisteredVehicle>> listVehicles();
   Future<DriverProfile> onboard(String displayName, DriverVehicle vehicle);
   Future<DriverProfile> setOnline(bool online);
@@ -45,6 +48,11 @@ class ApiDriverRepository implements DriverRepository {
       throw ApiException.fromDio(error);
     }
   }
+
+  @override
+  Future<OperatingState> operatingState() async => OperatingState.fromJson(await _request('/v1/driver/operating-selection'));
+  @override
+  Future<OperatingState> selectOperation(String vehicleId, String serviceCode) async => OperatingState.fromJson(await _request('/v1/driver/operating-selection', data: {'vehicle_id':vehicleId, 'service_code':serviceCode}));
 
   @override
   Future<List<RegisteredVehicle>> listVehicles() async {

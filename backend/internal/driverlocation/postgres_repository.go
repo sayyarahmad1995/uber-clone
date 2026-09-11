@@ -19,7 +19,7 @@ func (r PostgresRepository) UpsertCurrent(ctx context.Context, driverUserID uuid
 		SELECT dp.user_id, $2, $3, NOW()
 		FROM driver_profiles dp
 		WHERE dp.user_id = $1
-		  AND dp.status = 'active'
+		  AND dp.status IN ('approved', 'active')
 		ON CONFLICT (driver_user_id) DO UPDATE SET
 			latitude = EXCLUDED.latitude,
 			longitude = EXCLUDED.longitude,

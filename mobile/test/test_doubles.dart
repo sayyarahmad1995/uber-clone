@@ -1,3 +1,4 @@
+import 'package:uber_clone/features/driver_workspace/domain/operating_state.dart';
 import 'package:uber_clone/features/driver_workspace/domain/registered_vehicle.dart';
 import 'package:uber_clone/core/models/account.dart';
 import 'package:uber_clone/core/session/session_store.dart';
@@ -141,6 +142,11 @@ class FakeDriverRepository implements DriverRepository {
   List<RegisteredVehicle> vehicles;
   @override
   Future<List<RegisteredVehicle>> listVehicles() async => vehicles;
+  OperatingState operation = const OperatingState(vehicleId:'test-vehicle', serviceCode:'economy', valid:true);
+  @override
+  Future<OperatingState> operatingState() async => operation;
+  @override
+  Future<OperatingState> selectOperation(String vehicleId, String serviceCode) async => operation = OperatingState(vehicleId:vehicleId,serviceCode:serviceCode,valid:true);
   DriverProfile? profile;
   final calls = <String>[];
   bool failPublish = false;

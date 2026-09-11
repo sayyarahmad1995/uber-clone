@@ -1,3 +1,4 @@
+import 'package:uber_clone/features/driver_workspace/domain/operating_state.dart';
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -18,6 +19,17 @@ void main() {
     return controller;
   }
 
+  test('missing selection blocks location and online writes', () async {
+    final repo = FakeDriverRepository(profile: driverProfile)..operation = const OperatingState();
+    final controller = await create(repo);
+    await controller.setOnline(true);
+    expect(repo.calls, isEmpty);
+    expect(controller.error, contains('Select an approved'));
+    await controller.selectOperation('owned', 'economy');
+    expect(controller.operation!.vehicleId, 'owned');
+    await controller.load();
+    expect(controller.operation!.serviceCode, 'economy');
+  });
   test('missing profile loads setup, onboarding persists profile', () async {
     final repo = FakeDriverRepository();
     final controller = await create(repo);

@@ -3,6 +3,7 @@ package driver
 import (
 	"context"
 	"database/sql"
+ "errors"
 	"net/url"
 	"os"
 	"strings"
@@ -204,4 +205,31 @@ func TestPostgresRepositoryVehicleEnrollmentsAreExplicitAndOwnerScoped(t *testin
 	if err != nil || empty == nil || len(empty) != 0 {
 		t.Fatalf("unknown owner should have an empty list: %#v, %v", empty, err)
 	}
+}
+
+func TestOperatingSelectionAndAvailability(t *testing.T) {
+    db:=openDriverIntegrationDB(t)
+    id:=createDriverIntegrationUser(t,db)
+    repo:=NewPostgresRepository(db)
+    vehicle:=uuid.New()
+    if _,err:=db.Exec(`INSERT INTO driver_profiles(user_id,status) VALUES ($1,'approved')`,id);err!=nil { t.Fatal(err) }
+    if _,err:=db.Exec(`INSERT INTO driver_vehicles(id,driver_user_id,make,model,color,license_plate) VALUES ($1,$2,'Toyota','Corolla','White','READY')`,vehicle,id);err!=nil { t.Fatal(err) }
+    if _,err:=repo.SetOnline(context.Background(),id,true);!errors.Is(err,ErrSelectionInvalid) { t.Fatalf("missing selection accepted: %v",err) }
+    if _,err:=repo.SelectOperation(context.Background(),id,vehicle,"economy");!errors.Is(err,ErrSelectionInvalid) { t.Fatalf("unapproved selection accepted: %v",err) }
+    if _,err:=db.Exec(`INSERT INTO driver_vehicle_service_enrollments(vehicle_id,service_code,approved_at,approved_by) VALUES ($1,'economy',NOW(),'reviewer')`,vehicle);err!=nil { t.Fatal(err) }
+    if _,err:=repo.SelectOperation(context.Background(),id,uuid.New(),"economy");!errors.Is(err,ErrSelectionInvalid) { t.Fatalf("foreign vehicle accepted: %v",err) }
+    state,err:=repo.SelectOperation(context.Background(),id,vehicle,"economy")
+    if err!=nil || state.Selection==nil || !state.Selection.Valid { t.Fatalf("selection failed: %#v %v",state,err) }
+    restored,err:=repo.OperatingState(context.Background(),id)
+    if err!=nil || restored.Selection==nil || restored.Selection.VehicleID!=vehicle { t.Fatalf("selection not persisted: %#v %v",restored,err) }
+    if _,err:=repo.SetOnline(context.Background(),id,true);!errors.Is(err,ErrLocationRequired) { t.Fatalf("missing location accepted: %v",err) }
+    if _,err:=db.Exec(`INSERT INTO driver_locations(driver_user_id,latitude,longitude,updated_at) VALUES ($1,24,67,NOW()-INTERVAL '5 minutes')`,id);err!=nil { t.Fatal(err) }
+    if _,err:=repo.SetOnline(context.Background(),id,true);!errors.Is(err,ErrLocationRequired) { t.Fatalf("stale location accepted: %v",err) }
+    if _,err:=db.Exec(`UPDATE driver_locations SET updated_at=NOW() WHERE driver_user_id=$1`,id);err!=nil { t.Fatal(err) }
+    profile,err:=repo.SetOnline(context.Background(),id,true)
+    if err!=nil || !profile.IsOnline || profile.Status!=StatusActive { t.Fatalf("approved Driver cannot go online: %#v %v",profile,err) }
+    if _,err:=repo.SelectOperation(context.Background(),id,vehicle,"economy");!errors.Is(err,ErrSelectionLocked) { t.Fatalf("online selection allowed: %v",err) }
+    if _,err:=repo.SetOnline(context.Background(),id,false);err!=nil { t.Fatal(err) }
+    if _,err:=db.Exec(`DELETE FROM driver_vehicle_service_enrollments WHERE vehicle_id=$1`,vehicle);err!=nil { t.Fatal(err) }
+    if _,err:=repo.SetOnline(context.Background(),id,true);!errors.Is(err,ErrSelectionInvalid) { t.Fatalf("revoked enrollment accepted: %v",err) }
 }

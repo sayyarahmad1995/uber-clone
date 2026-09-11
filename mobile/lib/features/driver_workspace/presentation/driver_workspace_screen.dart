@@ -1,3 +1,4 @@
+import 'operating_selection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
@@ -108,6 +109,7 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen> {
             scrollController: scrollController,
             physics: physics,
             onAvailabilityChanged: driver.setOnline,
+            selectionValid: driver.operation?.valid == true,
             onPublishLocation: driver.publishLocation,
             onRefresh: driver.load,
           );
@@ -120,7 +122,7 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen> {
             error: onboarding.error,
             scrollController: scrollController,
             physics: physics,
-            onRefresh: onboarding.load,
+            onRefresh: () async { await onboarding.load(); await driver.load(); },
             onReapply: application.isRejected
                 ? () => setState(() => _reapplying = true)
                 : null,
@@ -374,11 +376,13 @@ class _DriverReadinessPanel extends StatelessWidget {
     required this.scrollController,
     required this.physics,
     required this.onAvailabilityChanged,
+    required this.selectionValid,
     required this.onPublishLocation,
     required this.onRefresh,
   });
 
   final DriverProfile profile;
+  final bool selectionValid;
   final PublishedDriverLocation? location;
   final bool busy;
   final String? error;
@@ -395,7 +399,7 @@ class _DriverReadinessPanel extends StatelessWidget {
     padding: const EdgeInsets.all(AppSpacing.md),
     children: [
       Text(
-        profile.isOnline ? 'You are online' : 'Ready to go online',
+        profile.isOnline ? 'You are online' : selectionValid ? 'Ready to go online' : 'Choose your operating vehicle',
         style: Theme.of(context).textTheme.headlineSmall,
       ),
       const SizedBox(height: AppSpacing.sm),
@@ -404,23 +408,18 @@ class _DriverReadinessPanel extends StatelessWidget {
             ? profile.displayName!
             : 'Driver profile',
       ),
-      Text(
-        '${profile.vehicle.make} ${profile.vehicle.model} ${profile.vehicle.modelYear ?? ''} • ${profile.vehicle.color}',
-      ),
-      Text(profile.vehicle.licensePlate),
+      const OperatingSelectionControl(),
       const SizedBox(height: AppSpacing.md),
       DashboardPanelControl(
         child: FilledButton.icon(
-          onPressed: busy
+          onPressed: busy || (!profile.isOnline && !selectionValid)
               ? null
               : () => onAvailabilityChanged(!profile.isOnline),
           icon: const Icon(Icons.power_settings_new),
           label: Text(profile.isOnline ? 'Go offline' : 'Go online'),
         ),
       ),
-      const Text(
-        'This is the legacy operational vehicle path. Vehicle/service selection will replace it before marketplace expansion.',
-      ),
+
       const SizedBox(height: AppSpacing.sm),
       Text(
         location == null
