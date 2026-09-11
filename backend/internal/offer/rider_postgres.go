@@ -50,7 +50,7 @@ func (r PostgresRepository) ListForRider(ctx context.Context, rideRequestID, rid
         LEFT JOIN driver_operating_selections s ON s.driver_user_id=p.user_id
         LEFT JOIN driver_vehicles v ON v.id=s.vehicle_id AND v.driver_user_id=p.user_id
         LEFT JOIN driver_vehicle_service_enrollments e ON e.vehicle_id=v.id AND e.service_code=s.service_code
-        LEFT JOIN driver_service_catalog sc ON sc.code=e.service_code AND sc.active
+        LEFT JOIN driver_service_catalog sc ON sc.code=e.service_code AND sc.is_active
 		LEFT JOIN user_capabilities c ON c.user_id = p.user_id AND c.capability = 'driver'
 		LEFT JOIN driver_locations l ON l.driver_user_id = p.user_id
 		WHERE rr.id = $1 AND rr.rider_user_id = $2 AND rr.status = 'requested'

@@ -1,4 +1,5 @@
 import 'operating_selection.dart';
+import '../../ride_flow/ride_flow_panels.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
@@ -49,6 +50,7 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen> w
     final driver = ref.watch(driverControllerProvider);
     final profile = driver.profile;
     final location = driver.location;
+    final trip = profile == null ? null : ref.watch(rideFlowControllerProvider('driver')).current;
     final onboarding = driver.loaded && profile == null
         ? ref.watch(driverOnboardingControllerProvider)
         : null;
@@ -81,14 +83,17 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen> w
           : 'driver-onboarding-${application!.status}',
       map: RideMap(
         tiles: ref.watch(mapTilesProvider),
-        markers: location == null
-            ? const []
-            : [
+        markers: [
+                if (location != null)
                 RideMapMarker(
                   point: LatLng(location.latitude, location.longitude),
                   icon: Icons.local_taxi,
                   color: AppColors.success,
                   label: 'Your published location',
+                ),
+                if (trip != null) for (final label in ['pickup','destination']) RideMapMarker(
+                  point: LatLng((trip[label]['latitude'] as num).toDouble(), (trip[label]['longitude'] as num).toDouble()),
+                  icon: label == 'pickup' ? Icons.my_location : Icons.flag, color: AppColors.danger, label: label,
                 ),
               ],
       ),
@@ -430,6 +435,7 @@ class _DriverReadinessPanel extends StatelessWidget {
             ? profile.displayName!
             : 'Driver profile',
       ),
+      const RideFlowPanel(),
       const OperatingSelectionControl(),
       const SizedBox(height: AppSpacing.md),
       DashboardPanelControl(

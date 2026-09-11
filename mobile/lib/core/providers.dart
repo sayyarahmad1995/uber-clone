@@ -1,5 +1,7 @@
 import '../features/driver_workspace/domain/registered_vehicle.dart';
 import 'package:dio/dio.dart';
+import '../features/ride_flow/ride_flow_repository.dart';
+import '../features/ride_flow/ride_flow_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -66,12 +68,18 @@ final rideRequestRepositoryProvider = Provider<RideRequestRepository>(
     ref.watch(sessionStoreProvider),
   ),
 );
+final rideFlowRepositoryProvider = Provider<RideFlowRepository>((ref) =>
+  ApiRideFlowRepository(ref.watch(dioProvider), ref.watch(sessionStoreProvider)));
+final rideFlowControllerProvider = ChangeNotifierProvider.autoDispose.family<RideFlowController, String>((ref, key) {
+  ref.watch(sessionControllerProvider.select((s) => s.state.account?.id));
+  return RideFlowController(ref.watch(rideFlowRepositoryProvider), rideId: key == 'driver' ? null : key);
+});
 final riderRequestControllerProvider =
     ChangeNotifierProvider.autoDispose<RiderRequestController>(
-      (ref) => RiderRequestController(
-        ref.watch(rideRequestRepositoryProvider),
-        ref.watch(deviceLocationProvider),
-      ),
+      (ref) {
+        ref.watch(sessionControllerProvider.select((s) => s.state.account?.id));
+        return RiderRequestController(ref.watch(rideRequestRepositoryProvider), ref.watch(deviceLocationProvider));
+      },
     );
 final driverRepositoryProvider = Provider<DriverRepository>(
   (ref) => ApiDriverRepository(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../ride_flow/ride_flow_panels.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
@@ -39,8 +40,8 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
   }
 
   Future<void> _submit() async {
-    final amount = double.tryParse(_fare.text.trim());
-    if (amount == null || amount <= 0) {
+    final amount = parseFareMinor(_fare.text);
+    if (amount == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Enter a valid proposed fare.')),
       );
@@ -48,7 +49,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
     }
     await ref
         .read(riderRequestControllerProvider)
-        .submit(amountMinor: (amount * 100).round(), currency: 'PKR');
+        .submit(amountMinor: amount, currency: 'PKR');
   }
 
   Future<void> _focusCurrentLocation({bool showError = true}) async {
@@ -73,6 +74,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
     final state = controller.state;
     final active = state.active;
     final tiles = ref.watch(mapTilesProvider);
+    final driverLocation = active == null ? null : freshDriverLocation(ref.watch(rideFlowControllerProvider(active.id)).location);
     final markers = active == null
         ? _markersFor(state.pickup, state.destination)
         : _markersFor(active.pickup, active.destination);
@@ -89,7 +91,10 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> {
       map: RideMap(
         mapController: _mapController,
         tiles: tiles,
-        markers: markers,
+        markers: [
+          ...markers,
+          if (driverLocation != null) RideMapMarker(point: LatLng((driverLocation["latitude"] as num).toDouble(), (driverLocation["longitude"] as num).toDouble()), icon: Icons.local_taxi, color: AppColors.success, label: "Driver"),
+        ],
         onTap: active == null ? _handleMapTap : null,
       ),
       mapControls: _MapFocusButton(onPressed: _focusCurrentLocation),
@@ -252,11 +257,13 @@ class _RequestRidePanel extends StatelessWidget {
           'Where are you going?',
           style: Theme.of(context).textTheme.headlineSmall,
         ),
+        const RiderRideHistory(),
         const SizedBox(height: AppSpacing.xs),
         const Text(
           'Choose pickup and destination, then propose the fare you want to pay.',
         ),
         const SizedBox(height: AppSpacing.sm),
+        const RiderServicePicker(),
         DashboardPanelControl(
           child: SegmentedButton<bool>(
             segments: const [
@@ -375,7 +382,7 @@ class _ActiveRequestPanel extends ConsumerWidget {
           style: Theme.of(context).textTheme.headlineSmall,
         ),
         const SizedBox(height: AppSpacing.xs),
-        Text('Request ${request.id}'),
+        RideFlowPanel(key: ValueKey(request.id), rideId: request.id),
         const SizedBox(height: AppSpacing.md),
         Card(
           child: Padding(

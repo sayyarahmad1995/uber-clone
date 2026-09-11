@@ -33,7 +33,7 @@ func (r PostgresRepository) Discover(ctx context.Context, driverUserID uuid.UUID
 		JOIN driver_operating_selections s ON s.driver_user_id = p.user_id
         JOIN driver_vehicles v ON v.id = s.vehicle_id AND v.driver_user_id = p.user_id
         JOIN driver_vehicle_service_enrollments e ON e.vehicle_id = v.id AND e.service_code = s.service_code
-        JOIN driver_service_catalog sc ON sc.code = e.service_code AND sc.active
+        JOIN driver_service_catalog sc ON sc.code = e.service_code AND sc.is_active
 		JOIN user_capabilities c ON c.user_id = p.user_id AND c.capability = 'driver'
 		JOIN driver_locations l ON l.driver_user_id = p.user_id
 		LEFT JOIN ride_offers o

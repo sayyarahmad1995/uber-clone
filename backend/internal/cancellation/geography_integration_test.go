@@ -195,7 +195,7 @@ func TestRiderComparisonRefreshOwnershipAndHistory(t *testing.T) {
     }
     var vehicleID uuid.UUID
     if err:=db.QueryRow(`SELECT id FROM driver_vehicles WHERE driver_user_id=$1`,stale).Scan(&vehicleID);err!=nil { t.Fatal(err) }
-    geoExec(t,db,`INSERT INTO driver_vehicle_service_enrollments(vehicle_id,service_code,approved_at,approved_by) VALUES ($1,'economy',NOW(),'reviewer')`,vehicleID)
+    geoExec(t,db,`INSERT INTO driver_vehicle_service_enrollments(vehicle_id,service_code,approved_at,approved_by) VALUES ($1,'economy',NOW(),'reviewer') ON CONFLICT DO NOTHING`,vehicleID)
     drivers:=driverops.NewPostgresRepository(db)
     if _,err:=drivers.SelectOperation(ctx,stale,vehicleID,"economy");err!=nil { t.Fatal(err) }
     if _,err:=drivers.SetOnline(ctx,stale,true);err!=nil { t.Fatal(err) }

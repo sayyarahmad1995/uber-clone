@@ -99,7 +99,7 @@ func (r PostgresRepository) Upsert(ctx context.Context, rideRequestID, driverUse
         FROM driver_operating_selections s
         JOIN driver_profiles p ON p.user_id=s.driver_user_id
         JOIN driver_vehicles v ON v.id=s.vehicle_id AND v.driver_user_id=p.user_id
-        JOIN driver_service_catalog sc ON sc.code=s.service_code AND sc.active
+        JOIN driver_service_catalog sc ON sc.code=s.service_code AND sc.is_active
         JOIN ride_requests rr ON rr.id=$1 AND rr.service_code=s.service_code
         WHERE s.driver_user_id=$2
     `, rideRequestID, driverUserID, amountMinor, currency).Scan(&operation)
