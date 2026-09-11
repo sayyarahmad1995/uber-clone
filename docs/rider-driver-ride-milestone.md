@@ -19,11 +19,13 @@ not rewrite history. License plates stay out of pre-assignment offer responses.
 Pending offers without context remain in history but require a new Driver response.
 
 The mobile client refreshes every five seconds while foregrounded, serializes
-commands with refreshes, and reloads after a failed command response. Network
-errors remain visible; the UI does not manufacture success. Driver location is
-published every twenty seconds while online or on an active foreground trip.
-Closing the app still ends marketplace presence; it does not cancel an assignment.
-Rider location display drops stale/future samples. Distances are not ETAs.
+commands with refreshes, and reloads after a failed command response. User
+commands wait for an in-flight refresh rather than being silently dropped.
+Network errors remain visible; the UI does not manufacture success. Driver
+location is published every twenty seconds while online or on an active
+foreground trip. Closing the app still ends marketplace presence; it does not
+cancel an assignment. Rider location display drops stale/future samples.
+Distances are not ETAs.
 
 ## Rollout
 
@@ -57,10 +59,20 @@ and a second independent client).
 - Repeat with Rider cancellation and Driver cancellation. The other client observes the cancellation and the Driver becomes available for an explicit return online.
 - Interrupt networking during a response/selection, restore it, and refresh. There must be no duplicate trip or false success.
 
+Physical-device follow-up on 2026-09-11 found that a Driver counteroffer could be
+silently skipped when the five-second foreground poll already owned the shared
+ride-flow controller. Accepting the Rider fare was less exposed because it did
+not have the counteroffer dialog transition window. The controller now waits for
+an active refresh before executing a user command, and regression coverage sends
+a counteroffer while a refresh is blocked and verifies that the PUT executes
+exactly once with the proposed amount. Repeat the counteroffer device case on the
+current branch head before considering acceptance complete.
+
 Automated PostgreSQL coverage checks changed selections, wrong services, revoked
 approval, immutable history, revised fares, concurrent assignment, and existing
 cancellation/location rules. Mobile tests check state recovery, lost command
-responses, polling lifetime, exact fare parsing, and stale-location presentation.
+responses, polling lifetime, exact fare parsing, counteroffer serialization, and
+stale-location presentation.
 
 Payments, routing ETA, push notifications/background trip tracking, media,
 additional vehicle registration and approval workflows remain outside this milestone.
