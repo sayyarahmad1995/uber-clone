@@ -40,5 +40,7 @@ jobs:
       - run: |
           git clone --depth 1 --branch stable https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
           echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+      - run: flutter analyze
+        working-directory: mobile
       - run: flutter test
         working-directory: mobile
