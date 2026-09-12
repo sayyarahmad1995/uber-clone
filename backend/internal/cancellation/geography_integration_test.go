@@ -210,8 +210,20 @@ func TestRiderComparisonRefreshOwnershipAndHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if view[2].DriverUserID != near || view[2].Selectable || view[2].Status != offer.StatusRejected {
-		t.Fatalf("rejected offer must remain unselectable history: %+v", view)
+	if len(view) != 2 {
+		t.Fatalf("rejected offer must leave active Rider comparison: %+v", view)
+	}
+	for _, item := range view {
+		if item.DriverUserID == near {
+			t.Fatalf("rejected offer remained in active Rider comparison: %+v", view)
+		}
+	}
+	var rejectedStatus string
+	if err := db.QueryRow(`SELECT status FROM ride_offers WHERE ride_request_id=$1 AND driver_user_id=$2`, ride, near).Scan(&rejectedStatus); err != nil {
+		t.Fatal(err)
+	}
+	if rejectedStatus != string(offer.StatusRejected) {
+		t.Fatalf("rejected offer history was not retained: %s", rejectedStatus)
 	}
 	if _, err := offers.Accept(ctx, ride, rider, stale); err != nil {
 		t.Fatalf("selection after refresh: %v", err)
