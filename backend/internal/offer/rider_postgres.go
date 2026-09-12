@@ -54,6 +54,7 @@ func (r PostgresRepository) ListForRider(ctx context.Context, rideRequestID, rid
 		LEFT JOIN user_capabilities c ON c.user_id = p.user_id AND c.capability = 'driver'
 		LEFT JOIN driver_locations l ON l.driver_user_id = p.user_id
 		WHERE rr.id = $1 AND rr.rider_user_id = $2 AND rr.status = 'requested'
+		  AND o.status = 'pending'
 		  AND rr.proposed_fare_minor IS NOT NULL AND rr.currency IS NOT NULL
 		  AND NOT EXISTS (SELECT 1 FROM trips t WHERE t.ride_request_id = rr.id)
 		ORDER BY selectable DESC, o.amount_minor ASC, pickup_distance_meters ASC NULLS LAST,
