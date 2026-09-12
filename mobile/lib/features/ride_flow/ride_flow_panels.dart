@@ -124,11 +124,13 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel> with WidgetsBindi
 
   List<Widget> _rider(RideFlowController flow) {
     final trip = flow.current?['trip'];
-    if (trip is Map) return [
-      OperationDetails(trip['operation_context']),
-      if (['assigned','in_progress'].contains(trip['status'])) Text(
-        freshDriverLocation(flow.location) == null ? 'Driver location is currently unavailable.' : 'Driver location updated: ${flow.location!['updated_at']}'),
-    ];
+    if (trip is Map) {
+      return [
+        OperationDetails(trip['operation_context']),
+        if (['assigned','in_progress'].contains(trip['status'])) Text(
+          freshDriverLocation(flow.location) == null ? 'Driver location is currently unavailable.' : 'Driver location updated: ${flow.location!['updated_at']}'),
+      ];
+    }
     return [
       if (flow.loaded && flow.offers.isEmpty) const Text('No offers yet. Driver responses will appear here.'),
       for (final offer in flow.offers) Card(child: Padding(padding: const EdgeInsets.all(12),
@@ -216,7 +218,9 @@ class _RiderRideHistoryState extends ConsumerState<RiderRideHistory> {
   String? _error;
   bool _loading = false;
   Future<void> _load() async {
-    if (_loading) return;
+    if (_loading) {
+      return;
+    }
     setState(() { _loading = true; _error = null; });
     try {
       final data = await ref.read(rideFlowRepositoryProvider).get('/v1/ride-requests');
