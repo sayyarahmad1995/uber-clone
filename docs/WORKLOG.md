@@ -384,7 +384,7 @@ Implementation must not silently redefine these product rules.
 
 ## Rider ↔ Driver ride milestone (completed)
 
-- Completed in PR #80 and merged into `main` on 2026-09-12.
+- Completed in PR #80 and merged into `main` on 2026-09-12 at merge commit `a6fb64975629b595346dfea47448441b8604ef47`.
 - Added service-scoped marketplace operations and captured vehicle/service/fare context for offers and trips, with exact offer-revision acceptance.
 - Connected Rider offer choice/rejection and Driver exact-fare/counteroffer responses to assignment, Trip controls, foreground recovery/location behavior, and terminal history.
 - The complete physical-device acceptance matrix was confirmed by the end of the milestone for full request → offer → Rider choice → start → complete flow, Rider cancellation, Driver cancellation, transient network recovery, and reopening during assigned/in-progress trips.
