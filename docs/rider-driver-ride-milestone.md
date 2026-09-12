@@ -1,8 +1,9 @@
 # Rider ↔ Driver ride milestone
 
 **Status: completed on 2026-09-12.** PR #80 is merged into `main` at merge commit
-`a6fb64975629b595346dfea47448441b8604ef47`. Automated validation and the required
-physical-device acceptance passed.
+`a6fb64975629b595346dfea47448441b8604ef47`. Automated validation passed before
+merge, and the complete physical-device acceptance matrix was confirmed by the
+end of the milestone on 2026-09-12.
 
 This milestone follows Driver operational readiness (PR #79) and ADR-0007/0009.
 It connects the marketplace and trip lifecycle to both mobile dashboards.
