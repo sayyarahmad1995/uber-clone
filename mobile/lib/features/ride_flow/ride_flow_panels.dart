@@ -224,14 +224,27 @@ class _RiderRideHistoryState extends ConsumerState<RiderRideHistory> {
     setState(() { _loading = true; _error = null; });
     try {
       final data = await ref.read(rideFlowRepositoryProvider).get('/v1/ride-requests');
-      if (mounted) setState(() { _rides = (data['ride_requests'] as List? ?? []).cast<Json>()
-        .where((ride) => ride['status'] == 'cancelled' || ['completed','cancelled'].contains(ride['trip']?['status'])).toList(); });
-    } catch (e) { if (mounted) setState(() => _error = '$e'); }
-    finally { if (mounted) setState(() => _loading = false); }
+      if (mounted) {
+        setState(() { _rides = (data['ride_requests'] as List? ?? []).cast<Json>()
+          .where((ride) => ride['status'] == 'cancelled' || ['completed','cancelled'].contains(ride['trip']?['status'])).toList(); });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = '$e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
   }
   @override
   Widget build(BuildContext context) => ExpansionTile(title: const Text('Recent rides'),
-    onExpansionChanged: (open) { if (open) _load(); }, children: [
+    onExpansionChanged: (open) {
+      if (open) {
+        _load();
+      }
+    }, children: [
       if (_loading) const LinearProgressIndicator(),
       if (_error != null) Text(_error!),
       if (_rides?.isEmpty == true) const Text('No completed or cancelled rides.'),
