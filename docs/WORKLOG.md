@@ -36,10 +36,12 @@ Rejected offers leave the Rider's active comparison but remain persisted, and a
 fresh response from the same eligible Driver may reopen the offer as pending.
 
 PR #80 completed the Rider ↔ Driver marketplace-to-trip mobile milestone. Automated
-backend/PostgreSQL and Flutter validation passed, and physical-device acceptance on
-2026-09-12 covered exact fares, Driver counteroffers, offer rejection/resubmission,
-Rider selection, assignment, start/completion, Rider and Driver cancellation,
-network failure/recovery, and reopening during assigned/in-progress trips.
+backend/PostgreSQL and Flutter validation passed before merge, and the complete
+physical-device acceptance matrix was confirmed by the end of the milestone on
+2026-09-12. Device coverage included exact fares, Driver counteroffers, offer
+rejection/resubmission, Rider selection, assignment, start/completion, Rider and
+Driver cancellation, network failure/recovery, and reopening during
+assigned/in-progress trips.
 
 ---
 
@@ -385,6 +387,6 @@ Implementation must not silently redefine these product rules.
 - Completed in PR #80 and merged into `main` on 2026-09-12.
 - Added service-scoped marketplace operations and captured vehicle/service/fare context for offers and trips, with exact offer-revision acceptance.
 - Connected Rider offer choice/rejection and Driver exact-fare/counteroffer responses to assignment, Trip controls, foreground recovery/location behavior, and terminal history.
-- Physical-device acceptance passed for full request → offer → Rider choice → start → complete flow, Rider cancellation, Driver cancellation, transient network recovery, and reopening during assigned/in-progress trips.
+- The complete physical-device acceptance matrix was confirmed by the end of the milestone for full request → offer → Rider choice → start → complete flow, Rider cancellation, Driver cancellation, transient network recovery, and reopening during assigned/in-progress trips.
 - Acceptance follow-ups fixed the foreground-poll/counteroffer race and rejected-offer visibility while preserving rejected lifecycle history and Driver resubmission behavior.
 - See [completed acceptance and rollout record](rider-driver-ride-milestone.md). No acceptance item remains open for this milestone.
