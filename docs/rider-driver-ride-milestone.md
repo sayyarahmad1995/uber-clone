@@ -60,7 +60,8 @@ code has changed.
 ## Device acceptance
 
 Physical-device acceptance was completed successfully on 2026-09-12 using
-independent Rider and Driver clients.
+independent Rider and Driver clients. These results were reported directly from
+the device test runs and close the milestone acceptance gate.
 
 - [x] Create an Economy request; the online Economy Driver discovers it. A Comfort selection does not see that Economy request.
 - [x] Send the Rider fare and a Driver counteroffer. Rider sees the corresponding price and vehicle and can reject or select. Neither Driver response assigns a trip by itself.
