@@ -1,0 +1,145 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uber_clone/core/providers.dart';
+import 'package:uber_clone/features/rider_request/application/rider_request_controller.dart';
+import 'test_doubles.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:uber_clone/core/network/api_exception.dart';
+import 'package:uber_clone/features/ride_flow/ride_flow_controller.dart';
+import 'package:uber_clone/features/ride_flow/ride_flow_repository.dart';
+import 'package:uber_clone/features/ride_flow/ride_flow_panels.dart';
+
+class FlowFake implements RideFlowRepository {
+  Json ride = {'id': 'ride', 'status': 'requested', 'trip': null};
+  Json? trip;
+  int reads = 0;
+  int actions = 0;
+  bool loseResponse = false;
+  bool locationFails = false;
+  bool selectable = true;
+  Json? lastData;
+  bool? lastPut;
+  Completer<void>? blocked;
+  @override
+  Future<Json> get(String path) async {
+    reads++;
+    if (blocked != null) await blocked!.future;
+    if (path == '/v1/driver/trip') {
+      if (trip == null) throw const ApiException('missing', 'No trip', statusCode: 404);
+      return trip!;
+    }
+    if (path.endsWith('/offers')) return {'offers': [{'driver_user_id':'driver','selectable':selectable,'status':'pending','fare':{'amount_minor':10000,'currency':'PKR'},'updated_at':'2026-09-11T00:00:00Z'}]};
+    if (path.endsWith('/driver-location')) {
+      if (locationFails) throw const ApiException('failed','Location failed',statusCode:500);
+      throw const ApiException('missing','No location', statusCode:404);
+    }
+    if (path.endsWith('/trips')) return {'trips': []};
+    if (path.contains('/marketplace/')) return {'ride_requests': []};
+    return ride;
+  }
+  @override
+  Future<void> act(String path, {Json? data, bool put = false}) async {
+    actions++;
+    lastData = data;
+    lastPut = put;
+    ride = {'id': 'ride', 'status': 'requested', 'trip': {'status':'assigned'}};
+    if (loseResponse) throw const ApiException('network_error', 'Response lost');
+  }
+}
+void main() {
+  testWidgets('Rider confirms exact displayed revision and unavailable offers cannot be selected', (tester) async {
+    final repo = FlowFake();
+    final flow = RideFlowController(repo, rideId:'ride');
+    await tester.pumpWidget(ProviderScope(overrides: [
+      rideFlowControllerProvider('ride').overrideWith((ref) => flow),
+      riderRequestControllerProvider.overrideWith((ref) => RiderRequestController(FakeRideRequestRepository(), FakeDeviceLocation())),
+    ], child: const MaterialApp(home: Scaffold(body: SingleChildScrollView(child: RideFlowPanel(rideId:'ride'))))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton,'Choose Driver'));
+    await tester.pumpAndSettle();
+    expect(repo.actions,0);
+    await tester.tap(find.descendant(of:find.byType(AlertDialog),matching:find.widgetWithText(FilledButton,'Choose Driver')));
+    await tester.pumpAndSettle();
+    expect(repo.actions,1);
+    expect(repo.lastData,{'updated_at':'2026-09-11T00:00:00Z'});
+    repo.ride={'id':'ride','status':'requested','trip':null};
+    repo.selectable=false;
+    await flow.refresh();
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilledButton>(find.widgetWithText(FilledButton,'Choose Driver')).onPressed,isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+  test('lost acceptance response reloads authoritative assignment without claiming success', () async {
+    final repo = FlowFake()..loseResponse=true;
+    final flow = RideFlowController(repo,rideId:'ride');
+    await Future<void>.delayed(Duration.zero);
+    expect(flow.offers, hasLength(1));
+    await flow.act('/v1/ride-requests/ride/offers/driver/accept');
+    expect(flow.status,'assigned');
+    expect(flow.offers,isEmpty);
+    expect(flow.error,contains('Response lost'));
+    expect(flow.location,isNull);
+    flow.dispose();
+  });
+  test('location failure does not hide assigned Rider trip', () async {
+    final repo=FlowFake()..locationFails=true;
+    repo.ride={'id':'ride','status':'requested','trip':{'status':'assigned'}};
+    final flow=RideFlowController(repo,rideId:'ride');
+    await Future<void>.delayed(Duration.zero);
+    expect(flow.status,'assigned');
+    expect(flow.loaded,isTrue);
+    expect(flow.location,isNull);
+    flow.dispose();
+  });
+  test('restores assigned Driver trip even while availability is offline', () async {
+    final repo = FlowFake()..trip={'ride_request_id':'ride','status':'in_progress'};
+    final flow = RideFlowController(repo);
+    await Future<void>.delayed(Duration.zero);
+    expect(flow.status,'in_progress');
+    expect(flow.requests,isEmpty);
+    flow.dispose();
+  });
+  test('background stops polling; dispose tolerates in-flight reads', () async {
+    final repo = FlowFake();
+    final flow = RideFlowController(repo,rideId:'ride',interval:const Duration(milliseconds:10));
+    await Future<void>.delayed(Duration.zero);
+    flow.setForeground(false);
+    final reads=repo.reads;
+    await Future<void>.delayed(const Duration(milliseconds:30));
+    expect(repo.reads,reads);
+    repo.blocked=Completer<void>();
+    flow.setForeground(true);
+    flow.dispose();
+    repo.blocked!.complete();
+    await Future<void>.delayed(Duration.zero);
+  });
+  test('counteroffer waits for an in-flight reload instead of being dropped', () async {
+    final repo = FlowFake()..blocked=Completer<void>();
+    final flow = RideFlowController(repo,rideId:'ride');
+    await Future<void>.delayed(Duration.zero);
+    expect(flow.busy,isTrue);
+    final action = flow.act(
+      '/v1/driver/ride-requests/ride/offer',
+      data:{'amount_minor':11500},
+      put:true,
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(repo.actions,0);
+    repo.blocked!.complete();
+    await action;
+    expect(repo.actions,1);
+    expect(repo.lastData,{'amount_minor':11500});
+    expect(repo.lastPut,isTrue);
+    flow.dispose();
+  });
+  test('fare parsing is exact and rejects non-finite or excess precision input', () {
+    expect(parseFareMinor('100.01'),10001);
+    for(final input in ['NaN','Infinity','1.001','-1','0','1e4']) { expect(parseFareMinor(input),isNull); }
+  });
+  test('stale or future locations are never shown as live', () {
+    expect(freshDriverLocation({'updated_at':DateTime.now().subtract(const Duration(minutes:3)).toIso8601String()}),isNull);
+    expect(freshDriverLocation({'updated_at':DateTime.now().add(const Duration(minutes:3)).toIso8601String()}),isNull);
+    expect(freshDriverLocation({'updated_at':DateTime.now().toIso8601String()}),isNotNull);
+  });
+}

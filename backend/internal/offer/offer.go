@@ -148,8 +148,8 @@ func (s Service) ListForRider(ctx context.Context, rideRequestID, riderUserID uu
 	return s.repository.ListForRider(ctx, rideRequestID, riderUserID)
 }
 
-func (s Service) Accept(ctx context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID) (trip.Trip, error) {
-	result, err := s.trips.SelectOffer(ctx, rideRequestID, riderUserID, driverUserID)
+func (s Service) Accept(ctx context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID, expectedVersion ...time.Time) (trip.Trip, error) {
+	result, err := s.trips.SelectOffer(ctx, rideRequestID, riderUserID, driverUserID, expectedVersion...)
 	if err != nil {
 		return trip.Trip{}, mapTripAssignmentError(err)
 	}

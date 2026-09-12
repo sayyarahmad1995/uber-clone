@@ -89,18 +89,34 @@ func (r PostgresRepository) Upsert(ctx context.Context, rideRequestID, driverUse
 	if !eligible {
 		return Offer{}, ErrDriverIneligible
 	}
-	var result Offer
+	var operation []byte
+    err = tx.QueryRowContext(ctx, `
+        SELECT jsonb_build_object('vehicle_id', v.id, 'service_code', s.service_code,
+          'service_name', sc.display_name, 'driver_name', p.display_name,
+          'make', v.make, 'model', v.model, 'model_year', v.model_year,
+          'color', v.color, 'license_plate', v.license_plate,
+          'fare', jsonb_build_object('amount_minor', $3::bigint, 'currency', $4::text))
+        FROM driver_operating_selections s
+        JOIN driver_profiles p ON p.user_id=s.driver_user_id
+        JOIN driver_vehicles v ON v.id=s.vehicle_id AND v.driver_user_id=p.user_id
+        JOIN driver_service_catalog sc ON sc.code=s.service_code AND sc.is_active
+        JOIN ride_requests rr ON rr.id=$1 AND rr.service_code=s.service_code
+        WHERE s.driver_user_id=$2
+    `, rideRequestID, driverUserID, amountMinor, currency).Scan(&operation)
+    if errors.Is(err, sql.ErrNoRows) { return Offer{}, ErrDriverIneligible }
+    if err != nil { return Offer{}, err }
+    var result Offer
 	if err := tx.QueryRowContext(ctx, `
-		INSERT INTO ride_offers (ride_request_id, driver_user_id, amount_minor, currency, status, decided_at)
-		VALUES ($1, $2, $3, $4, 'pending', NULL)
+		INSERT INTO ride_offers (ride_request_id, driver_user_id, amount_minor, currency, status, decided_at, operation_context)
+		VALUES ($1, $2, $3, $4, 'pending', NULL, $5::jsonb)
 		ON CONFLICT (ride_request_id, driver_user_id)
-		DO UPDATE SET amount_minor = EXCLUDED.amount_minor,
+		DO UPDATE SET operation_context = EXCLUDED.operation_context, amount_minor = EXCLUDED.amount_minor,
 		              currency = EXCLUDED.currency,
 		              status = 'pending',
 		              decided_at = NULL,
 		              updated_at = NOW()
 		RETURNING ride_request_id, driver_user_id, amount_minor, currency, status, created_at, updated_at, decided_at
-	`, rideRequestID, driverUserID, amountMinor, currency).Scan(
+	`, rideRequestID, driverUserID, amountMinor, currency, string(operation)).Scan(
 		&result.RideRequestID,
 		&result.DriverUserID,
 		&result.AmountMinor,

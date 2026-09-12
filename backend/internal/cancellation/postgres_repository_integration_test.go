@@ -216,7 +216,11 @@ func createCancellationDriver(t *testing.T, db *sql.DB) uuid.UUID {
 	if _, err := db.Exec(`INSERT INTO driver_vehicles (id, driver_user_id, make, model, color, license_plate) VALUES ($1, $2, 'Test', 'Car', 'White', 'TEST')`, uuid.New(), userID); err != nil {
 		t.Fatalf("insert vehicle: %v", err)
 	}
-	if _, err := db.Exec(`INSERT INTO driver_locations (driver_user_id, latitude, longitude, updated_at) VALUES ($1, 24.86, 67.0, NOW())`, userID); err != nil {
+	if _, err := db.Exec(`INSERT INTO driver_vehicle_service_enrollments (vehicle_id, service_code, approved_at, approved_by)
+       SELECT id, 'economy', NOW(), 'test-reviewer' FROM driver_vehicles WHERE driver_user_id=$1`, userID); err != nil { t.Fatal(err) }
+    if _, err := db.Exec(`INSERT INTO driver_operating_selections (driver_user_id,vehicle_id,service_code)
+       SELECT driver_user_id,id,'economy' FROM driver_vehicles WHERE driver_user_id=$1`, userID); err != nil { t.Fatal(err) }
+    if _, err := db.Exec(`INSERT INTO driver_locations (driver_user_id, latitude, longitude, updated_at) VALUES ($1, 24.86, 67.0, NOW())`, userID); err != nil {
 		t.Fatalf("insert location: %v", err)
 	}
 	return userID
@@ -264,8 +268,8 @@ func insertCancellationTrip(t *testing.T, db *sql.DB, rideID, riderID, driverID 
 func insertCancellationOffer(t *testing.T, db *sql.DB, rideID, driverID uuid.UUID) {
 	t.Helper()
 	if _, err := db.Exec(`
-		INSERT INTO ride_offers (ride_request_id, driver_user_id, amount_minor, currency, status)
-		VALUES ($1, $2, 90000, 'PKR', 'pending')
+		INSERT INTO ride_offers (ride_request_id, driver_user_id, amount_minor, currency, status, operation_context)
+		SELECT $1, $2, 90000, 'PKR', 'pending', jsonb_build_object('vehicle_id',vehicle_id,'service_code',service_code) FROM driver_operating_selections WHERE driver_user_id=$2
 	`, rideID, driverID); err != nil {
 		t.Fatalf("insert ride offer: %v", err)
 	}

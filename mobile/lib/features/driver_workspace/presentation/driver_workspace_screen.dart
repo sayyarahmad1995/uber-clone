@@ -1,4 +1,5 @@
 import 'operating_selection.dart';
+import '../../ride_flow/ride_flow_panels.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
@@ -31,8 +32,10 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen> w
     // Inactive can be a permission dialog; only actual background states end presence.
     if (state == AppLifecycleState.resumed) {
       ref.read(driverControllerProvider).setForeground(true);
+      if (ref.read(driverControllerProvider).profile != null) ref.read(rideFlowControllerProvider("driver")).setForeground(true);
     } else if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden || state == AppLifecycleState.detached) {
       ref.read(driverControllerProvider).setForeground(false);
+      if (ref.read(driverControllerProvider).profile != null) ref.read(rideFlowControllerProvider("driver")).setForeground(false);
     }
   }
 
@@ -49,6 +52,14 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen> w
     final driver = ref.watch(driverControllerProvider);
     final profile = driver.profile;
     final location = driver.location;
+    final trip = profile == null ? null : ref.watch(rideFlowControllerProvider('driver')).current;
+    if (profile != null) {
+      ref.listen(rideFlowControllerProvider('driver'), (_, flow) {
+        if (flow.loaded && !flow.busy) {
+          driver.setActiveTrip(flow.current != null);
+        }
+      });
+    }
     final onboarding = driver.loaded && profile == null
         ? ref.watch(driverOnboardingControllerProvider)
         : null;
@@ -81,14 +92,17 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen> w
           : 'driver-onboarding-${application!.status}',
       map: RideMap(
         tiles: ref.watch(mapTilesProvider),
-        markers: location == null
-            ? const []
-            : [
+        markers: [
+                if (location != null)
                 RideMapMarker(
                   point: LatLng(location.latitude, location.longitude),
                   icon: Icons.local_taxi,
                   color: AppColors.success,
                   label: 'Your published location',
+                ),
+                if (trip != null) for (final label in ['pickup','destination']) RideMapMarker(
+                  point: LatLng((trip[label]['latitude'] as num).toDouble(), (trip[label]['longitude'] as num).toDouble()),
+                  icon: label == 'pickup' ? Icons.my_location : Icons.flag, color: AppColors.danger, label: label,
                 ),
               ],
       ),
@@ -132,6 +146,7 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen> w
             physics: physics,
             onAvailabilityChanged: driver.setOnline,
             selectionValid: driver.operation?.valid == true,
+            activeTrip: trip != null,
             onPublishLocation: driver.publishLocation,
             onRefresh: driver.load,
           );
@@ -399,12 +414,14 @@ class _DriverReadinessPanel extends StatelessWidget {
     required this.physics,
     required this.onAvailabilityChanged,
     required this.selectionValid,
+    required this.activeTrip,
     required this.onPublishLocation,
     required this.onRefresh,
   });
 
   final DriverProfile profile;
   final bool selectionValid;
+  final bool activeTrip;
   final PublishedDriverLocation? location;
   final bool busy;
   final String? error;
@@ -421,7 +438,7 @@ class _DriverReadinessPanel extends StatelessWidget {
     padding: const EdgeInsets.all(AppSpacing.md),
     children: [
       Text(
-        profile.isOnline ? 'You are online' : selectionValid ? 'Ready to go online' : 'Choose your operating vehicle',
+        activeTrip ? 'Your active trip' : profile.isOnline ? 'You are online' : selectionValid ? 'Ready to go online' : 'Choose your operating vehicle',
         style: Theme.of(context).textTheme.headlineSmall,
       ),
       const SizedBox(height: AppSpacing.sm),
@@ -430,11 +447,12 @@ class _DriverReadinessPanel extends StatelessWidget {
             ? profile.displayName!
             : 'Driver profile',
       ),
-      const OperatingSelectionControl(),
+      if (activeTrip) const RideFlowPanel(),
+      if (!activeTrip) const OperatingSelectionControl(),
       const SizedBox(height: AppSpacing.md),
       DashboardPanelControl(
         child: FilledButton.icon(
-          onPressed: busy || (!profile.isOnline && !selectionValid)
+          onPressed: busy || (!profile.isOnline && (!selectionValid || activeTrip))
               ? null
               : () => onAvailabilityChanged(!profile.isOnline),
           icon: const Icon(Icons.power_settings_new),
@@ -442,6 +460,7 @@ class _DriverReadinessPanel extends StatelessWidget {
         ),
       ),
 
+      if (!activeTrip) const RideFlowPanel(),
       const SizedBox(height: AppSpacing.sm),
       Text(
         location == null

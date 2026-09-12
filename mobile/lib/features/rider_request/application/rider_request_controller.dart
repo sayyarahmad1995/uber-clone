@@ -62,6 +62,9 @@ class RiderRequestController extends ChangeNotifier {
   final DeviceLocation _location;
   RiderRequestState _state = const RiderRequestState();
   RiderRequestState get state => _state;
+  String serviceCode = 'economy';
+  bool _disposed = false;
+  void selectService(String code) { serviceCode = code; if (!_disposed) notifyListeners(); }
 
   Future<void> load() async {
     _set(_state.copyWith(loading: true, clearError: true));
@@ -92,6 +95,7 @@ class RiderRequestController extends ChangeNotifier {
     required int amountMinor,
     required String currency,
   }) async {
+    if (_state.submitting || _state.active != null) return false;
     final pickup = _state.pickup;
     final destination = _state.destination;
     if (pickup == null || destination == null) {
@@ -104,6 +108,7 @@ class RiderRequestController extends ChangeNotifier {
         pickup: pickup,
         destination: destination,
         proposedFare: Money(amountMinor: amountMinor, currency: currency),
+        serviceCode: serviceCode,
       );
       _set(
         _state.copyWith(
@@ -147,7 +152,11 @@ class RiderRequestController extends ChangeNotifier {
     }
   }
 
+  @override
+  void dispose() { _disposed = true; super.dispose(); }
+
   void _set(RiderRequestState value) {
+    if (_disposed) return;
     _state = value;
     notifyListeners();
   }

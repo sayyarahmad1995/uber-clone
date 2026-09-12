@@ -379,3 +379,9 @@ Implementation must not silently redefine these product rules.
 - Add infrastructure only when a concrete flow needs it.
 - Keep this worklog aligned with implementation and distinguish target behavior
   from completed behavior.
+
+## Rider ↔ Driver ride milestone (in review)
+
+- Added service-scoped marketplace operations and captured vehicle/service/fare context for offers and trips, with exact offer-revision acceptance.
+- Connected Rider offer choice and Driver marketplace/trip controls, foreground refresh/location recovery, and terminal history.
+- See [acceptance and rollout](rider-driver-ride-milestone.md). Physical-device acceptance is pending; this milestone is not yet complete.

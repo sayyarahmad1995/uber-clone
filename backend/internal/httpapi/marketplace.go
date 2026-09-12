@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/offer"
@@ -69,7 +70,12 @@ func (api *API) acceptRideOffer(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	result, err := api.offers.Accept(r.Context(), rideRequestID, u.ID, driverUserID)
+	var body struct { UpdatedAt time.Time `json:"updated_at"` }
+    if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.UpdatedAt.IsZero() {
+      writeJSON(w, http.StatusBadRequest, map[string]string{"error":"refresh offers and select the current offer version"})
+      return
+    }
+    result, err := api.offers.Accept(r.Context(), rideRequestID, u.ID, driverUserID, body.UpdatedAt)
 	if writeOfferError(w, err) {
 		return
 	}

@@ -18,6 +18,13 @@ class DriverController extends ChangeNotifier {
   OperatingState? operation;
   List<RegisteredVehicle> vehicles = [];
   PublishedDriverLocation? location;
+  bool hasActiveTrip = false;
+  void setActiveTrip(bool active) {
+    if (hasActiveTrip == active) return;
+    hasActiveTrip = active;
+    _scheduleHeartbeat();
+    unawaited(load());
+  }
   bool loaded = false;
   bool busy = false;
   String? error;
@@ -38,7 +45,7 @@ class DriverController extends ChangeNotifier {
 
   void _scheduleHeartbeat() {
     _heartbeat?.cancel();
-    if (_disposed || !_foreground || profile?.isOnline != true) return;
+    if (_disposed || !_foreground || (profile?.isOnline != true && !hasActiveTrip)) return;
     _heartbeat = Timer(const Duration(seconds: 20), () {
       if (busy) { _scheduleHeartbeat(); return; }
       unawaited(_run(() async {

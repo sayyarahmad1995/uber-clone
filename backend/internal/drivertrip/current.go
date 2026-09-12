@@ -2,6 +2,7 @@ package drivertrip
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -15,6 +16,7 @@ var ErrNotFound = errors.New("active trip not found")
 const historyLimit = 50
 
 type View struct {
+	OperationContext json.RawMessage
 	RideRequestID uuid.UUID
 	Pickup        ride.Location
 	Destination   ride.Location

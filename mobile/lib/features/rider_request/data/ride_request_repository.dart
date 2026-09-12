@@ -10,6 +10,7 @@ abstract interface class RideRequestRepository {
     required GeoPoint pickup,
     required GeoPoint destination,
     required Money proposedFare,
+    String serviceCode = 'economy',
   });
   Future<RideRequest> get(String id);
   Future<void> cancel(String id);
@@ -50,12 +51,14 @@ class ApiRideRequestRepository implements RideRequestRepository {
     required GeoPoint pickup,
     required GeoPoint destination,
     required Money proposedFare,
+    String serviceCode = 'economy',
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/v1/ride-requests',
         options: await _options(),
         data: {
+          'service_code': serviceCode,
           'pickup': pickup.toJson(),
           'destination': destination.toJson(),
           'proposed_fare': proposedFare.toJson(),

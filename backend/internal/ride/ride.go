@@ -11,6 +11,7 @@ import (
 
 var (
 	ErrInvalidLocation = errors.New("invalid ride location")
+	ErrInvalidService = errors.New("invalid ride service")
 	ErrInvalidFare     = errors.New("invalid proposed fare")
 )
 
@@ -38,12 +39,14 @@ type Money struct {
 }
 
 type CreateInput struct {
+	ServiceCode string
 	Pickup       Location
 	Destination  Location
 	ProposedFare *Money
 }
 
 type Request struct {
+	ServiceCode string
 	ID           uuid.UUID
 	RiderUserID  uuid.UUID
 	Pickup       Location
@@ -64,6 +67,9 @@ type Service struct{ repository Repository }
 func NewService(repository Repository) Service { return Service{repository: repository} }
 
 func (s Service) Create(ctx context.Context, riderUserID uuid.UUID, input CreateInput) (Request, error) {
+	input.ServiceCode = strings.ToLower(strings.TrimSpace(input.ServiceCode))
+	if input.ServiceCode == "" { input.ServiceCode = "economy" }
+	if input.ServiceCode != "economy" && input.ServiceCode != "comfort" { return Request{}, ErrInvalidService }
 	if !validLocation(input.Pickup) || !validLocation(input.Destination) {
 		return Request{}, ErrInvalidLocation
 	}

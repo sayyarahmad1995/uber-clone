@@ -1,3 +1,5 @@
+import 'package:uber_clone/core/network/api_exception.dart';
+import 'package:uber_clone/features/ride_flow/ride_flow_repository.dart';
 import 'package:uber_clone/features/driver_workspace/domain/operating_state.dart';
 import 'package:uber_clone/features/driver_workspace/domain/registered_vehicle.dart';
 import 'package:uber_clone/core/models/account.dart';
@@ -77,6 +79,7 @@ class FakeRideRequestRepository implements RideRequestRepository {
     required GeoPoint pickup,
     required GeoPoint destination,
     required Money proposedFare,
+    String serviceCode = 'economy',
   }) async {
     submittedPickup = pickup;
     submittedDestination = destination;
@@ -231,4 +234,18 @@ class FakeDriverOnboardingRepository implements DriverOnboardingRepository {
       submittedAt: DateTime.utc(2026, 9, 7),
     );
   }
+}
+
+// Existing dashboard tests isolate networking; flow behavior has dedicated tests.
+class FakeRideFlowRepository implements RideFlowRepository {
+  @override
+  Future<Json> get(String path) async {
+    if (path == '/v1/driver/trip') throw const ApiException('not_found','No active trip',statusCode:404);
+    if (path.endsWith('/offers')) return {'offers': <Json>[]};
+    if (path.endsWith('/trips')) return {'trips': <Json>[]};
+    if (path.contains('/marketplace/')) return {'ride_requests': <Json>[]};
+    return {'id': path.split('/').last, 'status':'requested', 'trip':null};
+  }
+  @override
+  Future<void> act(String path, {Json? data, bool put=false}) async {}
 }

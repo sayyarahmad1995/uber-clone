@@ -533,6 +533,7 @@ Widget testApp(
   DeviceLocation? deviceLocation,
 }) => ProviderScope(
   overrides: [
+      rideFlowRepositoryProvider.overrideWithValue(FakeRideFlowRepository()),
     authRepositoryProvider.overrideWithValue(repository),
     driverRepositoryProvider.overrideWithValue(FakeDriverRepository()),
     driverOnboardingRepositoryProvider.overrideWithValue(

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"encoding/json"
 
 	"github.com/google/uuid"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/ride"
@@ -18,6 +19,8 @@ type scanner interface { Scan(dest ...any) error }
 
 func scanView(row scanner) (View, error) {
 	var view View
+	var operation json.RawMessage
+	var service sql.NullString
 	var proposedAmount sql.NullInt64
 	var proposedCurrency sql.NullString
 	var rideCancelledAt sql.NullTime
@@ -47,6 +50,7 @@ func scanView(row scanner) (View, error) {
 		&startedAt,
 		&completedAt,
 		&tripCancelledAt,
+		&operation, &service,
 	); err != nil { return View{}, err }
 	if proposedAmount.Valid && proposedCurrency.Valid {
 		view.RideRequest.ProposedFare = &ride.Money{AmountMinor: proposedAmount.Int64, Currency: proposedCurrency.String}
@@ -58,11 +62,15 @@ func scanView(row scanner) (View, error) {
 		if startedAt.Valid { projectedTrip.StartedAt = &startedAt.Time }
 		if completedAt.Valid { projectedTrip.CompletedAt = &completedAt.Time }
 		if tripCancelledAt.Valid { projectedTrip.CancelledAt = &tripCancelledAt.Time }
+		projectedTrip.OperationContext = operation
 		view.Trip = &projectedTrip
 	}
+	view.RideRequest.ServiceCode = service.String
 	return view, nil
 }
 
+// A LEFT JOIN without a Trip returns SQL NULL. json.RawMessage accepts JSON
+// bytes, so project JSON null rather than asking database/sql to scan SQL NULL.
 const viewColumns = `
 	rr.id,
 	rr.rider_user_id,
@@ -81,7 +89,7 @@ const viewColumns = `
 	t.assigned_at,
 	t.started_at,
 	t.completed_at,
-	t.cancelled_at`
+	t.cancelled_at, COALESCE(t.operation_context, 'null'::jsonb), rr.service_code`
 
 func (r PostgresRepository) GetOwned(ctx context.Context, rideRequestID, riderUserID uuid.UUID) (View, error) {
 	view, err := scanView(r.db.QueryRowContext(ctx, `SELECT `+viewColumns+` FROM ride_requests rr LEFT JOIN trips t ON t.ride_request_id = rr.id WHERE rr.id = $1 AND rr.rider_user_id = $2`, rideRequestID, riderUserID))

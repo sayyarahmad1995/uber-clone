@@ -39,6 +39,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+      rideFlowRepositoryProvider.overrideWithValue(FakeRideFlowRepository()),
           driverRepositoryProvider.overrideWithValue(driverRepo),
           driverOnboardingRepositoryProvider.overrideWithValue(onboardingRepo),
           deviceLocationProvider.overrideWithValue(const FakeDeviceLocation()),
@@ -104,6 +105,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+      rideFlowRepositoryProvider.overrideWithValue(FakeRideFlowRepository()),
           driverRepositoryProvider.overrideWithValue(repo),
           driverOnboardingRepositoryProvider.overrideWithValue(
             FakeDriverOnboardingRepository(),

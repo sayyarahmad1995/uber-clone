@@ -167,6 +167,7 @@ Widget _testApp({
 }) {
   return ProviderScope(
     overrides: [
+      rideFlowRepositoryProvider.overrideWithValue(FakeRideFlowRepository()),
       authRepositoryProvider.overrideWithValue(
         FakeAuthRepository(
           account: accountHasDriver ? bothCapabilities : riderAccount,

@@ -31,29 +31,30 @@ func (r PostgresRepository) ListForRider(ctx context.Context, rideRequestID, rid
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT o.ride_request_id, o.driver_user_id, o.amount_minor, o.currency,
 		       o.status, o.created_at, o.updated_at, o.decided_at,
-		       p.display_name,
-		       v.make, v.model, v.model_year, v.color,
+		       o.operation_context->>'driver_name',
+		       o.operation_context->>'make', o.operation_context->>'model', (o.operation_context->>'model_year')::integer, o.operation_context->>'color',
 		       CASE WHEN l.updated_at BETWEEN statement_timestamp() - ($3 * INTERVAL '1 second') AND statement_timestamp()
 		            THEN `+pickupDistanceSQL+` END AS pickup_distance_meters,
 		       o.amount_minor = rr.proposed_fare_minor AND o.currency = rr.currency AS matches_proposed_fare,
 		       COALESCE(o.status = 'pending' AND p.status = 'active' AND p.is_online
 		         AND v.driver_user_id IS NOT NULL AND c.user_id IS NOT NULL
+                 AND sc.code = rr.service_code
+                 AND o.operation_context->>'vehicle_id' = s.vehicle_id::text
+                 AND o.operation_context->>'service_code' = s.service_code
 		         AND l.updated_at BETWEEN statement_timestamp() - ($3 * INTERVAL '1 second') AND statement_timestamp()
 		         AND o.driver_user_id <> rr.rider_user_id
 		         AND NOT EXISTS (SELECT 1 FROM trips t WHERE t.driver_user_id = o.driver_user_id AND t.status IN ('assigned', 'in_progress')), FALSE) AS selectable
 		FROM ride_requests rr
 		JOIN ride_offers o ON o.ride_request_id = rr.id
 		LEFT JOIN driver_profiles p ON p.user_id = o.driver_user_id
-		LEFT JOIN LATERAL (
-			SELECT driver_user_id, make, model, model_year, color
-			FROM driver_vehicles
-			WHERE driver_user_id = p.user_id
-			ORDER BY created_at ASC, id ASC
-			LIMIT 1
-		) v ON TRUE
+        LEFT JOIN driver_operating_selections s ON s.driver_user_id=p.user_id
+        LEFT JOIN driver_vehicles v ON v.id=s.vehicle_id AND v.driver_user_id=p.user_id
+        LEFT JOIN driver_vehicle_service_enrollments e ON e.vehicle_id=v.id AND e.service_code=s.service_code
+        LEFT JOIN driver_service_catalog sc ON sc.code=e.service_code AND sc.is_active
 		LEFT JOIN user_capabilities c ON c.user_id = p.user_id AND c.capability = 'driver'
 		LEFT JOIN driver_locations l ON l.driver_user_id = p.user_id
 		WHERE rr.id = $1 AND rr.rider_user_id = $2 AND rr.status = 'requested'
+		  AND o.status = 'pending'
 		  AND rr.proposed_fare_minor IS NOT NULL AND rr.currency IS NOT NULL
 		  AND NOT EXISTS (SELECT 1 FROM trips t WHERE t.ride_request_id = rr.id)
 		ORDER BY selectable DESC, o.amount_minor ASC, pickup_distance_meters ASC NULLS LAST,

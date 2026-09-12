@@ -37,7 +37,12 @@ func TestDriverPresentationRoundTripPreservesLegacyEligibility(t *testing.T) {
 		if err != nil || persisted.DisplayName != profile.DisplayName {
 			t.Fatalf("profile round trip: %+v %v", persisted, err)
 		}
-		view, err = offers.ListForRider(ctx, rideID, riderID)
+		// An existing offer retains its snapshot. Explicit resubmission captures edits.
+        view, err = offers.ListForRider(ctx, rideID, riderID)
+        if err != nil { t.Fatal(err) }
+        if view[0].Vehicle.ModelYear != 0 && view[0].Vehicle.ModelYear != 2024 { t.Fatalf("invalid snapshot: %+v", view) }
+        if _, err := offers.AcceptProposed(ctx, rideID, driverID); err != nil { t.Fatal(err) }
+        view, err = offers.ListForRider(ctx, rideID, riderID)
 		if err != nil {
 			t.Fatal(err)
 		}

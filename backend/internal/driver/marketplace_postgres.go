@@ -16,11 +16,14 @@ func LockMarketplaceEligible(ctx context.Context, tx *sql.Tx, driverID uuid.UUID
 	err := tx.QueryRowContext(ctx, `
 		SELECT p.user_id
 		FROM driver_profiles p
-		JOIN driver_vehicles v ON v.driver_user_id = p.user_id
+		JOIN driver_operating_selections s ON s.driver_user_id = p.user_id
+        JOIN driver_vehicles v ON v.id = s.vehicle_id AND v.driver_user_id = p.user_id
+        JOIN driver_vehicle_service_enrollments e ON e.vehicle_id = v.id AND e.service_code = s.service_code
+        JOIN driver_service_catalog sc ON sc.code = e.service_code AND sc.is_active
 		JOIN user_capabilities c ON c.user_id = p.user_id AND c.capability = 'driver'
 		JOIN driver_locations l ON l.driver_user_id = p.user_id
 		WHERE p.user_id = $1
-		FOR UPDATE OF p FOR SHARE OF v, c, l
+		FOR UPDATE OF p FOR SHARE OF v, c, l, s, e, sc
 	`, driverID).Scan(&locked)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
@@ -35,7 +38,10 @@ func LockMarketplaceEligible(ctx context.Context, tx *sql.Tx, driverID uuid.UUID
 	err = tx.QueryRowContext(ctx, `
 		SELECT EXISTS (
 			SELECT 1 FROM driver_profiles p
-			JOIN driver_vehicles v ON v.driver_user_id = p.user_id
+			JOIN driver_operating_selections s ON s.driver_user_id = p.user_id
+        JOIN driver_vehicles v ON v.id = s.vehicle_id AND v.driver_user_id = p.user_id
+        JOIN driver_vehicle_service_enrollments e ON e.vehicle_id = v.id AND e.service_code = s.service_code
+        JOIN driver_service_catalog sc ON sc.code = e.service_code AND sc.is_active
 			JOIN user_capabilities c ON c.user_id = p.user_id AND c.capability = 'driver'
 			JOIN driver_locations l ON l.driver_user_id = p.user_id
 			WHERE p.user_id = $1 AND p.status = 'active' AND p.is_online

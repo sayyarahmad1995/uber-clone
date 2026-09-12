@@ -2,6 +2,7 @@ package trip
 
 import (
 	"context"
+	"time"
 	"testing"
 
 	"github.com/google/uuid"
@@ -16,7 +17,7 @@ type fakeRepository struct {
 	operation string
 }
 
-func (f *fakeRepository) SelectOffer(_ context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID) (Trip, error) {
+func (f *fakeRepository) SelectOffer(_ context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID, expectedVersion ...time.Time) (Trip, error) {
 	f.rideID, f.riderID, f.driverID, f.operation = rideRequestID, riderUserID, driverUserID, "select_offer"
 	return f.trip, f.err
 }

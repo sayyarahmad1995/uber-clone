@@ -2,6 +2,7 @@ package trip
 
 import (
 	"context"
+	"time"
 	"database/sql"
 	"errors"
 
@@ -10,7 +11,7 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/driver"
 )
 
-func (r PostgresRepository) SelectOffer(ctx context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID) (Trip, error) {
+func (r PostgresRepository) SelectOffer(ctx context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID, expectedVersion ...time.Time) (Trip, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return Trip{}, err
@@ -45,25 +46,36 @@ func (r PostgresRepository) SelectOffer(ctx context.Context, rideRequestID, ride
 	}
 
 	var offerStatus string
+	var offerVersion time.Time
 	if err := tx.QueryRowContext(ctx, `
-		SELECT status
+		SELECT status, updated_at
 		FROM ride_offers
 		WHERE ride_request_id = $1 AND driver_user_id = $2
 		FOR UPDATE
-	`, rideRequestID, driverUserID).Scan(&offerStatus); err != nil {
+	`, rideRequestID, driverUserID).Scan(&offerStatus, &offerVersion); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Trip{}, ErrMarketplaceOfferGone
 		}
 		return Trip{}, err
 	}
-	if offerStatus != "pending" {
+	if offerStatus != "pending" || (len(expectedVersion) > 0 && !offerVersion.Equal(expectedVersion[0])) {
 		return Trip{}, ErrMarketplaceOfferGone
 	}
 
 	if err := lockEligibleMarketplaceDriver(ctx, tx, driverUserID); err != nil {
 		return Trip{}, err
 	}
-	if _, err := tx.ExecContext(ctx, `
+	var operationMatches bool
+    if err := tx.QueryRowContext(ctx, `SELECT EXISTS (
+        SELECT 1 FROM ride_offers o
+        JOIN driver_operating_selections s ON s.driver_user_id=o.driver_user_id
+        JOIN ride_requests rr ON rr.id=o.ride_request_id AND rr.service_code=s.service_code
+        WHERE o.ride_request_id=$1 AND o.driver_user_id=$2
+          AND o.operation_context->>'vehicle_id'=s.vehicle_id::text
+          AND o.operation_context->>'service_code'=s.service_code
+    )`, rideRequestID, driverUserID).Scan(&operationMatches); err != nil { return Trip{}, err }
+    if !operationMatches { return Trip{}, ErrDriverUnavailable }
+    if _, err := tx.ExecContext(ctx, `
 		UPDATE ride_offers
 		SET status = 'accepted', decided_at = NOW(), updated_at = NOW()
 		WHERE ride_request_id = $1 AND driver_user_id = $2
@@ -97,9 +109,10 @@ func lockEligibleMarketplaceDriver(ctx context.Context, tx *sql.Tx, driverUserID
 func insertMarketplaceTrip(ctx context.Context, tx *sql.Tx, rideRequestID, riderUserID, driverUserID uuid.UUID) (Trip, error) {
 	var trip Trip
 	if err := tx.QueryRowContext(ctx, `
-		INSERT INTO trips (ride_request_id, rider_user_id, driver_user_id, assigned_at)
-		VALUES ($1, $2, $3, NOW())
-		RETURNING ride_request_id, rider_user_id, driver_user_id, status, assigned_at, started_at, completed_at
+		INSERT INTO trips (ride_request_id, rider_user_id, driver_user_id, assigned_at, operation_context)
+        SELECT $1, $2, $3, NOW(), operation_context FROM ride_offers
+        WHERE ride_request_id=$1 AND driver_user_id=$3
+		RETURNING ride_request_id, rider_user_id, driver_user_id, status, assigned_at, started_at, completed_at, COALESCE(operation_context, 'null'::jsonb)
 	`, rideRequestID, riderUserID, driverUserID).Scan(
 		&trip.RideRequestID,
 		&trip.RiderUserID,
@@ -108,6 +121,7 @@ func insertMarketplaceTrip(ctx context.Context, tx *sql.Tx, rideRequestID, rider
 		&trip.AssignedAt,
 		&trip.StartedAt,
 		&trip.CompletedAt,
+		&trip.OperationContext,
 	); err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "trips_active_driver_idx" {
@@ -132,7 +146,7 @@ func closeCompetingOffers(ctx context.Context, tx *sql.Tx, rideRequestID, select
 func selectTripByRide(ctx context.Context, tx *sql.Tx, rideRequestID uuid.UUID) (Trip, bool, error) {
 	var trip Trip
 	err := tx.QueryRowContext(ctx, `
-		SELECT ride_request_id, rider_user_id, driver_user_id, status, assigned_at, started_at, completed_at
+		SELECT ride_request_id, rider_user_id, driver_user_id, status, assigned_at, started_at, completed_at, COALESCE(operation_context, 'null'::jsonb)
 		FROM trips
 		WHERE ride_request_id = $1
 	`, rideRequestID).Scan(
@@ -143,6 +157,7 @@ func selectTripByRide(ctx context.Context, tx *sql.Tx, rideRequestID uuid.UUID) 
 		&trip.AssignedAt,
 		&trip.StartedAt,
 		&trip.CompletedAt,
+		&trip.OperationContext,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Trip{}, false, nil

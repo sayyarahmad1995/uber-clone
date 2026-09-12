@@ -2,6 +2,7 @@ package trip
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -28,6 +29,7 @@ const (
 )
 
 type Trip struct {
+	OperationContext json.RawMessage
 	RideRequestID uuid.UUID
 	RiderUserID   uuid.UUID
 	DriverUserID  uuid.UUID
@@ -39,7 +41,7 @@ type Trip struct {
 }
 
 type Repository interface {
-	SelectOffer(ctx context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID) (Trip, error)
+	SelectOffer(ctx context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID, expectedVersion ...time.Time) (Trip, error)
 	Start(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Trip, error)
 	Complete(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Trip, error)
 }
@@ -48,8 +50,8 @@ type Service struct{ repository Repository }
 
 func NewService(repository Repository) Service { return Service{repository: repository} }
 
-func (s Service) SelectOffer(ctx context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID) (Trip, error) {
-	return s.repository.SelectOffer(ctx, rideRequestID, riderUserID, driverUserID)
+func (s Service) SelectOffer(ctx context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID, expectedVersion ...time.Time) (Trip, error) {
+	return s.repository.SelectOffer(ctx, rideRequestID, riderUserID, driverUserID, expectedVersion...)
 }
 
 func (s Service) Start(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Trip, error) {

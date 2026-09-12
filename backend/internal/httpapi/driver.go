@@ -160,6 +160,7 @@ func modelYearResponse(year int) any {
 
 func driverCurrentTripResponse(view drivertrip.View) map[string]any {
 	return map[string]any{
+		"operation_context": view.OperationContext,
 		"ride_request_id": view.RideRequestID,
 		"pickup":          map[string]any{"latitude": view.Pickup.Latitude, "longitude": view.Pickup.Longitude},
 		"destination":     map[string]any{"latitude": view.Destination.Latitude, "longitude": view.Destination.Longitude},
@@ -173,7 +174,8 @@ func driverTripHistoryResponse(views []drivertrip.View) map[string]any {
 	trips := make([]map[string]any, 0, len(views))
 	for _, view := range views {
 		trips = append(trips, map[string]any{
-			"ride_request_id": view.RideRequestID,
+			"operation_context": view.OperationContext,
+		"ride_request_id": view.RideRequestID,
 			"pickup":          map[string]any{"latitude": view.Pickup.Latitude, "longitude": view.Pickup.Longitude},
 			"destination":     map[string]any{"latitude": view.Destination.Latitude, "longitude": view.Destination.Longitude},
 			"status":          view.Status,
