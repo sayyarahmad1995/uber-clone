@@ -53,9 +53,13 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen> w
     final profile = driver.profile;
     final location = driver.location;
     final trip = profile == null ? null : ref.watch(rideFlowControllerProvider('driver')).current;
-    if (profile != null) ref.listen(rideFlowControllerProvider('driver'), (_, flow) {
-      if (flow.loaded && !flow.busy) driver.setActiveTrip(flow.current != null);
-    });
+    if (profile != null) {
+      ref.listen(rideFlowControllerProvider('driver'), (_, flow) {
+        if (flow.loaded && !flow.busy) {
+          driver.setActiveTrip(flow.current != null);
+        }
+      });
+    }
     final onboarding = driver.loaded && profile == null
         ? ref.watch(driverOnboardingControllerProvider)
         : null;
