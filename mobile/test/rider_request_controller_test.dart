@@ -57,6 +57,23 @@ void main() {
     expect(controller.state.error, 'Choose both pickup and destination.');
   });
 
+  test('keeps completed unsettled trips active until cash collection', () async {
+    final completedUnsettledRide = requestedRide.copyWith(
+      trip: const TripSnapshot(status: 'completed'),
+    );
+    final settledRide = requestedRide.copyWith(
+      id: 'ride-2',
+      trip: const TripSnapshot(status: 'settled'),
+    );
+    final controller = RiderRequestController(
+      FakeRideRequestRepository(requests: [settledRide, completedUnsettledRide]),
+      const FakeDeviceLocation(),
+    );
+    await controller.load();
+
+    expect(controller.state.active?.id, 'ride-1');
+  });
+
   test('cancels the active request and returns to request creation', () async {
     final repository = FakeRideRequestRepository(requests: [requestedRide]);
     final controller = RiderRequestController(

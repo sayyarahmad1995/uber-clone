@@ -36,6 +36,20 @@ void main() {
       expect(adapter.body?.containsKey('booking_mode'), isFalse);
     },
   );
+
+  test('normalizes cash-collected completed trips as settled', () async {
+    final adapter = RideListAdapter();
+    final repository = ApiRideRequestRepository(
+      Dio(BaseOptions(baseUrl: 'http://application.test'))
+        ..httpClientAdapter = adapter,
+      StaticSessionStore(),
+    );
+
+    final rides = await repository.list();
+
+    expect(rides[0].trip?.status, 'completed');
+    expect(rides[1].trip?.status, 'settled');
+  });
 }
 
 class StaticSessionStore implements SessionStore {
@@ -60,15 +74,7 @@ class RideContractAdapter implements HttpClientAdapter {
     authorization = options.headers['Authorization'] as String?;
     body = Map<String, dynamic>.from(options.data as Map);
     return ResponseBody.fromString(
-      jsonEncode({
-        'id': 'ride-1',
-        'rider_user_id': 'user-1',
-        'pickup': {'latitude': 24.8607, 'longitude': 67.0011},
-        'destination': {'latitude': 24.9056, 'longitude': 67.0822},
-        'proposed_fare': {'amount_minor': 70000, 'currency': 'PKR'},
-        'status': 'requested',
-        'created_at': '2026-09-04T00:00:00Z',
-      }),
+      jsonEncode(rideJson('ride-1', trip: null)),
       201,
       headers: {
         Headers.contentTypeHeader: [Headers.jsonContentType],
@@ -79,3 +85,48 @@ class RideContractAdapter implements HttpClientAdapter {
   @override
   void close({bool force = false}) {}
 }
+
+class RideListAdapter implements HttpClientAdapter {
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<List<int>>? requestStream,
+    Future<void>? cancelFuture,
+  ) async => ResponseBody.fromString(
+    jsonEncode({
+      'ride_requests': [
+        rideJson(
+          'ride-unsettled',
+          trip: tripJson(settlementStatus: 'unsettled'),
+        ),
+        rideJson(
+          'ride-settled',
+          trip: tripJson(settlementStatus: 'cash_collected'),
+        ),
+      ],
+    }),
+    200,
+    headers: {
+      Headers.contentTypeHeader: [Headers.jsonContentType],
+    },
+  );
+
+  @override
+  void close({bool force = false}) {}
+}
+
+Map<String, Object?> rideJson(String id, {required Object? trip}) => {
+  'id': id,
+  'rider_user_id': 'user-1',
+  'pickup': {'latitude': 24.8607, 'longitude': 67.0011},
+  'destination': {'latitude': 24.9056, 'longitude': 67.0822},
+  'proposed_fare': {'amount_minor': 70000, 'currency': 'PKR'},
+  'status': 'requested',
+  'created_at': '2026-09-04T00:00:00Z',
+  'trip': trip,
+};
+
+Map<String, Object?> tripJson({required String settlementStatus}) => {
+  'status': 'completed',
+  'settlement': {'status': settlementStatus},
+};
