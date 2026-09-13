@@ -44,7 +44,9 @@ class ApiRideRequestRepository implements RideRequestRepository {
       return items
           .map(
             (item) => RideRequest.fromJson(
-              _normalizeRideRequestSnapshot(Map<String, dynamic>.from(item as Map)),
+              _normalizeRideRequestSnapshot(
+                Map<String, dynamic>.from(item as Map),
+              ),
             ),
           )
           .toList();
