@@ -91,6 +91,9 @@ func (r PostgresRepository) SelectOffer(ctx context.Context, rideRequestID, ride
 	if err != nil {
 		return Trip{}, err
 	}
+	if err := markRideAccepted(ctx, tx, rideRequestID); err != nil {
+		return Trip{}, err
+	}
 	if err := closeCompetingOffers(ctx, tx, rideRequestID, driverUserID); err != nil {
 		return Trip{}, err
 	}
@@ -129,6 +132,25 @@ func insertMarketplaceTrip(ctx context.Context, tx *sql.Tx, rideRequestID, rider
 		return Trip{}, err
 	}
 	return trip, nil
+}
+
+func markRideAccepted(ctx context.Context, tx *sql.Tx, rideRequestID uuid.UUID) error {
+	result, err := tx.ExecContext(ctx, `
+		UPDATE ride_requests
+		SET status = 'accepted'
+		WHERE id = $1 AND status = 'requested'
+	`, rideRequestID)
+	if err != nil {
+		return err
+	}
+	updated, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if updated != 1 {
+		return ErrMarketplaceNotOpen
+	}
+	return nil
 }
 
 func closeCompetingOffers(ctx context.Context, tx *sql.Tx, rideRequestID, selectedDriverID uuid.UUID) error {
