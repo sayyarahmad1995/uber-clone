@@ -22,6 +22,7 @@ type CancellationActor string
 
 const (
 	StatusRequested Status = "requested"
+	StatusAccepted  Status = "accepted"
 	StatusCancelled Status = "cancelled"
 
 	CancellationActorRider  CancellationActor = "rider"
