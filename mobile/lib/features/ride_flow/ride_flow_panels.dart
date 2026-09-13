@@ -24,6 +24,42 @@ String statusText(String? status) => switch (status) {
   _ => 'Waiting for Driver offers',
 };
 
+String settlementText(dynamic settlement) {
+  if (settlement is! Map) {
+    return 'Settlement: Not recorded';
+  }
+  final status = settlement['status'];
+  if (status == 'unsettled') {
+    return 'Settlement: Cash due';
+  }
+  if (status == 'cash_collected') {
+    final collectedAt = settlement['cash_collected_at'];
+    if (collectedAt == null) {
+      return 'Settlement: Cash collected';
+    }
+    return 'Settlement: Cash collected · $collectedAt';
+  }
+  return 'Settlement: ${status ?? 'Unknown'}';
+}
+
+bool settlementIsCashDue(dynamic settlement) =>
+    settlement is Map && settlement['status'] == 'unsettled';
+
+String tripAgreedFareText(dynamic trip) {
+  if (trip is! Map || trip['operation_context'] is! Map) {
+    return 'Fare unavailable';
+  }
+  return fareText(trip['operation_context']['fare']);
+}
+
+String cashCollectionMessage(dynamic trip) {
+  final agreedFare = tripAgreedFareText(trip);
+  if (agreedFare == 'Fare unavailable') {
+    return 'Confirm that you collected the agreed cash fare from the Rider.';
+  }
+  return 'Confirm that you collected $agreedFare in cash from the Rider.';
+}
+
 class OperationDetails extends StatelessWidget {
   const OperationDetails(this.operation, {super.key});
 
@@ -143,12 +179,16 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
     final trip = flow.current;
     if (trip != null) {
       final id = trip['ride_request_id'];
+      final status = trip['status'];
+      final cashDue =
+          status == 'completed' && settlementIsCashDue(trip['settlement']);
       return [
-        Text(statusText(trip['status'] as String?)),
+        Text(statusText(status as String?)),
         OperationDetails(trip['operation_context']),
+        Text(settlementText(trip['settlement'])),
         Text('Pickup: ${pointText(trip['pickup'])}'),
         Text('Destination: ${pointText(trip['destination'])}'),
-        if (trip['status'] == 'assigned')
+        if (status == 'assigned')
           FilledButton(
             onPressed: flow.busy
                 ? null
@@ -161,7 +201,7 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
                   ),
             child: const Text('Start trip'),
           ),
-        if (trip['status'] == 'in_progress')
+        if (status == 'in_progress')
           FilledButton(
             onPressed: flow.busy
                 ? null
@@ -174,18 +214,33 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
                   ),
             child: const Text('Complete trip'),
           ),
-        TextButton(
-          onPressed: flow.busy
-              ? null
-              : () => _confirm(
-                  flow,
-                  '/v1/driver/ride-requests/$id/cancel',
-                  'Cancel trip?',
-                  'This ends the trip for both you and the Rider.',
-                  'Cancel trip',
-                ),
-          child: const Text('Cancel trip'),
-        ),
+        if (cashDue) const Text('Collect the agreed cash fare from the Rider.'),
+        if (cashDue)
+          FilledButton(
+            onPressed: flow.busy
+                ? null
+                : () => _confirm(
+                    flow,
+                    '/v1/driver/ride-requests/$id/cash-collected',
+                    'Confirm cash collected?',
+                    cashCollectionMessage(trip),
+                    'Confirm cash collected',
+                  ),
+            child: const Text('Confirm cash collected'),
+          ),
+        if (['assigned', 'in_progress'].contains(status))
+          TextButton(
+            onPressed: flow.busy
+                ? null
+                : () => _confirm(
+                    flow,
+                    '/v1/driver/ride-requests/$id/cancel',
+                    'Cancel trip?',
+                    'This ends the trip for both you and the Rider.',
+                    'Cancel trip',
+                  ),
+            child: const Text('Cancel trip'),
+          ),
       ];
     }
     final online =
@@ -246,6 +301,7 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
                 children: [
                   Text('Assigned: ${item['assigned_at']}'),
                   OperationDetails(item['operation_context']),
+                  Text(settlementText(item['settlement'])),
                 ],
               ),
             ),
@@ -259,6 +315,7 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
     if (trip is Map) {
       return [
         OperationDetails(trip['operation_context']),
+        Text(settlementText(trip['settlement'])),
         if (['assigned', 'in_progress'].contains(trip['status']))
           Text(
             freshDriverLocation(flow.location) == null
@@ -524,8 +581,10 @@ class _RiderRideHistoryState extends ConsumerState<RiderRideHistory> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('${ride['created_at']}'),
-              if (ride['trip'] != null)
+              if (ride['trip'] != null) ...[
                 OperationDetails(ride['trip']['operation_context']),
+                Text(settlementText(ride['trip']['settlement'])),
+              ],
             ],
           ),
         ),
