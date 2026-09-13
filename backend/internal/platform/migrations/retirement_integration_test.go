@@ -189,7 +189,7 @@ func TestRetirementRejectsUnrepresentedAcceptedCommitment(t *testing.T) {
 		}
 		var count int
 		if err := db.QueryRow(`SELECT count(*) FROM ride_driver_candidates`).Scan(&count); err != nil || count != 1 {
-				t.Fatalf("candidate lost on failed migration: count=%d err=%v", count, err)
+			t.Fatalf("candidate lost on failed migration: count=%d err=%v", count, err)
 		}
 		if err := db.QueryRow(`SELECT count(*) FROM schema_migrations WHERE version='016_retire_candidate_schema.sql'`).Scan(&count); err != nil || count != 0 {
 			t.Fatalf("failed migration recorded: count=%d err=%v", count, err)
