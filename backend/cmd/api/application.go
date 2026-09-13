@@ -1,11 +1,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
- "context"
- "time"
- "log/slog"
+	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/auth"
 	authkratos "github.com/sayyarahmad1995/uber-clone/backend/internal/auth/kratos"
@@ -68,24 +68,31 @@ func newApplication(cfg config) (application, func(), error) {
 		AdminReviewPassword:    cfg.AdminReviewPassword,
 		AdminReviewOrigin:      cfg.AdminReviewOrigin,
 	})
-    presenceCtx, cancelPresence := context.WithCancel(context.Background())
-    presenceDone := make(chan struct{})
-    go func() {
-        defer close(presenceDone)
-        ticker := time.NewTicker(10 * time.Second)
-        defer ticker.Stop()
-        for {
-            ctx, cancel := context.WithTimeout(presenceCtx, 5*time.Second)
-            err := driver.NewPostgresRepository(db).ExpirePresence(ctx)
-            cancel()
-            if err != nil && presenceCtx.Err() == nil { slog.Error("expire Driver presence", "error", err) }
-            select {
-            case <-presenceCtx.Done(): return
-            case <-ticker.C:
-            }
-        }
-    }()
-    return application{handler: api.Handler()}, func() { cancelPresence(); <-presenceDone; cleanup() }, nil
+	presenceCtx, cancelPresence := context.WithCancel(context.Background())
+	presenceDone := make(chan struct{})
+	go func() {
+		defer close(presenceDone)
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for {
+			ctx, cancel := context.WithTimeout(presenceCtx, 5*time.Second)
+			err := driver.NewPostgresRepository(db).ExpirePresence(ctx)
+			cancel()
+			if err != nil && presenceCtx.Err() == nil {
+				slog.Error("expire Driver presence", "error", err)
+			}
+			select {
+			case <-presenceCtx.Done():
+				return
+			case <-ticker.C:
+			}
+		}
+	}()
+	return application{handler: api.Handler()}, func() {
+		cancelPresence()
+		<-presenceDone
+		cleanup()
+	}, nil
 }
 
 func buildIdentityProviders(cfg config) (auth.Provider, identity.Provider, error) {
