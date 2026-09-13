@@ -161,12 +161,13 @@ func modelYearResponse(year int) any {
 func driverCurrentTripResponse(view drivertrip.View) map[string]any {
 	return map[string]any{
 		"operation_context": view.OperationContext,
-		"ride_request_id": view.RideRequestID,
-		"pickup":          map[string]any{"latitude": view.Pickup.Latitude, "longitude": view.Pickup.Longitude},
-		"destination":     map[string]any{"latitude": view.Destination.Latitude, "longitude": view.Destination.Longitude},
-		"status":          view.Status,
-		"assigned_at":     view.AssignedAt,
-		"started_at":      view.StartedAt,
+		"ride_request_id":   view.RideRequestID,
+		"pickup":            map[string]any{"latitude": view.Pickup.Latitude, "longitude": view.Pickup.Longitude},
+		"destination":       map[string]any{"latitude": view.Destination.Latitude, "longitude": view.Destination.Longitude},
+		"status":            view.Status,
+		"assigned_at":       view.AssignedAt,
+		"started_at":        view.StartedAt,
+		"settlement":        tripSettlementResponse(view.Settlement),
 	}
 }
 
@@ -175,14 +176,15 @@ func driverTripHistoryResponse(views []drivertrip.View) map[string]any {
 	for _, view := range views {
 		trips = append(trips, map[string]any{
 			"operation_context": view.OperationContext,
-		"ride_request_id": view.RideRequestID,
-			"pickup":          map[string]any{"latitude": view.Pickup.Latitude, "longitude": view.Pickup.Longitude},
-			"destination":     map[string]any{"latitude": view.Destination.Latitude, "longitude": view.Destination.Longitude},
-			"status":          view.Status,
-			"assigned_at":     view.AssignedAt,
-			"started_at":      view.StartedAt,
-			"completed_at":    view.CompletedAt,
-			"cancelled_at":    view.CancelledAt,
+			"ride_request_id":   view.RideRequestID,
+			"pickup":            map[string]any{"latitude": view.Pickup.Latitude, "longitude": view.Pickup.Longitude},
+			"destination":       map[string]any{"latitude": view.Destination.Latitude, "longitude": view.Destination.Longitude},
+			"status":            view.Status,
+			"assigned_at":       view.AssignedAt,
+			"started_at":        view.StartedAt,
+			"completed_at":      view.CompletedAt,
+			"cancelled_at":      view.CancelledAt,
+			"settlement":        tripSettlementResponse(view.Settlement),
 		})
 	}
 	return map[string]any{"trips": trips}
