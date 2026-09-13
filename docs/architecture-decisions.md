@@ -173,3 +173,15 @@ The client reads the best currently authoritative Driver information available t
 `Driver details` may show real Driver identity/status, availability when an operational profile exists, selected onboarding service, review reason, and submission/decision dates when those fields exist. `Vehicles` is plural to match the accepted multi-vehicle target, but this slice displays only the real currently available vehicle snapshot. It must not imply add/remove/switch/edit support before the backend multi-vehicle and approved-information workflows exist.
 
 Both surfaces remain read-only. Approved Driver/vehicle changes continue to follow ADR-0009 governance and must not be introduced as direct client-side overwrites.
+
+## 18. Minimal cash settlement and receipt
+
+The next MVP slice is minimal cash settlement and receipt display, as defined by ADR-0011.
+
+A selected offer's agreed fare remains the authoritative settlement amount for the completed Trip. Settlement exists to close the current ride-hailing pilot loop, not to introduce a general payment platform.
+
+For the MVP, cash settlement may record simple states such as cash due, cash confirmed, and settled. Rider and Driver history should expose receipt-relevant facts from immutable Trip context: agreed fare, service, Driver/vehicle context, completion time, Trip status, and settlement status.
+
+This decision does not authorize Stripe, wallets, stored payment methods, payouts, refunds, cancellation fees, no-show policy, commissions, promo credits, routing-based pricing, or broad administrator payment operations.
+
+See [ADR-0011: Minimal Cash Settlement and Trip Receipt](ADR-0011-minimal-cash-settlement-and-receipt.md).
