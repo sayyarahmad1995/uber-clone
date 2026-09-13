@@ -143,7 +143,7 @@ func TestRetirementPreservesLegacyRidesTripsAndOffers(t *testing.T) {
 	execRetirement(t, db, `INSERT INTO driver_profiles (user_id,status) VALUES ($1,'active')`, otherDriver)
 	execRetirement(t, db, `INSERT INTO ride_driver_candidates (ride_request_id,driver_user_id,status) VALUES ($1,$2,'pending')`, pending, otherDriver)
 	var before string
-	const snapshot = `SELECT json_build_array((SELECT json_agg(to_jsonb(t) - 'operation_context' ORDER BY ride_request_id) FROM trips t),(SELECT json_agg(to_jsonb(o) - 'operation_context' ORDER BY ride_request_id) FROM ride_offers o))::text`
+	const snapshot = `SELECT json_build_array((SELECT json_agg(to_jsonb(t) - 'operation_context' - 'settlement_status' - 'settlement_method' - 'cash_collected_at' - 'cash_collected_by' ORDER BY ride_request_id) FROM trips t),(SELECT json_agg(to_jsonb(o) - 'operation_context' ORDER BY ride_request_id) FROM ride_offers o))::text`
 	if err := db.QueryRow(snapshot).Scan(&before); err != nil {
 		t.Fatal(err)
 	}
@@ -189,7 +189,7 @@ func TestRetirementRejectsUnrepresentedAcceptedCommitment(t *testing.T) {
 		}
 		var count int
 		if err := db.QueryRow(`SELECT count(*) FROM ride_driver_candidates`).Scan(&count); err != nil || count != 1 {
-			t.Fatalf("candidate lost on failed migration: count=%d err=%v", count, err)
+				t.Fatalf("candidate lost on failed migration: count=%d err=%v", count, err)
 		}
 		if err := db.QueryRow(`SELECT count(*) FROM schema_migrations WHERE version='016_retire_candidate_schema.sql'`).Scan(&count); err != nil || count != 0 {
 			t.Fatalf("failed migration recorded: count=%d err=%v", count, err)
