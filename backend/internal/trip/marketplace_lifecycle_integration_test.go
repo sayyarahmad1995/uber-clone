@@ -25,17 +25,16 @@ func TestPostgresSelectionMarksRideRequestAccepted(t *testing.T) {
 	}
 }
 
-func TestPostgresSelectionBackfillMigrationMarksExistingTripsAccepted(t *testing.T) {
+func TestPostgresSelectionBackfillMarksExistingTripsAccepted(t *testing.T) {
 	db := openTripIntegrationDB(t)
 	riderID := createTripIntegrationUser(t, db, "rider")
 	driverID := createTripIntegrationDriver(t, db)
 	rideID := createTripIntegrationRide(t, db, riderID)
-	insertTripIntegrationOffer(t, db, rideID, driverID)
 
-	if _, err := db.Exec(`UPDATE ride_offers SET status = 'accepted', decided_at = NOW(), updated_at = NOW() WHERE ride_request_id = $1 AND driver_user_id = $2`, rideID, driverID); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := insertMarketplaceTrip(context.Background(), db, rideID, riderID, driverID); err != nil {
+	if _, err := db.Exec(`
+		INSERT INTO trips (ride_request_id, rider_user_id, driver_user_id, assigned_at)
+		VALUES ($1, $2, $3, NOW())
+	`, rideID, riderID, driverID); err != nil {
 		t.Fatalf("insert legacy trip fixture: %v", err)
 	}
 	if _, err := db.Exec(`UPDATE ride_requests SET status = 'requested' WHERE id = $1`, rideID); err != nil {
