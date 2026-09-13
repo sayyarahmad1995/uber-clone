@@ -2,8 +2,8 @@ package trip
 
 import (
 	"context"
-	"time"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -32,6 +32,11 @@ func (f *fakeRepository) Complete(_ context.Context, rideRequestID, driverUserID
 	return f.trip, f.err
 }
 
+func (f *fakeRepository) ConfirmCashCollected(_ context.Context, rideRequestID, driverUserID uuid.UUID) (Trip, error) {
+	f.rideID, f.driverID, f.operation = rideRequestID, driverUserID, "cash_collected"
+	return f.trip, f.err
+}
+
 func TestServiceDelegatesDriverOwnedTripLifecycle(t *testing.T) {
 	rideID := uuid.New()
 	driverID := uuid.New()
@@ -50,6 +55,13 @@ func TestServiceDelegatesDriverOwnedTripLifecycle(t *testing.T) {
 	}
 	if repository.operation != "complete" || repository.rideID != rideID || repository.driverID != driverID {
 		t.Fatalf("unexpected complete delegation: %#v", repository)
+	}
+
+	if _, err := service.ConfirmCashCollected(context.Background(), rideID, driverID); err != nil {
+		t.Fatalf("confirm cash collected: %v", err)
+	}
+	if repository.operation != "cash_collected" || repository.rideID != rideID || repository.driverID != driverID {
+		t.Fatalf("unexpected cash collection delegation: %#v", repository)
 	}
 }
 
