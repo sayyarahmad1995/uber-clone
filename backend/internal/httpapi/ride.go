@@ -22,7 +22,7 @@ type rideFareRequest struct {
 }
 
 type createRideRequestBody struct {
-	ServiceCode string `json:"service_code"`
+	ServiceCode  string               `json:"service_code"`
 	Pickup       *rideLocationRequest `json:"pickup"`
 	Destination  *rideLocationRequest `json:"destination"`
 	ProposedFare *rideFareRequest     `json:"proposed_fare"`
@@ -34,9 +34,12 @@ func (body createRideRequestBody) input() (ride.CreateInput, bool) {
 	}
 	return ride.CreateInput{
 		ServiceCode: body.ServiceCode,
-		Pickup:       ride.Location{Latitude: *body.Pickup.Latitude, Longitude: *body.Pickup.Longitude},
-		Destination:  ride.Location{Latitude: *body.Destination.Latitude, Longitude: *body.Destination.Longitude},
-		ProposedFare: &ride.Money{AmountMinor: *body.ProposedFare.AmountMinor, Currency: *body.ProposedFare.Currency},
+		Pickup:      ride.Location{Latitude: *body.Pickup.Latitude, Longitude: *body.Pickup.Longitude},
+		Destination: ride.Location{Latitude: *body.Destination.Latitude, Longitude: *body.Destination.Longitude},
+		ProposedFare: &ride.Money{
+			AmountMinor: *body.ProposedFare.AmountMinor,
+			Currency:    *body.ProposedFare.Currency,
+		},
 	}, true
 }
 
@@ -110,7 +113,7 @@ func (api *API) getRideRequestStatus(w http.ResponseWriter, r *http.Request) {
 
 func writeRideRequest(w http.ResponseWriter, status int, request ride.Request) {
 	response := map[string]any{
-		"service_code": request.ServiceCode,
+		"service_code":  request.ServiceCode,
 		"id":            request.ID,
 		"rider_user_id": request.RiderUserID,
 		"pickup":        map[string]any{"latitude": request.Pickup.Latitude, "longitude": request.Pickup.Longitude},
@@ -135,12 +138,12 @@ func rideRequestListResponse(views []ridestatus.View) map[string]any {
 func rideRequestStatusResponse(request ride.Request, assignedTrip *trip.Trip) map[string]any {
 	response := map[string]any{
 		"service_code": request.ServiceCode,
-		"id":          request.ID,
-		"pickup":      map[string]any{"latitude": request.Pickup.Latitude, "longitude": request.Pickup.Longitude},
-		"destination": map[string]any{"latitude": request.Destination.Latitude, "longitude": request.Destination.Longitude},
-		"status":      request.Status,
-		"created_at":  request.CreatedAt,
-		"trip":        nil,
+		"id":           request.ID,
+		"pickup":       map[string]any{"latitude": request.Pickup.Latitude, "longitude": request.Pickup.Longitude},
+		"destination":  map[string]any{"latitude": request.Destination.Latitude, "longitude": request.Destination.Longitude},
+		"status":       request.Status,
+		"created_at":   request.CreatedAt,
+		"trip":         nil,
 	}
 	if request.ProposedFare != nil {
 		response["proposed_fare"] = map[string]any{"amount_minor": request.ProposedFare.AmountMinor, "currency": request.ProposedFare.Currency}
@@ -152,12 +155,13 @@ func rideRequestStatusResponse(request ride.Request, assignedTrip *trip.Trip) ma
 	if assignedTrip != nil {
 		response["trip"] = map[string]any{
 			"operation_context": assignedTrip.OperationContext,
-			"driver_user_id": assignedTrip.DriverUserID,
-			"status":         assignedTrip.Status,
-			"assigned_at":    assignedTrip.AssignedAt,
-			"started_at":     assignedTrip.StartedAt,
-			"completed_at":   assignedTrip.CompletedAt,
-			"cancelled_at":   assignedTrip.CancelledAt,
+			"driver_user_id":    assignedTrip.DriverUserID,
+			"status":            assignedTrip.Status,
+			"assigned_at":       assignedTrip.AssignedAt,
+			"started_at":        assignedTrip.StartedAt,
+			"completed_at":      assignedTrip.CompletedAt,
+			"cancelled_at":      assignedTrip.CancelledAt,
+			"settlement":        tripSettlementResponse(assignedTrip.Settlement),
 		}
 	}
 	return response
