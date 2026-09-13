@@ -27,6 +27,16 @@ jobs:
         with:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
+      - name: Check Go formatting
+        run: |
+          files="$(gofmt -l .)"
+          if [ -n "$files" ]; then
+            echo "$files"
+            exit 1
+          fi
+        working-directory: backend
+      - run: go vet ./...
+        working-directory: backend
       - run: go test -p 1 ./...
         working-directory: backend
         env:
@@ -40,6 +50,13 @@ jobs:
       - run: |
           git clone --depth 1 --branch stable https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
           echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+      - run: flutter pub get
+        working-directory: mobile
+      - run: dart format --output=none --set-exit-if-changed lib test
+        working-directory: mobile
+      - run: dart run build_runner build --delete-conflicting-outputs
+        working-directory: mobile
+      - run: git diff --exit-code
       - run: flutter analyze
         working-directory: mobile
       - run: flutter test
