@@ -50,7 +50,9 @@ Live location/status updates
   ↓
 Trip completed
   ↓
-Trip history
+Cash settlement confirmed
+  ↓
+Trip receipt/history
 ```
 
 There is one Rider ride-request experience. The Rider does not select an `automatic` or `offers` booking mode. Migration 016 retires the legacy booking-mode persistence.
@@ -60,6 +62,8 @@ Driver commercial response is the differentiator:
 - accepting the Rider proposed fare creates a pending offer at that fare;
 - submitting a counteroffer creates a pending offer at a different allowed fare;
 - either response requires Rider selection before assignment.
+
+The selected offer's agreed fare is the authoritative commercial amount for the MVP Trip. The next MVP slice closes the ride loop with minimal cash settlement and receipt display, as defined by ADR-0011. It does not introduce a general payment platform.
 
 Geographic matching is marketplace policy used to determine which Drivers are eligible to receive/discover a request and how requests/Drivers are ranked. It is not a second Rider booking mode.
 
@@ -111,7 +115,7 @@ The MVP does not include complete implementations for:
 - Microservices
 - Advanced analytics/data pipelines
 - Elaborate audit/compliance platforms
-- Sophisticated payment infrastructure unless a concrete MVP payment requirement is introduced
+- Sophisticated payment infrastructure beyond the minimal cash settlement and receipt slice defined by ADR-0011
 - Arbitrary fixed pickup-radius/service-area policy without a concrete launch requirement or operating data
 - The complete Driver/vehicle revision review, cancellation-window, withdrawal-appeal, and administration UI; approved-information non-overwrite semantics remain an architecture requirement meanwhile
 
