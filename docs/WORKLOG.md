@@ -201,6 +201,20 @@ ADR-0007 remains authoritative for the Ride Request marketplace.
 - Assigned/in-progress Trip state is server-owned and recovers after app reopening
   or transient network failure.
 
+### Settlement and receipt
+
+- ADR-0011 selects minimal cash settlement and receipt display as the next MVP slice.
+- The selected offer's agreed fare snapshot remains the authoritative commercial
+  amount for settlement.
+- Settlement is scoped to completed ride-hailing Trips and cash handling only.
+- Receipt/history display should use immutable Trip context: agreed fare, service,
+  Driver/vehicle context, completion time, Trip status, and settlement status.
+- This slice must not introduce card payments, wallets, refunds, cancellation fees,
+  no-show policy, payout reconciliation, commissions, promo credits, or broad
+  administrator payment operations.
+
+See [ADR-0011](ADR-0011-minimal-cash-settlement-and-receipt.md).
+
 ### Location and geographic policy
 
 - One latest location row is stored per Driver, separate from profile/vehicle.
@@ -331,14 +345,39 @@ PR #80 readiness validation ran the backend/PostgreSQL suite plus `flutter analy
 and `flutter test`. Physical-device acceptance then verified the marketplace/trip
 lifecycle, both cancellation paths, network recovery, and reopening recovery.
 
+PR #81 hardened readiness validation before new product work by adding CI checks for
+changed-file Go/Dart formatting, backend vet, backend PostgreSQL tests, explicit
+Flutter dependency setup, build-runner execution, generated-code drift, Flutter
+analysis, and Flutter tests.
+
 ---
 
 ## Next implementation order
 
-The Rider ↔ Driver marketplace/trip milestone is complete. The next implementation
-slice is intentionally not declared in this worklog until it is selected from the
-accepted MVP roadmap. Do not reopen PR #80 scope unless a regression or an explicit
-product decision requires it.
+The next implementation slice is selected: **minimal cash settlement and Trip
+receipt**, governed by ADR-0011.
+
+PR #83 should implement this as a vertical slice through PostgreSQL, Go domain/API,
+and Flutter UI. It should close the completed ride loop commercially without
+introducing a payment platform.
+
+PR #83 target behavior:
+
+- Preserve the selected offer's agreed fare as the authoritative settlement amount.
+- Add minimal settlement state for completed cash Trips, using `cash_due`,
+  `cash_confirmed`, and/or `settled` semantics as justified by implementation.
+- Let the Driver confirm cash collection, either as part of completion or as an
+  explicit immediately-following action.
+- Show Rider and Driver receipt/history details from immutable Trip context:
+  agreed fare, service, Driver/vehicle context, Trip status, completion time, and
+  settlement status.
+- Preserve restart and transient-network recovery for completion/settlement state.
+- Keep Rider-selected assignment, offer revision checks, cancellation semantics,
+  and marketplace eligibility unchanged.
+
+PR #83 must not implement Stripe, wallets, stored cards, payouts, refunds,
+cancellation fees, no-show policy, promotions, commissions, administrator payment
+operations, routing-based pricing, or Courier/Freight settlement.
 
 The future approved-information revision/cancellation-window/withdrawal-appeal
 slice remains deferred until profile/vehicle change management becomes a concrete
@@ -351,8 +390,9 @@ dependency.
 Accepted ADRs, `architecture-decisions.md`, `product-and-capability-model.md`,
 `mvp-scope.md`, and this worklog describe the intended MVP. ADR-0007 is the Ride
 Request marketplace authority, ADR-0008 is the dashboard interaction authority,
-ADR-0009 is the Driver service/vehicle/onboarding authority, and ADR-0010 is the
-initial Driver onboarding reviewer authority.
+ADR-0009 is the Driver service/vehicle/onboarding authority, ADR-0010 is the
+initial Driver onboarding reviewer authority, and ADR-0011 is the minimal cash
+settlement and Trip receipt authority.
 
 Implementation must not silently redefine these product rules.
 
@@ -362,7 +402,9 @@ Implementation must not silently redefine these product rules.
 - Routing, ETA, geocoding, and PostGIS.
 - Live location streaming, breadcrumbs, and push notifications.
 - Redis, background dispatch workers, and advanced dispatch optimization.
-- Sophisticated payments, cancellation fees, refunds, and no-show policy.
+- Sophisticated payment infrastructure beyond the minimal cash settlement and
+  receipt slice defined by ADR-0011; this includes card processing, wallets,
+  payouts, refunds, cancellation fees, no-show policy, commissions, and promo credits.
 - Full administrator operations beyond the minimal review boundary needed by the
   current Driver application flow.
 - Proper administrator identity/role management beyond the temporary internal
