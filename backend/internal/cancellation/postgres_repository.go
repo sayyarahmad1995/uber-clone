@@ -48,7 +48,7 @@ func (r PostgresRepository) CancelByRider(ctx context.Context, rideRequestID, ri
 		}
 		return result, nil
 	}
-	if state.status != ride.StatusRequested {
+	if state.status != ride.StatusRequested && state.status != ride.StatusAccepted {
 		return Result{}, fmt.Errorf("unknown ride request status %q", state.status)
 	}
 	if found && assignedTrip.Status == trip.StatusCompleted {
@@ -94,7 +94,7 @@ func (r PostgresRepository) CancelByDriver(ctx context.Context, rideRequestID, d
 		}
 		return result, nil
 	}
-	if state.status != ride.StatusRequested {
+	if state.status != ride.StatusRequested && state.status != ride.StatusAccepted {
 		return Result{}, fmt.Errorf("unknown ride request status %q", state.status)
 	}
 	if assignedTrip.Status == trip.StatusCompleted {
