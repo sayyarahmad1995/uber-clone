@@ -118,7 +118,9 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
       children: [
         const Divider(),
         Text(
-          widget.rideId == null ? 'Trips and requests' : statusText(flow.status),
+          widget.rideId == null
+              ? 'Trips and requests'
+              : statusText(flow.status),
           style: Theme.of(context).textTheme.titleLarge,
         ),
         if (!flow.loaded && flow.busy) const LinearProgressIndicator(),
@@ -176,17 +178,18 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
           onPressed: flow.busy
               ? null
               : () => _confirm(
-                    flow,
-                    '/v1/driver/ride-requests/$id/cancel',
-                    'Cancel trip?',
-                    'This ends the trip for both you and the Rider.',
-                    'Cancel trip',
-                  ),
+                  flow,
+                  '/v1/driver/ride-requests/$id/cancel',
+                  'Cancel trip?',
+                  'This ends the trip for both you and the Rider.',
+                  'Cancel trip',
+                ),
           child: const Text('Cancel trip'),
         ),
       ];
     }
-    final online = ref.watch(driverControllerProvider).profile?.isOnline == true;
+    final online =
+        ref.watch(driverControllerProvider).profile?.isOnline == true;
     return [
       if (!online)
         const Text('Go online to receive requests for your selected service.'),
@@ -218,8 +221,8 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
                     onPressed: flow.busy
                         ? null
                         : () => flow.act(
-                              '/v1/driver/ride-requests/${request['id']}/accept',
-                            ),
+                            '/v1/driver/ride-requests/${request['id']}/accept',
+                          ),
                     child: const Text('Accept Rider fare'),
                   ),
                   OutlinedButton(
@@ -299,13 +302,13 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
                   onPressed: flow.busy || offer['selectable'] != true
                       ? null
                       : () => _confirm(
-                            flow,
-                            '/v1/ride-requests/${widget.rideId}/offers/${offer['driver_user_id']}/accept',
-                            'Choose this Driver?',
-                            'Agree to ${fareText(offer['fare'])} for this ride.',
-                            'Choose Driver',
-                            data: {'updated_at': offer['updated_at']},
-                          ),
+                          flow,
+                          '/v1/ride-requests/${widget.rideId}/offers/${offer['driver_user_id']}/accept',
+                          'Choose this Driver?',
+                          'Agree to ${fareText(offer['fare'])} for this ride.',
+                          'Choose Driver',
+                          data: {'updated_at': offer['updated_at']},
+                        ),
                   child: const Text('Choose Driver'),
                 ),
                 if (offer['status'] == 'pending')
@@ -313,8 +316,8 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
                     onPressed: flow.busy
                         ? null
                         : () => flow.act(
-                              '/v1/ride-requests/${widget.rideId}/offers/${offer['driver_user_id']}/reject',
-                            ),
+                            '/v1/ride-requests/${widget.rideId}/offers/${offer['driver_user_id']}/reject',
+                          ),
                     child: const Text('Reject offer'),
                   ),
               ],
@@ -384,7 +387,9 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
                 if (value == null ||
                     value < (proposed * 90 + 99) ~/ 100 ||
                     value > proposed * 130 ~/ 100) {
-                  update(() => error = 'Enter a fare within the allowed range.');
+                  update(
+                    () => error = 'Enter a fare within the allowed range.',
+                  );
                   return;
                 }
                 Navigator.pop(context, value);
@@ -468,7 +473,9 @@ class _RiderRideHistoryState extends ConsumerState<RiderRideHistory> {
       _error = null;
     });
     try {
-      final data = await ref.read(rideFlowRepositoryProvider).get('/v1/ride-requests');
+      final data = await ref
+          .read(rideFlowRepositoryProvider)
+          .get('/v1/ride-requests');
       if (mounted) {
         setState(() {
           _rides = (data['ride_requests'] as List? ?? [])
@@ -476,7 +483,10 @@ class _RiderRideHistoryState extends ConsumerState<RiderRideHistory> {
               .where(
                 (ride) =>
                     ride['status'] == 'cancelled' ||
-                    ['completed', 'cancelled'].contains(ride['trip']?['status']),
+                    [
+                      'completed',
+                      'cancelled',
+                    ].contains(ride['trip']?['status']),
               )
               .toList();
         });
@@ -503,7 +513,8 @@ class _RiderRideHistoryState extends ConsumerState<RiderRideHistory> {
     children: [
       if (_loading) const LinearProgressIndicator(),
       if (_error != null) Text(_error!),
-      if (_rides?.isEmpty == true) const Text('No completed or cancelled rides.'),
+      if (_rides?.isEmpty == true)
+        const Text('No completed or cancelled rides.'),
       for (final ride in _rides ?? <Json>[])
         ListTile(
           title: Text(
