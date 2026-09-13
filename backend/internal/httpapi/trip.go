@@ -36,6 +36,10 @@ func (api *API) completeTrip(w http.ResponseWriter, r *http.Request) {
 	api.transitionTrip(w, r, api.trips.Complete)
 }
 
+func (api *API) confirmCashCollected(w http.ResponseWriter, r *http.Request) {
+	api.transitionTrip(w, r, api.trips.ConfirmCashCollected)
+}
+
 func (api *API) transitionTrip(w http.ResponseWriter, r *http.Request, transition tripTransitionFunc) {
 	u, ok := api.requireDriverCapability(w, r)
 	if !ok {
@@ -53,6 +57,9 @@ func (api *API) transitionTrip(w http.ResponseWriter, r *http.Request, transitio
 		return
 	case errors.Is(err, trip.ErrTripNotStarted):
 		writeJSON(w, http.StatusConflict, map[string]string{"error": "trip has not started"})
+		return
+	case errors.Is(err, trip.ErrTripNotCompleted):
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "trip is not completed"})
 		return
 	case errors.Is(err, trip.ErrTripCompleted):
 		writeJSON(w, http.StatusConflict, map[string]string{"error": "trip already completed"})
@@ -74,13 +81,26 @@ func writeTrip(w http.ResponseWriter, result trip.Trip) {
 func tripResponse(result trip.Trip) map[string]any {
 	return map[string]any{
 		"operation_context": result.OperationContext,
-		"ride_request_id": result.RideRequestID,
-		"rider_user_id":   result.RiderUserID,
-		"driver_user_id":  result.DriverUserID,
-		"status":          result.Status,
-		"assigned_at":     result.AssignedAt,
-		"started_at":      result.StartedAt,
-		"completed_at":    result.CompletedAt,
-		"cancelled_at":    result.CancelledAt,
+		"ride_request_id":   result.RideRequestID,
+		"rider_user_id":     result.RiderUserID,
+		"driver_user_id":    result.DriverUserID,
+		"status":            result.Status,
+		"assigned_at":       result.AssignedAt,
+		"started_at":        result.StartedAt,
+		"completed_at":      result.CompletedAt,
+		"cancelled_at":      result.CancelledAt,
+		"settlement":        tripSettlementResponse(result.Settlement),
+	}
+}
+
+func tripSettlementResponse(settlement trip.Settlement) map[string]any {
+	status := settlement.Status
+	if status == "" {
+		status = trip.SettlementUnsettled
+	}
+	return map[string]any{
+		"status":            status,
+		"method":            settlement.Method,
+		"cash_collected_at": settlement.CashCollectedAt,
 	}
 }

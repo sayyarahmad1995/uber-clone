@@ -2,9 +2,9 @@ package trip
 
 import (
 	"context"
-	"time"
 	"database/sql"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -66,16 +66,20 @@ func (r PostgresRepository) SelectOffer(ctx context.Context, rideRequestID, ride
 		return Trip{}, err
 	}
 	var operationMatches bool
-    if err := tx.QueryRowContext(ctx, `SELECT EXISTS (
-        SELECT 1 FROM ride_offers o
-        JOIN driver_operating_selections s ON s.driver_user_id=o.driver_user_id
-        JOIN ride_requests rr ON rr.id=o.ride_request_id AND rr.service_code=s.service_code
-        WHERE o.ride_request_id=$1 AND o.driver_user_id=$2
-          AND o.operation_context->>'vehicle_id'=s.vehicle_id::text
-          AND o.operation_context->>'service_code'=s.service_code
-    )`, rideRequestID, driverUserID).Scan(&operationMatches); err != nil { return Trip{}, err }
-    if !operationMatches { return Trip{}, ErrDriverUnavailable }
-    if _, err := tx.ExecContext(ctx, `
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS (
+		SELECT 1 FROM ride_offers o
+		JOIN driver_operating_selections s ON s.driver_user_id=o.driver_user_id
+		JOIN ride_requests rr ON rr.id=o.ride_request_id AND rr.service_code=s.service_code
+		WHERE o.ride_request_id=$1 AND o.driver_user_id=$2
+		  AND o.operation_context->>'vehicle_id'=s.vehicle_id::text
+		  AND o.operation_context->>'service_code'=s.service_code
+	)`, rideRequestID, driverUserID).Scan(&operationMatches); err != nil {
+		return Trip{}, err
+	}
+	if !operationMatches {
+		return Trip{}, ErrDriverUnavailable
+	}
+	if _, err := tx.ExecContext(ctx, `
 		UPDATE ride_offers
 		SET status = 'accepted', decided_at = NOW(), updated_at = NOW()
 		WHERE ride_request_id = $1 AND driver_user_id = $2
@@ -106,23 +110,18 @@ func lockEligibleMarketplaceDriver(ctx context.Context, tx *sql.Tx, driverUserID
 	}
 	return nil
 }
+
 func insertMarketplaceTrip(ctx context.Context, tx *sql.Tx, rideRequestID, riderUserID, driverUserID uuid.UUID) (Trip, error) {
-	var trip Trip
-	if err := tx.QueryRowContext(ctx, `
+	trip, err := scanTrip(tx.QueryRowContext(ctx, `
 		INSERT INTO trips (ride_request_id, rider_user_id, driver_user_id, assigned_at, operation_context)
-        SELECT $1, $2, $3, NOW(), operation_context FROM ride_offers
-        WHERE ride_request_id=$1 AND driver_user_id=$3
-		RETURNING ride_request_id, rider_user_id, driver_user_id, status, assigned_at, started_at, completed_at, COALESCE(operation_context, 'null'::jsonb)
-	`, rideRequestID, riderUserID, driverUserID).Scan(
-		&trip.RideRequestID,
-		&trip.RiderUserID,
-		&trip.DriverUserID,
-		&trip.Status,
-		&trip.AssignedAt,
-		&trip.StartedAt,
-		&trip.CompletedAt,
-		&trip.OperationContext,
-	); err != nil {
+		SELECT $1, $2, $3, NOW(), operation_context FROM ride_offers
+		WHERE ride_request_id=$1 AND driver_user_id=$3
+		RETURNING `+tripColumns,
+		rideRequestID,
+		riderUserID,
+		driverUserID,
+	))
+	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "trips_active_driver_idx" {
 			return Trip{}, ErrDriverUnavailable
@@ -144,21 +143,11 @@ func closeCompetingOffers(ctx context.Context, tx *sql.Tx, rideRequestID, select
 }
 
 func selectTripByRide(ctx context.Context, tx *sql.Tx, rideRequestID uuid.UUID) (Trip, bool, error) {
-	var trip Trip
-	err := tx.QueryRowContext(ctx, `
-		SELECT ride_request_id, rider_user_id, driver_user_id, status, assigned_at, started_at, completed_at, COALESCE(operation_context, 'null'::jsonb)
+	trip, err := scanTrip(tx.QueryRowContext(ctx, `
+		SELECT `+tripColumns+`
 		FROM trips
 		WHERE ride_request_id = $1
-	`, rideRequestID).Scan(
-		&trip.RideRequestID,
-		&trip.RiderUserID,
-		&trip.DriverUserID,
-		&trip.Status,
-		&trip.AssignedAt,
-		&trip.StartedAt,
-		&trip.CompletedAt,
-		&trip.OperationContext,
-	)
+	`, rideRequestID))
 	if errors.Is(err, sql.ErrNoRows) {
 		return Trip{}, false, nil
 	}

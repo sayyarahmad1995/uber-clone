@@ -17,14 +17,15 @@ const historyLimit = 50
 
 type View struct {
 	OperationContext json.RawMessage
-	RideRequestID uuid.UUID
-	Pickup        ride.Location
-	Destination   ride.Location
-	Status        trip.Status
-	AssignedAt    time.Time
-	StartedAt     *time.Time
-	CompletedAt   *time.Time
-	CancelledAt   *time.Time
+	RideRequestID    uuid.UUID
+	Pickup           ride.Location
+	Destination      ride.Location
+	Status           trip.Status
+	AssignedAt       time.Time
+	StartedAt        *time.Time
+	CompletedAt      *time.Time
+	CancelledAt      *time.Time
+	Settlement       trip.Settlement
 }
 
 type Repository interface {
