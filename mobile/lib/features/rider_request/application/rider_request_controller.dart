@@ -25,11 +25,13 @@ class RiderRequestState {
 
   RideRequest? get active {
     for (final request in requests) {
-      if (request.status != 'cancelled' &&
-          request.trip?.status != 'completed' &&
-          request.trip?.status != 'cancelled') {
-        return request;
+      final tripStatus = request.trip?.status;
+      if (request.status == 'cancelled' ||
+          tripStatus == 'cancelled' ||
+          tripStatus == 'settled') {
+        continue;
       }
+      return request;
     }
     return null;
   }
@@ -64,7 +66,13 @@ class RiderRequestController extends ChangeNotifier {
   RiderRequestState get state => _state;
   String serviceCode = 'economy';
   bool _disposed = false;
-  void selectService(String code) { serviceCode = code; if (!_disposed) notifyListeners(); }
+
+  void selectService(String code) {
+    serviceCode = code;
+    if (!_disposed) {
+      notifyListeners();
+    }
+  }
 
   Future<void> load() async {
     _set(_state.copyWith(loading: true, clearError: true));
@@ -153,7 +161,10 @@ class RiderRequestController extends ChangeNotifier {
   }
 
   @override
-  void dispose() { _disposed = true; super.dispose(); }
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
 
   void _set(RiderRequestState value) {
     if (_disposed) return;
