@@ -122,7 +122,7 @@ func TestPostgresRepositoryCancelCompletedTripIsRejectedWithoutMutation(t *testi
 	if err := db.QueryRow(`SELECT status, cancelled_at FROM ride_requests WHERE id = $1`, rideID).Scan(&status, &cancelledAt); err != nil {
 		t.Fatalf("select ride: %v", err)
 	}
-	if status != string(ride.StatusRequested) || cancelledAt.Valid {
+	if status != string(ride.StatusAccepted) || cancelledAt.Valid {
 		t.Fatalf("completed-trip cancellation mutated ride: status=%s cancelled=%v", status, cancelledAt.Valid)
 	}
 	var persistedCompletedAt time.Time
@@ -217,10 +217,14 @@ func createCancellationDriver(t *testing.T, db *sql.DB) uuid.UUID {
 		t.Fatalf("insert vehicle: %v", err)
 	}
 	if _, err := db.Exec(`INSERT INTO driver_vehicle_service_enrollments (vehicle_id, service_code, approved_at, approved_by)
-       SELECT id, 'economy', NOW(), 'test-reviewer' FROM driver_vehicles WHERE driver_user_id=$1`, userID); err != nil { t.Fatal(err) }
-    if _, err := db.Exec(`INSERT INTO driver_operating_selections (driver_user_id,vehicle_id,service_code)
-       SELECT driver_user_id,id,'economy' FROM driver_vehicles WHERE driver_user_id=$1`, userID); err != nil { t.Fatal(err) }
-    if _, err := db.Exec(`INSERT INTO driver_locations (driver_user_id, latitude, longitude, updated_at) VALUES ($1, 24.86, 67.0, NOW())`, userID); err != nil {
+       SELECT id, 'economy', NOW(), 'test-reviewer' FROM driver_vehicles WHERE driver_user_id=$1`, userID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO driver_operating_selections (driver_user_id,vehicle_id,service_code)
+       SELECT driver_user_id,id,'economy' FROM driver_vehicles WHERE driver_user_id=$1`, userID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO driver_locations (driver_user_id, latitude, longitude, updated_at) VALUES ($1, 24.86, 67.0, NOW())`, userID); err != nil {
 		t.Fatalf("insert location: %v", err)
 	}
 	return userID
@@ -265,6 +269,7 @@ func insertCancellationTrip(t *testing.T, db *sql.DB, rideID, riderID, driverID 
 	}
 	return time.Time{}
 }
+
 func insertCancellationOffer(t *testing.T, db *sql.DB, rideID, driverID uuid.UUID) {
 	t.Helper()
 	if _, err := db.Exec(`
