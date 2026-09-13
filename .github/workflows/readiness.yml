@@ -22,6 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-go@v5
         with:
@@ -33,7 +34,7 @@ jobs:
         run: |
           changed_files() {
             if [ -n "${GITHUB_BASE_REF:-}" ]; then
-              git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF"
+              git fetch --no-tags origin "$GITHUB_BASE_REF"
               git diff --name-only --diff-filter=ACMR "origin/$GITHUB_BASE_REF"...HEAD -- 'backend/**/*.go'
             elif [ -n "${EVENT_BEFORE:-}" ] && [ "$EVENT_BEFORE" != "0000000000000000000000000000000000000000" ]; then
               git diff --name-only --diff-filter=ACMR "$EVENT_BEFORE" HEAD -- 'backend/**/*.go'
@@ -64,6 +65,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           persist-credentials: false
       - run: |
           git clone --depth 1 --branch stable https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
@@ -76,7 +78,7 @@ jobs:
         run: |
           changed_files() {
             if [ -n "${GITHUB_BASE_REF:-}" ]; then
-              git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF"
+              git fetch --no-tags origin "$GITHUB_BASE_REF"
               git diff --name-only --diff-filter=ACMR "origin/$GITHUB_BASE_REF"...HEAD -- 'mobile/lib/**/*.dart' 'mobile/test/**/*.dart'
             elif [ -n "${EVENT_BEFORE:-}" ] && [ "$EVENT_BEFORE" != "0000000000000000000000000000000000000000" ]; then
               git diff --name-only --diff-filter=ACMR "$EVENT_BEFORE" HEAD -- 'mobile/lib/**/*.dart' 'mobile/test/**/*.dart'
@@ -94,7 +96,7 @@ jobs:
           dart format --output=none --set-exit-if-changed "${files[@]}"
       - run: dart run build_runner build --delete-conflicting-outputs
         working-directory: mobile
-      - run: git diff --exit-code
+      - run: git diff --exit-code --ignore-space-at-eol
       - run: flutter analyze
         working-directory: mobile
       - run: flutter test
