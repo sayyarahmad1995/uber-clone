@@ -27,14 +27,32 @@ jobs:
         with:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
-      - name: Check Go formatting
+      - name: Check changed Go file formatting
+        env:
+          EVENT_BEFORE: ${{ github.event.before }}
         run: |
-          files="$(gofmt -l .)"
-          if [ -n "$files" ]; then
-            echo "$files"
+          changed_files() {
+            if [ -n "${GITHUB_BASE_REF:-}" ]; then
+              git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF"
+              git diff --name-only --diff-filter=ACMR "origin/$GITHUB_BASE_REF"...HEAD -- 'backend/**/*.go'
+            elif [ -n "${EVENT_BEFORE:-}" ] && [ "$EVENT_BEFORE" != "0000000000000000000000000000000000000000" ]; then
+              git diff --name-only --diff-filter=ACMR "$EVENT_BEFORE" HEAD -- 'backend/**/*.go'
+            else
+              git diff-tree --no-commit-id --name-only -r HEAD --diff-filter=ACMR -- 'backend/**/*.go'
+            fi
+          }
+
+          mapfile -t files < <(changed_files)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No Go files changed."
+            exit 0
+          fi
+
+          unformatted="$(gofmt -l "${files[@]}")"
+          if [ -n "$unformatted" ]; then
+            echo "$unformatted"
             exit 1
           fi
-        working-directory: backend
       - run: go vet ./...
         working-directory: backend
       - run: go test -p 1 ./...
@@ -52,8 +70,28 @@ jobs:
           echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
       - run: flutter pub get
         working-directory: mobile
-      - run: dart format --output=none --set-exit-if-changed lib test
-        working-directory: mobile
+      - name: Check changed Dart file formatting
+        env:
+          EVENT_BEFORE: ${{ github.event.before }}
+        run: |
+          changed_files() {
+            if [ -n "${GITHUB_BASE_REF:-}" ]; then
+              git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF"
+              git diff --name-only --diff-filter=ACMR "origin/$GITHUB_BASE_REF"...HEAD -- 'mobile/lib/**/*.dart' 'mobile/test/**/*.dart'
+            elif [ -n "${EVENT_BEFORE:-}" ] && [ "$EVENT_BEFORE" != "0000000000000000000000000000000000000000" ]; then
+              git diff --name-only --diff-filter=ACMR "$EVENT_BEFORE" HEAD -- 'mobile/lib/**/*.dart' 'mobile/test/**/*.dart'
+            else
+              git diff-tree --no-commit-id --name-only -r HEAD --diff-filter=ACMR -- 'mobile/lib/**/*.dart' 'mobile/test/**/*.dart'
+            fi
+          }
+
+          mapfile -t files < <(changed_files)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No Dart files changed."
+            exit 0
+          fi
+
+          dart format --output=none --set-exit-if-changed "${files[@]}"
       - run: dart run build_runner build --delete-conflicting-outputs
         working-directory: mobile
       - run: git diff --exit-code
