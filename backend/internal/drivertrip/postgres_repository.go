@@ -34,7 +34,12 @@ func (r PostgresRepository) GetCurrent(ctx context.Context, driverUserID uuid.UU
 		FROM trips t
 		JOIN ride_requests rr ON rr.id = t.ride_request_id
 		WHERE t.driver_user_id = $1
-		  AND t.status IN ('assigned', 'in_progress')
+		  AND (
+		    t.status IN ('assigned', 'in_progress')
+		    OR (t.status = 'completed' AND t.settlement_status = 'unsettled')
+		  )
+		ORDER BY t.assigned_at DESC, t.ride_request_id DESC
+		LIMIT 1
 	`, driverUserID).Scan(
 		&view.RideRequestID,
 		&view.Pickup.Latitude,
