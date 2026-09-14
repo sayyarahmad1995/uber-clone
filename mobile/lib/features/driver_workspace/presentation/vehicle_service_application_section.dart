@@ -374,9 +374,13 @@ class _ApplicationSummary extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Latest additional application: ${_applicationStatus(application)}'),
+            Text(
+              'Latest additional application: ${_applicationStatus(application)}',
+            ),
             Text('Service: ${application.service.displayName}'),
-            Text('${_vehicleLabel(application.vehicle)} • ${application.vehicle.color}'),
+            Text(
+              '${_vehicleLabel(application.vehicle)} • ${application.vehicle.color}',
+            ),
             Text('License plate: ${application.vehicle.licensePlate}'),
             if (application.rejectionReason != null)
               Text(
