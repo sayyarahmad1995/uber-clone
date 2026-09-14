@@ -151,10 +151,11 @@ func driverServiceResponse(service driveronboarding.ServiceOption) map[string]an
 
 func driverOnboardingResponse(application driveronboarding.Application) map[string]any {
 	return map[string]any{
-		"id":           application.ID,
-		"display_name": application.DisplayName,
-		"status":       application.Status,
-		"service":      driverServiceResponse(application.Service),
+		"id":               application.ID,
+		"application_type": application.ApplicationType,
+		"display_name":     application.DisplayName,
+		"status":           application.Status,
+		"service":          driverServiceResponse(application.Service),
 		"vehicle": map[string]any{
 			"make":          application.Vehicle.Make,
 			"model":         application.Vehicle.Model,
