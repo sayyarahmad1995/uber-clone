@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../theme/app_theme.dart';
+import 'last_map_location_store.dart';
 import 'map_tiles.dart';
 
 class RideMapMarker {
@@ -51,10 +52,12 @@ class _RideMapState extends State<RideMap> {
   static const _autoCenterLabel = 'Your published location';
 
   String? _lastAutoCenteredPoint;
+  bool _restoredCachedCenter = false;
 
   @override
   void initState() {
     super.initState();
+    _restoreCachedCenter();
     _scheduleAutoCenter();
   }
 
@@ -62,6 +65,19 @@ class _RideMapState extends State<RideMap> {
   void didUpdateWidget(covariant RideMap oldWidget) {
     super.didUpdateWidget(oldWidget);
     _scheduleAutoCenter();
+  }
+
+  Future<void> _restoreCachedCenter() async {
+    final controller = widget.mapController;
+    if (controller == null || _restoredCachedCenter) return;
+    final location = await PreferencesLastMapLocationStore().read();
+    if (!mounted || location == null || _restoredCachedCenter) return;
+    _restoredCachedCenter = true;
+    final center = LatLng(location.latitude, location.longitude);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      controller.move(center, 15);
+    });
   }
 
   RideMapMarker? _autoCenterMarker() {
