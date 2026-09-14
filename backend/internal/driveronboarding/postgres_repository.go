@@ -59,7 +59,26 @@ func (r PostgresRepository) FindService(ctx context.Context, code string) (Servi
 
 func (r PostgresRepository) LatestApplication(ctx context.Context, userID uuid.UUID) (Application, error) {
 	row := r.db.QueryRowContext(ctx, `
-		SELECT a.id, a.driver_user_id, a.display_name,
+		SELECT a.id, a.driver_user_id,
+		       CASE
+		           WHEN EXISTS (
+		               SELECT 1
+		               FROM driver_onboarding_applications previous
+		               WHERE previous.driver_user_id = a.driver_user_id
+		                 AND previous.id <> a.id
+		                 AND previous.status = 'approved'
+		                 AND previous.decided_at IS NOT NULL
+		                 AND previous.decided_at <= a.submitted_at
+		           ) OR EXISTS (
+		               SELECT 1
+		               FROM driver_profiles profile
+		               WHERE profile.user_id = a.driver_user_id
+		                 AND profile.created_at <= a.submitted_at
+		           )
+		           THEN 'additional_vehicle_service'
+		           ELSE 'initial_onboarding'
+		       END,
+		       a.display_name,
 		       s.code, s.display_name, s.description, s.minimum_model_year, s.implied_service_code,
 		       a.vehicle_make, a.vehicle_model, a.vehicle_model_year, a.vehicle_color, a.vehicle_license_plate,
 		       a.status, COALESCE(a.rejection_reason, ''), a.submitted_at, a.decided_at,
@@ -88,6 +107,11 @@ func (r PostgresRepository) CreateApplication(ctx context.Context, userID uuid.U
 	defer tx.Rollback()
 
 	if err := lockDriverReviewScope(ctx, tx, userID); err != nil {
+		return Application{}, err
+	}
+
+	applicationType, err := applicationTypeForSubmission(ctx, tx, userID)
+	if err != nil {
 		return Application{}, err
 	}
 
@@ -127,19 +151,39 @@ func (r PostgresRepository) CreateApplication(ctx context.Context, userID uuid.U
 		return Application{}, err
 	}
 	return Application{
-		ID:           applicationID,
-		DriverUserID: userID,
-		DisplayName:  input.DisplayName,
-		Service:      service,
-		Vehicle:      input.Vehicle,
-		Status:       StatusPending,
-		SubmittedAt:  now,
+		ID:              applicationID,
+		DriverUserID:    userID,
+		ApplicationType: applicationType,
+		DisplayName:     input.DisplayName,
+		Service:         service,
+		Vehicle:         input.Vehicle,
+		Status:          StatusPending,
+		SubmittedAt:     now,
 	}, nil
 }
 
 func (r PostgresRepository) ListPendingApplications(ctx context.Context) ([]Application, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT a.id, a.driver_user_id, a.display_name,
+		SELECT a.id, a.driver_user_id,
+		       CASE
+		           WHEN EXISTS (
+		               SELECT 1
+		               FROM driver_onboarding_applications previous
+		               WHERE previous.driver_user_id = a.driver_user_id
+		                 AND previous.id <> a.id
+		                 AND previous.status = 'approved'
+		                 AND previous.decided_at IS NOT NULL
+		                 AND previous.decided_at <= a.submitted_at
+		           ) OR EXISTS (
+		               SELECT 1
+		               FROM driver_profiles profile
+		               WHERE profile.user_id = a.driver_user_id
+		                 AND profile.created_at <= a.submitted_at
+		           )
+		           THEN 'additional_vehicle_service'
+		           ELSE 'initial_onboarding'
+		       END,
+		       a.display_name,
 		       s.code, s.display_name, s.description, s.minimum_model_year, s.implied_service_code,
 		       a.vehicle_make, a.vehicle_model, a.vehicle_model_year, a.vehicle_color, a.vehicle_license_plate,
 		       a.status, COALESCE(a.rejection_reason, ''), a.submitted_at, a.decided_at,
@@ -170,7 +214,26 @@ func (r PostgresRepository) ListPendingApplications(ctx context.Context) ([]Appl
 
 func (r PostgresRepository) FindApplicationByID(ctx context.Context, applicationID uuid.UUID) (Application, error) {
 	row := r.db.QueryRowContext(ctx, `
-		SELECT a.id, a.driver_user_id, a.display_name,
+		SELECT a.id, a.driver_user_id,
+		       CASE
+		           WHEN EXISTS (
+		               SELECT 1
+		               FROM driver_onboarding_applications previous
+		               WHERE previous.driver_user_id = a.driver_user_id
+		                 AND previous.id <> a.id
+		                 AND previous.status = 'approved'
+		                 AND previous.decided_at IS NOT NULL
+		                 AND previous.decided_at <= a.submitted_at
+		           ) OR EXISTS (
+		               SELECT 1
+		               FROM driver_profiles profile
+		               WHERE profile.user_id = a.driver_user_id
+		                 AND profile.created_at <= a.submitted_at
+		           )
+		           THEN 'additional_vehicle_service'
+		           ELSE 'initial_onboarding'
+		       END,
+		       a.display_name,
 		       s.code, s.display_name, s.description, s.minimum_model_year, s.implied_service_code,
 		       a.vehicle_make, a.vehicle_model, a.vehicle_model_year, a.vehicle_color, a.vehicle_license_plate,
 		       a.status, COALESCE(a.rejection_reason, ''), a.submitted_at, a.decided_at,
@@ -314,6 +377,19 @@ func (r PostgresRepository) RejectApplication(ctx context.Context, applicationID
 	return application, nil
 }
 
+func applicationTypeForSubmission(ctx context.Context, tx *sql.Tx, userID uuid.UUID) (ApplicationType, error) {
+	var hasApprovedProfile bool
+	if err := tx.QueryRowContext(ctx, `
+		SELECT EXISTS (SELECT 1 FROM driver_profiles WHERE user_id = $1)
+	`, userID).Scan(&hasApprovedProfile); err != nil {
+		return "", err
+	}
+	if hasApprovedProfile {
+		return ApplicationTypeAdditionalVehicleService, nil
+	}
+	return ApplicationTypeInitialOnboarding, nil
+}
+
 func loadApplicationDriverUserID(ctx context.Context, tx *sql.Tx, applicationID uuid.UUID) (uuid.UUID, error) {
 	var userID uuid.UUID
 	if err := tx.QueryRowContext(ctx, `
@@ -340,7 +416,26 @@ func lockDriverReviewScope(ctx context.Context, tx *sql.Tx, userID uuid.UUID) er
 
 func loadApplicationForUpdate(ctx context.Context, tx *sql.Tx, applicationID uuid.UUID) (Application, error) {
 	row := tx.QueryRowContext(ctx, `
-		SELECT a.id, a.driver_user_id, a.display_name,
+		SELECT a.id, a.driver_user_id,
+		       CASE
+		           WHEN EXISTS (
+		               SELECT 1
+		               FROM driver_onboarding_applications previous
+		               WHERE previous.driver_user_id = a.driver_user_id
+		                 AND previous.id <> a.id
+		                 AND previous.status = 'approved'
+		                 AND previous.decided_at IS NOT NULL
+		                 AND previous.decided_at <= a.submitted_at
+		           ) OR EXISTS (
+		               SELECT 1
+		               FROM driver_profiles profile
+		               WHERE profile.user_id = a.driver_user_id
+		                 AND profile.created_at <= a.submitted_at
+		           )
+		           THEN 'additional_vehicle_service'
+		           ELSE 'initial_onboarding'
+		       END,
+		       a.display_name,
 		       s.code, s.display_name, s.description, s.minimum_model_year, s.implied_service_code,
 		       a.vehicle_make, a.vehicle_model, a.vehicle_model_year, a.vehicle_color, a.vehicle_license_plate,
 		       a.status, COALESCE(a.rejection_reason, ''), a.submitted_at, a.decided_at,
@@ -394,6 +489,7 @@ func scanApplication(scan scanFunc) (Application, error) {
 	if err := scan(
 		&application.ID,
 		&application.DriverUserID,
+		&application.ApplicationType,
 		&application.DisplayName,
 		&application.Service.Code,
 		&application.Service.DisplayName,
