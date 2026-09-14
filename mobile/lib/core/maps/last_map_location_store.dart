@@ -31,7 +31,10 @@ class PreferencesLastMapLocationStore implements LastMapLocationStore {
       final latitude = preferences.getDouble(_latitudeKey);
       final longitude = preferences.getDouble(_longitudeKey);
       if (latitude == null || longitude == null) return null;
-      final location = LastMapLocation(latitude: latitude, longitude: longitude);
+      final location = LastMapLocation(
+        latitude: latitude,
+        longitude: longitude,
+      );
       return location.isValid ? location : null;
     } catch (_) {
       return null;
