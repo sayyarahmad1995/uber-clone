@@ -17,7 +17,9 @@ class DriverDetailsScreen extends ConsumerWidget {
     final profile = driver.profile;
     final application = onboarding.application;
     final loading = !driver.loaded || (profile == null && !onboarding.loaded);
-    final error = profile == null ? driver.error ?? onboarding.error : driver.error;
+    final error = profile == null
+        ? driver.error ?? onboarding.error
+        : driver.error;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Driver details')),
@@ -367,7 +369,8 @@ class _VehicleContent extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'This is your submitted application snapshot. Approved service enrollments are shown on registered vehicle records.',
+          'This is your submitted application snapshot. Approved service '
+          'enrollments are shown on registered vehicle records.',
           style: Theme.of(context).textTheme.bodySmall,
         ),
       ],
