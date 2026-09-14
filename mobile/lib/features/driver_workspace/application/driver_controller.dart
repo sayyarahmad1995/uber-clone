@@ -35,6 +35,7 @@ class DriverController extends ChangeNotifier {
   bool _disposed = false;
   bool _foreground = true;
   bool _firstLoad = true;
+  bool _entryPublishInFlight = false;
   Timer? _heartbeat;
 
   void setForeground(bool foreground) {
@@ -110,7 +111,11 @@ class DriverController extends ChangeNotifier {
       }
       loaded = true;
     });
-    if (!_disposed && _foreground && profile != null && location == null) {
+    if (!_disposed &&
+        _foreground &&
+        profile != null &&
+        operation?.valid == true &&
+        location == null) {
       unawaited(_publishForDriverModeEntry());
     }
   }
@@ -133,10 +138,24 @@ class DriverController extends ChangeNotifier {
     location = await _repository.publishLocation(point);
   }
 
-  Future<void> _publishForDriverModeEntry() => _run(() async {
-    if (profile == null) return;
-    await _publish();
-  }, reportError: false);
+  Future<void> _publishForDriverModeEntry() async {
+    if (_entryPublishInFlight ||
+        _disposed ||
+        !_foreground ||
+        profile == null ||
+        operation?.valid != true) {
+      return;
+    }
+    _entryPublishInFlight = true;
+    try {
+      await _publish();
+    } catch (_) {
+      // Driver mode entry should not surface permission or location errors.
+    } finally {
+      _entryPublishInFlight = false;
+      if (!_disposed) notifyListeners();
+    }
+  }
 
   Future<void> publishLocation() => _run(() async {
     if (profile == null) return;
