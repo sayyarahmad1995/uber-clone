@@ -38,30 +38,19 @@ class _VehicleServiceApplicationSectionState
     super.dispose();
   }
 
-  DriverServiceOption? _selectedService(List<DriverServiceOption> services) {
-    for (final service in services) {
-      if (service.code == _serviceCode) return service;
-    }
-    return services.isEmpty ? null : services.first;
-  }
-
   @override
   Widget build(BuildContext context) {
     final onboarding = ref.watch(driverOnboardingControllerProvider);
     final driver = ref.watch(driverControllerProvider);
-    final profile = driver.profile;
-    final application = onboarding.application;
-    final latestAdditional = application?.isAdditionalVehicleService == true
-        ? application
-        : null;
     final selectedService = _selectedService(onboarding.services);
     _serviceCode ??= selectedService?.code;
 
+    final latestAdditional = _latestAdditional(onboarding.application);
     final child = _adding
         ? _buildForm(
             context: context,
             onboarding: onboarding,
-            profile: profile,
+            profile: driver.profile,
             selectedService: selectedService,
           )
         : _buildSummary(
@@ -153,22 +142,11 @@ class _VehicleServiceApplicationSectionState
             'Approval will add a new approved operating option.',
           ),
           const SizedBox(height: AppSpacing.sm),
-          DropdownButtonFormField<String>(
-            key: const Key('additional-service-field'),
-            initialValue: _serviceCode,
-            decoration: const InputDecoration(labelText: 'Requested service'),
-            items: onboarding.services
-                .map<DropdownMenuItem<String>>(
-                  (service) => DropdownMenuItem<String>(
-                    value: service.code,
-                    child: Text(service.displayName),
-                  ),
-                )
-                .toList(growable: false),
-            onChanged: onboarding.busy || onboarding.services.isEmpty
-                ? null
-                : (value) => setState(() => _serviceCode = value),
-            validator: (value) => value == null ? 'Select a service' : null,
+          _ServicePicker(
+            services: onboarding.services,
+            serviceCode: _serviceCode,
+            busy: onboarding.busy,
+            onChanged: (value) => setState(() => _serviceCode = value),
           ),
           if (selectedService != null) ...[
             const SizedBox(height: AppSpacing.xs),
@@ -233,22 +211,16 @@ class _VehicleServiceApplicationSectionState
     required DriverServiceOption service,
   }) async {
     if (!_form.currentState!.validate()) return;
-    final values = _fields.map((field) => field.text.trim()).toList();
-    final vehicle = DriverVehicle(
-      make: values[0],
-      model: values[1],
-      modelYear: int.parse(values[2]),
-      color: values[3],
-      licensePlate: values[4],
-    );
-    final displayName = _displayName(profile);
 
+    final vehicle = _vehicleFromFields();
+    final displayName = _displayName(profile);
     final precheck = await onboarding.precheck(
       displayName: displayName,
       serviceCode: service.code,
       vehicle: vehicle,
     );
     if (!mounted || precheck == null) return;
+
     if (!precheck.eligible) {
       await _showIneligibleDialog(precheck);
       return;
@@ -271,11 +243,7 @@ class _VehicleServiceApplicationSectionState
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Vehicle not eligible'),
-        content: Text(
-          precheck.reasons.isEmpty
-              ? 'This vehicle does not meet the selected service requirements.'
-              : precheck.reasons.join('\n'),
-        ),
+        content: Text(_ineligibleMessage(precheck)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -328,6 +296,31 @@ class _VehicleServiceApplicationSectionState
     ref.invalidate(driverVehiclesProvider);
   }
 
+  DriverOnboardingApplication? _latestAdditional(
+    DriverOnboardingApplication? application,
+  ) {
+    if (application?.isAdditionalVehicleService != true) return null;
+    return application;
+  }
+
+  DriverServiceOption? _selectedService(List<DriverServiceOption> services) {
+    for (final service in services) {
+      if (service.code == _serviceCode) return service;
+    }
+    return services.isEmpty ? null : services.first;
+  }
+
+  DriverVehicle _vehicleFromFields() {
+    final values = _fields.map((field) => field.text.trim()).toList();
+    return DriverVehicle(
+      make: values[0],
+      model: values[1],
+      modelYear: int.parse(values[2]),
+      color: values[3],
+      licensePlate: values[4],
+    );
+  }
+
   String? _validateField(int index, String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'Required';
@@ -355,6 +348,46 @@ class _VehicleServiceApplicationSectionState
     return 'Add another vehicle and service without changing your approved '
         'Driver profile.';
   }
+
+  String _ineligibleMessage(DriverOnboardingPrecheck precheck) {
+    if (precheck.reasons.isEmpty) {
+      return 'This vehicle does not meet the selected service requirements.';
+    }
+    return precheck.reasons.join('\n');
+  }
+}
+
+class _ServicePicker extends StatelessWidget {
+  const _ServicePicker({
+    required this.services,
+    required this.serviceCode,
+    required this.busy,
+    required this.onChanged,
+  });
+
+  final List<DriverServiceOption> services;
+  final String? serviceCode;
+  final bool busy;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<String>(
+      key: const Key('additional-service-field'),
+      initialValue: serviceCode,
+      decoration: const InputDecoration(labelText: 'Requested service'),
+      items: services
+          .map(
+            (service) => DropdownMenuItem<String>(
+              value: service.code,
+              child: Text(service.displayName),
+            ),
+          )
+          .toList(growable: false),
+      onChanged: busy || services.isEmpty ? null : onChanged,
+      validator: (value) => value == null ? 'Select a service' : null,
+    );
+  }
 }
 
 class _ApplicationSummary extends StatelessWidget {
@@ -374,13 +407,9 @@ class _ApplicationSummary extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Latest additional application: ${_applicationStatus(application)}',
-            ),
+            Text(_latestApplicationLabel(application)),
             Text('Service: ${application.service.displayName}'),
-            Text(
-              '${_vehicleLabel(application.vehicle)} • ${application.vehicle.color}',
-            ),
+            Text('${_vehicleLabel(application.vehicle)} • ${application.vehicle.color}'),
             Text('License plate: ${application.vehicle.licensePlate}'),
             if (application.rejectionReason != null)
               Text(
@@ -392,6 +421,10 @@ class _ApplicationSummary extends StatelessWidget {
       ),
     );
   }
+}
+
+String _latestApplicationLabel(DriverOnboardingApplication application) {
+  return 'Latest additional application: ${_applicationStatus(application)}';
 }
 
 String _applicationStatus(DriverOnboardingApplication application) {
