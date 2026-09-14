@@ -29,10 +29,12 @@ class RideMap extends StatefulWidget {
     required this.tiles,
     this.mapController,
     this.markers = const [],
-    this.initialCenter = const LatLng(24.8607, 67.0011),
+    this.initialCenter = defaultCenter,
     this.initialZoom = 12,
     this.onTap,
   });
+
+  static const defaultCenter = LatLng(24.8607, 67.0011);
 
   final MapTiles tiles;
   final MapController? mapController;
