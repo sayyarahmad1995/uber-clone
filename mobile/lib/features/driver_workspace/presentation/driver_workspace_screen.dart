@@ -526,7 +526,8 @@ class _DriverReadinessPanel extends StatelessWidget {
       const SizedBox(height: AppSpacing.md),
       DashboardPanelControl(
         child: FilledButton.icon(
-          onPressed: busy || (!profile.isOnline && (!selectionValid || activeTrip))
+          onPressed:
+              busy || (!profile.isOnline && (!selectionValid || activeTrip))
               ? null
               : () => onAvailabilityChanged(!profile.isOnline),
           icon: const Icon(Icons.power_settings_new),
