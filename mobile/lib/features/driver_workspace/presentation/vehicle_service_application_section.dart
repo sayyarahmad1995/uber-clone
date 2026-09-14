@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../application/driver_onboarding_controller.dart';
 import '../domain/driver_onboarding.dart';
 import '../domain/driver_profile.dart';
 
@@ -80,7 +81,7 @@ class _VehicleServiceApplicationSectionState
 
   Widget _buildSummary({
     required BuildContext context,
-    required dynamic onboarding,
+    required DriverOnboardingController onboarding,
     required DriverOnboardingApplication? latestAdditional,
   }) {
     final pending = latestAdditional?.isPending == true;
@@ -139,7 +140,7 @@ class _VehicleServiceApplicationSectionState
 
   Widget _buildForm({
     required BuildContext context,
-    required dynamic onboarding,
+    required DriverOnboardingController onboarding,
     required DriverProfile? profile,
     required DriverServiceOption? selectedService,
   }) {
@@ -228,7 +229,9 @@ class _VehicleServiceApplicationSectionState
                           profile: profile,
                           service: selectedService,
                         ),
-                child: Text(onboarding.busy ? 'Checking…' : 'Review application'),
+                child: Text(
+                  onboarding.busy ? 'Checking…' : 'Review application',
+                ),
               ),
               TextButton(
                 onPressed: onboarding.busy
@@ -244,7 +247,7 @@ class _VehicleServiceApplicationSectionState
   }
 
   Future<void> _reviewAndSubmit({
-    required dynamic onboarding,
+    required DriverOnboardingController onboarding,
     required DriverProfile? profile,
     required DriverServiceOption service,
   }) async {
