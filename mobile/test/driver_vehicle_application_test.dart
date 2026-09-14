@@ -60,10 +60,8 @@ void main() {
       onboarding.application!.applicationType,
       'additional_vehicle_service',
     );
-    expect(
-      find.text('Latest additional application: Under review'),
-      findsOneWidget,
-    );
+    expect(onboarding.application!.isPending, isTrue);
+    expect(onboarding.application!.vehicle.licensePlate, 'NEW-456');
   });
 
   testWidgets('pending additional application disables another submission', (
