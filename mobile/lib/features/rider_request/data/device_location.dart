@@ -23,21 +23,17 @@ class CachingDeviceLocation implements DeviceLocation {
   @override
   Future<GeoPoint> current() async {
     final point = await _delegate.current();
-    try {
-      await _cache.save(
-        LastMapLocation(
-          latitude: point.latitude,
-          longitude: point.longitude,
-        ),
-      );
-    } catch (_) {
-      // A cache write must never block a live location read.
-    }
+    await _save(point, _cache);
     return point;
   }
 }
 
 class GeolocatorDeviceLocation implements DeviceLocation {
+  GeolocatorDeviceLocation({LastMapLocationStore? cache})
+    : _cache = cache ?? PreferencesLastMapLocationStore();
+
+  final LastMapLocationStore _cache;
+
   @override
   Future<GeoPoint> current() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
@@ -56,6 +52,21 @@ class GeolocatorDeviceLocation implements DeviceLocation {
       );
     }
     final position = await Geolocator.getCurrentPosition();
-    return GeoPoint(latitude: position.latitude, longitude: position.longitude);
+    final point = GeoPoint(
+      latitude: position.latitude,
+      longitude: position.longitude,
+    );
+    await _save(point, _cache);
+    return point;
+  }
+}
+
+Future<void> _save(GeoPoint point, LastMapLocationStore cache) async {
+  try {
+    await cache.save(
+      LastMapLocation(latitude: point.latitude, longitude: point.longitude),
+    );
+  } catch (_) {
+    // A cache write must never block a live location read.
   }
 }
