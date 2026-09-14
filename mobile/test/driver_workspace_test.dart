@@ -98,7 +98,7 @@ void main() {
     expect(find.text('Service: Comfort'), findsOneWidget);
   });
 
-  testWidgets('operational Driver can center map on published location', (
+  testWidgets('operational Driver centers map on entry and with the control', (
     tester,
   ) async {
     final repo = FakeDriverRepository(profile: driverProfile);
@@ -120,10 +120,12 @@ void main() {
 
     await tester.pumpAndSettle();
 
+    expect(repo.calls, ['location']);
+
     await tester.tap(find.byKey(const Key('driverCurrentLocationButton')));
     await tester.pumpAndSettle();
 
-    expect(repo.calls, ['location']);
+    expect(repo.calls, ['location', 'location']);
   });
 
   testWidgets('existing operational Driver can still go online', (
@@ -154,7 +156,7 @@ void main() {
     await tester.ensureVisible(find.text('Go online'));
     await tester.tap(find.text('Go online'));
     await tester.pumpAndSettle();
-    expect(repo.calls.take(2).toList(), ['location', 'online=true']);
+    expect(repo.calls, ['location', 'location', 'online=true']);
     expect(repo.profile!.isOnline, isTrue);
     expect(find.text('Go offline'), findsOneWidget);
   });
