@@ -153,6 +153,11 @@ void main() {
       const Offset(0, -300),
     );
     await tester.pumpAndSettle();
+    await tester.drag(
+      find.text('Vehicle/service applications'),
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Go online'));
     await tester.tap(find.text('Go online'));
     await tester.pumpAndSettle();
