@@ -29,6 +29,13 @@ const (
 	StatusRejected ApplicationStatus = "rejected"
 )
 
+type ApplicationType string
+
+const (
+	ApplicationTypeInitialOnboarding       ApplicationType = "initial_onboarding"
+	ApplicationTypeAdditionalVehicleService ApplicationType = "additional_vehicle_service"
+)
+
 type ServiceOption struct {
 	Code               string
 	DisplayName        string
@@ -54,6 +61,7 @@ type ApplicationInput struct {
 type Application struct {
 	ID              uuid.UUID
 	DriverUserID    uuid.UUID
+	ApplicationType ApplicationType
 	DisplayName     string
 	Service         ServiceOption
 	Vehicle         VehicleInput
