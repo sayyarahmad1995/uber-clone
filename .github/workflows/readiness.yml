@@ -93,7 +93,8 @@ jobs:
             exit 0
           fi
 
-          dart format --output=none --set-exit-if-changed "${files[@]}"
+          dart format --output=show "${files[@]}"
+          exit 1
       - run: dart run build_runner build --delete-conflicting-outputs
         working-directory: mobile
       - run: git diff --exit-code --ignore-space-at-eol
