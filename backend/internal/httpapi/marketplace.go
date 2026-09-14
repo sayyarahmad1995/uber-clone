@@ -70,12 +70,14 @@ func (api *API) acceptRideOffer(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var body struct { UpdatedAt time.Time `json:"updated_at"` }
-    if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.UpdatedAt.IsZero() {
-      writeJSON(w, http.StatusBadRequest, map[string]string{"error":"refresh offers and select the current offer version"})
-      return
-    }
-    result, err := api.offers.Accept(r.Context(), rideRequestID, u.ID, driverUserID, body.UpdatedAt)
+	var body struct {
+		UpdatedAt time.Time `json:"updated_at"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.UpdatedAt.IsZero() {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "refresh offers and select the current offer version"})
+		return
+	}
+	result, err := api.offers.Accept(r.Context(), rideRequestID, u.ID, driverUserID, body.UpdatedAt)
 	if writeOfferError(w, err) {
 		return
 	}
@@ -188,6 +190,7 @@ func riderOfferResponse(item offer.RiderOffer) map[string]any {
 	response["selectable"] = item.Selectable
 	response["driver"] = nil
 	response["vehicle"] = nil
+	response["service"] = nil
 	if item.Driver != nil {
 		response["driver"] = map[string]any{"display_name": item.Driver.DisplayName}
 	}
@@ -197,6 +200,12 @@ func riderOfferResponse(item offer.RiderOffer) map[string]any {
 			"model":      item.Vehicle.Model,
 			"model_year": modelYearResponse(item.Vehicle.ModelYear),
 			"color":      item.Vehicle.Color,
+		}
+	}
+	if item.Service != nil {
+		response["service"] = map[string]any{
+			"code":         item.Service.Code,
+			"display_name": item.Service.DisplayName,
 		}
 	}
 	return response

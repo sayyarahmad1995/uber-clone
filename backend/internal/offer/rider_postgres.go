@@ -33,24 +33,25 @@ func (r PostgresRepository) ListForRider(ctx context.Context, rideRequestID, rid
 		       o.status, o.created_at, o.updated_at, o.decided_at,
 		       o.operation_context->>'driver_name',
 		       o.operation_context->>'make', o.operation_context->>'model', (o.operation_context->>'model_year')::integer, o.operation_context->>'color',
+		       o.operation_context->>'service_code', o.operation_context->>'service_name',
 		       CASE WHEN l.updated_at BETWEEN statement_timestamp() - ($3 * INTERVAL '1 second') AND statement_timestamp()
 		            THEN `+pickupDistanceSQL+` END AS pickup_distance_meters,
 		       o.amount_minor = rr.proposed_fare_minor AND o.currency = rr.currency AS matches_proposed_fare,
 		       COALESCE(o.status = 'pending' AND p.status = 'active' AND p.is_online
 		         AND v.driver_user_id IS NOT NULL AND c.user_id IS NOT NULL
-                 AND sc.code = rr.service_code
-                 AND o.operation_context->>'vehicle_id' = s.vehicle_id::text
-                 AND o.operation_context->>'service_code' = s.service_code
+		         AND sc.code = rr.service_code
+		         AND o.operation_context->>'vehicle_id' = s.vehicle_id::text
+		         AND o.operation_context->>'service_code' = s.service_code
 		         AND l.updated_at BETWEEN statement_timestamp() - ($3 * INTERVAL '1 second') AND statement_timestamp()
 		         AND o.driver_user_id <> rr.rider_user_id
 		         AND NOT EXISTS (SELECT 1 FROM trips t WHERE t.driver_user_id = o.driver_user_id AND t.status IN ('assigned', 'in_progress')), FALSE) AS selectable
 		FROM ride_requests rr
 		JOIN ride_offers o ON o.ride_request_id = rr.id
 		LEFT JOIN driver_profiles p ON p.user_id = o.driver_user_id
-        LEFT JOIN driver_operating_selections s ON s.driver_user_id=p.user_id
-        LEFT JOIN driver_vehicles v ON v.id=s.vehicle_id AND v.driver_user_id=p.user_id
-        LEFT JOIN driver_vehicle_service_enrollments e ON e.vehicle_id=v.id AND e.service_code=s.service_code
-        LEFT JOIN driver_service_catalog sc ON sc.code=e.service_code AND sc.is_active
+		LEFT JOIN driver_operating_selections s ON s.driver_user_id = p.user_id
+		LEFT JOIN driver_vehicles v ON v.id = s.vehicle_id AND v.driver_user_id = p.user_id
+		LEFT JOIN driver_vehicle_service_enrollments e ON e.vehicle_id = v.id AND e.service_code = s.service_code
+		LEFT JOIN driver_service_catalog sc ON sc.code = e.service_code AND sc.is_active
 		LEFT JOIN user_capabilities c ON c.user_id = p.user_id AND c.capability = 'driver'
 		LEFT JOIN driver_locations l ON l.driver_user_id = p.user_id
 		WHERE rr.id = $1 AND rr.rider_user_id = $2 AND rr.status = 'requested'
@@ -67,12 +68,29 @@ func (r PostgresRepository) ListForRider(ctx context.Context, rideRequestID, rid
 	items := make([]RiderOffer, 0)
 	for rows.Next() {
 		var item RiderOffer
-		var displayName, make, model, color sql.NullString
+		var displayName, make, model, color, serviceCode, serviceName sql.NullString
 		var modelYear sql.NullInt64
 		var distance sql.NullFloat64
-		if err := rows.Scan(&item.RideRequestID, &item.DriverUserID, &item.AmountMinor, &item.Currency,
-			&item.Status, &item.CreatedAt, &item.UpdatedAt, &item.DecidedAt,
-			&displayName, &make, &model, &modelYear, &color, &distance, &item.MatchesProposedFare, &item.Selectable); err != nil {
+		if err := rows.Scan(
+			&item.RideRequestID,
+			&item.DriverUserID,
+			&item.AmountMinor,
+			&item.Currency,
+			&item.Status,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+			&item.DecidedAt,
+			&displayName,
+			&make,
+			&model,
+			&modelYear,
+			&color,
+			&serviceCode,
+			&serviceName,
+			&distance,
+			&item.MatchesProposedFare,
+			&item.Selectable,
+		); err != nil {
 			return nil, err
 		}
 		if displayName.Valid {
@@ -83,6 +101,13 @@ func (r PostgresRepository) ListForRider(ctx context.Context, rideRequestID, rid
 			if modelYear.Valid {
 				item.Vehicle.ModelYear = int(modelYear.Int64)
 			}
+		}
+		if serviceCode.Valid {
+			displayName := serviceName.String
+			if !serviceName.Valid || displayName == "" {
+				displayName = serviceCode.String
+			}
+			item.Service = &ServiceSummary{Code: serviceCode.String, DisplayName: displayName}
 		}
 		if distance.Valid {
 			item.PickupDistanceMeters = &distance.Float64
