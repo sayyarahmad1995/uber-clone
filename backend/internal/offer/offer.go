@@ -71,6 +71,7 @@ type RiderOffer struct {
 	Offer
 	Driver               *DriverSummary
 	Vehicle              *VehicleSummary
+	Service              *ServiceSummary
 	PickupDistanceMeters *float64
 	MatchesProposedFare  bool
 	Selectable           bool
@@ -85,6 +86,11 @@ type VehicleSummary struct {
 	Model     string
 	ModelYear int
 	Color     string
+}
+
+type ServiceSummary struct {
+	Code        string
+	DisplayName string
 }
 
 type Submission struct {
