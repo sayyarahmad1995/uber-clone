@@ -238,7 +238,9 @@ class _VehicleServiceApplicationSectionState
     setState(() => _adding = false);
   }
 
-  Future<void> _showIneligibleDialog(DriverOnboardingPrecheck precheck) async {
+  Future<void> _showIneligibleDialog(
+    DriverOnboardingPrecheck precheck,
+  ) async {
     await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
@@ -273,7 +275,8 @@ class _VehicleServiceApplicationSectionState
             const SizedBox(height: AppSpacing.sm),
             const Text(
               'Submitting sends this vehicle/service application for review. '
-              'It will not change your approved Driver profile or online status.',
+              'It will not change your approved Driver profile or '
+              'online status.',
             ),
           ],
         ),
@@ -424,11 +427,13 @@ class _ApplicationSummary extends StatelessWidget {
 }
 
 String _latestApplicationLabel(DriverOnboardingApplication application) {
-  return 'Latest additional application: ${_applicationStatus(application)}';
+  final status = _applicationStatus(application);
+  return 'Latest additional application: $status';
 }
 
 String _applicationVehicleLabel(DriverOnboardingApplication application) {
-  return '${_vehicleLabel(application.vehicle)} • ${application.vehicle.color}';
+  final vehicle = _vehicleLabel(application.vehicle);
+  return '$vehicle • ${application.vehicle.color}';
 }
 
 String _applicationStatus(DriverOnboardingApplication application) {
