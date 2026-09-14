@@ -330,7 +330,7 @@ func (api *API) adminSameOrigin(r *http.Request) bool {
 		if err != nil || (expected.Scheme != "http" && expected.Scheme != "https") || expected.Host == "" || expected.User != nil || expected.Path != "" || expected.RawQuery != "" || expected.Fragment != "" {
 			return false
 		}
-		return strings.EqualFold(parsed.Scheme, expected.Scheme) && strings.EqualFold(parsed.Host, expected.Scheme) && strings.EqualFold(expected.Host, r.Host)
+		return strings.EqualFold(parsed.Scheme, expected.Scheme) && strings.EqualFold(parsed.Host, expected.Host) && strings.EqualFold(expected.Host, r.Host)
 	}
 	return strings.EqualFold(parsed.Scheme, adminRequestScheme(r)) && strings.EqualFold(parsed.Host, r.Host)
 }
