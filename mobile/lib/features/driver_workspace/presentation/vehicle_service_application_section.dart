@@ -317,6 +317,7 @@ class _VehicleServiceApplicationSectionState
 
   void _refresh(DriverOnboardingController onboarding) {
     onboarding.load();
+    ref.read(driverControllerProvider).load();
     ref.invalidate(driverVehiclesProvider);
   }
 
