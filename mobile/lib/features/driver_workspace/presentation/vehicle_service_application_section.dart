@@ -409,7 +409,7 @@ class _ApplicationSummary extends StatelessWidget {
           children: [
             Text(_latestApplicationLabel(application)),
             Text('Service: ${application.service.displayName}'),
-            Text('${_vehicleLabel(application.vehicle)} • ${application.vehicle.color}'),
+            Text(_applicationVehicleLabel(application)),
             Text('License plate: ${application.vehicle.licensePlate}'),
             if (application.rejectionReason != null)
               Text(
@@ -425,6 +425,10 @@ class _ApplicationSummary extends StatelessWidget {
 
 String _latestApplicationLabel(DriverOnboardingApplication application) {
   return 'Latest additional application: ${_applicationStatus(application)}';
+}
+
+String _applicationVehicleLabel(DriverOnboardingApplication application) {
+  return '${_vehicleLabel(application.vehicle)} • ${application.vehicle.color}';
 }
 
 String _applicationStatus(DriverOnboardingApplication application) {
