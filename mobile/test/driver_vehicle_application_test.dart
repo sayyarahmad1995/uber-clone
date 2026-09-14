@@ -6,6 +6,7 @@ import 'package:uber_clone/core/providers.dart';
 import 'package:uber_clone/features/driver_workspace/data/driver_onboarding_repository.dart';
 import 'package:uber_clone/features/driver_workspace/domain/driver_onboarding.dart';
 import 'package:uber_clone/features/driver_workspace/domain/driver_profile.dart';
+import 'package:uber_clone/features/driver_workspace/domain/registered_vehicle.dart';
 import 'package:uber_clone/features/driver_workspace/presentation/driver_workspace_screen.dart';
 
 import 'test_doubles.dart';
@@ -86,18 +87,49 @@ void main() {
     );
     expect(addButton.onPressed, isNull);
   });
+
+  testWidgets('application refresh reloads approved operating vehicles', (
+    tester,
+  ) async {
+    final onboarding = AdditionalApplicationRepository(
+      application: approvedAdditionalApplication,
+    );
+    final driver = FakeDriverRepository(
+      profile: driverProfile,
+      vehicles: [registeredVehicleA],
+    );
+
+    await _pumpDriverWorkspace(tester, onboarding, driver: driver);
+    await _expandPanel(tester);
+
+    expect(
+      find.byKey(const ValueKey('operating-option-vehicle-b-comfort')),
+      findsNothing,
+    );
+
+    driver.vehicles = [registeredVehicleA, registeredVehicleB];
+    await tester.ensureVisible(find.widgetWithText(TextButton, 'Refresh'));
+    await tester.tap(find.widgetWithText(TextButton, 'Refresh'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('operating-option-vehicle-b-comfort')),
+      findsOneWidget,
+    );
+  });
 }
 
 Future<void> _pumpDriverWorkspace(
   WidgetTester tester,
-  DriverOnboardingRepository onboarding,
-) async {
+  DriverOnboardingRepository onboarding, {
+  FakeDriverRepository? driver,
+}) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         rideFlowRepositoryProvider.overrideWithValue(FakeRideFlowRepository()),
         driverRepositoryProvider.overrideWithValue(
-          FakeDriverRepository(profile: driverProfile),
+          driver ?? FakeDriverRepository(profile: driverProfile),
         ),
         driverOnboardingRepositoryProvider.overrideWithValue(onboarding),
         deviceLocationProvider.overrideWithValue(const FakeDeviceLocation()),
@@ -148,6 +180,55 @@ final pendingAdditionalApplication = DriverOnboardingApplication(
     licensePlate: 'NEW-456',
   ),
   submittedAt: DateTime.utc(2026, 9, 14),
+);
+
+final approvedAdditionalApplication = DriverOnboardingApplication(
+  id: 'approved-additional-application',
+  applicationType: 'additional_vehicle_service',
+  displayName: 'Test Driver',
+  status: 'approved',
+  service: comfortService,
+  vehicle: const DriverVehicle(
+    make: 'Honda',
+    model: 'Civic',
+    modelYear: 2025,
+    color: 'Black',
+    licensePlate: 'NEW-456',
+  ),
+  submittedAt: DateTime.utc(2026, 9, 14),
+  decidedAt: DateTime.utc(2026, 9, 14),
+);
+
+final registeredVehicleA = RegisteredVehicle(
+  id: 'vehicle-a',
+  vehicle: driverVehicle,
+  enrollments: [
+    ApprovedServiceEnrollment(
+      serviceCode: 'economy',
+      displayName: 'Economy',
+      approvedAt: DateTime.utc(2026, 9, 13),
+      serviceActive: true,
+    ),
+  ],
+);
+
+final registeredVehicleB = RegisteredVehicle(
+  id: 'vehicle-b',
+  vehicle: const DriverVehicle(
+    make: 'Honda',
+    model: 'Civic',
+    modelYear: 2025,
+    color: 'Black',
+    licensePlate: 'NEW-456',
+  ),
+  enrollments: [
+    ApprovedServiceEnrollment(
+      serviceCode: 'comfort',
+      displayName: 'Comfort',
+      approvedAt: DateTime.utc(2026, 9, 14),
+      serviceActive: true,
+    ),
+  ],
 );
 
 class AdditionalApplicationRepository implements DriverOnboardingRepository {
