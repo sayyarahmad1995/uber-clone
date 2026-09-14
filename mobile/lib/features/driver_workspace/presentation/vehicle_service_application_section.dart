@@ -145,7 +145,7 @@ class _VehicleServiceApplicationSectionState
             services: onboarding.services,
             serviceCode: _serviceCode,
             busy: onboarding.busy,
-            onChanged: (value) => setState(() => _serviceCode = value),
+            onChanged: _setServiceCode,
           ),
           if (selectedService != null) ...[
             const SizedBox(height: AppSpacing.xs),
@@ -283,17 +283,23 @@ class _VehicleServiceApplicationSectionState
     bool pending,
   ) {
     if (onboarding.busy || pending) return null;
-    return () => setState(() => _adding = true);
+    return () {
+      setState(() => _adding = true);
+    };
   }
 
   VoidCallback? _refreshPressed(DriverOnboardingController onboarding) {
     if (onboarding.busy) return null;
-    return () => _refresh(onboarding);
+    return () {
+      _refresh(onboarding);
+    };
   }
 
   VoidCallback? _cancelPressed(DriverOnboardingController onboarding) {
     if (onboarding.busy) return null;
-    return () => setState(() => _adding = false);
+    return () {
+      setState(() => _adding = false);
+    };
   }
 
   VoidCallback? _reviewPressed(
@@ -302,16 +308,22 @@ class _VehicleServiceApplicationSectionState
     DriverServiceOption? selectedService,
   ) {
     if (onboarding.busy || selectedService == null) return null;
-    return () => _reviewAndSubmit(
-      onboarding: onboarding,
-      profile: profile,
-      service: selectedService,
-    );
+    return () {
+      _reviewAndSubmit(
+        onboarding: onboarding,
+        profile: profile,
+        service: selectedService,
+      );
+    };
   }
 
   void _refresh(DriverOnboardingController onboarding) {
     onboarding.load();
     ref.invalidate(driverVehiclesProvider);
+  }
+
+  void _setServiceCode(String? value) {
+    setState(() => _serviceCode = value);
   }
 
   DriverOnboardingApplication? _latestAdditional(
