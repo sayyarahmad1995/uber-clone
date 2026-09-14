@@ -8,6 +8,8 @@ import 'package:uber_clone/features/driver_workspace/domain/driver_onboarding.da
 import 'package:uber_clone/features/driver_workspace/domain/driver_profile.dart';
 import 'package:uber_clone/features/driver_workspace/domain/registered_vehicle.dart';
 import 'package:uber_clone/features/driver_workspace/presentation/driver_workspace_screen.dart';
+import 'package:uber_clone/features/driver_workspace/presentation/operating_selection.dart';
+import 'package:uber_clone/features/driver_workspace/presentation/vehicle_service_application_section.dart';
 
 import 'test_doubles.dart';
 
@@ -99,8 +101,7 @@ void main() {
       vehicles: [registeredVehicleA],
     );
 
-    await _pumpDriverWorkspace(tester, onboarding, driver: driver);
-    await _expandPanel(tester);
+    await _pumpRefreshSurface(tester, onboarding, driver);
 
     expect(
       find.byKey(const ValueKey('operating-option-vehicle-b-comfort')),
@@ -108,7 +109,6 @@ void main() {
     );
 
     driver.vehicles = [registeredVehicleA, registeredVehicleB];
-    await tester.ensureVisible(find.widgetWithText(TextButton, 'Refresh'));
     await tester.tap(find.widgetWithText(TextButton, 'Refresh'));
     await tester.pumpAndSettle();
 
@@ -136,6 +136,35 @@ Future<void> _pumpDriverWorkspace(
       ],
       child: const MaterialApp(
         home: Scaffold(body: DriverWorkspaceScreen(accountID: 'user-1')),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+Future<void> _pumpRefreshSurface(
+  WidgetTester tester,
+  DriverOnboardingRepository onboarding,
+  FakeDriverRepository driver,
+) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        driverRepositoryProvider.overrideWithValue(driver),
+        driverOnboardingRepositoryProvider.overrideWithValue(onboarding),
+        deviceLocationProvider.overrideWithValue(const FakeDeviceLocation()),
+      ],
+      child: const MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: Column(
+              children: [
+                OperatingSelectionControl(),
+                VehicleServiceApplicationSection(),
+              ],
+            ),
+          ),
+        ),
       ),
     ),
   );
