@@ -54,11 +54,13 @@ class DriverOnboardingApplication {
     required this.service,
     required this.vehicle,
     required this.submittedAt,
+    this.applicationType = 'initial_onboarding',
     this.rejectionReason,
     this.decidedAt,
   });
 
   final String id;
+  final String applicationType;
   final String displayName;
   final String status;
   final DriverServiceOption service;
@@ -70,10 +72,14 @@ class DriverOnboardingApplication {
   bool get isPending => status == 'pending';
   bool get isApproved => status == 'approved';
   bool get isRejected => status == 'rejected';
+  bool get isAdditionalVehicleService =>
+      applicationType == 'additional_vehicle_service';
 
   factory DriverOnboardingApplication.fromJson(Map<String, dynamic> json) =>
       DriverOnboardingApplication(
         id: json['id'] as String,
+        applicationType:
+            json['application_type'] as String? ?? 'initial_onboarding',
         displayName: json['display_name'] as String,
         status: json['status'] as String,
         service: DriverServiceOption.fromJson(
