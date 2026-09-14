@@ -75,17 +75,30 @@ final rideRequestRepositoryProvider = Provider<RideRequestRepository>(
     ref.watch(sessionStoreProvider),
   ),
 );
-final rideFlowRepositoryProvider = Provider<RideFlowRepository>((ref) =>
-  ApiRideFlowRepository(ref.watch(dioProvider), ref.watch(sessionStoreProvider)));
-final rideFlowControllerProvider = ChangeNotifierProvider.autoDispose.family<RideFlowController, String>((ref, key) {
-  ref.watch(sessionControllerProvider.select((s) => s.state.account?.id));
-  return RideFlowController(ref.watch(rideFlowRepositoryProvider), rideId: key == 'driver' ? null : key);
-});
+final rideFlowRepositoryProvider = Provider<RideFlowRepository>(
+  (ref) => ApiRideFlowRepository(
+    ref.watch(dioProvider),
+    ref.watch(sessionStoreProvider),
+  ),
+);
+final rideFlowControllerProvider =
+    ChangeNotifierProvider.autoDispose.family<RideFlowController, String>(
+      (ref, key) {
+        ref.watch(sessionControllerProvider.select((s) => s.state.account?.id));
+        return RideFlowController(
+          ref.watch(rideFlowRepositoryProvider),
+          rideId: key == 'driver' ? null : key,
+        );
+      },
+    );
 final riderRequestControllerProvider =
     ChangeNotifierProvider.autoDispose<RiderRequestController>(
       (ref) {
         ref.watch(sessionControllerProvider.select((s) => s.state.account?.id));
-        return RiderRequestController(ref.watch(rideRequestRepositoryProvider), ref.watch(deviceLocationProvider));
+        return RiderRequestController(
+          ref.watch(rideRequestRepositoryProvider),
+          ref.watch(deviceLocationProvider),
+        );
       },
     );
 final driverRepositoryProvider = Provider<DriverRepository>(
@@ -94,12 +107,15 @@ final driverRepositoryProvider = Provider<DriverRepository>(
     ref.watch(sessionStoreProvider),
   ),
 );
-final driverVehiclesProvider = FutureProvider.autoDispose<List<RegisteredVehicle>>((ref) {
-  // Reload on account changes so records cannot survive an account switch.
-  final account = ref.watch(sessionControllerProvider.select((value) => value.state.account));
-  if (account == null) return Future.value(<RegisteredVehicle>[]);
-  return ref.watch(driverRepositoryProvider).listVehicles();
-});
+final driverVehiclesProvider =
+    FutureProvider.autoDispose<List<RegisteredVehicle>>((ref) {
+      // Reload on account changes so records cannot survive an account switch.
+      final account = ref.watch(
+        sessionControllerProvider.select((value) => value.state.account),
+      );
+      if (account == null) return Future.value(<RegisteredVehicle>[]);
+      return ref.watch(driverRepositoryProvider).listVehicles();
+    });
 final driverOnboardingRepositoryProvider = Provider<DriverOnboardingRepository>(
   (ref) => ApiDriverOnboardingRepository(
     ref.watch(dioProvider),
@@ -109,8 +125,13 @@ final driverOnboardingRepositoryProvider = Provider<DriverOnboardingRepository>(
 final driverControllerProvider =
     ChangeNotifierProvider.autoDispose<DriverController>(
       (ref) {
-        ref.watch(sessionControllerProvider.select((value) => value.state.account?.id));
-        return DriverController(ref.watch(driverRepositoryProvider), ref.watch(deviceLocationProvider));
+        ref.watch(
+          sessionControllerProvider.select((value) => value.state.account?.id),
+        );
+        return DriverController(
+          ref.watch(driverRepositoryProvider),
+          ref.watch(deviceLocationProvider),
+        );
       },
     );
 final driverOnboardingControllerProvider =
