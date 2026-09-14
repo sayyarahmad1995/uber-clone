@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
 import '../domain/driver_onboarding.dart';
 import '../domain/driver_profile.dart';
+import '../domain/registered_vehicle.dart';
 import 'vehicle_service_application_section.dart';
 
 class DriverDetailsScreen extends ConsumerWidget {
@@ -395,8 +396,8 @@ class _ReadOnlyTile extends StatelessWidget {
   }
 }
 
-String _enrollmentLabel(dynamic enrollment) {
-  if (enrollment.serviceActive) return enrollment.displayName as String;
+String _enrollmentLabel(ApprovedServiceEnrollment enrollment) {
+  if (enrollment.serviceActive) return enrollment.displayName;
   return '${enrollment.displayName} (currently unavailable)';
 }
 
