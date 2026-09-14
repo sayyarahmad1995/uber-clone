@@ -24,9 +24,12 @@ void main() {
 
     await _pump(tester, repo);
 
-    expect(find.byKey(const ValueKey('operating-current-selection')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('operating-current-selection')),
+      findsOneWidget,
+    );
     expect(find.text('Current selection'), findsOneWidget);
-    expect(find.text('Honda Civic 2025 • NEW-456'), findsOneWidget);
+    expect(find.text('Honda Civic 2025 • NEW-456'), findsWidgets);
     expect(find.text('Service: Comfort'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('operating-option-vehicle-a-economy')),
@@ -66,16 +69,17 @@ void main() {
     expect(repo.operation.valid, isTrue);
   });
 
-  testWidgets('online Driver cannot change operating context', (
+  testWidgets('locked Driver cannot change operating context', (
     tester,
   ) async {
     final repo = FakeDriverRepository(
-      profile: driverProfile.copyWith(isOnline: true),
+      profile: driverProfile,
       vehicles: operatingVehicles,
     )..operation = const OperatingState(
         vehicleId: 'vehicle-a',
         serviceCode: 'economy',
         valid: true,
+        canChange: false,
       );
 
     await _pump(tester, repo);
@@ -87,7 +91,9 @@ void main() {
     expect(repo.operation.vehicleId, 'vehicle-a');
     expect(repo.operation.serviceCode, 'economy');
     expect(
-      find.text('Go offline and finish any active trip before changing selection.'),
+      find.text(
+        'Go offline and finish any active trip before changing selection.',
+      ),
       findsOneWidget,
     );
   });
