@@ -16,6 +16,7 @@ func TestRiderOfferComparisonContractAndPrivacy(t *testing.T) {
 		Offer:                offer.Offer{RideRequestID: uuid.New(), DriverUserID: uuid.New(), AmountMinor: 100000, Currency: "PKR", Status: offer.StatusPending},
 		Driver:               &offer.DriverSummary{DisplayName: "Sayyar Ahmad"},
 		Vehicle:              &offer.VehicleSummary{Make: "Toyota", Model: "Corolla", ModelYear: 2024, Color: "White"},
+		Service:              &offer.ServiceSummary{Code: "comfort", DisplayName: "Comfort"},
 		PickupDistanceMeters: &zero,
 		MatchesProposedFare:  true,
 		Selectable:           true,
@@ -28,7 +29,7 @@ func TestRiderOfferComparisonContractAndPrivacy(t *testing.T) {
 	if err := json.Unmarshal(body, &decoded); err != nil {
 		t.Fatal(err)
 	}
-	if len(decoded) != 12 || decoded["matches_proposed_fare"] != true || decoded["selectable"] != true {
+	if len(decoded) != 13 || decoded["matches_proposed_fare"] != true || decoded["selectable"] != true {
 		t.Fatalf("unexpected comparison contract: %s", body)
 	}
 	for _, key := range []string{"latitude", "longitude", "driver_location", "license_plate", "email", "phone", "rider_user_id", "eta"} {
@@ -47,6 +48,10 @@ func TestRiderOfferComparisonContractAndPrivacy(t *testing.T) {
 	if len(vehicle) != 4 || vehicle["make"] != "Toyota" || vehicle["model"] != "Corolla" || vehicle["model_year"] != float64(2024) || vehicle["color"] != "White" {
 		t.Fatalf("unexpected vehicle projection: %s", body)
 	}
+	service := decoded["service"].(map[string]any)
+	if len(service) != 2 || service["code"] != "comfort" || service["display_name"] != "Comfort" {
+		t.Fatalf("unexpected service projection: %s", body)
+	}
 }
 
 func TestLegacyPresentationUsesNullModelYear(t *testing.T) {
@@ -59,7 +64,7 @@ func TestLegacyPresentationUsesNullModelYear(t *testing.T) {
 	if err := json.Unmarshal(body, &response); err != nil {
 		t.Fatal(err)
 	}
-	if response["driver"] != nil || response["vehicle"].(map[string]any)["model_year"] != nil || response["selectable"] != true {
+	if response["driver"] != nil || response["service"] != nil || response["vehicle"].(map[string]any)["model_year"] != nil || response["selectable"] != true {
 		t.Fatalf("legacy comparison contract: %s", body)
 	}
 	rr := httptest.NewRecorder()
@@ -77,6 +82,7 @@ func TestRiderOfferComparisonKeepsUnavailablePresentationSnapshot(t *testing.T) 
 		Offer:      offer.Offer{RideRequestID: uuid.New(), DriverUserID: uuid.New(), AmountMinor: 100000, Currency: "PKR", Status: offer.StatusPending},
 		Driver:     &offer.DriverSummary{DisplayName: "Driver"},
 		Vehicle:    &offer.VehicleSummary{Make: "Toyota", Model: "Corolla", ModelYear: 2024, Color: "White"},
+		Service:    &offer.ServiceSummary{Code: "economy", DisplayName: "Economy"},
 		Selectable: false,
 	}
 	body, err := json.Marshal(riderOfferResponse(item))
@@ -87,7 +93,7 @@ func TestRiderOfferComparisonKeepsUnavailablePresentationSnapshot(t *testing.T) 
 	if err := json.Unmarshal(body, &decoded); err != nil {
 		t.Fatal(err)
 	}
-	if decoded["pickup_distance_meters"] != nil || decoded["driver"] == nil || decoded["vehicle"] == nil {
+	if decoded["pickup_distance_meters"] != nil || decoded["driver"] == nil || decoded["vehicle"] == nil || decoded["service"] == nil {
 		t.Fatalf("unavailable offer should retain known public presentation but not stale distance: %s", body)
 	}
 }
