@@ -57,23 +57,25 @@ class _VehicleServiceApplicationSectionState
     final selectedService = _selectedService(onboarding.services);
     _serviceCode ??= selectedService?.code;
 
+    final child = _adding
+        ? _buildForm(
+            context: context,
+            onboarding: onboarding,
+            profile: profile,
+            selectedService: selectedService,
+          )
+        : _buildSummary(
+            context: context,
+            onboarding: onboarding,
+            latestAdditional: latestAdditional,
+          );
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.md),
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 200),
-          child: _adding
-              ? _buildForm(
-                  context: context,
-                  onboarding: onboarding,
-                  profile: profile,
-                  selectedService: selectedService,
-                )
-              : _buildSummary(
-                  context: context,
-                  onboarding: onboarding,
-                  latestAdditional: latestAdditional,
-                ),
+          child: child,
         ),
       ),
     );
@@ -94,11 +96,7 @@ class _VehicleServiceApplicationSectionState
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: AppSpacing.xs),
-        Text(
-          pending
-              ? 'Your latest vehicle/service application is under review.'
-              : 'Add another vehicle and service without changing your approved Driver profile.',
-        ),
+        Text(_summaryMessage(pending)),
         if (latestAdditional != null) ...[
           const SizedBox(height: AppSpacing.sm),
           _ApplicationSummary(application: latestAdditional),
@@ -124,12 +122,7 @@ class _VehicleServiceApplicationSectionState
               label: const Text('Add vehicle/service'),
             ),
             TextButton(
-              onPressed: onboarding.busy
-                  ? null
-                  : () {
-                      onboarding.load();
-                      ref.invalidate(driverVehiclesProvider);
-                    },
+              onPressed: onboarding.busy ? null : () => _refresh(onboarding),
               child: const Text('Refresh'),
             ),
           ],
@@ -156,7 +149,8 @@ class _VehicleServiceApplicationSectionState
           ),
           const SizedBox(height: AppSpacing.xs),
           const Text(
-            'Submit a new vehicle and one requested service for review. Approval will add a new approved operating option.',
+            'Submit a new vehicle and one requested service for review. '
+            'Approval will add a new approved operating option.',
           ),
           const SizedBox(height: AppSpacing.sm),
           DropdownButtonFormField<String>(
@@ -193,20 +187,7 @@ class _VehicleServiceApplicationSectionState
                 keyboardType: index == 2
                     ? TextInputType.number
                     : TextInputType.text,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Required';
-                  }
-                  if (index == 2) {
-                    final year = int.tryParse(value.trim());
-                    if (year == null ||
-                        year < 1886 ||
-                        year > DateTime.now().toUtc().year + 1) {
-                      return 'Enter a valid model year';
-                    }
-                  }
-                  return null;
-                },
+                validator: (value) => _validateField(index, value),
               ),
             ),
           if (onboarding.error != null) ...[
@@ -269,27 +250,47 @@ class _VehicleServiceApplicationSectionState
     );
     if (!mounted || precheck == null) return;
     if (!precheck.eligible) {
-      await showDialog<void>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Vehicle not eligible'),
-          content: Text(
-            precheck.reasons.isEmpty
-                ? 'This vehicle does not meet the selected service requirements.'
-                : precheck.reasons.join('\n'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Change application'),
-            ),
-          ],
-        ),
-      );
+      await _showIneligibleDialog(precheck);
       return;
     }
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await _confirmSubmission(service, vehicle);
+    if (confirmed != true || !mounted) return;
+
+    await onboarding.submit(
+      displayName: displayName,
+      serviceCode: service.code,
+      vehicle: vehicle,
+    );
+    if (!mounted || onboarding.error != null) return;
+    setState(() => _adding = false);
+  }
+
+  Future<void> _showIneligibleDialog(DriverOnboardingPrecheck precheck) async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Vehicle not eligible'),
+        content: Text(
+          precheck.reasons.isEmpty
+              ? 'This vehicle does not meet the selected service requirements.'
+              : precheck.reasons.join('\n'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Change application'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool?> _confirmSubmission(
+    DriverServiceOption service,
+    DriverVehicle vehicle,
+  ) async {
+    return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Review vehicle/service application'),
@@ -298,14 +299,13 @@ class _VehicleServiceApplicationSectionState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Service: ${service.displayName}'),
-            Text(
-              'Vehicle: ${vehicle.make} ${vehicle.model} ${vehicle.modelYear ?? ''}',
-            ),
+            Text('Vehicle: ${_vehicleLabel(vehicle)}'),
             Text('Color: ${vehicle.color}'),
             Text('License plate: ${vehicle.licensePlate}'),
             const SizedBox(height: AppSpacing.sm),
             const Text(
-              'Submitting sends this vehicle/service application for review. It will not change your approved Driver profile or online status.',
+              'Submitting sends this vehicle/service application for review. '
+              'It will not change your approved Driver profile or online status.',
             ),
           ],
         ),
@@ -321,20 +321,39 @@ class _VehicleServiceApplicationSectionState
         ],
       ),
     );
-    if (confirmed != true || !mounted) return;
+  }
 
-    await onboarding.submit(
-      displayName: displayName,
-      serviceCode: service.code,
-      vehicle: vehicle,
-    );
-    if (!mounted || onboarding.error != null) return;
-    setState(() => _adding = false);
+  void _refresh(DriverOnboardingController onboarding) {
+    onboarding.load();
+    ref.invalidate(driverVehiclesProvider);
+  }
+
+  String? _validateField(int index, String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Required';
+    }
+    if (index == 2) {
+      final year = int.tryParse(value.trim());
+      if (year == null ||
+          year < 1886 ||
+          year > DateTime.now().toUtc().year + 1) {
+        return 'Enter a valid model year';
+      }
+    }
+    return null;
   }
 
   String _displayName(DriverProfile? profile) {
     final name = profile?.displayName?.trim();
     return name == null || name.isEmpty ? 'Driver' : name;
+  }
+
+  String _summaryMessage(bool pending) {
+    if (pending) {
+      return 'Your latest vehicle/service application is under review.';
+    }
+    return 'Add another vehicle and service without changing your approved '
+        'Driver profile.';
   }
 }
 
@@ -345,11 +364,6 @@ class _ApplicationSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = application.isPending
-        ? 'Under review'
-        : application.isRejected
-        ? 'Rejected'
-        : 'Approved';
     return DecoratedBox(
       decoration: BoxDecoration(
         border: Border.all(color: Theme.of(context).dividerColor),
@@ -360,11 +374,9 @@ class _ApplicationSummary extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Latest additional application: $status'),
+            Text('Latest additional application: ${_applicationStatus(application)}'),
             Text('Service: ${application.service.displayName}'),
-            Text(
-              '${application.vehicle.make} ${application.vehicle.model} ${application.vehicle.modelYear ?? ''} • ${application.vehicle.color}',
-            ),
+            Text('${_vehicleLabel(application.vehicle)} • ${application.vehicle.color}'),
             Text('License plate: ${application.vehicle.licensePlate}'),
             if (application.rejectionReason != null)
               Text(
@@ -376,4 +388,15 @@ class _ApplicationSummary extends StatelessWidget {
       ),
     );
   }
+}
+
+String _applicationStatus(DriverOnboardingApplication application) {
+  if (application.isPending) return 'Under review';
+  if (application.isRejected) return 'Rejected';
+  return 'Approved';
+}
+
+String _vehicleLabel(DriverVehicle vehicle) {
+  final year = vehicle.modelYear == null ? '' : ' ${vehicle.modelYear}';
+  return '${vehicle.make} ${vehicle.model}$year';
 }
