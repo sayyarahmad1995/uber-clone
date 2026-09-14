@@ -22,25 +22,32 @@ type adminDriverReviewDetailView struct {
 	Message     string
 }
 
-var adminDriverReviewListTemplate = template.Must(template.New("driver-review-list").Parse(`<!doctype html>
+var adminDriverReviewTemplateFuncs = template.FuncMap{
+	"driverApplicationApprovalButton": driverApplicationApprovalButton,
+	"driverApplicationApprovalCopy":   driverApplicationApprovalCopy,
+	"driverApplicationTypeLabel":      driverApplicationTypeLabel,
+}
+
+var adminDriverReviewListTemplate = template.Must(template.New("driver-review-list").Funcs(adminDriverReviewTemplateFuncs).Parse(`<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Driver onboarding review</title>
 <style>
-body{font-family:system-ui,sans-serif;max-width:960px;margin:40px auto;padding:0 20px;color:#1f2937}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;border-bottom:1px solid #e5e7eb}a{color:#1d4ed8}code{font-size:.9em}.muted{color:#6b7280}
+body{font-family:system-ui,sans-serif;max-width:960px;margin:40px auto;padding:0 20px;color:#1f2937}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;border-bottom:1px solid #e5e7eb}a{color:#1d4ed8}code{font-size:.9em}.muted{color:#6b7280}.pill{display:inline-block;padding:3px 8px;border-radius:999px;background:#eef2ff;color:#3730a3;font-size:.85em}
 </style>
 </head>
 <body>
 <h1>Driver onboarding review</h1>
-<p class="muted">Pending applications only.</p>
+<p class="muted">Pending initial onboarding and additional vehicle/service applications.</p>
 {{if .}}
 <table>
-<thead><tr><th>Driver</th><th>Service</th><th>Vehicle</th><th>Submitted</th><th></th></tr></thead>
+<thead><tr><th>Type</th><th>Driver</th><th>Service</th><th>Vehicle</th><th>Submitted</th><th></th></tr></thead>
 <tbody>
 {{range .}}
 <tr>
+<td><span class="pill">{{driverApplicationTypeLabel .}}</span></td>
 <td>{{.DisplayName}}</td>
 <td>{{.Service.DisplayName}}</td>
 <td>{{.Vehicle.Make}} {{.Vehicle.Model}} {{.Vehicle.ModelYear}} · {{.Vehicle.LicensePlate}}</td>
@@ -51,27 +58,28 @@ body{font-family:system-ui,sans-serif;max-width:960px;margin:40px auto;padding:0
 </tbody>
 </table>
 {{else}}
-<p>No pending Driver onboarding applications.</p>
+<p>No pending Driver applications.</p>
 {{end}}
 </body>
 </html>`))
 
-var adminDriverReviewDetailTemplate = template.Must(template.New("driver-review-detail").Parse(`<!doctype html>
+var adminDriverReviewDetailTemplate = template.Must(template.New("driver-review-detail").Funcs(adminDriverReviewTemplateFuncs).Parse(`<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Driver onboarding application</title>
 <style>
-body{font-family:system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0 20px;color:#1f2937}.card{border:1px solid #e5e7eb;border-radius:10px;padding:18px;margin:18px 0}.grid{display:grid;grid-template-columns:160px 1fr;gap:8px 18px}.label{color:#6b7280}button{padding:10px 16px;border:0;border-radius:7px;cursor:pointer}.approve{background:#166534;color:white}.reject{background:#b91c1c;color:white}textarea{width:100%;min-height:90px;box-sizing:border-box;margin:8px 0 12px;padding:8px}a{color:#1d4ed8}.message{padding:10px;background:#eff6ff;border-radius:7px}
+body{font-family:system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0 20px;color:#1f2937}.card{border:1px solid #e5e7eb;border-radius:10px;padding:18px;margin:18px 0}.grid{display:grid;grid-template-columns:160px 1fr;gap:8px 18px}.label{color:#6b7280}button{padding:10px 16px;border:0;border-radius:7px;cursor:pointer}.approve{background:#166534;color:white}.reject{background:#b91c1c;color:white}textarea{width:100%;min-height:90px;box-sizing:border-box;margin:8px 0 12px;padding:8px}a{color:#1d4ed8}.message{padding:10px;background:#eff6ff;border-radius:7px}.pill{display:inline-block;padding:3px 8px;border-radius:999px;background:#eef2ff;color:#3730a3;font-size:.9em}
 </style>
 </head>
 <body>
 <p><a href="/admin/driver-onboarding">← Pending applications</a></p>
-<h1>Driver onboarding application</h1>
+<h1>Driver application</h1>
 {{if .Message}}<p class="message">{{.Message}}</p>{{end}}
 <div class="card grid">
 <div class="label">Application</div><div>{{.Application.ID}}</div>
+<div class="label">Type</div><div><span class="pill">{{driverApplicationTypeLabel .Application}}</span></div>
 <div class="label">Driver user</div><div>{{.Application.DriverUserID}}</div>
 <div class="label">Display name</div><div>{{.Application.DisplayName}}</div>
 <div class="label">Status</div><div>{{.Application.Status}}</div>
@@ -86,9 +94,9 @@ body{font-family:system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0
 {{if .Pending}}
 <div class="card">
 <h2>Approve</h2>
-<p>Approval promotes this exact submitted Driver, vehicle, and selected service snapshot into approved records. It does not yet make the Driver operationally active.</p>
+<p>{{driverApplicationApprovalCopy .Application}}</p>
 <form method="post" action="/admin/driver-onboarding/{{.Application.ID}}/approve">
-<button class="approve" type="submit">Approve application</button>
+<button class="approve" type="submit">{{driverApplicationApprovalButton .Application}}</button>
 </form>
 </div>
 <div class="card">
@@ -254,6 +262,27 @@ func adminDriverOnboardingResponse(application driveronboarding.Application) map
 	return response
 }
 
+func driverApplicationTypeLabel(application driveronboarding.Application) string {
+	if application.ApplicationType == driveronboarding.ApplicationTypeAdditionalVehicleService {
+		return "Additional vehicle/service"
+	}
+	return "Initial onboarding"
+}
+
+func driverApplicationApprovalCopy(application driveronboarding.Application) string {
+	if application.ApplicationType == driveronboarding.ApplicationTypeAdditionalVehicleService {
+		return "Approval adds this submitted vehicle and selected service enrollment to the existing approved Driver account. It does not change the Driver profile display name and does not make the Driver operationally active."
+	}
+	return "Approval promotes this exact submitted Driver, vehicle, and selected service snapshot into approved records. It does not yet make the Driver operationally active."
+}
+
+func driverApplicationApprovalButton(application driveronboarding.Application) string {
+	if application.ApplicationType == driveronboarding.ApplicationTypeAdditionalVehicleService {
+		return "Approve vehicle/service"
+	}
+	return "Approve application"
+}
+
 func writeDriverReviewError(w http.ResponseWriter, err error) {
 	writeJSON(w, driverReviewStatus(err), map[string]string{"error": driverReviewErrorMessage(err)})
 }
@@ -301,7 +330,7 @@ func (api *API) adminSameOrigin(r *http.Request) bool {
 		if err != nil || (expected.Scheme != "http" && expected.Scheme != "https") || expected.Host == "" || expected.User != nil || expected.Path != "" || expected.RawQuery != "" || expected.Fragment != "" {
 			return false
 		}
-		return strings.EqualFold(parsed.Scheme, expected.Scheme) && strings.EqualFold(parsed.Host, expected.Host) && strings.EqualFold(expected.Host, r.Host)
+		return strings.EqualFold(parsed.Scheme, expected.Scheme) && strings.EqualFold(parsed.Host, expected.Scheme) && strings.EqualFold(expected.Host, r.Host)
 	}
 	return strings.EqualFold(parsed.Scheme, adminRequestScheme(r)) && strings.EqualFold(parsed.Host, r.Host)
 }
