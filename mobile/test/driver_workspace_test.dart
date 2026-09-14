@@ -39,7 +39,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-      rideFlowRepositoryProvider.overrideWithValue(FakeRideFlowRepository()),
+          rideFlowRepositoryProvider.overrideWithValue(FakeRideFlowRepository()),
           driverRepositoryProvider.overrideWithValue(driverRepo),
           driverOnboardingRepositoryProvider.overrideWithValue(onboardingRepo),
           deviceLocationProvider.overrideWithValue(const FakeDeviceLocation()),
@@ -98,6 +98,34 @@ void main() {
     expect(find.text('Service: Comfort'), findsOneWidget);
   });
 
+  testWidgets('operational Driver can center map on published location', (
+    tester,
+  ) async {
+    final repo = FakeDriverRepository(profile: driverProfile);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          rideFlowRepositoryProvider.overrideWithValue(FakeRideFlowRepository()),
+          driverRepositoryProvider.overrideWithValue(repo),
+          driverOnboardingRepositoryProvider.overrideWithValue(
+            FakeDriverOnboardingRepository(),
+          ),
+          deviceLocationProvider.overrideWithValue(const FakeDeviceLocation()),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(body: DriverWorkspaceScreen(accountID: 'user-1')),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('driverCurrentLocationButton')));
+    await tester.pumpAndSettle();
+
+    expect(repo.calls, ['location']);
+  });
+
   testWidgets('existing operational Driver can still go online', (
     tester,
   ) async {
@@ -105,7 +133,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-      rideFlowRepositoryProvider.overrideWithValue(FakeRideFlowRepository()),
+          rideFlowRepositoryProvider.overrideWithValue(FakeRideFlowRepository()),
           driverRepositoryProvider.overrideWithValue(repo),
           driverOnboardingRepositoryProvider.overrideWithValue(
             FakeDriverOnboardingRepository(),
