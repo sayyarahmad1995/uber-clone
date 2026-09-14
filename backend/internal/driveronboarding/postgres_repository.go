@@ -91,19 +91,18 @@ func (r PostgresRepository) CreateApplication(ctx context.Context, userID uuid.U
 		return Application{}, err
 	}
 
-	var alreadyOnboarded bool
+	var vehicleAlreadyRegistered bool
 	if err := tx.QueryRowContext(ctx, `
 		SELECT EXISTS (
-			SELECT 1 FROM driver_profiles WHERE user_id = $1
-			UNION ALL
-			SELECT 1 FROM driver_onboarding_applications
-			WHERE driver_user_id = $1 AND status = 'approved'
+			SELECT 1
+			FROM driver_vehicles
+			WHERE driver_user_id = $1 AND license_plate = $2
 		)
-	`, userID).Scan(&alreadyOnboarded); err != nil {
+	`, userID, input.Vehicle.LicensePlate).Scan(&vehicleAlreadyRegistered); err != nil {
 		return Application{}, err
 	}
-	if alreadyOnboarded {
-		return Application{}, ErrAlreadyOnboarded
+	if vehicleAlreadyRegistered {
+		return Application{}, ErrVehicleAlreadyRegistered
 	}
 
 	now := time.Now().UTC()
@@ -213,28 +212,22 @@ func (r PostgresRepository) ApproveApplication(ctx context.Context, applicationI
 		return Application{}, ErrApplicationNotPending
 	}
 
-	var profileExists bool
-	if err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM driver_profiles WHERE user_id = $1)`, application.DriverUserID).Scan(&profileExists); err != nil {
+	now := time.Now().UTC()
+	if err := ensureDriverProfile(ctx, tx, application, now); err != nil {
 		return Application{}, err
-	}
-	if profileExists {
-		return Application{}, ErrAlreadyOnboarded
 	}
 
-	now := time.Now().UTC()
 	vehicleID := uuid.New()
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO driver_profiles (user_id, display_name, status, is_online, created_at, updated_at)
-		VALUES ($1, $2, 'approved', FALSE, $3, $3)
-	`, application.DriverUserID, application.DisplayName, now); err != nil {
-		return Application{}, err
-	}
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO driver_vehicles (
 			id, driver_user_id, make, model, model_year, color, license_plate, created_at, updated_at
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
 	`, vehicleID, application.DriverUserID, application.Vehicle.Make, application.Vehicle.Model,
 		application.Vehicle.ModelYear, application.Vehicle.Color, application.Vehicle.LicensePlate, now); err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.ConstraintName == "driver_vehicles_driver_license_plate_key" {
+			return Application{}, ErrVehicleAlreadyRegistered
+		}
 		return Application{}, err
 	}
 	if _, err := tx.ExecContext(ctx, `
@@ -260,6 +253,23 @@ func (r PostgresRepository) ApproveApplication(ctx context.Context, applicationI
 	application.DecidedAt = &now
 	application.DecidedBy = reviewer
 	return application, nil
+}
+
+func ensureDriverProfile(ctx context.Context, tx *sql.Tx, application Application, now time.Time) error {
+	var profileExists bool
+	if err := tx.QueryRowContext(ctx, `
+		SELECT EXISTS (SELECT 1 FROM driver_profiles WHERE user_id = $1)
+	`, application.DriverUserID).Scan(&profileExists); err != nil {
+		return err
+	}
+	if profileExists {
+		return nil
+	}
+	_, err := tx.ExecContext(ctx, `
+		INSERT INTO driver_profiles (user_id, display_name, status, is_online, created_at, updated_at)
+		VALUES ($1, $2, 'approved', FALSE, $3, $3)
+	`, application.DriverUserID, application.DisplayName, now)
+	return err
 }
 
 func (r PostgresRepository) RejectApplication(ctx context.Context, applicationID uuid.UUID, reviewer, reason string) (Application, error) {
