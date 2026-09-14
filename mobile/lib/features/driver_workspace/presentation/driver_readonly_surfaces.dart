@@ -4,8 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
 import '../domain/driver_onboarding.dart';
 import '../domain/driver_profile.dart';
-import '../domain/registered_vehicle.dart';
-import 'vehicle_service_application_section.dart';
 
 class DriverDetailsScreen extends ConsumerWidget {
   const DriverDetailsScreen({super.key});
@@ -28,8 +26,7 @@ class DriverDetailsScreen extends ConsumerWidget {
         error: error,
         empty: profile == null && application == null,
         emptyTitle: 'No submitted Driver details yet',
-        emptyMessage:
-            'Complete Driver onboarding from the Driver dashboard to create Driver details.',
+        emptyMessage: 'Complete Driver onboarding from the Driver dashboard to create Driver details.',
         child: _DriverDetailsContent(
           profile: profile,
           application: application,
@@ -51,77 +48,35 @@ class DriverVehiclesScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Vehicles')),
       body: records.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Unable to load vehicles'),
-              TextButton(
-                onPressed: () => ref.invalidate(driverVehiclesProvider),
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
+        error: (error, stack) => Center(child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Unable to load vehicles'),
+            TextButton(onPressed: () => ref.invalidate(driverVehiclesProvider), child: const Text('Retry')),
+          ],
+        )),
         data: (vehicles) => _ReadOnlyBody(
           loading: vehicles.isEmpty && !onboarding.loaded,
           error: onboarding.error,
           empty: vehicles.isEmpty && application == null,
           emptyTitle: 'No vehicle submitted yet',
-          emptyMessage:
-              'Complete Driver onboarding from the Driver dashboard to submit a vehicle.',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const VehicleServiceApplicationSection(),
-              const SizedBox(height: 12),
-              for (final record in vehicles)
-                Card(
-                  key: ValueKey(record.id),
-                  child: Column(
-                    children: [
-                      _ReadOnlyTile(
-                        icon: Icons.directions_car_outlined,
-                        label: 'Vehicle',
-                        value: '${record.vehicle.make} ${record.vehicle.model}',
-                      ),
-                      if (record.vehicle.modelYear != null)
-                        _ReadOnlyTile(
-                          icon: Icons.calendar_today_outlined,
-                          label: 'Model year',
-                          value: '${record.vehicle.modelYear}',
-                        ),
-                      _ReadOnlyTile(
-                        icon: Icons.palette_outlined,
-                        label: 'Color',
-                        value: record.vehicle.color,
-                      ),
-                      _ReadOnlyTile(
-                        icon: Icons.pin_outlined,
-                        label: 'License plate',
-                        value: record.vehicle.licensePlate,
-                      ),
-                      if (record.enrollments.isEmpty)
-                        const ListTile(
-                          title: Text('No approved service enrollments'),
-                        ),
-                      for (final enrollment in record.enrollments)
-                        _ReadOnlyTile(
-                          icon: Icons.verified_outlined,
-                          label: 'Approved service',
-                          value: _enrollmentLabel(enrollment),
-                        ),
-                    ],
-                  ),
-                ),
-              if (vehicles.isEmpty && application != null)
-                _VehicleContent(
-                  vehicle: application.vehicle,
-                  profile: null,
-                  application: application,
-                ),
-            ],
-          ),
+          emptyMessage: 'Complete Driver onboarding from the Driver dashboard to submit a vehicle.',
+          child: Column(children: [
+            for (final record in vehicles)
+              Card(key: ValueKey(record.id), child: Column(children: [
+                _ReadOnlyTile(icon: Icons.directions_car_outlined, label: 'Vehicle', value: '${record.vehicle.make} ${record.vehicle.model}'),
+                if (record.vehicle.modelYear != null)
+                  _ReadOnlyTile(icon: Icons.calendar_today_outlined, label: 'Model year', value: '${record.vehicle.modelYear}'),
+                _ReadOnlyTile(icon: Icons.palette_outlined, label: 'Color', value: record.vehicle.color),
+                _ReadOnlyTile(icon: Icons.pin_outlined, label: 'License plate', value: record.vehicle.licensePlate),
+                if (record.enrollments.isEmpty)
+                  const ListTile(title: Text('No approved service enrollments')),
+                for (final enrollment in record.enrollments)
+                  _ReadOnlyTile(icon: Icons.verified_outlined, label: 'Approved service', value: '${enrollment.displayName}${enrollment.serviceActive ? '' : ' (currently unavailable)'}'),
+              ])),
+            if (vehicles.isEmpty && application != null)
+              _VehicleContent(vehicle: application.vehicle, profile: null, application: application),
+          ]),
         ),
       ),
     );
@@ -177,9 +132,7 @@ class _ReadOnlyBody extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Read-only. Approved Driver and vehicle information cannot '
-                    'be changed directly from this screen. New vehicle/service '
-                    'applications require review.',
+                    'Read-only. Approved Driver and vehicle information cannot be changed directly from this screen.',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ),
@@ -259,12 +212,6 @@ class _DriverDetailsContent extends StatelessWidget {
             ),
           if (application != null)
             _ReadOnlyTile(
-              icon: Icons.assignment_outlined,
-              label: 'Latest application type',
-              value: _statusLabel(application!.applicationType),
-            ),
-          if (application != null)
-            _ReadOnlyTile(
               icon: Icons.local_taxi_outlined,
               label: 'Selected service',
               value: application!.service.displayName,
@@ -314,10 +261,7 @@ class _VehicleContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Submitted vehicle',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text('Submitted vehicle', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         Card(
           child: Column(
@@ -369,8 +313,7 @@ class _VehicleContent extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'This is your submitted application snapshot. Approved service '
-          'enrollments are shown on registered vehicle records.',
+          'This is your submitted application snapshot. Approved service enrollments are shown on registered vehicle records.',
           style: Theme.of(context).textTheme.bodySmall,
         ),
       ],
@@ -397,11 +340,6 @@ class _ReadOnlyTile extends StatelessWidget {
       subtitle: Text(value),
     );
   }
-}
-
-String _enrollmentLabel(ApprovedServiceEnrollment enrollment) {
-  if (enrollment.serviceActive) return enrollment.displayName;
-  return '${enrollment.displayName} (currently unavailable)';
 }
 
 String _statusLabel(String? status) {
