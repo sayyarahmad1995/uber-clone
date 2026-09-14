@@ -174,14 +174,16 @@ The client reads the best currently authoritative Driver information available t
 
 Both surfaces remain read-only. Approved Driver/vehicle changes continue to follow ADR-0009 governance and must not be introduced as direct client-side overwrites.
 
-## 18. Minimal cash settlement and receipt
+## 18. Minimal cash settlement, receipt, and pilot acceptance
 
-The next MVP slice is minimal cash settlement and receipt display, as defined by ADR-0011.
+The current cash-settlement milestone closes the MVP ride-hailing loop with minimal cash handling and receipt/history display, as defined by ADR-0011.
 
 A selected offer's agreed fare remains the authoritative settlement amount for the completed Trip. Settlement exists to close the current ride-hailing pilot loop, not to introduce a general payment platform.
 
 For the MVP, cash settlement may record simple states such as cash due, cash confirmed, and settled. Rider and Driver history should expose receipt-relevant facts from immutable Trip context: agreed fare, service, Driver/vehicle context, completion time, Trip status, and settlement status.
 
-This decision does not authorize Stripe, wallets, stored payment methods, payouts, refunds, cancellation fees, no-show policy, commissions, promo credits, routing-based pricing, or broad administrator payment operations.
+Before unrelated product domains or sophisticated payment infrastructure are started, the cash ride loop must be validated against the [Pilot cash ride acceptance checklist](pilot-cash-ride-acceptance.md). Any acceptance failure should become the next implementation slice before Courier, Freight, broad administration, advanced dispatch, multi-database architecture, or infrastructure scaling.
+
+This decision does not authorize Stripe, wallets, stored payment methods, payouts, refunds, cancellation fees, no-show policy, commissions, promo credits, routing-based pricing, broad administrator payment operations, Courier, or Freight.
 
 See [ADR-0011: Minimal Cash Settlement and Trip Receipt](ADR-0011-minimal-cash-settlement-and-receipt.md).
