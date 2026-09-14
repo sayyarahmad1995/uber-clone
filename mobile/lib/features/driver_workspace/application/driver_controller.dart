@@ -126,18 +126,17 @@ class DriverController extends ChangeNotifier {
   });
 
   Future<void> _publish() async {
-    final point = await _location.current().timeout(const Duration(seconds: 20));
+    final point = await _location.current().timeout(
+      const Duration(seconds: 20),
+    );
     if (_disposed || !_foreground) return;
     location = await _repository.publishLocation(point);
   }
 
-  Future<void> _publishForDriverModeEntry() => _run(
-    () async {
-      if (profile == null) return;
-      await _publish();
-    },
-    reportError: false,
-  );
+  Future<void> _publishForDriverModeEntry() => _run(() async {
+    if (profile == null) return;
+    await _publish();
+  }, reportError: false);
 
   Future<void> publishLocation() => _run(() async {
     if (profile == null) return;
