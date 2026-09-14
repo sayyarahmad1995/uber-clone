@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:uber_clone/core/dashboard/ride_dashboard_scaffold.dart';
 import 'package:uber_clone/core/providers.dart';
 import 'package:uber_clone/features/driver_workspace/data/driver_onboarding_repository.dart';
 import 'package:uber_clone/features/driver_workspace/domain/driver_onboarding.dart';
 import 'package:uber_clone/features/driver_workspace/domain/driver_profile.dart';
-import 'package:uber_clone/features/driver_workspace/domain/registered_vehicle.dart';
-import 'package:uber_clone/features/driver_workspace/presentation/driver_readonly_surfaces.dart';
+import 'package:uber_clone/features/driver_workspace/presentation/driver_workspace_screen.dart';
 
 import 'test_doubles.dart';
 
@@ -17,23 +17,15 @@ void main() {
     final onboarding = AdditionalApplicationRepository(
       application: initialApprovedApplication,
     );
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          driverRepositoryProvider.overrideWithValue(
-            FakeDriverRepository(profile: driverProfile),
-          ),
-          driverOnboardingRepositoryProvider.overrideWithValue(onboarding),
-          driverVehiclesProvider.overrideWith((ref) async => [registeredVehicle]),
-        ],
-        child: const MaterialApp(home: DriverVehiclesScreen()),
-      ),
-    );
-    await tester.pumpAndSettle();
+    await _pumpDriverWorkspace(tester, onboarding);
+    await _expandPanel(tester);
 
     expect(find.text('Vehicle/service applications'), findsOneWidget);
     expect(find.text('Add vehicle/service'), findsOneWidget);
 
+    await tester.ensureVisible(
+      find.byKey(const Key('driverAddVehicleServiceApplicationButton')),
+    );
     await tester.tap(
       find.byKey(const Key('driverAddVehicleServiceApplicationButton')),
     );
@@ -68,49 +60,70 @@ void main() {
       onboarding.application!.applicationType,
       'additional_vehicle_service',
     );
-    expect(find.text('Latest additional application: Under review'), findsOneWidget);
+    expect(
+      find.text('Latest additional application: Under review'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('pending additional application disables another submission', (
     tester,
   ) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          driverRepositoryProvider.overrideWithValue(
-            FakeDriverRepository(profile: driverProfile),
-          ),
-          driverOnboardingRepositoryProvider.overrideWithValue(
-            AdditionalApplicationRepository(application: pendingAdditionalApplication),
-          ),
-          driverVehiclesProvider.overrideWith((ref) async => [registeredVehicle]),
-        ],
-        child: const MaterialApp(home: DriverVehiclesScreen()),
-      ),
+    await _pumpDriverWorkspace(
+      tester,
+      AdditionalApplicationRepository(application: pendingAdditionalApplication),
     );
-    await tester.pumpAndSettle();
+    await _expandPanel(tester);
 
+    await tester.ensureVisible(
+      find.byKey(const Key('driverAddVehicleServiceApplicationButton')),
+    );
     final addButton = tester.widget<FilledButton>(
       find.byKey(const Key('driverAddVehicleServiceApplicationButton')),
     );
 
-    expect(find.text('Latest additional application: Under review'), findsOneWidget);
+    expect(
+      find.text('Latest additional application: Under review'),
+      findsOneWidget,
+    );
     expect(addButton.onPressed, isNull);
   });
 }
 
-final registeredVehicle = RegisteredVehicle(
-  id: 'vehicle-1',
-  vehicle: driverVehicle,
-  enrollments: [
-    ApprovedServiceEnrollment(
-      serviceCode: 'economy',
-      displayName: 'Economy',
-      approvedAt: DateTime.utc(2026, 9, 14),
-      serviceActive: true,
+Future<void> _pumpDriverWorkspace(
+  WidgetTester tester,
+  DriverOnboardingRepository onboarding,
+) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        rideFlowRepositoryProvider.overrideWithValue(FakeRideFlowRepository()),
+        driverRepositoryProvider.overrideWithValue(
+          FakeDriverRepository(profile: driverProfile),
+        ),
+        driverOnboardingRepositoryProvider.overrideWithValue(onboarding),
+        deviceLocationProvider.overrideWithValue(const FakeDeviceLocation()),
+      ],
+      child: const MaterialApp(
+        home: Scaffold(body: DriverWorkspaceScreen(accountID: 'user-1')),
+      ),
     ),
-  ],
-);
+  );
+  await tester.pumpAndSettle();
+}
+
+Future<void> _expandPanel(WidgetTester tester) async {
+  final panel = find.byKey(const Key('dashboardPanel'));
+  final dashboardHeight = tester
+      .getSize(find.byType(RideDashboardScaffold))
+      .height;
+  await tester.drag(
+    find.byKey(const Key('dashboardPanelDragHandle')),
+    const Offset(0, -300),
+  );
+  await tester.pumpAndSettle();
+  expect(tester.getSize(panel).height, dashboardHeight * 0.60);
+}
 
 final initialApprovedApplication = DriverOnboardingApplication(
   id: 'initial-application',
