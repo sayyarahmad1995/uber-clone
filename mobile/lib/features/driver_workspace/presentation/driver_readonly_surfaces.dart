@@ -16,9 +16,7 @@ class DriverDetailsScreen extends ConsumerWidget {
     final profile = driver.profile;
     final application = onboarding.application;
     final loading = !driver.loaded || (profile == null && !onboarding.loaded);
-    final error = profile == null
-        ? driver.error ?? onboarding.error
-        : driver.error;
+    final error = profile == null ? driver.error ?? onboarding.error : driver.error;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Driver details')),
@@ -82,8 +80,7 @@ class DriverVehiclesScreen extends ConsumerWidget {
                       _ReadOnlyTile(
                         icon: Icons.directions_car_outlined,
                         label: 'Vehicle',
-                        value:
-                            '${record.vehicle.make} ${record.vehicle.model}',
+                        value: '${record.vehicle.make} ${record.vehicle.model}',
                       ),
                       if (record.vehicle.modelYear != null)
                         _ReadOnlyTile(
@@ -109,8 +106,7 @@ class DriverVehiclesScreen extends ConsumerWidget {
                         _ReadOnlyTile(
                           icon: Icons.verified_outlined,
                           label: 'Approved service',
-                          value:
-                              '${enrollment.displayName}${enrollment.serviceActive ? '' : ' (currently unavailable)'}',
+                          value: _enrollmentLabel(enrollment),
                         ),
                     ],
                   ),
@@ -178,7 +174,9 @@ class _ReadOnlyBody extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Read-only. Approved Driver and vehicle information cannot be changed directly from this screen. New vehicle/service applications require review.',
+                    'Read-only. Approved Driver and vehicle information cannot '
+                    'be changed directly from this screen. New vehicle/service '
+                    'applications require review.',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ),
@@ -395,6 +393,11 @@ class _ReadOnlyTile extends StatelessWidget {
       subtitle: Text(value),
     );
   }
+}
+
+String _enrollmentLabel(dynamic enrollment) {
+  if (enrollment.serviceActive) return enrollment.displayName as String;
+  return '${enrollment.displayName} (currently unavailable)';
 }
 
 String _statusLabel(String? status) {
