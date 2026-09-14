@@ -12,6 +12,7 @@ import '../application/driver_onboarding_controller.dart';
 import '../domain/driver_onboarding.dart';
 import '../domain/driver_profile.dart';
 import 'operating_selection.dart';
+import 'vehicle_service_application_section.dart';
 
 class DriverWorkspaceScreen extends ConsumerStatefulWidget {
   const DriverWorkspaceScreen({super.key, required this.accountID});
@@ -523,6 +524,10 @@ class _DriverReadinessPanel extends StatelessWidget {
       ),
       if (activeTrip) const RideFlowPanel(),
       if (!activeTrip) const OperatingSelectionControl(),
+      if (!activeTrip) ...[
+        const SizedBox(height: AppSpacing.md),
+        const VehicleServiceApplicationSection(),
+      ],
       const SizedBox(height: AppSpacing.md),
       DashboardPanelControl(
         child: FilledButton.icon(
