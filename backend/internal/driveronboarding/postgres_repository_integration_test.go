@@ -257,6 +257,155 @@ func TestPostgresReviewRejectKeepsOperationalRecordsAbsent(t *testing.T) {
 	}
 }
 
+func TestPostgresRepositoryAllowsAdditionalApplicationAfterApproval(t *testing.T) {
+	db := openDriverOnboardingIntegrationDB(t)
+	userID := createDriverOnboardingUser(t, db)
+	repository := NewPostgresRepository(db)
+	submission := NewService(repository)
+	review := NewReviewService(repository)
+
+	initial, err := submission.Submit(
+		context.Background(),
+		userID,
+		validDriverOnboardingInput("comfort", "FIRST-123"),
+	)
+	if err != nil {
+		t.Fatalf("submit initial application: %v", err)
+	}
+	if _, err := review.Approve(context.Background(), initial.ID, "reviewer"); err != nil {
+		t.Fatalf("approve initial application: %v", err)
+	}
+
+	additional, err := submission.Submit(
+		context.Background(),
+		userID,
+		validDriverOnboardingInput("economy", "SECOND-456"),
+	)
+	if err != nil {
+		t.Fatalf("submit additional application after approval: %v", err)
+	}
+	if additional.Status != StatusPending || additional.ID == initial.ID {
+		t.Fatalf("unexpected additional application: %#v", additional)
+	}
+
+	var vehicleCount int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM driver_vehicles WHERE driver_user_id = $1`, userID).Scan(&vehicleCount); err != nil {
+		t.Fatalf("count approved vehicles while additional application is pending: %v", err)
+	}
+	if vehicleCount != 1 {
+		t.Fatalf("pending additional application should not create a vehicle, got %d", vehicleCount)
+	}
+
+	latest, err := submission.Latest(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("restore latest additional application: %v", err)
+	}
+	if latest.ID != additional.ID {
+		t.Fatalf("expected latest additional application %s, got %s", additional.ID, latest.ID)
+	}
+}
+
+func TestPostgresReviewApproveAdditionalApplicationCreatesNewVehicle(t *testing.T) {
+	db := openDriverOnboardingIntegrationDB(t)
+	userID := createDriverOnboardingUser(t, db)
+	repository := NewPostgresRepository(db)
+	submission := NewService(repository)
+	review := NewReviewService(repository)
+
+	initial, err := submission.Submit(
+		context.Background(),
+		userID,
+		validDriverOnboardingInput("comfort", "FIRST-123"),
+	)
+	if err != nil {
+		t.Fatalf("submit initial application: %v", err)
+	}
+	if _, err := review.Approve(context.Background(), initial.ID, "reviewer"); err != nil {
+		t.Fatalf("approve initial application: %v", err)
+	}
+
+	additionalInput := validDriverOnboardingInput("economy", "SECOND-456")
+	additionalInput.DisplayName = "Updated Display Name"
+	additional, err := submission.Submit(context.Background(), userID, additionalInput)
+	if err != nil {
+		t.Fatalf("submit additional application: %v", err)
+	}
+	if _, err := review.Approve(context.Background(), additional.ID, "reviewer"); err != nil {
+		t.Fatalf("approve additional application: %v", err)
+	}
+
+	var profileCount int
+	var displayName string
+	if err := db.QueryRow(`
+		SELECT COUNT(*), MAX(display_name)
+		FROM driver_profiles
+		WHERE user_id = $1
+	`, userID).Scan(&profileCount, &displayName); err != nil {
+		t.Fatalf("load Driver profile after additional approval: %v", err)
+	}
+	if profileCount != 1 || displayName != initial.DisplayName {
+		t.Fatalf("additional approval changed profile unexpectedly: count=%d display_name=%q", profileCount, displayName)
+	}
+
+	vehicles, err := driver.NewPostgresRepository(db).ListVehicles(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("list vehicles after additional approval: %v", err)
+	}
+	if len(vehicles) != 2 {
+		t.Fatalf("expected two approved vehicles, got %#v", vehicles)
+	}
+	if vehicles[0].LicensePlate != "FIRST-123" || vehicles[1].LicensePlate != "SECOND-456" {
+		t.Fatalf("unexpected approved vehicle order/snapshots: %#v", vehicles)
+	}
+	if len(vehicles[0].Enrollments) != 1 || vehicles[0].Enrollments[0].ServiceCode != "comfort" {
+		t.Fatalf("initial vehicle enrollment changed: %#v", vehicles[0])
+	}
+	if len(vehicles[1].Enrollments) != 1 || vehicles[1].Enrollments[0].ServiceCode != "economy" {
+		t.Fatalf("additional vehicle enrollment missing: %#v", vehicles[1])
+	}
+}
+
+func TestPostgresRepositoryRejectsExistingVehiclePlateApplication(t *testing.T) {
+	db := openDriverOnboardingIntegrationDB(t)
+	userID := createDriverOnboardingUser(t, db)
+	repository := NewPostgresRepository(db)
+	submission := NewService(repository)
+	review := NewReviewService(repository)
+
+	initial, err := submission.Submit(
+		context.Background(),
+		userID,
+		validDriverOnboardingInput("comfort", "DUP-123"),
+	)
+	if err != nil {
+		t.Fatalf("submit initial application: %v", err)
+	}
+	if _, err := review.Approve(context.Background(), initial.ID, "reviewer"); err != nil {
+		t.Fatalf("approve initial application: %v", err)
+	}
+
+	_, err = submission.Submit(
+		context.Background(),
+		userID,
+		validDriverOnboardingInput("economy", "dup-123"),
+	)
+	if !errors.Is(err, ErrVehicleAlreadyRegistered) {
+		t.Fatalf("expected ErrVehicleAlreadyRegistered, got %v", err)
+	}
+
+	var pendingCount int
+	if err := db.QueryRow(`
+		SELECT COUNT(*)
+		FROM driver_onboarding_applications
+		WHERE driver_user_id = $1 AND status = 'pending'
+	`, userID).Scan(&pendingCount); err != nil {
+		t.Fatalf("count pending duplicate applications: %v", err)
+	}
+	if pendingCount != 0 {
+		t.Fatalf("duplicate vehicle plate left a pending application: count=%d", pendingCount)
+	}
+}
+
 func TestPostgresSubmissionCannotRaceApprovalIntoNewPendingApplication(t *testing.T) {
 	db := openDriverOnboardingIntegrationDB(t)
 	userID := createDriverOnboardingUser(t, db)

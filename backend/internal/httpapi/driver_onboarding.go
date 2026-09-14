@@ -117,6 +117,9 @@ func (api *API) submitDriverOnboarding(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, driveronboarding.ErrPendingApplication):
 		writeJSON(w, http.StatusConflict, map[string]string{"error": "a Driver onboarding application is already under review"})
 		return
+	case errors.Is(err, driveronboarding.ErrVehicleAlreadyRegistered):
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "vehicle is already registered for this Driver"})
+		return
 	case errors.Is(err, driveronboarding.ErrAlreadyOnboarded):
 		writeJSON(w, http.StatusConflict, map[string]string{"error": "Driver onboarding is already complete; use the vehicle/service application flow"})
 		return

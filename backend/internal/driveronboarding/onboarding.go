@@ -10,14 +10,15 @@ import (
 )
 
 var (
-	ErrInvalidApplication    = errors.New("invalid driver onboarding application")
-	ErrServiceNotFound       = errors.New("driver service not found")
-	ErrPendingApplication    = errors.New("driver onboarding application already pending")
-	ErrAlreadyOnboarded      = errors.New("driver onboarding already complete")
-	ErrNotFound              = errors.New("driver onboarding application not found")
-	ErrIneligible            = errors.New("vehicle is not eligible for selected service")
-	ErrInvalidReviewDecision = errors.New("invalid driver onboarding review decision")
-	ErrApplicationNotPending = errors.New("driver onboarding application is not pending")
+	ErrInvalidApplication       = errors.New("invalid driver onboarding application")
+	ErrServiceNotFound          = errors.New("driver service not found")
+	ErrPendingApplication       = errors.New("driver onboarding application already pending")
+	ErrAlreadyOnboarded         = errors.New("driver onboarding already complete")
+	ErrVehicleAlreadyRegistered = errors.New("driver vehicle is already registered")
+	ErrNotFound                 = errors.New("driver onboarding application not found")
+	ErrIneligible               = errors.New("vehicle is not eligible for selected service")
+	ErrInvalidReviewDecision    = errors.New("invalid driver onboarding review decision")
+	ErrApplicationNotPending    = errors.New("driver onboarding application is not pending")
 )
 
 type ApplicationStatus string
