@@ -46,18 +46,21 @@ class _VehicleServiceApplicationSectionState
     _serviceCode ??= selectedService?.code;
 
     final latestAdditional = _latestAdditional(onboarding.application);
-    final child = _adding
-        ? _buildForm(
-            context: context,
-            onboarding: onboarding,
-            profile: driver.profile,
-            selectedService: selectedService,
-          )
-        : _buildSummary(
-            context: context,
-            onboarding: onboarding,
-            latestAdditional: latestAdditional,
-          );
+    final Widget child;
+    if (_adding) {
+      child = _buildForm(
+        context: context,
+        onboarding: onboarding,
+        profile: driver.profile,
+        selectedService: selectedService,
+      );
+    } else {
+      child = _buildSummary(
+        context: context,
+        onboarding: onboarding,
+        latestAdditional: latestAdditional,
+      );
+    }
 
     return Card(
       child: Padding(
@@ -104,14 +107,12 @@ class _VehicleServiceApplicationSectionState
           children: [
             FilledButton.icon(
               key: const Key('driverAddVehicleServiceApplicationButton'),
-              onPressed: onboarding.busy || pending
-                  ? null
-                  : () => setState(() => _adding = true),
+              onPressed: _addPressed(onboarding, pending),
               icon: const Icon(Icons.add),
               label: const Text('Add vehicle/service'),
             ),
             TextButton(
-              onPressed: onboarding.busy ? null : () => _refresh(onboarding),
+              onPressed: _refreshPressed(onboarding),
               child: const Text('Refresh'),
             ),
           ],
@@ -137,10 +138,8 @@ class _VehicleServiceApplicationSectionState
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: AppSpacing.xs),
-          const Text(
-            'Submit a new vehicle and one requested service for review. '
-            'Approval will add a new approved operating option.',
-          ),
+          const Text('Submit a new vehicle and one service for review.'),
+          const Text('Approval adds a new operating option.'),
           const SizedBox(height: AppSpacing.sm),
           _ServicePicker(
             services: onboarding.services,
@@ -162,9 +161,7 @@ class _VehicleServiceApplicationSectionState
                 controller: _fields[index],
                 enabled: !onboarding.busy,
                 decoration: InputDecoration(labelText: _labels[index]),
-                keyboardType: index == 2
-                    ? TextInputType.number
-                    : TextInputType.text,
+                keyboardType: _keyboardType(index),
                 validator: (value) => _validateField(index, value),
               ),
             ),
@@ -181,21 +178,11 @@ class _VehicleServiceApplicationSectionState
             runSpacing: AppSpacing.xs,
             children: [
               FilledButton(
-                onPressed: onboarding.busy || selectedService == null
-                    ? null
-                    : () => _reviewAndSubmit(
-                          onboarding: onboarding,
-                          profile: profile,
-                          service: selectedService,
-                        ),
-                child: Text(
-                  onboarding.busy ? 'Checking…' : 'Review application',
-                ),
+                onPressed: _reviewPressed(onboarding, profile, selectedService),
+                child: Text(_reviewButtonLabel(onboarding)),
               ),
               TextButton(
-                onPressed: onboarding.busy
-                    ? null
-                    : () => setState(() => _adding = false),
+                onPressed: _cancelPressed(onboarding),
                 child: const Text('Cancel'),
               ),
             ],
@@ -273,11 +260,8 @@ class _VehicleServiceApplicationSectionState
             Text('Color: ${vehicle.color}'),
             Text('License plate: ${vehicle.licensePlate}'),
             const SizedBox(height: AppSpacing.sm),
-            const Text(
-              'Submitting sends this vehicle/service application for review. '
-              'It will not change your approved Driver profile or '
-              'online status.',
-            ),
+            const Text('Submitting sends this application for review.'),
+            const Text('It will not change your current Driver profile.'),
           ],
         ),
         actions: [
@@ -291,6 +275,37 @@ class _VehicleServiceApplicationSectionState
           ),
         ],
       ),
+    );
+  }
+
+  VoidCallback? _addPressed(
+    DriverOnboardingController onboarding,
+    bool pending,
+  ) {
+    if (onboarding.busy || pending) return null;
+    return () => setState(() => _adding = true);
+  }
+
+  VoidCallback? _refreshPressed(DriverOnboardingController onboarding) {
+    if (onboarding.busy) return null;
+    return () => _refresh(onboarding);
+  }
+
+  VoidCallback? _cancelPressed(DriverOnboardingController onboarding) {
+    if (onboarding.busy) return null;
+    return () => setState(() => _adding = false);
+  }
+
+  VoidCallback? _reviewPressed(
+    DriverOnboardingController onboarding,
+    DriverProfile? profile,
+    DriverServiceOption? selectedService,
+  ) {
+    if (onboarding.busy || selectedService == null) return null;
+    return () => _reviewAndSubmit(
+      onboarding: onboarding,
+      profile: profile,
+      service: selectedService,
     );
   }
 
@@ -324,6 +339,10 @@ class _VehicleServiceApplicationSectionState
     );
   }
 
+  TextInputType _keyboardType(int index) {
+    return index == 2 ? TextInputType.number : TextInputType.text;
+  }
+
   String? _validateField(int index, String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'Required';
@@ -348,8 +367,7 @@ class _VehicleServiceApplicationSectionState
     if (pending) {
       return 'Your latest vehicle/service application is under review.';
     }
-    return 'Add another vehicle and service without changing your approved '
-        'Driver profile.';
+    return 'Add another vehicle and service for review.';
   }
 
   String _ineligibleMessage(DriverOnboardingPrecheck precheck) {
@@ -357,6 +375,10 @@ class _VehicleServiceApplicationSectionState
       return 'This vehicle does not meet the selected service requirements.';
     }
     return precheck.reasons.join('\n');
+  }
+
+  String _reviewButtonLabel(DriverOnboardingController onboarding) {
+    return onboarding.busy ? 'Checking…' : 'Review application';
   }
 }
 
