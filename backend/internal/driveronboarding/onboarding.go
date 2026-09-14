@@ -32,7 +32,7 @@ const (
 type ApplicationType string
 
 const (
-	ApplicationTypeInitialOnboarding       ApplicationType = "initial_onboarding"
+	ApplicationTypeInitialOnboarding        ApplicationType = "initial_onboarding"
 	ApplicationTypeAdditionalVehicleService ApplicationType = "additional_vehicle_service"
 )
 
