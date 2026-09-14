@@ -23,12 +23,16 @@ class CachingDeviceLocation implements DeviceLocation {
   @override
   Future<GeoPoint> current() async {
     final point = await _delegate.current();
-    await _cache.save(
-      LastMapLocation(
-        latitude: point.latitude,
-        longitude: point.longitude,
-      ),
-    );
+    try {
+      await _cache.save(
+        LastMapLocation(
+          latitude: point.latitude,
+          longitude: point.longitude,
+        ),
+      );
+    } catch (_) {
+      // A cache write must never block a live location read.
+    }
     return point;
   }
 }
