@@ -32,7 +32,7 @@ Future implementation must be checked against these documents before a slice is 
 - Use one Rider Ride Request flow: pickup, destination, and proposed fare.
 - Let eligible Drivers either accept the Rider proposed fare or submit a counteroffer.
 - Treat geographic logic as marketplace eligibility/distribution/ranking policy, not a Rider-selected booking mode.
-- Close the MVP ride loop with minimal cash settlement and receipt display before introducing any sophisticated payment infrastructure.
+- Validate the MVP ride loop through minimal cash settlement and receipt display before introducing sophisticated payment infrastructure or unrelated product domains.
 
 ## Documents
 
@@ -42,6 +42,7 @@ Future implementation must be checked against these documents before a slice is 
 - [ADR-0009: Driver Service and Vehicle Eligibility Model](ADR-0009-driver-service-vehicle-eligibility.md)
 - [ADR-0010: Minimal Driver Onboarding Reviewer](ADR-0010-minimal-driver-onboarding-reviewer.md)
 - [ADR-0011: Minimal Cash Settlement and Trip Receipt](ADR-0011-minimal-cash-settlement-and-receipt.md)
+- [Pilot cash ride acceptance checklist](pilot-cash-ride-acceptance.md)
 - [Driver onboarding reviewer runbook](driver-onboarding-reviewer.md)
 - [Product and Capability Model](product-and-capability-model.md)
 - [Technology Stack](technology-stack.md)

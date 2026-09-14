@@ -63,7 +63,9 @@ Driver commercial response is the differentiator:
 - submitting a counteroffer creates a pending offer at a different allowed fare;
 - either response requires Rider selection before assignment.
 
-The selected offer's agreed fare is the authoritative commercial amount for the MVP Trip. The next MVP slice closes the ride loop with minimal cash settlement and receipt display, as defined by ADR-0011. It does not introduce a general payment platform.
+The selected offer's agreed fare is the authoritative commercial amount for the MVP Trip. The cash-settlement and receipt milestone closes the ride loop commercially with minimal cash handling and receipt/history display, as defined by ADR-0011. It does not introduce a general payment platform.
+
+The pilot acceptance boundary for this loop is defined in [Pilot cash ride acceptance checklist](pilot-cash-ride-acceptance.md). The next implementation slice after that checklist should be selected from actual pilot blockers or the smallest visible receipt/history polish still needed for the cash ride loop.
 
 Geographic matching is marketplace policy used to determine which Drivers are eligible to receive/discover a request and how requests/Drivers are ranked. It is not a second Rider booking mode.
 
