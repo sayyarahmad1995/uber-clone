@@ -1,5 +1,6 @@
 import 'package:geolocator/geolocator.dart';
 
+import '../../../core/maps/last_map_location_store.dart';
 import '../domain/ride_request.dart';
 
 abstract interface class DeviceLocation {
@@ -11,6 +12,25 @@ class LocationUnavailable implements Exception {
   final String message;
   @override
   String toString() => message;
+}
+
+class CachingDeviceLocation implements DeviceLocation {
+  CachingDeviceLocation(this._delegate, this._cache);
+
+  final DeviceLocation _delegate;
+  final LastMapLocationStore _cache;
+
+  @override
+  Future<GeoPoint> current() async {
+    final point = await _delegate.current();
+    await _cache.save(
+      LastMapLocation(
+        latitude: point.latitude,
+        longitude: point.longitude,
+      ),
+    );
+    return point;
+  }
 }
 
 class GeolocatorDeviceLocation implements DeviceLocation {
