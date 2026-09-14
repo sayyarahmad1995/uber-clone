@@ -225,9 +225,7 @@ class _VehicleServiceApplicationSectionState
     setState(() => _adding = false);
   }
 
-  Future<void> _showIneligibleDialog(
-    DriverOnboardingPrecheck precheck,
-  ) async {
+  Future<void> _showIneligibleDialog(DriverOnboardingPrecheck precheck) async {
     await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
