@@ -1,5 +1,6 @@
 import 'package:geolocator/geolocator.dart';
 
+import '../../../core/maps/last_map_location_store.dart';
 import '../domain/ride_request.dart';
 
 abstract interface class DeviceLocation {
@@ -13,7 +14,26 @@ class LocationUnavailable implements Exception {
   String toString() => message;
 }
 
+class CachingDeviceLocation implements DeviceLocation {
+  CachingDeviceLocation(this._delegate, this._cache);
+
+  final DeviceLocation _delegate;
+  final LastMapLocationStore _cache;
+
+  @override
+  Future<GeoPoint> current() async {
+    final point = await _delegate.current();
+    await _save(point, _cache);
+    return point;
+  }
+}
+
 class GeolocatorDeviceLocation implements DeviceLocation {
+  GeolocatorDeviceLocation({LastMapLocationStore? cache})
+    : _cache = cache ?? PreferencesLastMapLocationStore();
+
+  final LastMapLocationStore _cache;
+
   @override
   Future<GeoPoint> current() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
@@ -32,6 +52,21 @@ class GeolocatorDeviceLocation implements DeviceLocation {
       );
     }
     final position = await Geolocator.getCurrentPosition();
-    return GeoPoint(latitude: position.latitude, longitude: position.longitude);
+    final point = GeoPoint(
+      latitude: position.latitude,
+      longitude: position.longitude,
+    );
+    await _save(point, _cache);
+    return point;
+  }
+}
+
+Future<void> _save(GeoPoint point, LastMapLocationStore cache) async {
+  try {
+    await cache.save(
+      LastMapLocation(latitude: point.latitude, longitude: point.longitude),
+    );
+  } catch (_) {
+    // A cache write must never block a live location read.
   }
 }
