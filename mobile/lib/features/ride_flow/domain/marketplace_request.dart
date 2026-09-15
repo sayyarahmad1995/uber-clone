@@ -23,7 +23,8 @@ abstract class RideFare with _$RideFare {
     required String currency,
   }) = _RideFare;
 
-  factory RideFare.fromJson(Map<String, dynamic> json) => _$RideFareFromJson(json);
+  factory RideFare.fromJson(Map<String, dynamic> json) =>
+      _$RideFareFromJson(json);
 }
 
 @freezed

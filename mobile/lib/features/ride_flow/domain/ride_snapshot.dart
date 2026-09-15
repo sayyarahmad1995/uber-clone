@@ -21,7 +21,8 @@ abstract class RiderRideSnapshot with _$RiderRideSnapshot {
     TripSnapshot? trip,
   }) = _RiderRideSnapshot;
 
-  factory RiderRideSnapshot.fromJson(Map<String, dynamic> json) => _$RiderRideSnapshotFromJson(json);
+  factory RiderRideSnapshot.fromJson(Map<String, dynamic> json) =>
+      _$RiderRideSnapshotFromJson(json);
 }
 
 @freezed
@@ -33,11 +34,16 @@ abstract class DriverLocationSnapshot with _$DriverLocationSnapshot {
     @JsonKey(name: 'updated_at') required DateTime updatedAt,
   }) = _DriverLocationSnapshot;
 
-  factory DriverLocationSnapshot.fromJson(Map<String, dynamic> json) => _$DriverLocationSnapshotFromJson(json);
+  factory DriverLocationSnapshot.fromJson(Map<String, dynamic> json) =>
+      _$DriverLocationSnapshotFromJson(json);
 }
 
 class RideSnapshot {
-  const RideSnapshot({required this.ride, required this.offers, this.driverLocation});
+  const RideSnapshot({
+    required this.ride,
+    required this.offers,
+    this.driverLocation,
+  });
 
   final RiderRideSnapshot ride;
   final List<RiderOfferComparison> offers;

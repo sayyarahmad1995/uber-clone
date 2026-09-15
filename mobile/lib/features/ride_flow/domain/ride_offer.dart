@@ -18,7 +18,8 @@ abstract class RideOffer with _$RideOffer {
     @JsonKey(name: 'decided_at') DateTime? decidedAt,
   }) = _RideOffer;
 
-  factory RideOffer.fromJson(Map<String, dynamic> json) => _$RideOfferFromJson(json);
+  factory RideOffer.fromJson(Map<String, dynamic> json) =>
+      _$RideOfferFromJson(json);
 }
 
 @freezed
