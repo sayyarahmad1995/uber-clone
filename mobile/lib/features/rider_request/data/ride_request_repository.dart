@@ -43,9 +43,8 @@ class ApiRideRequestRepository implements RideRequestRepository {
       final items = response.data!['ride_requests'] as List<dynamic>? ?? [];
       return items
           .map(
-            (item) => RideRequest.fromJson(
-              Map<String, dynamic>.from(item as Map),
-            ),
+            (item) =>
+                RideRequest.fromJson(Map<String, dynamic>.from(item as Map)),
           )
           .toList();
     } on DioException catch (error) {
