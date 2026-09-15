@@ -2,19 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
+import 'domain/marketplace_request.dart';
+import 'domain/ride_offer.dart';
+import 'domain/ride_snapshot.dart';
+import 'domain/trip.dart';
 import 'ride_flow_controller.dart';
-import 'ride_flow_repository.dart';
 
 String fareText(dynamic fare) {
-  if (fare is! Map || fare['amount_minor'] is! num) {
-    return 'Fare unavailable';
+  if (fare is RideFare) {
+    return '${fare.currency} ${(fare.amountMinor / 100).toStringAsFixed(2)}';
   }
-  return '${fare['currency']} ${((fare['amount_minor'] as num) / 100).toStringAsFixed(2)}';
+  if (fare is TripOperationFare) {
+    return '${fare.currency} ${(fare.amountMinor / 100).toStringAsFixed(2)}';
+  }
+  return 'Fare unavailable';
 }
 
-String pointText(dynamic point) => point is Map
-    ? '${(point['latitude'] as num).toStringAsFixed(5)}, ${(point['longitude'] as num).toStringAsFixed(5)}'
-    : 'Unavailable';
+String pointText(RideLocation? point) => point == null
+    ? 'Unavailable'
+    : '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}';
 
 String statusText(String? status) => switch (status) {
   'assigned' => 'Driver assigned',
@@ -24,51 +30,41 @@ String statusText(String? status) => switch (status) {
   _ => 'Waiting for Driver offers',
 };
 
-String settlementText(dynamic settlement) {
-  if (settlement is! Map) {
-    return 'Settlement: Not recorded';
+String settlementText(SettlementSnapshot? settlement) {
+  if (settlement == null) return 'Settlement: Not recorded';
+  if (settlement.status == 'unsettled') return 'Settlement: Cash due';
+  if (settlement.status == 'cash_collected') {
+    final collectedAt = settlement.cashCollectedAt;
+    return collectedAt == null
+        ? 'Settlement: Cash collected'
+        : 'Settlement: Cash collected · $collectedAt';
   }
-  final status = settlement['status'];
-  if (status == 'unsettled') {
-    return 'Settlement: Cash due';
-  }
-  if (status == 'cash_collected') {
-    final collectedAt = settlement['cash_collected_at'];
-    if (collectedAt == null) {
-      return 'Settlement: Cash collected';
-    }
-    return 'Settlement: Cash collected · $collectedAt';
-  }
-  return 'Settlement: ${status ?? 'Unknown'}';
+  return 'Settlement: ${settlement.status}';
 }
 
-bool settlementIsCashDue(dynamic settlement) =>
-    settlement is Map && settlement['status'] == 'unsettled';
+bool settlementIsCashDue(SettlementSnapshot settlement) =>
+    settlement.status == 'unsettled';
 
-String tripAgreedFareText(dynamic trip) {
-  if (trip is! Map || trip['operation_context'] is! Map) {
-    return 'Fare unavailable';
-  }
-  return fareText(trip['operation_context']['fare']);
+String tripAgreedFareText(TripSnapshot trip) {
+  final fare = trip.operationContext?.fare;
+  return fare == null ? 'Fare unavailable' : fareText(fare);
 }
 
-String cashCollectionMessage(dynamic trip) {
+String cashCollectionMessage(TripSnapshot trip) {
   final agreedFare = tripAgreedFareText(trip);
-  if (agreedFare == 'Fare unavailable') {
-    return 'Confirm that you collected the agreed cash fare from the Rider.';
-  }
-  return 'Confirm that you collected $agreedFare in cash from the Rider.';
+  return agreedFare == 'Fare unavailable'
+      ? 'Confirm that you collected the agreed cash fare from the Rider.'
+      : 'Confirm that you collected $agreedFare in cash from the Rider.';
 }
 
 class OperationDetails extends StatelessWidget {
   const OperationDetails(this.operation, {super.key});
-
-  final dynamic operation;
+  final TripOperationContext? operation;
 
   @override
   Widget build(BuildContext context) {
     final value = operation;
-    if (value is! Map) {
+    if (value == null) {
       return const Text(
         'Vehicle and service details unavailable for this historical trip.',
       );
@@ -76,14 +72,11 @@ class OperationDetails extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (value['driver_name'] != null) Text('${value['driver_name']}'),
-        Text(
-          '${value['make'] ?? ''} ${value['model'] ?? ''} ${value['model_year'] ?? ''} · ${value['color'] ?? ''}',
-        ),
-        if (value['license_plate'] != null)
-          Text('License plate: ${value['license_plate']}'),
-        Text('Service: ${value['service_name'] ?? value['service_code']}'),
-        Text('Agreed fare: ${fareText(value['fare'])}'),
+        Text(value.driverName),
+        Text('${value.make} ${value.model} ${value.modelYear} · ${value.color}'),
+        Text('License plate: ${value.licensePlate}'),
+        Text('Service: ${value.serviceName}'),
+        Text('Agreed fare: ${fareText(value.fare)}'),
       ],
     );
   }
@@ -91,7 +84,6 @@ class OperationDetails extends StatelessWidget {
 
 class RideFlowPanel extends ConsumerStatefulWidget {
   const RideFlowPanel({super.key, this.rideId});
-
   final String? rideId;
 
   @override
@@ -101,7 +93,6 @@ class RideFlowPanel extends ConsumerStatefulWidget {
 class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
     with WidgetsBindingObserver {
   String get flowKey => widget.rideId ?? 'driver';
-
   bool _syncing = false;
 
   @override
@@ -121,11 +112,8 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
     if (state == AppLifecycleState.resumed) {
       ref.read(rideFlowControllerProvider(flowKey)).setForeground(true);
     }
-    if ([
-      AppLifecycleState.paused,
-      AppLifecycleState.hidden,
-      AppLifecycleState.detached,
-    ].contains(state)) {
+    if ([AppLifecycleState.paused, AppLifecycleState.hidden, AppLifecycleState.detached]
+        .contains(state)) {
       ref.read(rideFlowControllerProvider(flowKey)).setForeground(false);
     }
   }
@@ -136,7 +124,7 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
     ref.listen(rideFlowControllerProvider(flowKey), (_, next) {
       if (!next.loaded || next.busy) return;
       if (widget.rideId == null) {
-        ref.read(driverControllerProvider).setActiveTrip(next.current != null);
+        ref.read(driverControllerProvider).setActiveTrip(next.driverTrip != null);
       } else if (!_syncing) {
         final request = ref.read(riderRequestControllerProvider).state.active;
         if (request?.id == widget.rideId &&
@@ -154,17 +142,12 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
       children: [
         const Divider(),
         Text(
-          widget.rideId == null
-              ? 'Trips and requests'
-              : statusText(flow.status),
+          widget.rideId == null ? 'Trips and requests' : statusText(flow.status),
           style: Theme.of(context).textTheme.titleLarge,
         ),
         if (!flow.loaded && flow.busy) const LinearProgressIndicator(),
         if (flow.error != null)
-          Text(
-            flow.error!,
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
-          ),
+          Text(flow.error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
         TextButton.icon(
           onPressed: flow.busy ? null : flow.refresh,
           icon: const Icon(Icons.refresh),
@@ -176,41 +159,37 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
   }
 
   List<Widget> _driver(RideFlowController flow) {
-    final trip = flow.current;
+    final trip = flow.driverTrip;
     if (trip != null) {
-      final id = trip['ride_request_id'];
-      final status = trip['status'];
-      final cashDue =
-          status == 'completed' && settlementIsCashDue(trip['settlement']);
+      final id = trip.rideRequestId!;
+      final cashDue = trip.status == 'completed' && settlementIsCashDue(trip.settlement);
       return [
-        Text(statusText(status as String?)),
-        OperationDetails(trip['operation_context']),
-        Text(settlementText(trip['settlement'])),
-        Text('Pickup: ${pointText(trip['pickup'])}'),
-        Text('Destination: ${pointText(trip['destination'])}'),
-        if (status == 'assigned')
+        Text(statusText(trip.status)),
+        OperationDetails(trip.operationContext),
+        Text(settlementText(trip.settlement)),
+        Text('Pickup: ${pointText(trip.pickup)}'),
+        Text('Destination: ${pointText(trip.destination)}'),
+        if (trip.status == 'assigned')
           FilledButton(
             onPressed: flow.busy
                 ? null
                 : () => _confirm(
-                    flow,
-                    '/v1/driver/ride-requests/$id/start',
                     'Start trip?',
                     'Confirm that the Rider is on board.',
                     'Start trip',
+                    () => flow.startTrip(id),
                   ),
             child: const Text('Start trip'),
           ),
-        if (status == 'in_progress')
+        if (trip.status == 'in_progress')
           FilledButton(
             onPressed: flow.busy
                 ? null
                 : () => _confirm(
-                    flow,
-                    '/v1/driver/ride-requests/$id/complete',
                     'Complete trip?',
                     'Confirm that you have reached the destination.',
                     'Complete trip',
+                    () => flow.completeTrip(id),
                   ),
             child: const Text('Complete trip'),
           ),
@@ -220,31 +199,29 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
             onPressed: flow.busy
                 ? null
                 : () => _confirm(
-                    flow,
-                    '/v1/driver/ride-requests/$id/cash-collected',
                     'Confirm cash collected?',
                     cashCollectionMessage(trip),
                     'Confirm cash collected',
+                    () => flow.confirmCashCollected(id),
                   ),
             child: const Text('Confirm cash collected'),
           ),
-        if (['assigned', 'in_progress'].contains(status))
+        if (['assigned', 'in_progress'].contains(trip.status))
           TextButton(
             onPressed: flow.busy
                 ? null
                 : () => _confirm(
-                    flow,
-                    '/v1/driver/ride-requests/$id/cancel',
                     'Cancel trip?',
                     'This ends the trip for both you and the Rider.',
                     'Cancel trip',
+                    () => flow.cancelDriverTrip(id),
                   ),
             child: const Text('Cancel trip'),
           ),
       ];
     }
-    final online =
-        ref.watch(driverControllerProvider).profile?.isOnline == true;
+
+    final online = ref.watch(driverControllerProvider).profile?.isOnline == true;
     return [
       if (!online)
         const Text('Go online to receive requests for your selected service.'),
@@ -258,26 +235,15 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('Rider fare: ${fareText(request['proposed_fare'])}'),
-                  Text('Pickup: ${pointText(request['pickup'])}'),
-                  Text('Destination: ${pointText(request['destination'])}'),
-                  if (request['pickup_distance_meters'] is num)
-                    Text(
-                      '${((request['pickup_distance_meters'] as num) / 1000).toStringAsFixed(1)} km to pickup · straight-line distance',
-                    ),
-                  if (request['own_offer'] is Map)
-                    Text(
-                      'Your response: ${fareText(request['own_offer']['fare'])} · ${request['own_offer']['status']}',
-                    ),
-                  const Text(
-                    'The Rider chooses a Driver. Sending a response does not assign this trip.',
-                  ),
+                  Text('Rider fare: ${fareText(request.proposedFare)}'),
+                  Text('Pickup: ${pointText(request.pickup)}'),
+                  Text('Destination: ${pointText(request.destination)}'),
+                  Text('${(request.pickupDistanceMeters / 1000).toStringAsFixed(1)} km to pickup · straight-line distance'),
+                  if (request.ownOffer != null)
+                    Text('Your response: ${fareText(request.ownOffer!.fare)} · ${request.ownOffer!.status}'),
+                  const Text('The Rider chooses a Driver. Sending a response does not assign this trip.'),
                   FilledButton(
-                    onPressed: flow.busy
-                        ? null
-                        : () => flow.act(
-                            '/v1/driver/ride-requests/${request['id']}/accept',
-                          ),
+                    onPressed: flow.busy ? null : () => flow.acceptProposedFare(request.id),
                     child: const Text('Accept Rider fare'),
                   ),
                   OutlinedButton(
@@ -295,13 +261,13 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
             const ListTile(title: Text('No completed or cancelled trips.')),
           for (final item in flow.history)
             ListTile(
-              title: Text(statusText(item['status'] as String?)),
+              title: Text(statusText(item.status)),
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Assigned: ${item['assigned_at']}'),
-                  OperationDetails(item['operation_context']),
-                  Text(settlementText(item['settlement'])),
+                  Text('Assigned: ${item.assignedAt}'),
+                  OperationDetails(item.operationContext),
+                  Text(settlementText(item.settlement)),
                 ],
               ),
             ),
@@ -311,16 +277,16 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
   }
 
   List<Widget> _rider(RideFlowController flow) {
-    final trip = flow.current?['trip'];
-    if (trip is Map) {
+    final trip = flow.riderRide?.trip;
+    if (trip != null) {
       return [
-        OperationDetails(trip['operation_context']),
-        Text(settlementText(trip['settlement'])),
-        if (['assigned', 'in_progress'].contains(trip['status']))
+        OperationDetails(trip.operationContext),
+        Text(settlementText(trip.settlement)),
+        if (['assigned', 'in_progress'].contains(trip.status))
           Text(
             freshDriverLocation(flow.location) == null
                 ? 'Driver location is currently unavailable.'
-                : 'Driver location updated: ${flow.location!['updated_at']}',
+                : 'Driver location updated: ${flow.location!.updatedAt}',
           ),
       ];
     }
@@ -334,49 +300,28 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  '${offer['driver']?['display_name'] ?? 'Driver'}',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                if (offer['vehicle'] is Map)
-                  Text(
-                    '${offer['vehicle']['make']} ${offer['vehicle']['model']} ${offer['vehicle']['model_year'] ?? ''} · ${offer['vehicle']['color']}',
-                  ),
-                Text(
-                  '${fareText(offer['fare'])}${offer['matches_proposed_fare'] == true ? ' · Your fare' : ''}',
-                ),
-                if (offer['pickup_distance_meters'] is num)
-                  Text(
-                    '${((offer['pickup_distance_meters'] as num) / 1000).toStringAsFixed(1)} km to pickup · straight-line distance',
-                  ),
-                if (offer['selectable'] != true)
-                  Text(
-                    offer['status'] == 'pending'
-                        ? 'Driver currently unavailable'
-                        : '${offer['status']}',
-                  ),
+                Text(offer.driver?.displayName ?? 'Driver', style: Theme.of(context).textTheme.titleMedium),
+                if (offer.vehicle != null)
+                  Text('${offer.vehicle!.make} ${offer.vehicle!.model} ${offer.vehicle!.modelYear ?? ''} · ${offer.vehicle!.color}'),
+                Text('${fareText(offer.fare)}${offer.matchesProposedFare ? ' · Your fare' : ''}'),
+                Text('${(offer.pickupDistanceMeters / 1000).toStringAsFixed(1)} km to pickup · straight-line distance'),
+                if (!offer.selectable)
+                  Text(offer.status == 'pending' ? 'Driver currently unavailable' : offer.status),
                 FilledButton(
-                  onPressed: flow.busy || offer['selectable'] != true
+                  onPressed: flow.busy || !offer.selectable
                       ? null
                       : () => _confirm(
-                          flow,
-                          '/v1/ride-requests/${widget.rideId}/offers/${offer['driver_user_id']}/accept',
                           'Choose this Driver?',
-                          'Agree to ${fareText(offer['fare'])} for this ride.',
+                          'Agree to ${fareText(offer.fare)} for this ride.',
                           'Choose Driver',
-                          data: {'updated_at': offer['updated_at']},
+                          () => flow.selectOffer(
+                            widget.rideId!,
+                            offer.driverUserId,
+                            offer.updatedAt,
+                          ),
                         ),
                   child: const Text('Choose Driver'),
                 ),
-                if (offer['status'] == 'pending')
-                  TextButton(
-                    onPressed: flow.busy
-                        ? null
-                        : () => flow.act(
-                            '/v1/ride-requests/${widget.rideId}/offers/${offer['driver_user_id']}/reject',
-                          ),
-                    child: const Text('Reject offer'),
-                  ),
               ],
             ),
           ),
@@ -385,13 +330,11 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
   }
 
   Future<void> _confirm(
-    RideFlowController flow,
-    String path,
     String title,
     String message,
-    String action, {
-    Json? data,
-  }) async {
+    String action,
+    Future<void> Function() command,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -409,15 +352,17 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
         ],
       ),
     );
-    if (confirmed == true && mounted) await flow.act(path, data: data);
+    if (confirmed == true && mounted) await command();
   }
 
-  Future<void> _counter(RideFlowController flow, Json request) async {
+  Future<void> _counter(
+    RideFlowController flow,
+    MarketplaceRequest request,
+  ) async {
     final field = TextEditingController(
-      text: ((request['proposed_fare']['amount_minor'] as num) / 100)
-          .toStringAsFixed(2),
+      text: (request.proposedFare.amountMinor / 100).toStringAsFixed(2),
     );
-    final proposed = request['proposed_fare']['amount_minor'] as int;
+    final proposed = request.proposedFare.amountMinor;
     String? error;
     final amount = await showDialog<int>(
       context: context,
@@ -428,8 +373,7 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
             controller: field,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: InputDecoration(
-              labelText:
-                  '${request['proposed_fare']['currency']} · 90%–130% of Rider fare',
+              labelText: '${request.proposedFare.currency} · 90%–130% of Rider fare',
               errorText: error,
             ),
           ),
@@ -444,9 +388,7 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
                 if (value == null ||
                     value < (proposed * 90 + 99) ~/ 100 ||
                     value > proposed * 130 ~/ 100) {
-                  update(
-                    () => error = 'Enter a fare within the allowed range.',
-                  );
+                  update(() => error = 'Enter a fare within the allowed range.');
                   return;
                 }
                 Navigator.pop(context, value);
@@ -457,16 +399,9 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
         ),
       ),
     );
-    // Dispose after the dialog transition has released its TextField.
     await Future<void>.delayed(const Duration(milliseconds: 300));
     field.dispose();
-    if (amount != null && mounted) {
-      await flow.act(
-        '/v1/driver/ride-requests/${request['id']}/offer',
-        data: {'amount_minor': amount},
-        put: true,
-      );
-    }
+    if (amount != null && mounted) await flow.submitOffer(request.id, amount);
   }
 }
 
@@ -475,15 +410,13 @@ int? parseFareMinor(String text) {
   if (match == null) return null;
   final whole = int.tryParse(match.group(1)!);
   if (whole == null || whole > 10000000000) return null;
-  final value =
-      whole * 100 + int.parse((match.group(2) ?? '').padRight(2, '0'));
+  final value = whole * 100 + int.parse((match.group(2) ?? '').padRight(2, '0'));
   return value > 0 && value <= 1000000000000 ? value : null;
 }
 
-Json? freshDriverLocation(Json? value) {
-  final time = DateTime.tryParse('${value?['updated_at']}');
-  if (time == null) return null;
-  final age = DateTime.now().toUtc().difference(time.toUtc());
+DriverLocationSnapshot? freshDriverLocation(DriverLocationSnapshot? value) {
+  if (value == null) return null;
+  final age = DateTime.now().toUtc().difference(value.updatedAt.toUtc());
   return age.isNegative || age > const Duration(minutes: 2) ? null : value;
 }
 
@@ -517,45 +450,33 @@ class RiderRideHistory extends ConsumerStatefulWidget {
 }
 
 class _RiderRideHistoryState extends ConsumerState<RiderRideHistory> {
-  List<Json>? _rides;
+  List<RiderRideSnapshot>? _rides;
   String? _error;
   bool _loading = false;
 
   Future<void> _load() async {
-    if (_loading) {
-      return;
-    }
+    if (_loading) return;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final data = await ref
-          .read(rideFlowRepositoryProvider)
-          .get('/v1/ride-requests');
+      final data = await ref.read(rideFlowRepositoryProvider).listRiderRides();
       if (mounted) {
         setState(() {
-          _rides = (data['ride_requests'] as List? ?? [])
-              .cast<Json>()
+          _rides = data
               .where(
                 (ride) =>
-                    ride['status'] == 'cancelled' ||
-                    [
-                      'completed',
-                      'cancelled',
-                    ].contains(ride['trip']?['status']),
+                    ride.status == 'cancelled' ||
+                    ['completed', 'cancelled'].contains(ride.trip?.status),
               )
               .toList();
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _error = '$e');
-      }
+      if (mounted) setState(() => _error = '$e');
     } finally {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -563,27 +484,23 @@ class _RiderRideHistoryState extends ConsumerState<RiderRideHistory> {
   Widget build(BuildContext context) => ExpansionTile(
     title: const Text('Recent rides'),
     onExpansionChanged: (open) {
-      if (open) {
-        _load();
-      }
+      if (open) _load();
     },
     children: [
       if (_loading) const LinearProgressIndicator(),
       if (_error != null) Text(_error!),
       if (_rides?.isEmpty == true)
         const Text('No completed or cancelled rides.'),
-      for (final ride in _rides ?? <Json>[])
+      for (final ride in _rides ?? <RiderRideSnapshot>[])
         ListTile(
-          title: Text(
-            statusText((ride['trip']?['status'] ?? ride['status']) as String?),
-          ),
+          title: Text(statusText(ride.trip?.status ?? ride.status)),
           subtitle: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('${ride['created_at']}'),
-              if (ride['trip'] != null) ...[
-                OperationDetails(ride['trip']['operation_context']),
-                Text(settlementText(ride['trip']['settlement'])),
+              Text('${ride.createdAt}'),
+              if (ride.trip != null) ...[
+                OperationDetails(ride.trip!.operationContext),
+                Text(settlementText(ride.trip!.settlement)),
               ],
             ],
           ),
