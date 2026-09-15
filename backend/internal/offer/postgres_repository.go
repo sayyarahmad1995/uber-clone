@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/driver"
@@ -62,6 +61,10 @@ func (r PostgresRepository) Upsert(ctx context.Context, rideRequestID, driverUse
 	defer tx.Rollback()
 
 	if err := marketplace.Expire(ctx, tx); err != nil {
+		return Offer{}, err
+	}
+	policy, err := marketplace.LoadTimingPolicy(ctx, tx)
+	if err != nil {
 		return Offer{}, err
 	}
 
@@ -142,7 +145,6 @@ func (r PostgresRepository) Upsert(ctx context.Context, rideRequestID, driverUse
 		return Offer{}, err
 	}
 
-	offerTTLSeconds := int64(marketplace.DefaultOfferDecisionTTL / time.Second)
 	var result Offer
 	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO ride_offers (
@@ -156,7 +158,7 @@ func (r PostgresRepository) Upsert(ctx context.Context, rideRequestID, driverUse
 		ON CONFLICT (ride_request_id, driver_user_id) DO NOTHING
 		RETURNING ride_request_id, driver_user_id, amount_minor, currency, status,
 			created_at, updated_at, expires_at, decided_at
-	`, rideRequestID, driverUserID, amountMinor, currency, string(operation), offerTTLSeconds).Scan(
+	`, rideRequestID, driverUserID, amountMinor, currency, string(operation), policy.OfferDecisionTTLSeconds).Scan(
 		&result.RideRequestID,
 		&result.DriverUserID,
 		&result.AmountMinor,
