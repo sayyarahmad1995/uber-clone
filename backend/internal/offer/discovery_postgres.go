@@ -2,7 +2,6 @@ package offer
 
 import (
 	"context"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/driver"
@@ -19,8 +18,11 @@ func (r PostgresRepository) Discover(ctx context.Context, driverUserID uuid.UUID
 	if err := marketplace.Expire(ctx, tx); err != nil {
 		return nil, err
 	}
+	policy, err := marketplace.LoadTimingPolicy(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
 
-	opportunityTTLSeconds := int64(marketplace.DefaultDriverOpportunityTTL / time.Second)
 	_, err = tx.ExecContext(ctx, `
 		WITH eligible AS (
 			SELECT rr.id
@@ -64,7 +66,7 @@ func (r PostgresRepository) Discover(ctx context.Context, driverUserID uuid.UUID
 			statement_timestamp() + ($4 * INTERVAL '1 second')
 		FROM eligible
 		ON CONFLICT (ride_request_id, driver_user_id) DO NOTHING
-	`, driverUserID, limit, driver.MarketplaceLocationMaxAge.Seconds(), opportunityTTLSeconds)
+	`, driverUserID, limit, driver.MarketplaceLocationMaxAge.Seconds(), policy.DriverOpportunityTTLSeconds)
 	if err != nil {
 		return nil, err
 	}

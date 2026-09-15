@@ -3,7 +3,6 @@ package ride
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
@@ -20,11 +19,14 @@ func (r PostgresRepository) Create(ctx context.Context, riderUserID uuid.UUID, i
 		proposedAmount = input.ProposedFare.AmountMinor
 		proposedCurrency = input.ProposedFare.Currency
 	}
+	policy, err := marketplace.LoadTimingPolicy(ctx, r.db)
+	if err != nil {
+		return Request{}, err
+	}
 	var request Request
 	var amount sql.NullInt64
 	var currency sql.NullString
-	ttlSeconds := int64(marketplace.DefaultRideRequestTTL / time.Second)
-	err := r.db.QueryRowContext(ctx, `
+	err = r.db.QueryRowContext(ctx, `
 		INSERT INTO ride_requests (
 			id,rider_user_id,pickup_latitude,pickup_longitude,destination_latitude,destination_longitude,
 			proposed_fare_minor,currency,status,service_code,expires_at
@@ -33,7 +35,7 @@ func (r PostgresRepository) Create(ctx context.Context, riderUserID uuid.UUID, i
 		WHERE EXISTS (SELECT 1 FROM driver_service_catalog WHERE code=$10 AND is_active)
 		RETURNING id,rider_user_id,pickup_latitude,pickup_longitude,destination_latitude,destination_longitude,
 			proposed_fare_minor,currency,status,created_at,expires_at
-	`, uuid.New(), riderUserID, input.Pickup.Latitude, input.Pickup.Longitude, input.Destination.Latitude, input.Destination.Longitude, proposedAmount, proposedCurrency, StatusRequested, input.ServiceCode, ttlSeconds).Scan(
+	`, uuid.New(), riderUserID, input.Pickup.Latitude, input.Pickup.Longitude, input.Destination.Latitude, input.Destination.Longitude, proposedAmount, proposedCurrency, StatusRequested, input.ServiceCode, policy.RideRequestTTLSeconds).Scan(
 		&request.ID,
 		&request.RiderUserID,
 		&request.Pickup.Latitude,
