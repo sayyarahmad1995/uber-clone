@@ -52,6 +52,7 @@ func (api *API) registerDriverRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /v1/driver/marketplace/ride-requests", api.authenticated(api.discoverDriverMarketplace))
 	mux.Handle("PUT /v1/driver/ride-requests/{ride_request_id}/offer", api.authenticated(api.submitRideOffer))
 	mux.Handle("POST /v1/driver/ride-requests/{ride_request_id}/accept", api.authenticated(api.acceptRideRequestFare))
+	mux.Handle("POST /v1/driver/ride-requests/{ride_request_id}/skip", api.authenticated(api.skipDriverRideRequest))
 	mux.Handle("POST /v1/driver/ride-requests/{ride_request_id}/start", api.authenticated(api.startTrip))
 	mux.Handle("POST /v1/driver/ride-requests/{ride_request_id}/complete", api.authenticated(api.completeTrip))
 	mux.Handle("POST /v1/driver/ride-requests/{ride_request_id}/cash-collected", api.authenticated(api.confirmCashCollected))

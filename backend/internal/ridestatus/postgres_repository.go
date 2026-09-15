@@ -7,6 +7,7 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/ride"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/trip"
 )
@@ -45,6 +46,7 @@ func scanView(row scanner) (View, error) {
 		&proposedCurrency,
 		&view.RideRequest.Status,
 		&view.RideRequest.CreatedAt,
+		&view.RideRequest.ExpiresAt,
 		&rideCancelledAt,
 		&rideCancelledBy,
 		&tripDriver,
@@ -112,6 +114,7 @@ const viewColumns = `
 	rr.currency,
 	rr.status,
 	rr.created_at,
+	rr.expires_at,
 	rr.cancelled_at,
 	rr.cancelled_by,
 	t.driver_user_id,
@@ -127,6 +130,9 @@ const viewColumns = `
 	t.cash_collected_at`
 
 func (r PostgresRepository) GetOwned(ctx context.Context, rideRequestID, riderUserID uuid.UUID) (View, error) {
+	if err := marketplace.Expire(ctx, r.db); err != nil {
+		return View{}, err
+	}
 	view, err := scanView(r.db.QueryRowContext(ctx, `SELECT `+viewColumns+` FROM ride_requests rr LEFT JOIN trips t ON t.ride_request_id = rr.id WHERE rr.id = $1 AND rr.rider_user_id = $2`, rideRequestID, riderUserID))
 	if errors.Is(err, sql.ErrNoRows) {
 		return View{}, ErrNotFound
@@ -135,6 +141,9 @@ func (r PostgresRepository) GetOwned(ctx context.Context, rideRequestID, riderUs
 }
 
 func (r PostgresRepository) ListOwned(ctx context.Context, riderUserID uuid.UUID, limit int) ([]View, error) {
+	if err := marketplace.Expire(ctx, r.db); err != nil {
+		return nil, err
+	}
 	rows, err := r.db.QueryContext(ctx, `SELECT `+viewColumns+` FROM ride_requests rr LEFT JOIN trips t ON t.ride_request_id = rr.id WHERE rr.rider_user_id = $1 ORDER BY rr.created_at DESC, rr.id DESC LIMIT $2`, riderUserID, limit)
 	if err != nil {
 		return nil, err

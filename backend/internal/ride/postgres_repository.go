@@ -3,8 +3,10 @@ package ride
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 )
 
 type PostgresRepository struct{ db *sql.DB }
@@ -21,13 +23,32 @@ func (r PostgresRepository) Create(ctx context.Context, riderUserID uuid.UUID, i
 	var request Request
 	var amount sql.NullInt64
 	var currency sql.NullString
+	ttlSeconds := int64(marketplace.DefaultRideRequestTTL / time.Second)
 	err := r.db.QueryRowContext(ctx, `
-		INSERT INTO ride_requests (id,rider_user_id,pickup_latitude,pickup_longitude,destination_latitude,destination_longitude,proposed_fare_minor,currency,status,service_code)
-		SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10 WHERE EXISTS (SELECT 1 FROM driver_service_catalog WHERE code=$10 AND is_active)
-		RETURNING id,rider_user_id,pickup_latitude,pickup_longitude,destination_latitude,destination_longitude,proposed_fare_minor,currency,status,created_at
-	`, uuid.New(), riderUserID, input.Pickup.Latitude, input.Pickup.Longitude, input.Destination.Latitude, input.Destination.Longitude, proposedAmount, proposedCurrency, StatusRequested, input.ServiceCode).Scan(
-		&request.ID, &request.RiderUserID, &request.Pickup.Latitude, &request.Pickup.Longitude, &request.Destination.Latitude, &request.Destination.Longitude, &amount, &currency, &request.Status, &request.CreatedAt)
-	if err == sql.ErrNoRows { return Request{}, ErrInvalidService }
+		INSERT INTO ride_requests (
+			id,rider_user_id,pickup_latitude,pickup_longitude,destination_latitude,destination_longitude,
+			proposed_fare_minor,currency,status,service_code,expires_at
+		)
+		SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,statement_timestamp() + ($11 * INTERVAL '1 second')
+		WHERE EXISTS (SELECT 1 FROM driver_service_catalog WHERE code=$10 AND is_active)
+		RETURNING id,rider_user_id,pickup_latitude,pickup_longitude,destination_latitude,destination_longitude,
+			proposed_fare_minor,currency,status,created_at,expires_at
+	`, uuid.New(), riderUserID, input.Pickup.Latitude, input.Pickup.Longitude, input.Destination.Latitude, input.Destination.Longitude, proposedAmount, proposedCurrency, StatusRequested, input.ServiceCode, ttlSeconds).Scan(
+		&request.ID,
+		&request.RiderUserID,
+		&request.Pickup.Latitude,
+		&request.Pickup.Longitude,
+		&request.Destination.Latitude,
+		&request.Destination.Longitude,
+		&amount,
+		&currency,
+		&request.Status,
+		&request.CreatedAt,
+		&request.ExpiresAt,
+	)
+	if err == sql.ErrNoRows {
+		return Request{}, ErrInvalidService
+	}
 	if err != nil {
 		return Request{}, err
 	}

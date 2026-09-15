@@ -30,6 +30,7 @@ func TestMarketplaceWithoutCandidatesThroughCancellation(t *testing.T) {
 		t.Cleanup(func() {
 			db.Exec(`DELETE FROM trips WHERE ride_request_id=$1`, r.ID)
 			db.Exec(`DELETE FROM ride_offers WHERE ride_request_id=$1`, r.ID)
+			db.Exec(`DELETE FROM driver_ride_request_opportunities WHERE ride_request_id=$1`, r.ID)
 			db.Exec(`DELETE FROM ride_requests WHERE id=$1`, r.ID)
 		})
 		return r.ID
@@ -59,6 +60,19 @@ func TestMarketplaceWithoutCandidatesThroughCancellation(t *testing.T) {
 			t.Fatalf("expected pending exact-fare offer: %+v", submission)
 		}
 	}
+	competitorFeed, err := offers.Discover(ctx, competitor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	competitorFound := false
+	for _, item := range competitorFeed {
+		if item.RideRequestID == first {
+			competitorFound = true
+		}
+	}
+	if !competitorFound {
+		t.Fatal("competitor did not receive a one-time opportunity for first ride")
+	}
 	if _, err := offers.Submit(ctx, first, competitor, 110000); err != nil {
 		t.Fatal(err)
 	}
@@ -76,8 +90,8 @@ func TestMarketplaceWithoutCandidatesThroughCancellation(t *testing.T) {
 	if err != nil || len(feed) != 0 {
 		t.Fatalf("busy Driver should not discover requests: %v %v", feed, err)
 	}
-	if _, err := offers.AcceptProposed(ctx, second, driver); !errors.Is(err, offer.ErrDriverIneligible) {
-		t.Fatalf("busy Driver submission: %v", err)
+	if _, err := offers.AcceptProposed(ctx, second, driver); !errors.Is(err, offer.ErrOpportunityNotOpen) {
+		t.Fatalf("one-shot Driver submission was reopened while busy: %v", err)
 	}
 	if _, err := offers.Accept(ctx, second, rider, driver); !errors.Is(err, offer.ErrDriverIneligible) {
 		t.Fatalf("busy Driver selection: %v", err)
@@ -96,15 +110,17 @@ func TestMarketplaceWithoutCandidatesThroughCancellation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	found = map[uuid.UUID]bool{}
 	for _, item := range feed {
-		found[item.RideRequestID] = true
+		if item.RideRequestID == first || item.RideRequestID == second || item.RideRequestID == legacy {
+			t.Fatalf("terminal or already-responded request reappeared after cancellation: %+v", feed)
+		}
 	}
-	if !found[second] || found[first] || found[legacy] {
-		t.Fatalf("unexpected discovery after cancellation: %v", found)
+	comparison, err := offers.ListForRider(ctx, second, rider)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if _, err := offers.AcceptProposed(ctx, second, driver); err != nil {
-		t.Fatalf("freed Driver submission: %v", err)
+	if len(comparison) != 1 || !comparison[0].Selectable || comparison[0].DriverUserID != driver {
+		t.Fatalf("existing second offer did not become selectable after Driver was freed: %+v", comparison)
 	}
 	if _, err := offers.Accept(ctx, second, rider, driver); err != nil {
 		t.Fatalf("freed Driver selection: %v", err)

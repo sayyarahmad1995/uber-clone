@@ -9,25 +9,34 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/driver"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 )
 
 func (r PostgresRepository) SelectOffer(ctx context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID, expectedVersion ...time.Time) (Trip, error) {
+	if err := marketplace.Expire(ctx, r.db); err != nil {
+		return Trip{}, err
+	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return Trip{}, err
 	}
 	defer tx.Rollback()
+	if err := marketplace.Expire(ctx, tx); err != nil {
+		return Trip{}, err
+	}
 
 	var actualRider uuid.UUID
 	var status string
 	var proposedAmount sql.NullInt64
 	var currency sql.NullString
+	var rideUnexpired bool
 	if err := tx.QueryRowContext(ctx, `
-		SELECT rider_user_id, status, proposed_fare_minor, currency
+		SELECT rider_user_id, status, proposed_fare_minor, currency,
+		       expires_at > statement_timestamp()
 		FROM ride_requests
 		WHERE id = $1
 		FOR UPDATE
-	`, rideRequestID).Scan(&actualRider, &status, &proposedAmount, &currency); err != nil {
+	`, rideRequestID).Scan(&actualRider, &status, &proposedAmount, &currency, &rideUnexpired); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Trip{}, ErrMarketplaceNotOpen
 		}
@@ -36,7 +45,7 @@ func (r PostgresRepository) SelectOffer(ctx context.Context, rideRequestID, ride
 	if actualRider != riderUserID {
 		return Trip{}, ErrMarketplaceOfferGone
 	}
-	if status != "requested" || !proposedAmount.Valid || !currency.Valid {
+	if status != "requested" || !rideUnexpired || !proposedAmount.Valid || !currency.Valid {
 		return Trip{}, ErrMarketplaceNotOpen
 	}
 	if _, found, err := selectTripByRide(ctx, tx, rideRequestID); err != nil {
@@ -47,18 +56,35 @@ func (r PostgresRepository) SelectOffer(ctx context.Context, rideRequestID, ride
 
 	var offerStatus string
 	var offerVersion time.Time
+	var offerUnexpired bool
 	if err := tx.QueryRowContext(ctx, `
-		SELECT status, updated_at
+		SELECT status, updated_at, expires_at > statement_timestamp()
 		FROM ride_offers
 		WHERE ride_request_id = $1 AND driver_user_id = $2
 		FOR UPDATE
-	`, rideRequestID, driverUserID).Scan(&offerStatus, &offerVersion); err != nil {
+	`, rideRequestID, driverUserID).Scan(&offerStatus, &offerVersion, &offerUnexpired); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Trip{}, ErrMarketplaceOfferGone
 		}
 		return Trip{}, err
 	}
-	if offerStatus != "pending" || (len(expectedVersion) > 0 && !offerVersion.Equal(expectedVersion[0])) {
+	if offerStatus != "pending" || !offerUnexpired || (len(expectedVersion) > 0 && !offerVersion.Equal(expectedVersion[0])) {
+		return Trip{}, ErrMarketplaceOfferGone
+	}
+
+	var opportunityStatus string
+	if err := tx.QueryRowContext(ctx, `
+		SELECT status
+		FROM driver_ride_request_opportunities
+		WHERE ride_request_id = $1 AND driver_user_id = $2
+		FOR UPDATE
+	`, rideRequestID, driverUserID).Scan(&opportunityStatus); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Trip{}, ErrMarketplaceOfferGone
+		}
+		return Trip{}, err
+	}
+	if opportunityStatus != "offered" {
 		return Trip{}, ErrMarketplaceOfferGone
 	}
 
@@ -81,8 +107,15 @@ func (r PostgresRepository) SelectOffer(ctx context.Context, rideRequestID, ride
 	}
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE ride_offers
-		SET status = 'accepted', decided_at = NOW(), updated_at = NOW()
+		SET status = 'accepted', decided_at = statement_timestamp(), updated_at = statement_timestamp()
 		WHERE ride_request_id = $1 AND driver_user_id = $2
+	`, rideRequestID, driverUserID); err != nil {
+		return Trip{}, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE driver_ride_request_opportunities
+		SET status = 'accepted'
+		WHERE ride_request_id = $1 AND driver_user_id = $2 AND status = 'offered'
 	`, rideRequestID, driverUserID); err != nil {
 		return Trip{}, err
 	}
@@ -95,6 +128,9 @@ func (r PostgresRepository) SelectOffer(ctx context.Context, rideRequestID, ride
 		return Trip{}, err
 	}
 	if err := closeCompetingOffers(ctx, tx, rideRequestID, driverUserID); err != nil {
+		return Trip{}, err
+	}
+	if err := closeCompetingOpportunities(ctx, tx, rideRequestID, driverUserID); err != nil {
 		return Trip{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -117,7 +153,7 @@ func lockEligibleMarketplaceDriver(ctx context.Context, tx *sql.Tx, driverUserID
 func insertMarketplaceTrip(ctx context.Context, tx *sql.Tx, rideRequestID, riderUserID, driverUserID uuid.UUID) (Trip, error) {
 	trip, err := scanTrip(tx.QueryRowContext(ctx, `
 		INSERT INTO trips (ride_request_id, rider_user_id, driver_user_id, assigned_at, operation_context)
-		SELECT $1, $2, $3, NOW(), operation_context FROM ride_offers
+		SELECT $1, $2, $3, statement_timestamp(), operation_context FROM ride_offers
 		WHERE ride_request_id=$1 AND driver_user_id=$3
 		RETURNING `+tripColumns,
 		rideRequestID,
@@ -138,7 +174,7 @@ func markRideAccepted(ctx context.Context, tx *sql.Tx, rideRequestID uuid.UUID) 
 	result, err := tx.ExecContext(ctx, `
 		UPDATE ride_requests
 		SET status = 'accepted'
-		WHERE id = $1 AND status = 'requested'
+		WHERE id = $1 AND status = 'requested' AND expires_at > statement_timestamp()
 	`, rideRequestID)
 	if err != nil {
 		return err
@@ -156,10 +192,21 @@ func markRideAccepted(ctx context.Context, tx *sql.Tx, rideRequestID uuid.UUID) 
 func closeCompetingOffers(ctx context.Context, tx *sql.Tx, rideRequestID, selectedDriverID uuid.UUID) error {
 	_, err := tx.ExecContext(ctx, `
 		UPDATE ride_offers
-		SET status = 'closed', decided_at = NOW(), updated_at = NOW()
+		SET status = 'closed', decided_at = statement_timestamp(), updated_at = statement_timestamp()
 		WHERE ride_request_id = $1
 		  AND driver_user_id <> $2
 		  AND status = 'pending'
+	`, rideRequestID, selectedDriverID)
+	return err
+}
+
+func closeCompetingOpportunities(ctx context.Context, tx *sql.Tx, rideRequestID, selectedDriverID uuid.UUID) error {
+	_, err := tx.ExecContext(ctx, `
+		UPDATE driver_ride_request_opportunities
+		SET status = 'closed', responded_at = COALESCE(responded_at, statement_timestamp())
+		WHERE ride_request_id = $1
+		  AND driver_user_id <> $2
+		  AND status IN ('open', 'offered')
 	`, rideRequestID, selectedDriverID)
 	return err
 }

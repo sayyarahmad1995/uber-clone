@@ -16,6 +16,7 @@ type fakeRepository struct {
 	upsertedAmount  int64
 	upsertedMinimum int64
 	upsertedMaximum int64
+	skipped         bool
 }
 
 func (f *fakeRepository) Market(context.Context, uuid.UUID) (Market, error) {
@@ -36,6 +37,11 @@ func (f *fakeRepository) Upsert(_ context.Context, rideRequestID, driverUserID u
 		Currency:      currency,
 		Status:        StatusPending,
 	}, nil
+}
+
+func (f *fakeRepository) Skip(context.Context, uuid.UUID, uuid.UUID) error {
+	f.skipped = true
+	return nil
 }
 
 func (f *fakeRepository) ListForRider(context.Context, uuid.UUID, uuid.UUID) ([]RiderOffer, error) {
@@ -119,6 +125,17 @@ func TestSubmitProposedFareUsesSamePendingOfferPath(t *testing.T) {
 	}
 	if result.Offer.AmountMinor != 10000 || result.Offer.Status != StatusPending || result.Trip != nil {
 		t.Fatalf("unexpected exact-fare submission: %#v", result)
+	}
+}
+
+func TestSkipDelegatesOneTimeOpportunity(t *testing.T) {
+	repo := &fakeRepository{}
+	service := NewService(repo, trip.Service{})
+	if err := service.Skip(context.Background(), uuid.New(), uuid.New()); err != nil {
+		t.Fatalf("Skip returned error: %v", err)
+	}
+	if !repo.skipped {
+		t.Fatal("expected repository skip call")
 	}
 }
 

@@ -40,6 +40,22 @@ func (api *API) submitRideOffer(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, response)
 }
 
+func (api *API) skipDriverRideRequest(w http.ResponseWriter, r *http.Request) {
+	u, ok := api.requireDriverCapability(w, r)
+	if !ok {
+		return
+	}
+	rideRequestID, err := uuid.Parse(r.PathValue("ride_request_id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid ride_request_id"})
+		return
+	}
+	if writeOfferError(w, api.offers.Skip(r.Context(), rideRequestID, u.ID)) {
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (api *API) listRideOffers(w http.ResponseWriter, r *http.Request) {
 	u, ok := api.requireRiderCapability(w, r)
 	if !ok {
@@ -139,6 +155,8 @@ func writeOfferError(w http.ResponseWriter, err error) bool {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "ride request or offer not found"})
 	case errors.Is(err, offer.ErrRideNotOpen):
 		writeJSON(w, http.StatusConflict, map[string]string{"error": "ride request is not open for offers"})
+	case errors.Is(err, offer.ErrOpportunityNotOpen):
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "driver response window is no longer open"})
 	case errors.Is(err, offer.ErrOfferNotActionable):
 		writeJSON(w, http.StatusConflict, map[string]string{"error": "ride offer is not actionable"})
 	case errors.Is(err, offer.ErrDriverIneligible):
@@ -163,6 +181,7 @@ func rideOfferResponse(result offer.Offer) map[string]any {
 		"status":          result.Status,
 		"created_at":      result.CreatedAt,
 		"updated_at":      result.UpdatedAt,
+		"expires_at":      result.ExpiresAt,
 		"decided_at":      result.DecidedAt,
 	}
 }
@@ -174,6 +193,8 @@ func driverMarketplaceItemResponse(item offer.DiscoveryItem) map[string]any {
 		"destination":            map[string]float64{"latitude": item.Destination.Latitude, "longitude": item.Destination.Longitude},
 		"proposed_fare":          map[string]any{"amount_minor": item.ProposedFare.ProposedAmountMinor, "currency": item.ProposedFare.Currency},
 		"created_at":             item.CreatedAt,
+		"expires_at":             item.RideExpiresAt,
+		"response_deadline":      item.OpportunityExpiresAt,
 		"own_offer":              nil,
 		"pickup_distance_meters": item.PickupDistanceMeters,
 	}

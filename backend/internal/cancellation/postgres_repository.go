@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/ride"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/trip"
 )
@@ -28,6 +29,9 @@ func (r PostgresRepository) CancelByRider(ctx context.Context, rideRequestID, ri
 		return Result{}, err
 	}
 	defer tx.Rollback()
+	if err := marketplace.Expire(ctx, tx); err != nil {
+		return Result{}, err
+	}
 
 	state, err := lockRide(ctx, tx, rideRequestID, &riderUserID)
 	if err != nil {
@@ -47,6 +51,9 @@ func (r PostgresRepository) CancelByRider(ctx context.Context, rideRequestID, ri
 			return Result{}, err
 		}
 		return result, nil
+	}
+	if state.status == ride.StatusExpired {
+		return Result{}, ErrRideExpired
 	}
 	if state.status != ride.StatusRequested && state.status != ride.StatusAccepted {
 		return Result{}, fmt.Errorf("unknown ride request status %q", state.status)
@@ -71,6 +78,9 @@ func (r PostgresRepository) CancelByDriver(ctx context.Context, rideRequestID, d
 		return Result{}, err
 	}
 	defer tx.Rollback()
+	if err := marketplace.Expire(ctx, tx); err != nil {
+		return Result{}, err
+	}
 
 	state, err := lockRide(ctx, tx, rideRequestID, nil)
 	if err != nil {
@@ -93,6 +103,9 @@ func (r PostgresRepository) CancelByDriver(ctx context.Context, rideRequestID, d
 			return Result{}, err
 		}
 		return result, nil
+	}
+	if state.status == ride.StatusExpired {
+		return Result{}, ErrRideExpired
 	}
 	if state.status != ride.StatusRequested && state.status != ride.StatusAccepted {
 		return Result{}, fmt.Errorf("unknown ride request status %q", state.status)
@@ -189,7 +202,7 @@ func cancelLocked(ctx context.Context, tx *sql.Tx, rideRequestID uuid.UUID, acto
 	var cancelledAt time.Time
 	if err := tx.QueryRowContext(ctx, `
 		UPDATE ride_requests
-		SET status = 'cancelled', cancelled_by = $2, cancelled_at = NOW()
+		SET status = 'cancelled', cancelled_by = $2, cancelled_at = statement_timestamp()
 		WHERE id = $1
 		RETURNING cancelled_at
 	`, rideRequestID, actor).Scan(&cancelledAt); err != nil {
@@ -235,9 +248,17 @@ func cancelLocked(ctx context.Context, tx *sql.Tx, rideRequestID uuid.UUID, acto
 
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE ride_offers
-		SET status = 'closed', decided_at = $2, updated_at = NOW()
+		SET status = 'closed', decided_at = $2, updated_at = statement_timestamp()
 		WHERE ride_request_id = $1
 		  AND status = 'pending'
+	`, rideRequestID, cancelledAt); err != nil {
+		return Result{}, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE driver_ride_request_opportunities
+		SET status = 'closed', responded_at = COALESCE(responded_at, $2)
+		WHERE ride_request_id = $1
+		  AND status IN ('open', 'offered')
 	`, rideRequestID, cancelledAt); err != nil {
 		return Result{}, err
 	}

@@ -24,6 +24,7 @@ const (
 	StatusRequested Status = "requested"
 	StatusAccepted  Status = "accepted"
 	StatusCancelled Status = "cancelled"
+	StatusExpired   Status = "expired"
 
 	CancellationActorRider  CancellationActor = "rider"
 	CancellationActorDriver CancellationActor = "driver"
@@ -55,6 +56,7 @@ type Request struct {
 	ProposedFare *Money
 	Status       Status
 	CreatedAt    time.Time
+	ExpiresAt    time.Time
 	CancelledAt  *time.Time
 	CancelledBy  CancellationActor
 }
