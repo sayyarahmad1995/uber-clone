@@ -27,6 +27,7 @@ class RiderRequestState {
     for (final request in requests) {
       final tripStatus = request.trip?.status;
       if (request.status == 'cancelled' ||
+          request.status == 'expired' ||
           tripStatus == 'cancelled' ||
           tripStatus == 'settled') {
         continue;
