@@ -47,16 +47,16 @@ type Location struct {
 }
 
 type DiscoveryItem struct {
-	PickupDistanceMeters float64
-	RideRequestID         uuid.UUID
-	RiderUserID           uuid.UUID
-	Pickup                Location
-	Destination           Location
-	ProposedFare          Market
-	CreatedAt             time.Time
-	RideExpiresAt         time.Time
-	OpportunityExpiresAt  time.Time
-	OwnOffer              *Offer
+	PickupDistanceMeters  float64
+	RideRequestID          uuid.UUID
+	RiderUserID            uuid.UUID
+	Pickup                 Location
+	Destination            Location
+	ProposedFare           Market
+	CreatedAt              time.Time
+	RideExpiresAt          time.Time
+	OpportunityExpiresAt   time.Time
+	OwnOffer               *Offer
 }
 
 type Offer struct {
