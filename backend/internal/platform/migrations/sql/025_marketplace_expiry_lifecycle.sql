@@ -66,6 +66,29 @@ CREATE TABLE driver_ride_request_opportunities (
     )
 );
 
+INSERT INTO driver_ride_request_opportunities (
+    ride_request_id,
+    driver_user_id,
+    status,
+    opened_at,
+    visible_until,
+    responded_at
+)
+SELECT
+    ride_request_id,
+    driver_user_id,
+    CASE status
+        WHEN 'pending' THEN 'offered'
+        WHEN 'accepted' THEN 'accepted'
+        WHEN 'rejected' THEN 'rider_rejected'
+        ELSE 'closed'
+    END,
+    created_at,
+    created_at + INTERVAL '30 seconds',
+    created_at
+FROM ride_offers
+ON CONFLICT (ride_request_id, driver_user_id) DO NOTHING;
+
 CREATE INDEX ride_requests_requested_expiry_idx
     ON ride_requests (expires_at)
     WHERE status = 'requested';
