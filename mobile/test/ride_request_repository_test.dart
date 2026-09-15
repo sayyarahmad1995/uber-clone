@@ -37,7 +37,7 @@ void main() {
     },
   );
 
-  test('normalizes cash-collected completed trips as settled', () async {
+  test('keeps completed trip status separate from settlement status', () async {
     final adapter = RideListAdapter();
     final repository = ApiRideRequestRepository(
       Dio(BaseOptions(baseUrl: 'http://application.test'))
@@ -48,7 +48,9 @@ void main() {
     final rides = await repository.list();
 
     expect(rides[0].trip?.status, 'completed');
-    expect(rides[1].trip?.status, 'settled');
+    expect(rides[0].trip?.settlement.status, 'unsettled');
+    expect(rides[1].trip?.status, 'completed');
+    expect(rides[1].trip?.settlement.status, 'cash_collected');
   });
 }
 
