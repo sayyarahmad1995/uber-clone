@@ -25,6 +25,10 @@ type MarketplacePolicyService interface {
 	Update(context.Context, marketplace.TimingPolicy, string) (marketplace.TimingPolicy, error)
 }
 
+type ReadinessChecker interface {
+	Check(context.Context) error
+}
+
 type Dependencies struct {
 	Users                  user.Service
 	Drivers                driver.Service
@@ -39,6 +43,7 @@ type Dependencies struct {
 	Offers                 offer.Service
 	Trips                  trip.Service
 	MarketplacePolicy      MarketplacePolicyService
+	Readiness              ReadinessChecker
 	Identity               identity.Provider
 	Auth                   auth.Handler
 	AdminReviewUsername    string
@@ -60,6 +65,7 @@ type API struct {
 	offers                 offer.Service
 	trips                  trip.Service
 	marketplacePolicy      MarketplacePolicyService
+	readiness              ReadinessChecker
 	identity               identity.Provider
 	auth                   auth.Handler
 	adminReviewUsername    string
@@ -82,6 +88,7 @@ func New(deps Dependencies) *API {
 		offers:                 deps.Offers,
 		trips:                  deps.Trips,
 		marketplacePolicy:      deps.MarketplacePolicy,
+		readiness:              deps.Readiness,
 		identity:               deps.Identity,
 		auth:                   deps.Auth,
 		adminReviewUsername:    deps.AdminReviewUsername,

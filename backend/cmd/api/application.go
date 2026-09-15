@@ -63,6 +63,7 @@ func newApplication(cfg config) (application, func(), error) {
 		Offers:                 offer.NewService(offer.NewPostgresRepository(db), tripService),
 		Trips:                  tripService,
 		MarketplacePolicy:      marketplace.NewPolicyService(marketplace.NewPostgresTimingPolicyStore(db)),
+		Readiness:              database.NewReadinessChecker(db),
 		Identity:               identityProvider,
 		Auth:                   auth.NewHandler(auth.NewService(authProvider)),
 		AdminReviewUsername:    cfg.AdminReviewUsername,
