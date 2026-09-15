@@ -1,5 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:uber_clone/features/ride_flow/domain/ride_flow_models.dart';
+import 'package:uber_clone/features/ride_flow/domain/marketplace_request.dart';
+import 'package:uber_clone/features/ride_flow/domain/ride_offer.dart';
+import 'package:uber_clone/features/ride_flow/domain/ride_snapshot.dart';
+import 'package:uber_clone/features/ride_flow/domain/trip.dart';
 import 'package:uber_clone/features/ride_flow/ride_flow_repository.dart';
 
 class SemanticRideFlowFake implements RideFlowRepository {
