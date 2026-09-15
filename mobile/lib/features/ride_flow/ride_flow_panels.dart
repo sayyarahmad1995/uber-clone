@@ -5,7 +5,9 @@ import '../../core/providers.dart';
 import 'domain/marketplace_request.dart';
 import 'domain/ride_snapshot.dart';
 import 'domain/trip.dart';
-import 'ride_flow_controller.dart';
+import 'application/driver_marketplace_controller.dart';
+import 'application/driver_trip_controller.dart';
+import 'application/rider_active_ride_controller.dart';
 
 String fareText(dynamic fare) {
   if (fare is RideFare) {
@@ -84,8 +86,13 @@ class OperationDetails extends StatelessWidget {
 }
 
 class RideFlowPanel extends ConsumerStatefulWidget {
-  const RideFlowPanel({super.key, this.rideId});
+  const RideFlowPanel.rider({required String this.rideId, super.key})
+    : driver = false;
+
+  const RideFlowPanel.driver({super.key}) : rideId = null, driver = true;
+
   final String? rideId;
+  final bool driver;
 
   @override
   ConsumerState<RideFlowPanel> createState() => _RideFlowPanelState();
@@ -93,8 +100,9 @@ class RideFlowPanel extends ConsumerStatefulWidget {
 
 class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
     with WidgetsBindingObserver {
-  String get flowKey => widget.rideId ?? 'driver';
   bool _syncing = false;
+
+  bool get _driver => widget.driver;
 
   @override
   void initState() {
@@ -110,47 +118,96 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      ref.read(rideFlowControllerProvider(flowKey)).setForeground(true);
-    }
-    if ([
+    final foreground = state == AppLifecycleState.resumed;
+    final background = [
       AppLifecycleState.paused,
       AppLifecycleState.hidden,
       AppLifecycleState.detached,
-    ].contains(state)) {
-      ref.read(rideFlowControllerProvider(flowKey)).setForeground(false);
+    ].contains(state);
+
+    if (!foreground && !background) return;
+
+    if (_driver) {
+      ref.read(driverMarketplaceControllerProvider).setForeground(foreground);
+      ref.read(driverTripControllerProvider).setForeground(foreground);
+      return;
     }
+
+    ref
+        .read(riderActiveRideControllerProvider(widget.rideId!))
+        .setForeground(foreground);
   }
 
   @override
   Widget build(BuildContext context) {
-    final flow = ref.watch(rideFlowControllerProvider(flowKey));
-    ref.listen(rideFlowControllerProvider(flowKey), (_, next) {
+    return _driver ? _buildDriver(context) : _buildRider(context);
+  }
+
+  Widget _buildDriver(BuildContext context) {
+    final marketplace = ref.watch(driverMarketplaceControllerProvider);
+    final trips = ref.watch(driverTripControllerProvider);
+
+    ref.listen(driverTripControllerProvider, (_, next) {
       if (!next.loaded || next.busy) return;
-      if (widget.rideId == null) {
-        ref
-            .read(driverControllerProvider)
-            .setActiveTrip(next.driverTrip != null);
-      } else if (!_syncing) {
-        final request = ref.read(riderRequestControllerProvider).state.active;
-        if (request?.id == widget.rideId &&
-            (request?.trip?.status ?? request?.status) != next.status) {
-          _syncing = true;
-          ref
-              .read(riderRequestControllerProvider)
-              .refreshActive()
-              .whenComplete(() => _syncing = false);
-        }
-      }
+      ref.read(driverControllerProvider).setActiveTrip(next.trip != null);
     });
+
+    final busy = marketplace.busy || trips.busy;
+    final loaded = marketplace.loaded && trips.loaded;
+    final error = trips.error ?? marketplace.error;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Divider(),
         Text(
-          widget.rideId == null
-              ? 'Trips and requests'
-              : statusText(flow.status),
+          'Trips and requests',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        if (!loaded && busy) const LinearProgressIndicator(),
+        if (error != null)
+          Text(
+            error,
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
+          ),
+        TextButton.icon(
+          onPressed: busy
+              ? null
+              : () async {
+                  await Future.wait([marketplace.refresh(), trips.refresh()]);
+                },
+          icon: const Icon(Icons.refresh),
+          label: const Text('Refresh rides'),
+        ),
+        ..._driverContent(marketplace, trips),
+      ],
+    );
+  }
+
+  Widget _buildRider(BuildContext context) {
+    final rideId = widget.rideId!;
+    final flow = ref.watch(riderActiveRideControllerProvider(rideId));
+
+    ref.listen(riderActiveRideControllerProvider(rideId), (_, next) {
+      if (!next.loaded || next.busy || _syncing) return;
+
+      final request = ref.read(riderRequestControllerProvider).state.active;
+      if (request?.id == rideId &&
+          (request?.trip?.status ?? request?.status) != next.status) {
+        _syncing = true;
+        ref
+            .read(riderRequestControllerProvider)
+            .refreshActive()
+            .whenComplete(() => _syncing = false);
+      }
+    });
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Divider(),
+        Text(
+          statusText(flow.status),
           style: Theme.of(context).textTheme.titleLarge,
         ),
         if (!flow.loaded && flow.busy) const LinearProgressIndicator(),
@@ -164,17 +221,21 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
           icon: const Icon(Icons.refresh),
           label: const Text('Refresh rides'),
         ),
-        if (widget.rideId == null) ..._driver(flow) else ..._rider(flow),
+        ..._riderContent(flow),
       ],
     );
   }
 
-  List<Widget> _driver(RideFlowController flow) {
-    final trip = flow.driverTrip;
+  List<Widget> _driverContent(
+    DriverMarketplaceController marketplace,
+    DriverTripController trips,
+  ) {
+    final trip = trips.trip;
     if (trip != null) {
       final id = trip.rideRequestId!;
       final cashDue =
           trip.status == 'completed' && settlementIsCashDue(trip.settlement);
+
       return [
         Text(statusText(trip.status)),
         OperationDetails(trip.operationContext),
@@ -183,65 +244,67 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
         Text('Destination: ${pointText(trip.destination)}'),
         if (trip.status == 'assigned')
           FilledButton(
-            onPressed: flow.busy
+            onPressed: trips.busy
                 ? null
                 : () => _confirm(
                     'Start trip?',
                     'Confirm that the Rider is on board.',
                     'Start trip',
-                    () => flow.startTrip(id),
+                    () => trips.startTrip(id),
                   ),
             child: const Text('Start trip'),
           ),
         if (trip.status == 'in_progress')
           FilledButton(
-            onPressed: flow.busy
+            onPressed: trips.busy
                 ? null
                 : () => _confirm(
                     'Complete trip?',
                     'Confirm that you have reached the destination.',
                     'Complete trip',
-                    () => flow.completeTrip(id),
+                    () => trips.completeTrip(id),
                   ),
             child: const Text('Complete trip'),
           ),
         if (cashDue) const Text('Collect the agreed cash fare from the Rider.'),
         if (cashDue)
           FilledButton(
-            onPressed: flow.busy
+            onPressed: trips.busy
                 ? null
                 : () => _confirm(
                     'Confirm cash collected?',
                     cashCollectionMessage(trip),
                     'Confirm cash collected',
-                    () => flow.confirmCashCollected(id),
+                    () => trips.confirmCashCollected(id),
                   ),
             child: const Text('Confirm cash collected'),
           ),
         if (['assigned', 'in_progress'].contains(trip.status))
           TextButton(
-            onPressed: flow.busy
+            onPressed: trips.busy
                 ? null
                 : () => _confirm(
                     'Cancel trip?',
                     'This ends the trip for both you and the Rider.',
                     'Cancel trip',
-                    () => flow.cancelDriverTrip(id),
+                    () => trips.cancelTrip(id),
                   ),
             child: const Text('Cancel trip'),
           ),
+        ..._tripHistory(trips),
       ];
     }
 
     final online =
         ref.watch(driverControllerProvider).profile?.isOnline == true;
+
     return [
       if (!online)
         const Text('Go online to receive requests for your selected service.'),
-      if (online && flow.loaded && flow.requests.isEmpty)
+      if (online && marketplace.loaded && marketplace.requests.isEmpty)
         const Text('No requests available. This list updates automatically.'),
       if (online)
-        for (final request in flow.requests)
+        for (final request in marketplace.requests)
           Card(
             child: Padding(
               padding: const EdgeInsets.all(12),
@@ -262,25 +325,33 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
                     'The Rider chooses a Driver. Sending a response does not assign this trip.',
                   ),
                   FilledButton(
-                    onPressed: flow.busy
+                    onPressed: marketplace.busy
                         ? null
-                        : () => flow.acceptProposedFare(request.id),
+                        : () => marketplace.acceptProposedFare(request.id),
                     child: const Text('Accept Rider fare'),
                   ),
                   OutlinedButton(
-                    onPressed: flow.busy ? null : () => _counter(flow, request),
+                    onPressed: marketplace.busy
+                        ? null
+                        : () => _counter(marketplace, request),
                     child: const Text('Propose another fare'),
                   ),
                 ],
               ),
             ),
           ),
+      ..._tripHistory(trips),
+    ];
+  }
+
+  List<Widget> _tripHistory(DriverTripController trips) {
+    return [
       ExpansionTile(
         title: const Text('Trip history'),
         children: [
-          if (flow.history.isEmpty)
+          if (trips.history.isEmpty)
             const ListTile(title: Text('No completed or cancelled trips.')),
-          for (final item in flow.history)
+          for (final item in trips.history)
             ListTile(
               title: Text(statusText(item.status)),
               subtitle: Column(
@@ -297,7 +368,7 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
     ];
   }
 
-  List<Widget> _rider(RideFlowController flow) {
+  List<Widget> _riderContent(RiderActiveRideController flow) {
     final trip = flow.riderRide?.trip;
     if (trip != null) {
       return [
@@ -311,6 +382,7 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
           ),
       ];
     }
+
     return [
       if (flow.loaded && flow.offers.isEmpty)
         const Text('No offers yet. Driver responses will appear here.'),
@@ -349,7 +421,6 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
                           'Agree to ${fareText(offer.fare)} for this ride.',
                           'Choose Driver',
                           () => flow.selectOffer(
-                            widget.rideId!,
                             offer.driverUserId,
                             offer.updatedAt,
                           ),
@@ -386,11 +457,12 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
         ],
       ),
     );
+
     if (confirmed == true && mounted) await command();
   }
 
   Future<void> _counter(
-    RideFlowController flow,
+    DriverMarketplaceController marketplace,
     MarketplaceRequest request,
   ) async {
     final field = TextEditingController(
@@ -398,6 +470,7 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
     );
     final proposed = request.proposedFare.amountMinor;
     String? error;
+
     final amount = await showDialog<int>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -436,9 +509,13 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
         ),
       ),
     );
+
     await Future<void>.delayed(const Duration(milliseconds: 300));
     field.dispose();
-    if (amount != null && mounted) await flow.submitOffer(request.id, amount);
+
+    if (amount != null && mounted) {
+      await marketplace.submitOffer(request.id, amount);
+    }
   }
 }
 
