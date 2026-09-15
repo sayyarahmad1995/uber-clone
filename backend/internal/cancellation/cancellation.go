@@ -13,6 +13,7 @@ import (
 var (
 	ErrNotFound      = errors.New("ride cancellation target not found")
 	ErrTripCompleted = errors.New("completed trip cannot be cancelled")
+	ErrRideExpired   = errors.New("expired ride request cannot be cancelled")
 )
 
 type Result struct {
