@@ -1,6 +1,7 @@
 package ridestatus
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -18,9 +19,20 @@ func NewPostgresRepository(db *sql.DB) PostgresRepository { return PostgresRepos
 
 type scanner interface{ Scan(dest ...any) error }
 
+func decodeTripOperationContext(raw []byte) (*marketplace.OperationContext, error) {
+	if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return nil, nil
+	}
+	var operationContext marketplace.OperationContext
+	if err := json.Unmarshal(raw, &operationContext); err != nil {
+		return nil, err
+	}
+	return &operationContext, nil
+}
+
 func scanView(row scanner) (View, error) {
 	var view View
-	var operation json.RawMessage
+	var operationContextRaw []byte
 	var service sql.NullString
 	var proposedAmount sql.NullInt64
 	var proposedCurrency sql.NullString
@@ -55,7 +67,7 @@ func scanView(row scanner) (View, error) {
 		&startedAt,
 		&completedAt,
 		&tripCancelledAt,
-		&operation,
+		&operationContextRaw,
 		&service,
 		&settlementStatus,
 		&settlementMethod,
@@ -73,7 +85,11 @@ func scanView(row scanner) (View, error) {
 		view.RideRequest.CancelledBy = ride.CancellationActor(rideCancelledBy.String)
 	}
 	if tripDriver.Valid && tripStatus.Valid && assignedAt.Valid {
-		projectedTrip := trip.Trip{RideRequestID: view.RideRequest.ID, RiderUserID: view.RideRequest.RiderUserID, DriverUserID: tripDriver.UUID, Status: trip.Status(tripStatus.String), AssignedAt: assignedAt.Time}
+		operationContext, err := decodeTripOperationContext(operationContextRaw)
+		if err != nil {
+			return View{}, err
+		}
+		projectedTrip := trip.Trip{RideRequestID: view.RideRequest.ID, RiderUserID: view.RideRequest.RiderUserID, DriverUserID: tripDriver.UUID, Status: trip.Status(tripStatus.String), AssignedAt: assignedAt.Time, OperationContext: operationContext}
 		if startedAt.Valid {
 			projectedTrip.StartedAt = &startedAt.Time
 		}
@@ -83,7 +99,6 @@ func scanView(row scanner) (View, error) {
 		if tripCancelledAt.Valid {
 			projectedTrip.CancelledAt = &tripCancelledAt.Time
 		}
-		projectedTrip.OperationContext = operation
 		projectedTrip.Settlement.Status = trip.SettlementUnsettled
 		if settlementStatus.Valid {
 			projectedTrip.Settlement.Status = trip.SettlementStatus(settlementStatus.String)
@@ -101,8 +116,6 @@ func scanView(row scanner) (View, error) {
 	return view, nil
 }
 
-// A LEFT JOIN without a Trip returns SQL NULL. json.RawMessage accepts JSON
-// bytes, so project JSON null rather than asking database/sql to scan SQL NULL.
 const viewColumns = `
 	rr.id,
 	rr.rider_user_id,

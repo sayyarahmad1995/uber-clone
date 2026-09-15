@@ -2,11 +2,11 @@ package trip
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 )
 
 var (
@@ -43,7 +43,7 @@ type Settlement struct {
 }
 
 type Trip struct {
-	OperationContext json.RawMessage
+	OperationContext *marketplace.OperationContext
 	RideRequestID    uuid.UUID
 	RiderUserID      uuid.UUID
 	DriverUserID     uuid.UUID

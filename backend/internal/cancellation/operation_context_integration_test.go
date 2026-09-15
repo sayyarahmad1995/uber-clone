@@ -2,7 +2,6 @@ package cancellation
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"testing"
 
@@ -58,7 +57,6 @@ func TestMarketplaceRequiresMatchingReviewedOperationAndPreservesTrip(t *testing
 		t.Fatalf("same Driver re-offered after operation changed: %v", err)
 	}
 
-	// A new ride can snapshot the newly selected vehicle/service operation.
 	freshRideID := createCancellationRide(t, db, rider)
 	if _, err := offers.Submit(ctx, freshRideID, driverID, 110000); err != nil {
 		t.Fatalf("fresh ride offer: %v", err)
@@ -67,12 +65,8 @@ func TestMarketplaceRequiresMatchingReviewedOperationAndPreservesTrip(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	var snapshot map[string]any
-	if err := json.Unmarshal(assigned.OperationContext, &snapshot); err != nil {
-		t.Fatal(err)
-	}
-	if snapshot["vehicle_id"] != second.String() || snapshot["model"] != "Second" || snapshot["service_code"] != "economy" || snapshot["fare"].(map[string]any)["amount_minor"] != float64(110000) {
-		t.Fatalf("wrong assignment context: %s", assigned.OperationContext)
+	if assigned.OperationContext == nil || assigned.OperationContext.VehicleID != second || assigned.OperationContext.Model != "Second" || assigned.OperationContext.ServiceCode != "economy" || assigned.OperationContext.Fare.AmountMinor != 110000 {
+		t.Fatalf("wrong assignment context: %+v", assigned.OperationContext)
 	}
 	trips := trip.NewPostgresRepository(db)
 	if _, err := trips.Start(ctx, freshRideID, driverID); err != nil {
@@ -84,11 +78,11 @@ func TestMarketplaceRequiresMatchingReviewedOperationAndPreservesTrip(t *testing
 	mustExec(`UPDATE driver_vehicles SET model='Changed later' WHERE id=$1`, second)
 	mustExec(`DELETE FROM driver_vehicle_service_enrollments WHERE vehicle_id=$1`, second)
 	view, err := ridestatus.NewPostgresRepository(db).GetOwned(ctx, freshRideID, rider)
-	if err != nil || view.Trip == nil || string(view.Trip.OperationContext) != string(assigned.OperationContext) {
+	if err != nil || view.Trip == nil || view.Trip.OperationContext == nil || *view.Trip.OperationContext != *assigned.OperationContext {
 		t.Fatalf("Rider history changed: %+v %v", view, err)
 	}
 	history, err := drivertrip.NewPostgresRepository(db).ListHistory(ctx, driverID, 50)
-	if err != nil || len(history) != 1 || string(history[0].OperationContext) != string(assigned.OperationContext) {
+	if err != nil || len(history) != 1 || history[0].OperationContext == nil || *history[0].OperationContext != *assigned.OperationContext {
 		t.Fatalf("Driver history changed: %+v %v", history, err)
 	}
 }
@@ -187,18 +181,25 @@ func TestLegacyTripWithNullContextRemainsReadableAndExecutable(t *testing.T) {
 	if _, err := offers.Accept(ctx, rideID, rider, driverID); err != nil {
 		t.Fatal(err)
 	}
-	// Pre-migration trips have no captured context. Never fabricate one on read.
 	if _, err := db.Exec(`UPDATE trips SET operation_context=NULL WHERE ride_request_id=$1`, rideID); err != nil {
 		t.Fatal(err)
 	}
 	t.Run("rider_read", func(t *testing.T) {
-		if _, err := ridestatus.NewPostgresRepository(db).GetOwned(ctx, rideID, rider); err != nil {
+		view, err := ridestatus.NewPostgresRepository(db).GetOwned(ctx, rideID, rider)
+		if err != nil {
 			t.Fatal(err)
+		}
+		if view.Trip == nil || view.Trip.OperationContext != nil {
+			t.Fatalf("legacy rider context = %+v, want nil", view.Trip)
 		}
 	})
 	t.Run("driver_read", func(t *testing.T) {
-		if _, err := drivertrip.NewPostgresRepository(db).GetCurrent(ctx, driverID); err != nil {
+		view, err := drivertrip.NewPostgresRepository(db).GetCurrent(ctx, driverID)
+		if err != nil {
 			t.Fatal(err)
+		}
+		if view.OperationContext != nil {
+			t.Fatalf("legacy driver context = %+v, want nil", view.OperationContext)
 		}
 	})
 	t.Run("execution_and_history", func(t *testing.T) {
@@ -212,6 +213,9 @@ func TestLegacyTripWithNullContextRemainsReadableAndExecutable(t *testing.T) {
 		history, err := drivertrip.NewPostgresRepository(db).ListHistory(ctx, driverID, 50)
 		if err != nil || len(history) != 1 {
 			t.Fatalf("legacy history: %v count=%d", err, len(history))
+		}
+		if history[0].OperationContext != nil {
+			t.Fatalf("legacy history context = %+v, want nil", history[0].OperationContext)
 		}
 	})
 }

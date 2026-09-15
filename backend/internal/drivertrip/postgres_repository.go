@@ -1,11 +1,14 @@
 package drivertrip
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 
 	"github.com/google/uuid"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/trip"
 )
 
@@ -13,8 +16,20 @@ type PostgresRepository struct{ db *sql.DB }
 
 func NewPostgresRepository(db *sql.DB) PostgresRepository { return PostgresRepository{db: db} }
 
+func decodeOperationContext(raw []byte) (*marketplace.OperationContext, error) {
+	if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return nil, nil
+	}
+	var operationContext marketplace.OperationContext
+	if err := json.Unmarshal(raw, &operationContext); err != nil {
+		return nil, err
+	}
+	return &operationContext, nil
+}
+
 func (r PostgresRepository) GetCurrent(ctx context.Context, driverUserID uuid.UUID) (View, error) {
 	var view View
+	var operationContextRaw []byte
 	var settlementStatus string
 	var settlementMethod sql.NullString
 	err := r.db.QueryRowContext(ctx, `
@@ -49,7 +64,7 @@ func (r PostgresRepository) GetCurrent(ctx context.Context, driverUserID uuid.UU
 		&view.Status,
 		&view.AssignedAt,
 		&view.StartedAt,
-		&view.OperationContext,
+		&operationContextRaw,
 		&settlementStatus,
 		&settlementMethod,
 		&view.Settlement.CashCollectedAt,
@@ -60,6 +75,11 @@ func (r PostgresRepository) GetCurrent(ctx context.Context, driverUserID uuid.UU
 	if err != nil {
 		return View{}, err
 	}
+	operationContext, err := decodeOperationContext(operationContextRaw)
+	if err != nil {
+		return View{}, err
+	}
+	view.OperationContext = operationContext
 	applySettlement(&view, settlementStatus, settlementMethod)
 	return view, nil
 }
@@ -96,6 +116,7 @@ func (r PostgresRepository) ListHistory(ctx context.Context, driverUserID uuid.U
 	views := make([]View, 0)
 	for rows.Next() {
 		var view View
+		var operationContextRaw []byte
 		var settlementStatus string
 		var settlementMethod sql.NullString
 		if err := rows.Scan(
@@ -109,13 +130,18 @@ func (r PostgresRepository) ListHistory(ctx context.Context, driverUserID uuid.U
 			&view.StartedAt,
 			&view.CompletedAt,
 			&view.CancelledAt,
-			&view.OperationContext,
+			&operationContextRaw,
 			&settlementStatus,
 			&settlementMethod,
 			&view.Settlement.CashCollectedAt,
 		); err != nil {
 			return nil, err
 		}
+		operationContext, err := decodeOperationContext(operationContextRaw)
+		if err != nil {
+			return nil, err
+		}
+		view.OperationContext = operationContext
 		applySettlement(&view, settlementStatus, settlementMethod)
 		views = append(views, view)
 	}
