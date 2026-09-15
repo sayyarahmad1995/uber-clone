@@ -3,6 +3,7 @@ package offer
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"net/url"
 	"os"
 	"strings"
@@ -13,7 +14,7 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/migrations"
 )
 
-func TestListForRiderHidesRejectedOfferUntilDriverResubmits(t *testing.T) {
+func TestRiderRejectClosesDriverOpportunity(t *testing.T) {
 	db := openOfferIntegrationDB(t)
 	ctx := context.Background()
 	riderID := createOfferTestUser(t, db, "rider")
@@ -21,6 +22,7 @@ func TestListForRiderHidesRejectedOfferUntilDriverResubmits(t *testing.T) {
 	rideID := createOfferTestRide(t, db, riderID)
 	repository := NewPostgresRepository(db)
 
+	openOfferOpportunity(t, repository, driverID, rideID)
 	if _, err := repository.Upsert(ctx, rideID, driverID, 110000, 90000, 130000, "PKR"); err != nil {
 		t.Fatalf("submit offer: %v", err)
 	}
@@ -46,16 +48,133 @@ func TestListForRiderHidesRejectedOfferUntilDriverResubmits(t *testing.T) {
 	if len(items) != 0 {
 		t.Fatalf("rejected offer must disappear from active Rider comparison, got %#v", items)
 	}
-
-	if _, err := repository.Upsert(ctx, rideID, driverID, 115000, 90000, 130000, "PKR"); err != nil {
-		t.Fatalf("resubmit offer: %v", err)
+	if _, err := repository.Upsert(ctx, rideID, driverID, 115000, 90000, 130000, "PKR"); !errors.Is(err, ErrOpportunityNotOpen) {
+		t.Fatalf("same Driver must not re-offer after Rider rejection, got %v", err)
 	}
-	items, err = repository.ListForRider(ctx, rideID, riderID)
+	feed, err := repository.Discover(ctx, driverID, DiscoveryLimit)
 	if err != nil {
-		t.Fatalf("list resubmitted offer: %v", err)
+		t.Fatalf("discover after rejection: %v", err)
 	}
-	if len(items) != 1 || items[0].Status != StatusPending || items[0].AmountMinor != 115000 {
-		t.Fatalf("expected resubmitted pending offer to reappear, got %#v", items)
+	if len(feed) != 0 {
+		t.Fatalf("same request must not reappear after Rider rejection, got %#v", feed)
+	}
+}
+
+func TestDriverOpportunityExpiresOnce(t *testing.T) {
+	db := openOfferIntegrationDB(t)
+	ctx := context.Background()
+	riderID := createOfferTestUser(t, db, "rider")
+	driverID := createOfferTestDriver(t, db)
+	rideID := createOfferTestRide(t, db, riderID)
+	repository := NewPostgresRepository(db)
+
+	openOfferOpportunity(t, repository, driverID, rideID)
+	if _, err := db.Exec(`
+		UPDATE driver_ride_request_opportunities
+		SET opened_at = statement_timestamp() - INTERVAL '60 seconds',
+		    visible_until = statement_timestamp() - INTERVAL '30 seconds'
+		WHERE ride_request_id = $1 AND driver_user_id = $2
+	`, rideID, driverID); err != nil {
+		t.Fatalf("age opportunity: %v", err)
+	}
+	if _, err := repository.Upsert(ctx, rideID, driverID, 100000, 90000, 130000, "PKR"); !errors.Is(err, ErrOpportunityNotOpen) {
+		t.Fatalf("expected closed opportunity after visibility deadline, got %v", err)
+	}
+	var status string
+	if err := db.QueryRow(`SELECT status FROM driver_ride_request_opportunities WHERE ride_request_id=$1 AND driver_user_id=$2`, rideID, driverID).Scan(&status); err != nil {
+		t.Fatalf("read opportunity state: %v", err)
+	}
+	if status != "window_expired" {
+		t.Fatalf("expected window_expired, got %q", status)
+	}
+	feed, err := repository.Discover(ctx, driverID, DiscoveryLimit)
+	if err != nil {
+		t.Fatalf("discover after window expiry: %v", err)
+	}
+	if len(feed) != 0 {
+		t.Fatalf("expired opportunity must never reopen, got %#v", feed)
+	}
+}
+
+func TestOfferExpiryIsTerminalForDriverPair(t *testing.T) {
+	db := openOfferIntegrationDB(t)
+	ctx := context.Background()
+	riderID := createOfferTestUser(t, db, "rider")
+	driverID := createOfferTestDriver(t, db)
+	rideID := createOfferTestRide(t, db, riderID)
+	repository := NewPostgresRepository(db)
+
+	openOfferOpportunity(t, repository, driverID, rideID)
+	if _, err := repository.Upsert(ctx, rideID, driverID, 100000, 90000, 130000, "PKR"); err != nil {
+		t.Fatalf("submit offer: %v", err)
+	}
+	if _, err := db.Exec(`
+		UPDATE ride_offers
+		SET created_at = statement_timestamp() - INTERVAL '20 seconds',
+		    expires_at = statement_timestamp() - INTERVAL '1 second'
+		WHERE ride_request_id=$1 AND driver_user_id=$2
+	`, rideID, driverID); err != nil {
+		t.Fatalf("age offer: %v", err)
+	}
+	items, err := repository.ListForRider(ctx, rideID, riderID)
+	if err != nil {
+		t.Fatalf("list after offer expiry: %v", err)
+	}
+	if len(items) != 0 {
+		t.Fatalf("expired offer must disappear, got %#v", items)
+	}
+	offer, err := repository.Get(ctx, rideID, driverID)
+	if err != nil {
+		t.Fatalf("get expired offer: %v", err)
+	}
+	if offer.Status != StatusExpired {
+		t.Fatalf("expected expired offer, got %q", offer.Status)
+	}
+	if _, err := repository.Upsert(ctx, rideID, driverID, 105000, 90000, 130000, "PKR"); !errors.Is(err, ErrOpportunityNotOpen) {
+		t.Fatalf("expired offer must not permit a second offer, got %v", err)
+	}
+}
+
+func TestExpiredRideNeverEntersDriverFeed(t *testing.T) {
+	db := openOfferIntegrationDB(t)
+	ctx := context.Background()
+	riderID := createOfferTestUser(t, db, "rider")
+	driverID := createOfferTestDriver(t, db)
+	rideID := createOfferTestRide(t, db, riderID)
+	repository := NewPostgresRepository(db)
+
+	if _, err := db.Exec(`
+		UPDATE ride_requests
+		SET created_at = statement_timestamp() - INTERVAL '4 minutes',
+		    expires_at = statement_timestamp() - INTERVAL '1 second'
+		WHERE id=$1
+	`, rideID); err != nil {
+		t.Fatalf("age ride request: %v", err)
+	}
+	feed, err := repository.Discover(ctx, driverID, DiscoveryLimit)
+	if err != nil {
+		t.Fatalf("discover expired ride: %v", err)
+	}
+	if len(feed) != 0 {
+		t.Fatalf("expired ride must not be discoverable, got %#v", feed)
+	}
+	var status string
+	if err := db.QueryRow(`SELECT status FROM ride_requests WHERE id=$1`, rideID).Scan(&status); err != nil {
+		t.Fatalf("read expired ride: %v", err)
+	}
+	if status != "expired" {
+		t.Fatalf("expected ride request expired state, got %q", status)
+	}
+}
+
+func openOfferOpportunity(t *testing.T, repository PostgresRepository, driverID, rideID uuid.UUID) {
+	t.Helper()
+	feed, err := repository.Discover(context.Background(), driverID, DiscoveryLimit)
+	if err != nil {
+		t.Fatalf("discover ride: %v", err)
+	}
+	if len(feed) != 1 || feed[0].RideRequestID != rideID {
+		t.Fatalf("expected one Driver opportunity for ride %s, got %#v", rideID, feed)
 	}
 }
 
