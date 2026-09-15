@@ -17,6 +17,7 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/httpapi"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/identity"
 	identitykratos "github.com/sayyarahmad1995/uber-clone/backend/internal/identity/kratos"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/offer"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/database"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/migrations"
@@ -61,7 +62,8 @@ func newApplication(cfg config) (application, func(), error) {
 		Cancellations:          cancellation.NewService(cancellation.NewPostgresRepository(db)),
 		Offers:                 offer.NewService(offer.NewPostgresRepository(db), tripService),
 		Trips:                  tripService,
-		DB:                     db,
+		MarketplacePolicy:      marketplace.NewPolicyService(marketplace.NewPostgresTimingPolicyStore(db)),
+		Readiness:              database.NewReadinessChecker(db),
 		Identity:               identityProvider,
 		Auth:                   auth.NewHandler(auth.NewService(authProvider)),
 		AdminReviewUsername:    cfg.AdminReviewUsername,
