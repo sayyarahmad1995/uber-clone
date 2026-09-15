@@ -81,7 +81,14 @@ scrolling early.
 The Rider dashboard requests location during startup so the map can focus on the
 Rider automatically. On a first run, the platform may display its location-permission
 prompt as part of this startup behavior. Explicit current-location actions remain
-available for refocusing the map and selecting pickup. The Driver dashboard now
-supports profile setup/editing, availability, and explicit location publishing.
-Its controls reuse the shared panel contract. Marketplace discovery and offers
-remain the next client slice. See [Driver readiness](flutter-driver-readiness.md).
+available for refocusing the map and selecting pickup. The Driver dashboard supports
+profile setup/editing, availability, explicit location publishing, and operating
+vehicle/service selection. Marketplace discovery, Driver offer actions, Rider offer
+comparison/selection, active Trip controls, cash confirmation, and ride history are
+implemented client flows.
+
+The current ride-flow implementation refreshes server-authoritative state with
+polling. Polling remains the MVP strategy; WebSockets and push notifications stay
+deferred until a concrete latency or scale requirement justifies them. The ride-flow
+client layer is scheduled for typed-model, semantic-repository, and controller
+boundary refactoring without changing that transport strategy.

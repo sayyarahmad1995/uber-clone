@@ -56,9 +56,13 @@ Platform-specific behavior must be isolated behind clear boundaries where it is 
 
 ## 7. Authentication
 
-Authentication and authorization will use an external OIDC provider.
+Authentication is exposed to clients through application-owned endpoints and provider-neutral identity/authentication boundaries.
 
-We will not introduce a custom OIDC identity provider for the MVP.
+The MVP internal provider is self-hosted Ory Kratos. The active client session uses Kratos session tokens through the application API as defined by ADR-0005.
+
+ADR-0003's Hydra-issued OAuth/OIDC token flow and mobile Authorization Code + PKCE decision are superseded for the MVP. The retained rule is provider neutrality: business domains must not depend on Kratos, Hydra, or another provider's SDKs, token types, or APIs.
+
+A future provider or session strategy may change behind the identity/authentication boundary when concrete requirements justify it.
 
 ## 8. Primary data technologies
 
