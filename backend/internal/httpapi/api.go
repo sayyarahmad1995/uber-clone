@@ -1,7 +1,7 @@
 package httpapi
 
 import (
-	"database/sql"
+	"context"
 	"net/http"
 
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/auth"
@@ -11,6 +11,7 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/driveronboarding"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/drivertrip"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/identity"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/offer"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/ride"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/riderlocation"
@@ -18,6 +19,11 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/trip"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/user"
 )
+
+type MarketplacePolicyService interface {
+	Load(context.Context) (marketplace.TimingPolicy, error)
+	Update(context.Context, marketplace.TimingPolicy, string) (marketplace.TimingPolicy, error)
+}
 
 type Dependencies struct {
 	Users                  user.Service
@@ -32,7 +38,7 @@ type Dependencies struct {
 	Cancellations          cancellation.Service
 	Offers                 offer.Service
 	Trips                  trip.Service
-	DB                     *sql.DB
+	MarketplacePolicy      MarketplacePolicyService
 	Identity               identity.Provider
 	Auth                   auth.Handler
 	AdminReviewUsername    string
@@ -53,7 +59,7 @@ type API struct {
 	cancellations          cancellation.Service
 	offers                 offer.Service
 	trips                  trip.Service
-	db                     *sql.DB
+	marketplacePolicy      MarketplacePolicyService
 	identity               identity.Provider
 	auth                   auth.Handler
 	adminReviewUsername    string
@@ -75,7 +81,7 @@ func New(deps Dependencies) *API {
 		cancellations:          deps.Cancellations,
 		offers:                 deps.Offers,
 		trips:                  deps.Trips,
-		db:                     deps.DB,
+		marketplacePolicy:      deps.MarketplacePolicy,
 		identity:               deps.Identity,
 		auth:                   deps.Auth,
 		adminReviewUsername:    deps.AdminReviewUsername,
