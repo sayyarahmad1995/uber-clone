@@ -23,8 +23,19 @@ abstract class Money with _$Money {
 }
 
 @freezed
+abstract class SettlementSnapshot with _$SettlementSnapshot {
+  const factory SettlementSnapshot({required String status}) =
+      _SettlementSnapshot;
+  factory SettlementSnapshot.fromJson(Map<String, dynamic> json) =>
+      _$SettlementSnapshotFromJson(json);
+}
+
+@freezed
 abstract class TripSnapshot with _$TripSnapshot {
-  const factory TripSnapshot({required String status}) = _TripSnapshot;
+  const factory TripSnapshot({
+    required String status,
+    required SettlementSnapshot settlement,
+  }) = _TripSnapshot;
   factory TripSnapshot.fromJson(Map<String, dynamic> json) =>
       _$TripSnapshotFromJson(json);
 }
