@@ -18,7 +18,7 @@ func (api *API) routes() http.Handler {
 }
 
 func (api *API) registerSystemRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /health", health)
+	mux.HandleFunc("GET /health", api.health)
 	mux.HandleFunc("GET /ready", api.ready)
 }
 
