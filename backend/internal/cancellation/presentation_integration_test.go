@@ -37,17 +37,13 @@ func TestDriverPresentationRoundTripPreservesLegacyEligibility(t *testing.T) {
 		if err != nil || persisted.DisplayName != profile.DisplayName {
 			t.Fatalf("profile round trip: %+v %v", persisted, err)
 		}
-		// An existing offer retains its snapshot. Explicit resubmission captures edits.
-        view, err = offers.ListForRider(ctx, rideID, riderID)
-        if err != nil { t.Fatal(err) }
-        if view[0].Vehicle.ModelYear != 0 && view[0].Vehicle.ModelYear != 2024 { t.Fatalf("invalid snapshot: %+v", view) }
-        if _, err := offers.AcceptProposed(ctx, rideID, driverID); err != nil { t.Fatal(err) }
-        view, err = offers.ListForRider(ctx, rideID, riderID)
+		// An already-submitted offer keeps its immutable public presentation snapshot.
+		view, err = offers.ListForRider(ctx, rideID, riderID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !view[0].Selectable || view[0].Driver == nil || view[0].Driver.DisplayName != profile.DisplayName || view[0].Vehicle.ModelYear != 2024 {
-			t.Fatalf("Rider projection lost public fields: %+v", view)
+		if len(view) != 1 || !view[0].Selectable || view[0].Driver != nil || view[0].Vehicle == nil || view[0].Vehicle.ModelYear != 0 {
+			t.Fatalf("submitted offer presentation snapshot changed: %+v", view)
 		}
 	}
 	if _, err := offers.Accept(ctx, rideID, riderID, driverID); err != nil {
