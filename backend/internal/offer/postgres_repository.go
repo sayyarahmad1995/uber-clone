@@ -52,6 +52,9 @@ func (r PostgresRepository) Market(ctx context.Context, rideRequestID uuid.UUID)
 }
 
 func (r PostgresRepository) Upsert(ctx context.Context, rideRequestID, driverUserID uuid.UUID, amountMinor, minimumMinor, maximumMinor int64, currency string) (Offer, error) {
+	if err := marketplace.Expire(ctx, r.db); err != nil {
+		return Offer{}, err
+	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return Offer{}, err
@@ -185,6 +188,9 @@ func (r PostgresRepository) Upsert(ctx context.Context, rideRequestID, driverUse
 }
 
 func (r PostgresRepository) Skip(ctx context.Context, rideRequestID, driverUserID uuid.UUID) error {
+	if err := marketplace.Expire(ctx, r.db); err != nil {
+		return err
+	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -221,6 +227,9 @@ func (r PostgresRepository) Skip(ctx context.Context, rideRequestID, driverUserI
 }
 
 func (r PostgresRepository) Reject(ctx context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID) (Offer, error) {
+	if err := marketplace.Expire(ctx, r.db); err != nil {
+		return Offer{}, err
+	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return Offer{}, err
