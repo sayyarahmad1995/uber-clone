@@ -61,10 +61,14 @@ func createTripIntegrationDriver(t *testing.T, db *sql.DB) uuid.UUID {
 		t.Fatalf("insert vehicle: %v", err)
 	}
 	if _, err := db.Exec(`INSERT INTO driver_vehicle_service_enrollments (vehicle_id, service_code, approved_at, approved_by)
-       SELECT id, 'economy', NOW(), 'test-reviewer' FROM driver_vehicles WHERE driver_user_id=$1`, userID); err != nil { t.Fatal(err) }
-    if _, err := db.Exec(`INSERT INTO driver_operating_selections (driver_user_id,vehicle_id,service_code)
-       SELECT driver_user_id,id,'economy' FROM driver_vehicles WHERE driver_user_id=$1`, userID); err != nil { t.Fatal(err) }
-    if _, err := db.Exec(`INSERT INTO driver_locations (driver_user_id, latitude, longitude, updated_at) VALUES ($1, 24.86, 67.0, NOW())`, userID); err != nil {
+		SELECT id, 'economy', NOW(), 'test-reviewer' FROM driver_vehicles WHERE driver_user_id=$1`, userID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO driver_operating_selections (driver_user_id,vehicle_id,service_code)
+		SELECT driver_user_id,id,'economy' FROM driver_vehicles WHERE driver_user_id=$1`, userID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO driver_locations (driver_user_id, latitude, longitude, updated_at) VALUES ($1, 24.86, 67.0, NOW())`, userID); err != nil {
 		t.Fatalf("insert location: %v", err)
 	}
 	return userID
@@ -85,6 +89,7 @@ func createTripIntegrationRide(t *testing.T, db *sql.DB, riderUserID uuid.UUID) 
 	t.Cleanup(func() {
 		_, _ = db.Exec(`DELETE FROM trips WHERE ride_request_id = $1`, rideID)
 		_, _ = db.Exec(`DELETE FROM ride_offers WHERE ride_request_id = $1`, rideID)
+		_, _ = db.Exec(`DELETE FROM driver_ride_request_opportunities WHERE ride_request_id = $1`, rideID)
 		_, _ = db.Exec(`DELETE FROM ride_requests WHERE id = $1`, rideID)
 	})
 	return rideID
@@ -92,6 +97,14 @@ func createTripIntegrationRide(t *testing.T, db *sql.DB, riderUserID uuid.UUID) 
 
 func insertTripIntegrationOffer(t *testing.T, db *sql.DB, rideRequestID, driverUserID uuid.UUID) {
 	t.Helper()
+	if _, err := db.Exec(`
+		INSERT INTO driver_ride_request_opportunities (
+			ride_request_id, driver_user_id, status, visible_until, responded_at
+		)
+		VALUES ($1, $2, 'offered', NOW() + INTERVAL '30 seconds', NOW())
+	`, rideRequestID, driverUserID); err != nil {
+		t.Fatalf("insert opportunity: %v", err)
+	}
 	if _, err := db.Exec(`
 		INSERT INTO ride_offers (ride_request_id, driver_user_id, amount_minor, currency, operation_context)
 		SELECT $1, $2, 100000, 'PKR', jsonb_build_object('vehicle_id',vehicle_id,'service_code',service_code) FROM driver_operating_selections WHERE driver_user_id=$2
