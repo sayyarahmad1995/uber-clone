@@ -48,17 +48,17 @@ type CreateInput struct {
 }
 
 type Request struct {
-	ServiceCode string
-	ID          uuid.UUID
-	RiderUserID uuid.UUID
-	Pickup      Location
-	Destination Location
+	ServiceCode  string
+	ID           uuid.UUID
+	RiderUserID  uuid.UUID
+	Pickup       Location
+	Destination  Location
 	ProposedFare *Money
-	Status      Status
-	CreatedAt   time.Time
-	ExpiresAt   time.Time
-	CancelledAt *time.Time
-	CancelledBy CancellationActor
+	Status       Status
+	CreatedAt    time.Time
+	ExpiresAt    time.Time
+	CancelledAt  *time.Time
+	CancelledBy  CancellationActor
 }
 
 type Repository interface {
