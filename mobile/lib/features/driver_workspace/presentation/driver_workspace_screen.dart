@@ -38,7 +38,7 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final driver = ref.read(driverControllerProvider);
-    final flow = ref.read(rideFlowControllerProvider('driver'));
+    final flow = ref.read(driverTripControllerProvider);
     // Inactive can be a permission dialog; only actual background states end presence.
     if (state == AppLifecycleState.resumed) {
       driver.setForeground(true);
@@ -90,11 +90,11 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
     final location = driver.location;
     final trip = profile == null
         ? null
-        : ref.watch(rideFlowControllerProvider('driver')).driverTrip;
+        : ref.watch(driverTripControllerProvider).trip;
     if (profile != null) {
-      ref.listen(rideFlowControllerProvider('driver'), (_, flow) {
+      ref.listen(driverTripControllerProvider, (_, flow) {
         if (flow.loaded && !flow.busy) {
-          driver.setActiveTrip(flow.driverTrip != null);
+          driver.setActiveTrip(flow.trip != null);
         }
       });
     }
@@ -385,7 +385,7 @@ class _LoadingPanel extends StatelessWidget {
     physics: physics,
     padding: const EdgeInsets.all(AppSpacing.md),
     children: [
-      Text(busy ? 'Loading Driver status…' : 'Unable to load Driver status'),
+      Text(busy ? 'Loading Driver statusâ€¦' : 'Unable to load Driver status'),
       if (error != null) Text(error!),
       DashboardPanelControl(
         child: TextButton(
@@ -432,7 +432,7 @@ class _DriverApplicationStatusPanel extends StatelessWidget {
         const SizedBox(height: AppSpacing.sm),
         Text('Service: ${application.service.displayName}'),
         Text(
-          '${application.vehicle.make} ${application.vehicle.model} ${application.vehicle.modelYear ?? ''} • ${application.vehicle.color}',
+          '${application.vehicle.make} ${application.vehicle.model} ${application.vehicle.modelYear ?? ''} â€¢ ${application.vehicle.color}',
         ),
         Text(application.vehicle.licensePlate),
         Text('Submitted ${application.submittedAt.toLocal()}'),
@@ -528,7 +528,7 @@ class _DriverReadinessPanel extends StatelessWidget {
             ? profile.displayName!
             : 'Driver profile',
       ),
-      if (activeTrip) const RideFlowPanel(),
+      if (activeTrip) const RideFlowPanel.driver(),
       if (!activeTrip) const OperatingSelectionControl(),
       if (!activeTrip) ...[
         const SizedBox(height: AppSpacing.md),
@@ -545,7 +545,7 @@ class _DriverReadinessPanel extends StatelessWidget {
           label: Text(profile.isOnline ? 'Go offline' : 'Go online'),
         ),
       ),
-      if (!activeTrip) const RideFlowPanel(),
+      if (!activeTrip) const RideFlowPanel.driver(),
       const SizedBox(height: AppSpacing.sm),
       Text(
         location == null
@@ -744,7 +744,7 @@ class _DriverSetupFormState extends State<_DriverSetupForm> {
                         ),
                       );
                     },
-              child: Text(widget.busy ? 'Checking…' : 'Review application'),
+              child: Text(widget.busy ? 'Checkingâ€¦' : 'Review application'),
             ),
           ),
           if (widget.onCancel != null)

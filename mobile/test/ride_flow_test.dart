@@ -9,7 +9,9 @@ import 'package:uber_clone/features/ride_flow/domain/marketplace_request.dart';
 import 'package:uber_clone/features/ride_flow/domain/ride_offer.dart';
 import 'package:uber_clone/features/ride_flow/domain/ride_snapshot.dart';
 import 'package:uber_clone/features/ride_flow/domain/trip.dart';
-import 'package:uber_clone/features/ride_flow/ride_flow_controller.dart';
+import 'package:uber_clone/features/ride_flow/application/driver_marketplace_controller.dart';
+import 'package:uber_clone/features/ride_flow/application/driver_trip_controller.dart';
+import 'package:uber_clone/features/ride_flow/application/rider_active_ride_controller.dart';
 import 'package:uber_clone/features/ride_flow/ride_flow_panels.dart';
 import 'package:uber_clone/features/ride_flow/ride_flow_repository.dart';
 import 'package:uber_clone/features/rider_request/application/rider_request_controller.dart';
@@ -169,11 +171,12 @@ void main() {
     'Rider confirms exact displayed revision and unavailable offers cannot be selected',
     (tester) async {
       final repo = FlowFake();
-      final flow = RideFlowController(repo, rideId: 'ride');
+      final flow = RiderActiveRideController(repo, rideId: 'ride');
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            rideFlowControllerProvider('ride').overrideWith((ref) => flow),
+            riderActiveRideControllerProvider('ride')
+                .overrideWith((ref) => flow),
             riderRequestControllerProvider.overrideWith(
               (ref) => RiderRequestController(
                 FakeRideRequestRepository(),
@@ -183,7 +186,9 @@ void main() {
           ],
           child: const MaterialApp(
             home: Scaffold(
-              body: SingleChildScrollView(child: RideFlowPanel(rideId: 'ride')),
+              body: SingleChildScrollView(
+                child: RideFlowPanel.rider(rideId: 'ride'),
+              ),
             ),
           ),
         ),
@@ -220,10 +225,12 @@ void main() {
 
   test('lost acceptance response reloads authoritative assignment without claiming success', () async {
     final repo = FlowFake()..loseResponse = true;
-    final flow = RideFlowController(repo, rideId: 'ride');
+    final flow = RiderActiveRideController(repo, rideId: 'ride');
     await Future<void>.delayed(Duration.zero);
     expect(flow.offers, hasLength(1));
-    await flow.selectOffer('ride', 'driver', DateTime.utc(2026, 9, 11));
+
+    await flow.selectOffer('driver', DateTime.utc(2026, 9, 11));
+
     expect(flow.status, 'assigned');
     expect(flow.offers, isEmpty);
     expect(flow.error, contains('Response lost'));
@@ -234,7 +241,7 @@ void main() {
   test('location failure does not hide assigned Rider trip', () async {
     final repo = FlowFake()..locationFails = true;
     repo.ride = _ride(trip: _trip('assigned'));
-    final flow = RideFlowController(repo, rideId: 'ride');
+    final flow = RiderActiveRideController(repo, rideId: 'ride');
     await Future<void>.delayed(Duration.zero);
     expect(flow.status, 'assigned');
     expect(flow.loaded, isTrue);
@@ -246,17 +253,16 @@ void main() {
     'restores assigned Driver trip even while availability is offline',
     () async {
       final repo = FlowFake()..trip = _trip('in_progress');
-      final flow = RideFlowController(repo);
+      final flow = DriverTripController(repo);
       await Future<void>.delayed(Duration.zero);
-      expect(flow.status, 'in_progress');
-      expect(flow.requests, isEmpty);
+      expect(flow.trip?.status, 'in_progress');
       flow.dispose();
     },
   );
 
   test('background stops polling; dispose tolerates in-flight reads', () async {
     final repo = FlowFake();
-    final flow = RideFlowController(
+    final flow = RiderActiveRideController(
       repo,
       rideId: 'ride',
       interval: const Duration(milliseconds: 10),
@@ -277,14 +283,19 @@ void main() {
     'counteroffer waits for an in-flight reload instead of being dropped',
     () async {
       final repo = FlowFake()..blocked = Completer<void>();
-      final flow = RideFlowController(repo, rideId: 'ride');
+      final flow = DriverMarketplaceController(repo);
+
       await Future<void>.delayed(Duration.zero);
       expect(flow.busy, isTrue);
+
       final action = flow.submitOffer('ride', 11500);
       await Future<void>.delayed(Duration.zero);
+
       expect(repo.actions, 0);
+
       repo.blocked!.complete();
       await action;
+
       expect(repo.actions, 1);
       expect(repo.lastAmountMinor, 11500);
       flow.dispose();

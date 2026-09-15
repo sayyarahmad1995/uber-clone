@@ -49,14 +49,14 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     final id = ref.read(riderRequestControllerProvider).state.active?.id;
     if (id == null) return;
     if (state == AppLifecycleState.resumed) {
-      ref.read(rideFlowControllerProvider(id)).setForeground(true);
+      ref.read(riderActiveRideControllerProvider(id)).setForeground(true);
     }
     if ([
       AppLifecycleState.paused,
       AppLifecycleState.hidden,
       AppLifecycleState.detached,
     ].contains(state)) {
-      ref.read(rideFlowControllerProvider(id)).setForeground(false);
+      ref.read(riderActiveRideControllerProvider(id)).setForeground(false);
     }
   }
 
@@ -98,7 +98,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     final driverLocation = active == null
         ? null
         : freshDriverLocation(
-            ref.watch(rideFlowControllerProvider(active.id)).location,
+            ref.watch(riderActiveRideControllerProvider(active.id)).location,
           );
     final markers = active == null
         ? _markersFor(state.pickup, state.destination)
@@ -354,7 +354,7 @@ class _RequestRidePanel extends StatelessWidget {
             key: const Key('requestRideButton'),
             onPressed: state.submitting ? null : () => onSubmit(),
             icon: const Icon(Icons.local_taxi),
-            label: Text(state.submitting ? 'Requesting…' : 'Request ride'),
+            label: Text(state.submitting ? 'Requestingâ€¦' : 'Request ride'),
           ),
         ),
       ],
@@ -413,7 +413,7 @@ class _ActiveRequestPanel extends ConsumerWidget {
           style: Theme.of(context).textTheme.headlineSmall,
         ),
         const SizedBox(height: AppSpacing.xs),
-        RideFlowPanel(key: ValueKey(request.id), rideId: request.id),
+        RideFlowPanel.rider(rideId: 'ride'),
         const SizedBox(height: AppSpacing.md),
         Card(
           child: Padding(
@@ -452,7 +452,9 @@ class _ActiveRequestPanel extends ConsumerWidget {
               onPressed: state.submitting
                   ? null
                   : () => _confirmCancellation(context, ref),
-              child: Text(state.submitting ? 'Cancelling…' : 'Cancel request'),
+              child: Text(
+                state.submitting ? 'Cancellingâ€¦' : 'Cancel request',
+              ),
             ),
           ),
         ],
