@@ -13,9 +13,9 @@
 | Data models | Freezed + json_serializable | Shared across platforms |
 | Secure storage | Flutter Secure Storage | Platform-specific implementations hidden behind clear boundaries |
 | Simple preferences | SharedPreferences | Keep lightweight unless offline requirements require a database |
-| Real-time | WebSocket | Use only where live updates are required |
-| Maps | TBD | Provider to be selected before map-dependent slice |
-| Device location | TBD | Provider/package to be selected before location-dependent slice |
+| Ride-state refresh | HTTP polling | Add WebSockets or push only when a concrete latency/scale requirement justifies server-driven updates |
+| Maps | `flutter_map` with attributed OpenStreetMap tiles behind application-owned map boundaries | Keep provider replaceable behind `MapTiles`/map adapters |
+| Device location | `geolocator` behind the application-owned `DeviceLocation` port | Keep platform/provider APIs outside ride-domain models |
 
 ## Backend
 
@@ -23,10 +23,10 @@
 |---|---|
 | Language | Go |
 | Architecture | Modular monolith |
-| API | HTTP API; concrete API style finalized with first backend slice |
+| API | Application-owned HTTP API |
 | Database | PostgreSQL |
-| Cache / fast ephemeral data | Redis |
-| Authentication | External OIDC provider |
+| Cache / fast ephemeral data | None currently; introduce Redis only when a concrete slice needs cache/ephemeral data |
+| Authentication | Provider-neutral identity/authentication boundaries backed by Ory Kratos sessions for the MVP |
 | Deployment | Containers |
 | Infrastructure | Self-managed server |
 | Scaling | Vertical scaling initially |
@@ -40,3 +40,5 @@ The client is organized so that shared application infrastructure and business c
 ## Technology selection rule
 
 Package-level choices remain revisable until the relevant vertical slice requires them. A tool should be introduced because the current product slice needs it, not because a future enterprise architecture might eventually need it.
+
+The current absence of Redis, WebSockets, push infrastructure, Hydra, Kubernetes, or an event bus is intentional. Those tools require a concrete product or operational need before adoption.
