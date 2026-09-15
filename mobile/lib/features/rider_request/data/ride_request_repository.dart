@@ -44,9 +44,7 @@ class ApiRideRequestRepository implements RideRequestRepository {
       return items
           .map(
             (item) => RideRequest.fromJson(
-              _normalizeRideRequestSnapshot(
-                Map<String, dynamic>.from(item as Map),
-              ),
+              Map<String, dynamic>.from(item as Map),
             ),
           )
           .toList();
@@ -73,9 +71,7 @@ class ApiRideRequestRepository implements RideRequestRepository {
           'proposed_fare': proposedFare.toJson(),
         },
       );
-      return RideRequest.fromJson(
-        _normalizeRideRequestSnapshot(response.data!),
-      );
+      return RideRequest.fromJson(response.data!);
     } on DioException catch (error) {
       throw ApiException.fromDio(error);
     }
@@ -88,9 +84,7 @@ class ApiRideRequestRepository implements RideRequestRepository {
         '/v1/ride-requests/$id',
         options: await _options(),
       );
-      return RideRequest.fromJson(
-        _normalizeRideRequestSnapshot(response.data!),
-      );
+      return RideRequest.fromJson(response.data!);
     } on DioException catch (error) {
       throw ApiException.fromDio(error);
     }
@@ -107,22 +101,4 @@ class ApiRideRequestRepository implements RideRequestRepository {
       throw ApiException.fromDio(error);
     }
   }
-}
-
-Map<String, dynamic> _normalizeRideRequestSnapshot(
-  Map<String, dynamic> source,
-) {
-  final data = Map<String, dynamic>.from(source);
-  final trip = data['trip'];
-  if (trip is Map) {
-    final tripData = Map<String, dynamic>.from(trip);
-    final settlement = tripData['settlement'];
-    if (tripData['status'] == 'completed' &&
-        settlement is Map &&
-        settlement['status'] == 'cash_collected') {
-      tripData['status'] = 'settled';
-    }
-    data['trip'] = tripData;
-  }
-  return data;
 }
