@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+
 import '../../ride_flow/ride_flow_panels.dart';
+
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
@@ -18,7 +20,8 @@ class RiderRequestScreen extends ConsumerStatefulWidget {
   ConsumerState<RiderRequestScreen> createState() => _RiderRequestScreenState();
 }
 
-class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> with WidgetsBindingObserver {
+class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
+    with WidgetsBindingObserver {
   final _fare = TextEditingController();
   final _mapController = MapController();
   bool _selectingPickup = true;
@@ -45,11 +48,18 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> with Wi
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final id = ref.read(riderRequestControllerProvider).state.active?.id;
     if (id == null) return;
-    if (state == AppLifecycleState.resumed) ref.read(rideFlowControllerProvider(id)).setForeground(true);
-    if ([AppLifecycleState.paused, AppLifecycleState.hidden, AppLifecycleState.detached].contains(state)) {
+    if (state == AppLifecycleState.resumed) {
+      ref.read(rideFlowControllerProvider(id)).setForeground(true);
+    }
+    if ([
+      AppLifecycleState.paused,
+      AppLifecycleState.hidden,
+      AppLifecycleState.detached,
+    ].contains(state)) {
       ref.read(rideFlowControllerProvider(id)).setForeground(false);
     }
   }
+
   Future<void> _submit() async {
     final amount = parseFareMinor(_fare.text);
     if (amount == null) {
@@ -85,7 +95,11 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> with Wi
     final state = controller.state;
     final active = state.active;
     final tiles = ref.watch(mapTilesProvider);
-    final driverLocation = active == null ? null : freshDriverLocation(ref.watch(rideFlowControllerProvider(active.id)).location);
+    final driverLocation = active == null
+        ? null
+        : freshDriverLocation(
+            ref.watch(rideFlowControllerProvider(active.id)).location,
+          );
     final markers = active == null
         ? _markersFor(state.pickup, state.destination)
         : _markersFor(active.pickup, active.destination);
@@ -104,7 +118,13 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen> with Wi
         tiles: tiles,
         markers: [
           ...markers,
-          if (driverLocation != null) RideMapMarker(point: LatLng((driverLocation["latitude"] as num).toDouble(), (driverLocation["longitude"] as num).toDouble()), icon: Icons.local_taxi, color: AppColors.success, label: "Driver"),
+          if (driverLocation != null)
+            RideMapMarker(
+              point: LatLng(driverLocation.latitude, driverLocation.longitude),
+              icon: Icons.local_taxi,
+              color: AppColors.success,
+              label: "Driver",
+            ),
         ],
         onTap: active == null ? _handleMapTap : null,
       ),

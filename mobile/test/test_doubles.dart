@@ -1,5 +1,9 @@
 import 'package:uber_clone/core/network/api_exception.dart';
 import 'package:uber_clone/features/ride_flow/ride_flow_repository.dart';
+import 'package:uber_clone/features/ride_flow/domain/marketplace_request.dart';
+import 'package:uber_clone/features/ride_flow/domain/ride_offer.dart';
+import 'package:uber_clone/features/ride_flow/domain/ride_snapshot.dart';
+import 'package:uber_clone/features/ride_flow/domain/trip.dart';
 import 'package:uber_clone/features/driver_workspace/domain/operating_state.dart';
 import 'package:uber_clone/features/driver_workspace/domain/registered_vehicle.dart';
 import 'package:uber_clone/core/models/account.dart';
@@ -11,7 +15,8 @@ import 'package:uber_clone/features/driver_workspace/domain/driver_onboarding.da
 import 'package:uber_clone/features/driver_workspace/domain/driver_profile.dart';
 import 'package:uber_clone/features/rider_request/data/device_location.dart';
 import 'package:uber_clone/features/rider_request/data/ride_request_repository.dart';
-import 'package:uber_clone/features/rider_request/domain/ride_request.dart';
+import 'package:uber_clone/features/rider_request/domain/ride_request.dart'
+    hide TripSnapshot;
 
 const riderAccount = Account(id: 'user-1', capabilities: [Capability.rider]);
 const bothCapabilities = Account(
@@ -30,6 +35,7 @@ class FakeAuthRepository implements AuthRepository {
     if (loginError != null) throw loginError!;
     return account!;
   }
+
   @override
   Future<String> register(String identifier, String password) async =>
       'challenge';
@@ -145,11 +151,22 @@ class FakeDriverRepository implements DriverRepository {
   List<RegisteredVehicle> vehicles;
   @override
   Future<List<RegisteredVehicle>> listVehicles() async => vehicles;
-  OperatingState operation = const OperatingState(vehicleId:'test-vehicle', serviceCode:'economy', valid:true);
+  OperatingState operation = const OperatingState(
+    vehicleId: 'test-vehicle',
+    serviceCode: 'economy',
+    valid: true,
+  );
   @override
   Future<OperatingState> operatingState() async => operation;
   @override
-  Future<OperatingState> selectOperation(String vehicleId, String serviceCode) async => operation = OperatingState(vehicleId:vehicleId,serviceCode:serviceCode,valid:true);
+  Future<OperatingState> selectOperation(
+    String vehicleId,
+    String serviceCode,
+  ) async => operation = OperatingState(
+    vehicleId: vehicleId,
+    serviceCode: serviceCode,
+    valid: true,
+  );
   DriverProfile? profile;
   final calls = <String>[];
   bool failPublish = false;
@@ -236,16 +253,44 @@ class FakeDriverOnboardingRepository implements DriverOnboardingRepository {
   }
 }
 
-// Existing dashboard tests isolate networking; flow behavior has dedicated tests.
 class FakeRideFlowRepository implements RideFlowRepository {
   @override
-  Future<Json> get(String path) async {
-    if (path == '/v1/driver/trip') throw const ApiException('not_found','No active trip',statusCode:404);
-    if (path.endsWith('/offers')) return {'offers': <Json>[]};
-    if (path.endsWith('/trips')) return {'trips': <Json>[]};
-    if (path.contains('/marketplace/')) return {'ride_requests': <Json>[]};
-    return {'id': path.split('/').last, 'status':'requested', 'trip':null};
-  }
+  Future<List<MarketplaceRequest>> listMarketplaceRequests() async => const [];
   @override
-  Future<void> act(String path, {Json? data, bool put=false}) async {}
+  Future<TripSnapshot?> getCurrentDriverTrip() async => null;
+  @override
+  Future<List<DriverTripHistoryItem>> listDriverTrips() async => const [];
+  @override
+  Future<List<RiderRideSnapshot>> listRiderRides() async => const [];
+  @override
+  Future<RiderRideSnapshot> getRiderRide(String rideRequestId) {
+    throw const ApiException('not_found', 'No ride', statusCode: 404);
+  }
+
+  @override
+  Future<List<RiderOfferComparison>> listRiderOffers(
+    String rideRequestId,
+  ) async => const [];
+  @override
+  Future<DriverLocationSnapshot?> getDriverLocation(
+    String rideRequestId,
+  ) async => null;
+  @override
+  Future<void> submitOffer(String rideRequestId, int amountMinor) async {}
+  @override
+  Future<void> acceptProposedFare(String rideRequestId) async {}
+  @override
+  Future<void> selectOffer(
+    String rideRequestId,
+    String driverUserId,
+    DateTime updatedAt,
+  ) async {}
+  @override
+  Future<void> startTrip(String rideRequestId) async {}
+  @override
+  Future<void> completeTrip(String rideRequestId) async {}
+  @override
+  Future<void> confirmCashCollected(String rideRequestId) async {}
+  @override
+  Future<void> cancelDriverTrip(String rideRequestId) async {}
 }

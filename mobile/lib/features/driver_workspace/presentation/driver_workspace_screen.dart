@@ -90,11 +90,11 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
     final location = driver.location;
     final trip = profile == null
         ? null
-        : ref.watch(rideFlowControllerProvider('driver')).current;
+        : ref.watch(rideFlowControllerProvider('driver')).driverTrip;
     if (profile != null) {
       ref.listen(rideFlowControllerProvider('driver'), (_, flow) {
         if (flow.loaded && !flow.busy) {
-          driver.setActiveTrip(flow.current != null);
+          driver.setActiveTrip(flow.driverTrip != null);
         }
       });
     }
@@ -139,17 +139,23 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
               color: AppColors.success,
               label: 'Your published location',
             ),
-          if (trip != null)
-            for (final label in ['pickup', 'destination'])
-              RideMapMarker(
-                point: LatLng(
-                  (trip[label]['latitude'] as num).toDouble(),
-                  (trip[label]['longitude'] as num).toDouble(),
-                ),
-                icon: label == 'pickup' ? Icons.my_location : Icons.flag,
-                color: AppColors.danger,
-                label: label,
+          if (trip?.pickup != null)
+            RideMapMarker(
+              point: LatLng(trip!.pickup!.latitude, trip.pickup!.longitude),
+              icon: Icons.my_location,
+              color: AppColors.danger,
+              label: 'pickup',
+            ),
+          if (trip?.destination != null)
+            RideMapMarker(
+              point: LatLng(
+                trip!.destination!.latitude,
+                trip.destination!.longitude,
               ),
+              icon: Icons.flag,
+              color: AppColors.danger,
+              label: 'destination',
+            ),
         ],
       ),
       mapControls: profile == null
