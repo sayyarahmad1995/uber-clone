@@ -50,6 +50,8 @@ func writeCancellationError(w http.ResponseWriter, err error) bool {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "ride request or trip not found"})
 	case errors.Is(err, cancellation.ErrTripCompleted):
 		writeJSON(w, http.StatusConflict, map[string]string{"error": "completed trip cannot be cancelled"})
+	case errors.Is(err, cancellation.ErrRideExpired):
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "expired ride request cannot be cancelled"})
 	default:
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "unable to cancel ride"})
 	}
