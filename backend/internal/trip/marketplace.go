@@ -13,6 +13,9 @@ import (
 )
 
 func (r PostgresRepository) SelectOffer(ctx context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID, expectedVersion ...time.Time) (Trip, error) {
+	if err := marketplace.Expire(ctx, r.db); err != nil {
+		return Trip{}, err
+	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return Trip{}, err
