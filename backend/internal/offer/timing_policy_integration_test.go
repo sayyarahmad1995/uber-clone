@@ -2,6 +2,7 @@ package offer
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 	"time"
 
@@ -110,14 +111,9 @@ func TestMarketplaceTimingPolicyIsSnapshottedAtCreation(t *testing.T) {
 	assertDuration(t, "second offer TTL", secondOffer.ExpiresAt.Sub(secondOffer.CreatedAt), 25*time.Second)
 }
 
-func createPolicyRide(t *testing.T, db interface {
-	QueryRowContext(context.Context, string, ...any) *sql.Row
-}, riderID uuid.UUID) ride.Request {
+func createPolicyRide(t *testing.T, db *sql.DB, riderID uuid.UUID) ride.Request {
 	t.Helper()
-	// Kept below as a concrete repository call so the production creation path
-	// snapshots the current timing policy.
-	database := db.(*sql.DB)
-	request, err := ride.NewService(ride.NewPostgresRepository(database)).Create(context.Background(), riderID, ride.CreateInput{
+	request, err := ride.NewService(ride.NewPostgresRepository(db)).Create(context.Background(), riderID, ride.CreateInput{
 		ServiceCode: "economy",
 		Pickup:      ride.Location{Latitude: 24.8610, Longitude: 67.0010},
 		Destination: ride.Location{Latitude: 24.8800, Longitude: 67.0200},
@@ -130,10 +126,10 @@ func createPolicyRide(t *testing.T, db interface {
 		t.Fatalf("create policy ride: %v", err)
 	}
 	t.Cleanup(func() {
-		_, _ = database.Exec(`DELETE FROM trips WHERE ride_request_id=$1`, request.ID)
-		_, _ = database.Exec(`DELETE FROM ride_offers WHERE ride_request_id=$1`, request.ID)
-		_, _ = database.Exec(`DELETE FROM driver_ride_request_opportunities WHERE ride_request_id=$1`, request.ID)
-		_, _ = database.Exec(`DELETE FROM ride_requests WHERE id=$1`, request.ID)
+		_, _ = db.Exec(`DELETE FROM trips WHERE ride_request_id=$1`, request.ID)
+		_, _ = db.Exec(`DELETE FROM ride_offers WHERE ride_request_id=$1`, request.ID)
+		_, _ = db.Exec(`DELETE FROM driver_ride_request_opportunities WHERE ride_request_id=$1`, request.ID)
+		_, _ = db.Exec(`DELETE FROM ride_requests WHERE id=$1`, request.ID)
 	})
 	return request
 }
