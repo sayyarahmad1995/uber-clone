@@ -16,6 +16,7 @@ var (
 	ErrAmountOutOfRange   = errors.New("offer amount is outside allowed range")
 	ErrOfferNotFound      = errors.New("ride offer not found")
 	ErrOfferNotActionable = errors.New("ride offer is not actionable")
+	ErrOpportunityNotOpen = errors.New("driver opportunity is not open")
 )
 
 const (
@@ -30,6 +31,7 @@ const (
 	StatusPending  Status = "pending"
 	StatusAccepted Status = "accepted"
 	StatusRejected Status = "rejected"
+	StatusExpired  Status = "expired"
 	StatusClosed   Status = "closed"
 )
 
@@ -46,13 +48,15 @@ type Location struct {
 
 type DiscoveryItem struct {
 	PickupDistanceMeters float64
-	RideRequestID        uuid.UUID
-	RiderUserID          uuid.UUID
-	Pickup               Location
-	Destination          Location
-	ProposedFare         Market
-	CreatedAt            time.Time
-	OwnOffer             *Offer
+	RideRequestID         uuid.UUID
+	RiderUserID           uuid.UUID
+	Pickup                Location
+	Destination           Location
+	ProposedFare          Market
+	CreatedAt             time.Time
+	RideExpiresAt         time.Time
+	OpportunityExpiresAt  time.Time
+	OwnOffer              *Offer
 }
 
 type Offer struct {
@@ -63,6 +67,7 @@ type Offer struct {
 	Status        Status
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
+	ExpiresAt     time.Time
 	DecidedAt     *time.Time
 }
 
@@ -102,6 +107,7 @@ type Repository interface {
 	Market(context.Context, uuid.UUID) (Market, error)
 	Discover(context.Context, uuid.UUID, int) ([]DiscoveryItem, error)
 	Upsert(context.Context, uuid.UUID, uuid.UUID, int64, int64, int64, string) (Offer, error)
+	Skip(context.Context, uuid.UUID, uuid.UUID) error
 	ListForRider(context.Context, uuid.UUID, uuid.UUID) ([]RiderOffer, error)
 	Reject(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) (Offer, error)
 	Get(context.Context, uuid.UUID, uuid.UUID) (Offer, error)
@@ -148,6 +154,10 @@ func (s Service) AcceptProposed(ctx context.Context, rideRequestID, driverUserID
 		return Submission{}, err
 	}
 	return Submission{Offer: result}, nil
+}
+
+func (s Service) Skip(ctx context.Context, rideRequestID, driverUserID uuid.UUID) error {
+	return s.repository.Skip(ctx, rideRequestID, driverUserID)
 }
 
 func (s Service) ListForRider(ctx context.Context, rideRequestID, riderUserID uuid.UUID) ([]RiderOffer, error) {
