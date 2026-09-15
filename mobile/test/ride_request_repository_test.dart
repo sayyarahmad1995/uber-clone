@@ -48,9 +48,9 @@ void main() {
     final rides = await repository.list();
 
     expect(rides[0].trip?.status, 'completed');
-    expect(rides[0].trip?.settlement.status, 'unsettled');
+    expect(rides[0].trip?.settlement?.status, 'unsettled');
     expect(rides[1].trip?.status, 'completed');
-    expect(rides[1].trip?.settlement.status, 'cash_collected');
+    expect(rides[1].trip?.settlement?.status, 'cash_collected');
   });
 }
 
