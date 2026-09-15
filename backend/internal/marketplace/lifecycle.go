@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	DefaultRideRequestTTL      = 3 * time.Minute
+	DefaultRideRequestTTL       = 3 * time.Minute
 	DefaultDriverOpportunityTTL = 30 * time.Second
 	DefaultOfferDecisionTTL     = 10 * time.Second
 )
