@@ -7,6 +7,9 @@ import 'package:uber_clone/features/ride_flow/ride_flow_repository.dart';
 
 class SemanticRideFlowFake implements RideFlowRepository {
   @override
+  Future<List<RiderRideSnapshot>> listRiderRides() async => const [];
+
+  @override
   Future<List<MarketplaceRequest>> listMarketplaceRequests() async => const [];
 
   @override
@@ -20,12 +23,14 @@ class SemanticRideFlowFake implements RideFlowRepository {
       throw UnimplementedError();
 
   @override
-  Future<List<RiderOfferComparison>> listRiderOffers(String rideRequestId) async =>
-      const [];
+  Future<List<RiderOfferComparison>> listRiderOffers(
+    String rideRequestId,
+  ) async => const [];
 
   @override
-  Future<DriverLocationSnapshot?> getDriverLocation(String rideRequestId) async =>
-      null;
+  Future<DriverLocationSnapshot?> getDriverLocation(
+    String rideRequestId,
+  ) async => null;
 
   @override
   Future<void> submitOffer(String rideRequestId, int amountMinor) async {}
@@ -54,8 +59,11 @@ class SemanticRideFlowFake implements RideFlowRepository {
 }
 
 void main() {
-  test('ride flow repository exposes semantic operations instead of raw paths', () {
-    final repository = SemanticRideFlowFake();
-    expect(repository, isA<RideFlowRepository>());
-  });
+  test(
+    'ride flow repository exposes semantic operations instead of raw paths',
+    () {
+      final repository = SemanticRideFlowFake();
+      expect(repository, isA<RideFlowRepository>());
+    },
+  );
 }

@@ -113,7 +113,9 @@ class ApiRideFlowRepository implements RideFlowRepository {
   );
 
   @override
-  Future<DriverLocationSnapshot?> getDriverLocation(String rideRequestId) async {
+  Future<DriverLocationSnapshot?> getDriverLocation(
+    String rideRequestId,
+  ) async {
     try {
       return DriverLocationSnapshot.fromJson(
         await _request(
@@ -130,11 +132,9 @@ class ApiRideFlowRepository implements RideFlowRepository {
 
   @override
   Future<void> submitOffer(String rideRequestId, int amountMinor) async {
-    await _request(
-      '/v1/driver/ride-requests/$rideRequestId/offer',
-      'PUT',
-      {'amount_minor': amountMinor},
-    );
+    await _request('/v1/driver/ride-requests/$rideRequestId/offer', 'PUT', {
+      'amount_minor': amountMinor,
+    });
   }
 
   @override

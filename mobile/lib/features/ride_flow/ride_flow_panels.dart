@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
 import 'domain/marketplace_request.dart';
-import 'domain/ride_offer.dart';
 import 'domain/ride_snapshot.dart';
 import 'domain/trip.dart';
 import 'ride_flow_controller.dart';
@@ -73,7 +72,9 @@ class OperationDetails extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(value.driverName),
-        Text('${value.make} ${value.model} ${value.modelYear} · ${value.color}'),
+        Text(
+          '${value.make} ${value.model} ${value.modelYear} · ${value.color}',
+        ),
         Text('License plate: ${value.licensePlate}'),
         Text('Service: ${value.serviceName}'),
         Text('Agreed fare: ${fareText(value.fare)}'),
@@ -112,8 +113,11 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
     if (state == AppLifecycleState.resumed) {
       ref.read(rideFlowControllerProvider(flowKey)).setForeground(true);
     }
-    if ([AppLifecycleState.paused, AppLifecycleState.hidden, AppLifecycleState.detached]
-        .contains(state)) {
+    if ([
+      AppLifecycleState.paused,
+      AppLifecycleState.hidden,
+      AppLifecycleState.detached,
+    ].contains(state)) {
       ref.read(rideFlowControllerProvider(flowKey)).setForeground(false);
     }
   }
@@ -124,7 +128,9 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
     ref.listen(rideFlowControllerProvider(flowKey), (_, next) {
       if (!next.loaded || next.busy) return;
       if (widget.rideId == null) {
-        ref.read(driverControllerProvider).setActiveTrip(next.driverTrip != null);
+        ref
+            .read(driverControllerProvider)
+            .setActiveTrip(next.driverTrip != null);
       } else if (!_syncing) {
         final request = ref.read(riderRequestControllerProvider).state.active;
         if (request?.id == widget.rideId &&
@@ -142,12 +148,17 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
       children: [
         const Divider(),
         Text(
-          widget.rideId == null ? 'Trips and requests' : statusText(flow.status),
+          widget.rideId == null
+              ? 'Trips and requests'
+              : statusText(flow.status),
           style: Theme.of(context).textTheme.titleLarge,
         ),
         if (!flow.loaded && flow.busy) const LinearProgressIndicator(),
         if (flow.error != null)
-          Text(flow.error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          Text(
+            flow.error!,
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
+          ),
         TextButton.icon(
           onPressed: flow.busy ? null : flow.refresh,
           icon: const Icon(Icons.refresh),
@@ -162,7 +173,8 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
     final trip = flow.driverTrip;
     if (trip != null) {
       final id = trip.rideRequestId!;
-      final cashDue = trip.status == 'completed' && settlementIsCashDue(trip.settlement);
+      final cashDue =
+          trip.status == 'completed' && settlementIsCashDue(trip.settlement);
       return [
         Text(statusText(trip.status)),
         OperationDetails(trip.operationContext),
@@ -221,7 +233,8 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
       ];
     }
 
-    final online = ref.watch(driverControllerProvider).profile?.isOnline == true;
+    final online =
+        ref.watch(driverControllerProvider).profile?.isOnline == true;
     return [
       if (!online)
         const Text('Go online to receive requests for your selected service.'),
@@ -238,12 +251,20 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
                   Text('Rider fare: ${fareText(request.proposedFare)}'),
                   Text('Pickup: ${pointText(request.pickup)}'),
                   Text('Destination: ${pointText(request.destination)}'),
-                  Text('${(request.pickupDistanceMeters / 1000).toStringAsFixed(1)} km to pickup · straight-line distance'),
+                  Text(
+                    '${(request.pickupDistanceMeters / 1000).toStringAsFixed(1)} km to pickup · straight-line distance',
+                  ),
                   if (request.ownOffer != null)
-                    Text('Your response: ${fareText(request.ownOffer!.fare)} · ${request.ownOffer!.status}'),
-                  const Text('The Rider chooses a Driver. Sending a response does not assign this trip.'),
+                    Text(
+                      'Your response: ${fareText(request.ownOffer!.fare)} · ${request.ownOffer!.status}',
+                    ),
+                  const Text(
+                    'The Rider chooses a Driver. Sending a response does not assign this trip.',
+                  ),
                   FilledButton(
-                    onPressed: flow.busy ? null : () => flow.acceptProposedFare(request.id),
+                    onPressed: flow.busy
+                        ? null
+                        : () => flow.acceptProposedFare(request.id),
                     child: const Text('Accept Rider fare'),
                   ),
                   OutlinedButton(
@@ -300,13 +321,26 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(offer.driver?.displayName ?? 'Driver', style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  offer.driver?.displayName ?? 'Driver',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
                 if (offer.vehicle != null)
-                  Text('${offer.vehicle!.make} ${offer.vehicle!.model} ${offer.vehicle!.modelYear ?? ''} · ${offer.vehicle!.color}'),
-                Text('${fareText(offer.fare)}${offer.matchesProposedFare ? ' · Your fare' : ''}'),
-                Text('${(offer.pickupDistanceMeters / 1000).toStringAsFixed(1)} km to pickup · straight-line distance'),
+                  Text(
+                    '${offer.vehicle!.make} ${offer.vehicle!.model} ${offer.vehicle!.modelYear ?? ''} · ${offer.vehicle!.color}',
+                  ),
+                Text(
+                  '${fareText(offer.fare)}${offer.matchesProposedFare ? ' · Your fare' : ''}',
+                ),
+                Text(
+                  '${(offer.pickupDistanceMeters / 1000).toStringAsFixed(1)} km to pickup · straight-line distance',
+                ),
                 if (!offer.selectable)
-                  Text(offer.status == 'pending' ? 'Driver currently unavailable' : offer.status),
+                  Text(
+                    offer.status == 'pending'
+                        ? 'Driver currently unavailable'
+                        : offer.status,
+                  ),
                 FilledButton(
                   onPressed: flow.busy || !offer.selectable
                       ? null
@@ -373,7 +407,8 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
             controller: field,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: InputDecoration(
-              labelText: '${request.proposedFare.currency} · 90%–130% of Rider fare',
+              labelText:
+                  '${request.proposedFare.currency} · 90%–130% of Rider fare',
               errorText: error,
             ),
           ),
@@ -388,7 +423,9 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
                 if (value == null ||
                     value < (proposed * 90 + 99) ~/ 100 ||
                     value > proposed * 130 ~/ 100) {
-                  update(() => error = 'Enter a fare within the allowed range.');
+                  update(
+                    () => error = 'Enter a fare within the allowed range.',
+                  );
                   return;
                 }
                 Navigator.pop(context, value);
@@ -410,7 +447,8 @@ int? parseFareMinor(String text) {
   if (match == null) return null;
   final whole = int.tryParse(match.group(1)!);
   if (whole == null || whole > 10000000000) return null;
-  final value = whole * 100 + int.parse((match.group(2) ?? '').padRight(2, '0'));
+  final value =
+      whole * 100 + int.parse((match.group(2) ?? '').padRight(2, '0'));
   return value > 0 && value <= 1000000000000 ? value : null;
 }
 

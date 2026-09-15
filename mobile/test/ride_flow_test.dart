@@ -25,25 +25,25 @@ SettlementSnapshot _settlement([String status = 'unsettled']) =>
     SettlementSnapshot(status: status);
 
 RiderRideSnapshot _ride({TripSnapshot? trip}) => RiderRideSnapshot(
-      serviceCode: 'economy',
-      id: 'ride',
-      pickup: _point(33.68, 73.04),
-      destination: _point(33.56, 73.01),
-      proposedFare: _fare(10000),
-      status: 'requested',
-      createdAt: DateTime.utc(2026, 9, 11),
-      expiresAt: DateTime.utc(2026, 9, 11, 0, 10),
-      trip: trip,
-    );
+  serviceCode: 'economy',
+  id: 'ride',
+  pickup: _point(33.68, 73.04),
+  destination: _point(33.56, 73.01),
+  proposedFare: _fare(10000),
+  status: 'requested',
+  createdAt: DateTime.utc(2026, 9, 11),
+  expiresAt: DateTime.utc(2026, 9, 11, 0, 10),
+  trip: trip,
+);
 
 TripSnapshot _trip(String status) => TripSnapshot(
-      rideRequestId: 'ride',
-      pickup: _point(33.68, 73.04),
-      destination: _point(33.56, 73.01),
-      status: status,
-      assignedAt: DateTime.utc(2026, 9, 11),
-      settlement: _settlement(),
-    );
+  rideRequestId: 'ride',
+  pickup: _point(33.68, 73.04),
+  destination: _point(33.56, 73.01),
+  status: status,
+  assignedAt: DateTime.utc(2026, 9, 11),
+  settlement: _settlement(),
+);
 
 class FlowFake implements RideFlowRepository {
   RiderRideSnapshot ride = _ride();
@@ -93,7 +93,9 @@ class FlowFake implements RideFlowRepository {
   }
 
   @override
-  Future<List<RiderOfferComparison>> listRiderOffers(String rideRequestId) async {
+  Future<List<RiderOfferComparison>> listRiderOffers(
+    String rideRequestId,
+  ) async {
     await _readBarrier();
     return [
       RiderOfferComparison(
@@ -112,7 +114,9 @@ class FlowFake implements RideFlowRepository {
   }
 
   @override
-  Future<DriverLocationSnapshot?> getDriverLocation(String rideRequestId) async {
+  Future<DriverLocationSnapshot?> getDriverLocation(
+    String rideRequestId,
+  ) async {
     await _readBarrier();
     if (locationFails) {
       throw const ApiException('failed', 'Location failed', statusCode: 500);
@@ -203,30 +207,29 @@ void main() {
       await flow.refresh();
       await tester.pumpAndSettle();
       expect(
-        tester.widget<FilledButton>(
-          find.widgetWithText(FilledButton, 'Choose Driver'),
-        ).onPressed,
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Choose Driver'),
+            )
+            .onPressed,
         isNull,
       );
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
 
-  test(
-    'lost acceptance response reloads authoritative assignment without claiming success',
-    () async {
-      final repo = FlowFake()..loseResponse = true;
-      final flow = RideFlowController(repo, rideId: 'ride');
-      await Future<void>.delayed(Duration.zero);
-      expect(flow.offers, hasLength(1));
-      await flow.selectOffer('ride', 'driver', DateTime.utc(2026, 9, 11));
-      expect(flow.status, 'assigned');
-      expect(flow.offers, isEmpty);
-      expect(flow.error, contains('Response lost'));
-      expect(flow.location, isNull);
-      flow.dispose();
-    },
-  );
+  test('lost acceptance response reloads authoritative assignment without claiming success', () async {
+    final repo = FlowFake()..loseResponse = true;
+    final flow = RideFlowController(repo, rideId: 'ride');
+    await Future<void>.delayed(Duration.zero);
+    expect(flow.offers, hasLength(1));
+    await flow.selectOffer('ride', 'driver', DateTime.utc(2026, 9, 11));
+    expect(flow.status, 'assigned');
+    expect(flow.offers, isEmpty);
+    expect(flow.error, contains('Response lost'));
+    expect(flow.location, isNull);
+    flow.dispose();
+  });
 
   test('location failure does not hide assigned Rider trip', () async {
     final repo = FlowFake()..locationFails = true;
@@ -239,14 +242,17 @@ void main() {
     flow.dispose();
   });
 
-  test('restores assigned Driver trip even while availability is offline', () async {
-    final repo = FlowFake()..trip = _trip('in_progress');
-    final flow = RideFlowController(repo);
-    await Future<void>.delayed(Duration.zero);
-    expect(flow.status, 'in_progress');
-    expect(flow.requests, isEmpty);
-    flow.dispose();
-  });
+  test(
+    'restores assigned Driver trip even while availability is offline',
+    () async {
+      final repo = FlowFake()..trip = _trip('in_progress');
+      final flow = RideFlowController(repo);
+      await Future<void>.delayed(Duration.zero);
+      expect(flow.status, 'in_progress');
+      expect(flow.requests, isEmpty);
+      flow.dispose();
+    },
+  );
 
   test('background stops polling; dispose tolerates in-flight reads', () async {
     final repo = FlowFake();
@@ -267,27 +273,33 @@ void main() {
     await Future<void>.delayed(Duration.zero);
   });
 
-  test('counteroffer waits for an in-flight reload instead of being dropped', () async {
-    final repo = FlowFake()..blocked = Completer<void>();
-    final flow = RideFlowController(repo, rideId: 'ride');
-    await Future<void>.delayed(Duration.zero);
-    expect(flow.busy, isTrue);
-    final action = flow.submitOffer('ride', 11500);
-    await Future<void>.delayed(Duration.zero);
-    expect(repo.actions, 0);
-    repo.blocked!.complete();
-    await action;
-    expect(repo.actions, 1);
-    expect(repo.lastAmountMinor, 11500);
-    flow.dispose();
-  });
+  test(
+    'counteroffer waits for an in-flight reload instead of being dropped',
+    () async {
+      final repo = FlowFake()..blocked = Completer<void>();
+      final flow = RideFlowController(repo, rideId: 'ride');
+      await Future<void>.delayed(Duration.zero);
+      expect(flow.busy, isTrue);
+      final action = flow.submitOffer('ride', 11500);
+      await Future<void>.delayed(Duration.zero);
+      expect(repo.actions, 0);
+      repo.blocked!.complete();
+      await action;
+      expect(repo.actions, 1);
+      expect(repo.lastAmountMinor, 11500);
+      flow.dispose();
+    },
+  );
 
-  test('fare parsing is exact and rejects non-finite or excess precision input', () {
-    expect(parseFareMinor('100.01'), 10001);
-    for (final input in ['NaN', 'Infinity', '1.001', '-1', '0', '1e4']) {
-      expect(parseFareMinor(input), isNull);
-    }
-  });
+  test(
+    'fare parsing is exact and rejects non-finite or excess precision input',
+    () {
+      expect(parseFareMinor('100.01'), 10001);
+      for (final input in ['NaN', 'Infinity', '1.001', '-1', '0', '1e4']) {
+        expect(parseFareMinor(input), isNull);
+      }
+    },
+  );
 
   test('stale or future locations are never shown as live', () {
     DriverLocationSnapshot location(DateTime updatedAt) =>

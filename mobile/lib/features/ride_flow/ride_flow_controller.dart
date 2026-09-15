@@ -58,7 +58,8 @@ class RideFlowController extends ChangeNotifier {
       final id = rideId!;
       final ride = await repository.getRiderRide(id);
       final active =
-          ride.trip != null && !['completed', 'cancelled'].contains(ride.trip!.status);
+          ride.trip != null &&
+          !['completed', 'cancelled'].contains(ride.trip!.status);
       final comparison = ride.trip == null && ride.status == 'requested'
           ? await repository.listRiderOffers(id)
           : <RiderOfferComparison>[];
@@ -80,13 +81,11 @@ class RideFlowController extends ChangeNotifier {
 
   Future<void> refresh() => _run(_load);
 
-  Future<void> submitOffer(String rideRequestId, int amountMinor) => _command(
-    () => repository.submitOffer(rideRequestId, amountMinor),
-  );
+  Future<void> submitOffer(String rideRequestId, int amountMinor) =>
+      _command(() => repository.submitOffer(rideRequestId, amountMinor));
 
-  Future<void> acceptProposedFare(String rideRequestId) => _command(
-    () => repository.acceptProposedFare(rideRequestId),
-  );
+  Future<void> acceptProposedFare(String rideRequestId) =>
+      _command(() => repository.acceptProposedFare(rideRequestId));
 
   Future<void> selectOffer(
     String rideRequestId,
