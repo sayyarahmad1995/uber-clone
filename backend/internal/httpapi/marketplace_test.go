@@ -29,7 +29,7 @@ func TestRiderOfferComparisonContractAndPrivacy(t *testing.T) {
 	if err := json.Unmarshal(body, &decoded); err != nil {
 		t.Fatal(err)
 	}
-	if len(decoded) != 13 || decoded["matches_proposed_fare"] != true || decoded["selectable"] != true {
+	if len(decoded) != 14 || decoded["matches_proposed_fare"] != true || decoded["selectable"] != true {
 		t.Fatalf("unexpected comparison contract: %s", body)
 	}
 	for _, key := range []string{"latitude", "longitude", "driver_location", "license_plate", "email", "phone", "rider_user_id", "eta"} {
