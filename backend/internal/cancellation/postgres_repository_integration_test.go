@@ -217,11 +217,11 @@ func createCancellationDriver(t *testing.T, db *sql.DB) uuid.UUID {
 		t.Fatalf("insert vehicle: %v", err)
 	}
 	if _, err := db.Exec(`INSERT INTO driver_vehicle_service_enrollments (vehicle_id, service_code, approved_at, approved_by)
-       SELECT id, 'economy', NOW(), 'test-reviewer' FROM driver_vehicles WHERE driver_user_id=$1`, userID); err != nil {
+		SELECT id, 'economy', NOW(), 'test-reviewer' FROM driver_vehicles WHERE driver_user_id=$1`, userID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(`INSERT INTO driver_operating_selections (driver_user_id,vehicle_id,service_code)
-       SELECT driver_user_id,id,'economy' FROM driver_vehicles WHERE driver_user_id=$1`, userID); err != nil {
+		SELECT driver_user_id,id,'economy' FROM driver_vehicles WHERE driver_user_id=$1`, userID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(`INSERT INTO driver_locations (driver_user_id, latitude, longitude, updated_at) VALUES ($1, 24.86, 67.0, NOW())`, userID); err != nil {
@@ -240,9 +240,23 @@ func createCancellationRide(t *testing.T, db *sql.DB, riderID uuid.UUID) uuid.UU
 	`, rideID, riderID); err != nil {
 		t.Fatalf("insert ride: %v", err)
 	}
+	if _, err := db.Exec(`
+		INSERT INTO driver_ride_request_opportunities (
+			ride_request_id, driver_user_id, status, visible_until
+		)
+		SELECT $1, p.user_id, 'open', NOW() + INTERVAL '30 seconds'
+		FROM driver_profiles p
+		JOIN user_capabilities c ON c.user_id = p.user_id AND c.capability = 'driver'
+		WHERE p.status = 'active' AND p.is_online
+		  AND p.user_id <> $2
+		ON CONFLICT DO NOTHING
+	`, rideID, riderID); err != nil {
+		t.Fatalf("insert ride opportunities: %v", err)
+	}
 	t.Cleanup(func() {
 		_, _ = db.Exec(`DELETE FROM trips WHERE ride_request_id = $1`, rideID)
 		_, _ = db.Exec(`DELETE FROM ride_offers WHERE ride_request_id = $1`, rideID)
+		_, _ = db.Exec(`DELETE FROM driver_ride_request_opportunities WHERE ride_request_id = $1`, rideID)
 		_, _ = db.Exec(`DELETE FROM ride_requests WHERE id = $1`, rideID)
 	})
 	return rideID
@@ -272,6 +286,16 @@ func insertCancellationTrip(t *testing.T, db *sql.DB, rideID, riderID, driverID 
 
 func insertCancellationOffer(t *testing.T, db *sql.DB, rideID, driverID uuid.UUID) {
 	t.Helper()
+	if _, err := db.Exec(`
+		INSERT INTO driver_ride_request_opportunities (
+			ride_request_id, driver_user_id, status, visible_until, responded_at
+		)
+		VALUES ($1, $2, 'offered', NOW() + INTERVAL '30 seconds', NOW())
+		ON CONFLICT (ride_request_id, driver_user_id)
+		DO UPDATE SET status = 'offered', responded_at = NOW()
+	`, rideID, driverID); err != nil {
+		t.Fatalf("insert offered opportunity: %v", err)
+	}
 	if _, err := db.Exec(`
 		INSERT INTO ride_offers (ride_request_id, driver_user_id, amount_minor, currency, status, operation_context)
 		SELECT $1, $2, 90000, 'PKR', 'pending', jsonb_build_object('vehicle_id',vehicle_id,'service_code',service_code) FROM driver_operating_selections WHERE driver_user_id=$2
