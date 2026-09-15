@@ -120,6 +120,7 @@ func writeRideRequest(w http.ResponseWriter, status int, request ride.Request) {
 		"destination":   map[string]any{"latitude": request.Destination.Latitude, "longitude": request.Destination.Longitude},
 		"status":        request.Status,
 		"created_at":    request.CreatedAt,
+		"expires_at":    request.ExpiresAt,
 	}
 	if request.ProposedFare != nil {
 		response["proposed_fare"] = map[string]any{"amount_minor": request.ProposedFare.AmountMinor, "currency": request.ProposedFare.Currency}
@@ -143,6 +144,7 @@ func rideRequestStatusResponse(request ride.Request, assignedTrip *trip.Trip) ma
 		"destination":  map[string]any{"latitude": request.Destination.Latitude, "longitude": request.Destination.Longitude},
 		"status":       request.Status,
 		"created_at":   request.CreatedAt,
+		"expires_at":   request.ExpiresAt,
 		"trip":         nil,
 	}
 	if request.ProposedFare != nil {
