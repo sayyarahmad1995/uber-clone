@@ -2,11 +2,11 @@ package drivertrip
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/ride"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/trip"
 )
@@ -16,7 +16,7 @@ var ErrNotFound = errors.New("active trip not found")
 const historyLimit = 50
 
 type View struct {
-	OperationContext json.RawMessage
+	OperationContext *marketplace.OperationContext
 	RideRequestID    uuid.UUID
 	Pickup           ride.Location
 	Destination      ride.Location
