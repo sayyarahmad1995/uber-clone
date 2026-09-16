@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/database"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/migrations"
 )
@@ -122,6 +123,9 @@ func TestOfferExpiryIsTerminalForDriverPair(t *testing.T) {
 	}
 	if len(items) != 0 {
 		t.Fatalf("expired offer must disappear, got %#v", items)
+	}
+	if err := marketplace.NewExpiryService(db).Sweep(ctx); err != nil {
+		t.Fatalf("sweep expired offer: %v", err)
 	}
 	offer, err := repository.Get(ctx, rideID, driverID)
 	if err != nil {
