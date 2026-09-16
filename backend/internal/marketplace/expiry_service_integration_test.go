@@ -2,6 +2,7 @@ package marketplace
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 
 	"github.com/google/uuid"
