@@ -1,4 +1,4 @@
-package trip
+package marketplace
 
 import (
 	"database/sql"

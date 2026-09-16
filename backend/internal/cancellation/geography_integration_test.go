@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	driverops "github.com/sayyarahmad1995/uber-clone/backend/internal/driver"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/driverlocation"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/offer"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/trip"
 )
@@ -22,7 +23,7 @@ func geoExec(t *testing.T, db *sql.DB, query string, args ...any) {
 }
 
 func geoOffers(db *sql.DB) offer.Service {
-	return offer.NewService(offer.NewPostgresRepository(db), trip.NewService(trip.NewPostgresRepository(db)))
+	return offer.NewService(offer.NewPostgresRepository(db))
 }
 
 func TestGeographicDiscoveryRanksBeforeLimiting(t *testing.T) {
@@ -98,7 +99,9 @@ func TestMarketplaceEligibilityIsConsistentAcrossTheJourney(t *testing.T) {
 			driver := createCancellationDriver(t, db)
 			ride := createCancellationRide(t, db, rider)
 			offers := geoOffers(db)
-			if _, err := offers.AcceptProposed(ctx, ride, driver); err != nil {
+			assignments := marketplace.NewAssignmentService(marketplace.NewPostgresAssignmentRepository(db))
+			submission, err := offers.AcceptProposed(ctx, ride, driver)
+			if err != nil {
 				t.Fatal(err)
 			}
 			switch reason {
@@ -135,7 +138,7 @@ func TestMarketplaceEligibilityIsConsistentAcrossTheJourney(t *testing.T) {
 			if _, err := offers.AcceptProposed(ctx, ride, driver); !errors.Is(err, offer.ErrOpportunityNotOpen) {
 				t.Fatalf("one-shot exact-fare offer was reopened: %v", err)
 			}
-			if _, err := offers.Accept(ctx, ride, rider, driver); !errors.Is(err, offer.ErrDriverIneligible) {
+			if _, err := assignments.SelectOffer(ctx, ride, rider, driver, submission.Offer.UpdatedAt); !errors.Is(err, marketplace.ErrDriverUnavailable) {
 				t.Fatalf("selection bypassed eligibility: %v", err)
 			}
 			var count int
@@ -157,12 +160,17 @@ func TestRiderComparisonRefreshOwnershipAndHistory(t *testing.T) {
 	geoExec(t, db, `UPDATE driver_locations SET latitude=0,longitude=0 WHERE driver_user_id=$1`, near)
 	geoExec(t, db, `UPDATE driver_locations SET latitude=0,longitude=1 WHERE driver_user_id=$1`, far)
 	offers := geoOffers(db)
+	assignments := marketplace.NewAssignmentService(marketplace.NewPostgresAssignmentRepository(db))
+	submittedOffers := make(map[uuid.UUID]offer.Offer)
 	for _, id := range []uuid.UUID{near, far} {
-		if _, err := offers.AcceptProposed(ctx, ride, id); err != nil {
+		submission, err := offers.AcceptProposed(ctx, ride, id)
+		if err != nil {
 			t.Fatal(err)
 		}
+		submittedOffers[id] = submission.Offer
 	}
-	if _, err := offers.Submit(ctx, ride, stale, 90000); err != nil {
+	staleSubmission, err := offers.Submit(ctx, ride, stale, 90000)
+	if err != nil {
 		t.Fatal(err)
 	}
 	geoExec(t, db, `UPDATE driver_locations SET updated_at=NOW()-INTERVAL '3 minutes' WHERE driver_user_id=$1`, stale)
@@ -182,7 +190,7 @@ func TestRiderComparisonRefreshOwnershipAndHistory(t *testing.T) {
 	if _, err := offers.ListForRider(ctx, ride, stranger); !errors.Is(err, offer.ErrRideNotFound) {
 		t.Fatalf("ownership bypass: %v", err)
 	}
-	if _, err := offers.Accept(ctx, ride, stranger, near); !errors.Is(err, offer.ErrOfferNotActionable) {
+	if _, err := assignments.SelectOffer(ctx, ride, stranger, near, submittedOffers[near].UpdatedAt); !errors.Is(err, marketplace.ErrOfferNotActionable) {
 		t.Fatalf("selection ownership bypass: %v", err)
 	}
 	locations := driverlocation.NewService(driverlocation.NewPostgresRepository(db))
@@ -231,7 +239,7 @@ func TestRiderComparisonRefreshOwnershipAndHistory(t *testing.T) {
 	if rejectedStatus != string(offer.StatusRejected) {
 		t.Fatalf("rejected offer history was not retained: %s", rejectedStatus)
 	}
-	if _, err := offers.Accept(ctx, ride, rider, stale); err != nil {
+	if _, err := assignments.SelectOffer(ctx, ride, rider, stale, staleSubmission.Offer.UpdatedAt); err != nil {
 		t.Fatalf("selection after refresh: %v", err)
 	}
 }

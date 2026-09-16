@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/driver"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 )
 
 func TestDriverPresentationRoundTripPreservesLegacyEligibility(t *testing.T) {
@@ -14,7 +15,9 @@ func TestDriverPresentationRoundTripPreservesLegacyEligibility(t *testing.T) {
 	driverID := createCancellationDriver(t, db)
 	rideID := createCancellationRide(t, db, riderID)
 	offers := geoOffers(db)
-	if _, err := offers.AcceptProposed(ctx, rideID, driverID); err != nil {
+	assignments := marketplace.NewAssignmentService(marketplace.NewPostgresAssignmentRepository(db))
+	submission, err := offers.AcceptProposed(ctx, rideID, driverID)
+	if err != nil {
 		t.Fatalf("legacy Driver response: %v", err)
 	}
 	view, err := offers.ListForRider(ctx, rideID, riderID)
@@ -46,7 +49,7 @@ func TestDriverPresentationRoundTripPreservesLegacyEligibility(t *testing.T) {
 			t.Fatalf("submitted offer presentation snapshot changed: %+v", view)
 		}
 	}
-	if _, err := offers.Accept(ctx, rideID, riderID, driverID); err != nil {
+	if _, err := assignments.SelectOffer(ctx, rideID, riderID, driverID, submission.Offer.UpdatedAt); err != nil {
 		t.Fatalf("presentation update broke selection: %v", err)
 	}
 }

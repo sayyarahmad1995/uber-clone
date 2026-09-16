@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/sayyarahmad1995/uber-clone/backend/internal/trip"
 )
 
 type fakeRepository struct {
@@ -59,7 +58,7 @@ func (f *fakeRepository) Get(context.Context, uuid.UUID, uuid.UUID) (Offer, erro
 func TestDiscoverUsesBoundedMarketplaceFeed(t *testing.T) {
 	expected := []DiscoveryItem{{RideRequestID: uuid.New()}}
 	repo := &fakeRepository{discovery: expected}
-	service := NewService(repo, trip.Service{})
+	service := NewService(repo)
 
 	actual, err := service.Discover(context.Background(), uuid.New())
 	if err != nil {
@@ -89,7 +88,7 @@ func TestSubmitAcceptsBoundaryCounteroffers(t *testing.T) {
 				Currency:            "PKR",
 			},
 		}
-		service := NewService(repo, trip.Service{})
+		service := NewService(repo)
 		if _, err := service.Submit(context.Background(), repo.market.RideRequestID, uuid.New(), amount); err != nil {
 			t.Fatalf("Submit(%d) returned error: %v", amount, err)
 		}
@@ -98,7 +97,7 @@ func TestSubmitAcceptsBoundaryCounteroffers(t *testing.T) {
 
 func TestAcceptProposedCreatesPendingOfferWithoutTrip(t *testing.T) {
 	repo := &fakeRepository{market: Market{RideRequestID: uuid.New(), ProposedAmountMinor: 10000, Currency: "PKR"}}
-	service := NewService(repo, trip.Service{})
+	service := NewService(repo)
 
 	result, err := service.AcceptProposed(context.Background(), repo.market.RideRequestID, uuid.New())
 	if err != nil {
@@ -110,27 +109,24 @@ func TestAcceptProposedCreatesPendingOfferWithoutTrip(t *testing.T) {
 	if result.Offer.Status != StatusPending {
 		t.Fatalf("expected pending offer, got %s", result.Offer.Status)
 	}
-	if result.Trip != nil {
-		t.Fatal("exact-fare Driver response must not assign a Trip")
-	}
 }
 
 func TestSubmitProposedFareUsesSamePendingOfferPath(t *testing.T) {
 	repo := &fakeRepository{market: Market{RideRequestID: uuid.New(), ProposedAmountMinor: 10000, Currency: "PKR"}}
-	service := NewService(repo, trip.Service{})
+	service := NewService(repo)
 
 	result, err := service.Submit(context.Background(), repo.market.RideRequestID, uuid.New(), 10000)
 	if err != nil {
 		t.Fatalf("Submit returned error: %v", err)
 	}
-	if result.Offer.AmountMinor != 10000 || result.Offer.Status != StatusPending || result.Trip != nil {
+	if result.Offer.AmountMinor != 10000 || result.Offer.Status != StatusPending {
 		t.Fatalf("unexpected exact-fare submission: %#v", result)
 	}
 }
 
 func TestSkipDelegatesOneTimeOpportunity(t *testing.T) {
 	repo := &fakeRepository{}
-	service := NewService(repo, trip.Service{})
+	service := NewService(repo)
 	if err := service.Skip(context.Background(), uuid.New(), uuid.New()); err != nil {
 		t.Fatalf("Skip returned error: %v", err)
 	}
@@ -147,7 +143,7 @@ func TestSubmitRejectsOutsideRange(t *testing.T) {
 			Currency:            "PKR",
 		},
 	}
-	service := NewService(repo, trip.Service{})
+	service := NewService(repo)
 	for _, amount := range []int64{8999, 13001} {
 		_, err := service.Submit(context.Background(), repo.market.RideRequestID, uuid.New(), amount)
 		if !errors.Is(err, ErrAmountOutOfRange) {

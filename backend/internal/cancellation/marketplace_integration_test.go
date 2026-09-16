@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/offer"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/ride"
-	"github.com/sayyarahmad1995/uber-clone/backend/internal/trip"
 )
 
 func TestMarketplaceWithoutCandidatesThroughCancellation(t *testing.T) {
@@ -39,7 +39,8 @@ func TestMarketplaceWithoutCandidatesThroughCancellation(t *testing.T) {
 	if _, err := db.Exec(`UPDATE ride_requests SET proposed_fare_minor=NULL, currency=NULL WHERE id=$1`, legacy); err != nil {
 		t.Fatal(err)
 	}
-	offers := offer.NewService(offer.NewPostgresRepository(db), trip.NewService(trip.NewPostgresRepository(db)))
+	offers := offer.NewService(offer.NewPostgresRepository(db))
+	assignments := marketplace.NewAssignmentService(marketplace.NewPostgresAssignmentRepository(db))
 	feed, err := offers.Discover(ctx, driver)
 	if err != nil {
 		t.Fatal(err)
@@ -51,14 +52,16 @@ func TestMarketplaceWithoutCandidatesThroughCancellation(t *testing.T) {
 	if !found[first] || !found[second] || found[legacy] {
 		t.Fatalf("unexpected discovery: %v", found)
 	}
+	submittedOffers := make(map[uuid.UUID]offer.Offer)
 	for _, id := range []uuid.UUID{first, second} {
 		submission, err := offers.AcceptProposed(ctx, id, driver)
 		if err != nil {
 			t.Fatalf("accept Rider fare: %v", err)
 		}
-		if submission.Trip != nil || submission.Offer.Status != offer.StatusPending || submission.Offer.AmountMinor != 100000 {
+		if submission.Offer.Status != offer.StatusPending || submission.Offer.AmountMinor != 100000 {
 			t.Fatalf("expected pending exact-fare offer: %+v", submission)
 		}
+		submittedOffers[id] = submission.Offer
 	}
 	competitorFeed, err := offers.Discover(ctx, competitor)
 	if err != nil {
@@ -83,7 +86,7 @@ func TestMarketplaceWithoutCandidatesThroughCancellation(t *testing.T) {
 	if count != 0 {
 		t.Fatal("Driver response assigned a Trip before Rider selection")
 	}
-	if _, err := offers.Accept(ctx, first, rider, driver); err != nil {
+	if _, err := assignments.SelectOffer(ctx, first, rider, driver, submittedOffers[first].UpdatedAt); err != nil {
 		t.Fatal(err)
 	}
 	feed, err = offers.Discover(ctx, driver)
@@ -93,7 +96,7 @@ func TestMarketplaceWithoutCandidatesThroughCancellation(t *testing.T) {
 	if _, err := offers.AcceptProposed(ctx, second, driver); !errors.Is(err, offer.ErrOpportunityNotOpen) {
 		t.Fatalf("one-shot Driver submission was reopened while busy: %v", err)
 	}
-	if _, err := offers.Accept(ctx, second, rider, driver); !errors.Is(err, offer.ErrDriverIneligible) {
+	if _, err := assignments.SelectOffer(ctx, second, rider, driver, submittedOffers[second].UpdatedAt); !errors.Is(err, marketplace.ErrDriverUnavailable) {
 		t.Fatalf("busy Driver selection: %v", err)
 	}
 	var status string
@@ -122,7 +125,7 @@ func TestMarketplaceWithoutCandidatesThroughCancellation(t *testing.T) {
 	if len(comparison) != 1 || !comparison[0].Selectable || comparison[0].DriverUserID != driver {
 		t.Fatalf("existing second offer did not become selectable after Driver was freed: %+v", comparison)
 	}
-	if _, err := offers.Accept(ctx, second, rider, driver); err != nil {
+	if _, err := assignments.SelectOffer(ctx, second, rider, driver, submittedOffers[second].UpdatedAt); err != nil {
 		t.Fatalf("freed Driver selection: %v", err)
 	}
 }

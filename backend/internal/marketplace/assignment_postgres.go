@@ -1,4 +1,4 @@
-package trip
+package marketplace
 
 import (
 	"context"
@@ -9,20 +9,20 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/driver"
-	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/trip"
 )
 
-func (r PostgresRepository) SelectOffer(ctx context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID, expectedVersion ...time.Time) (Trip, error) {
-	if err := marketplace.Expire(ctx, r.db); err != nil {
-		return Trip{}, err
+func (r PostgresAssignmentRepository) SelectOffer(ctx context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID, expectedVersion time.Time) (trip.Trip, error) {
+	if err := Expire(ctx, r.db); err != nil {
+		return trip.Trip{}, err
 	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return Trip{}, err
+		return trip.Trip{}, err
 	}
 	defer tx.Rollback()
-	if err := marketplace.Expire(ctx, tx); err != nil {
-		return Trip{}, err
+	if err := Expire(ctx, tx); err != nil {
+		return trip.Trip{}, err
 	}
 
 	var actualRider uuid.UUID
@@ -38,20 +38,22 @@ func (r PostgresRepository) SelectOffer(ctx context.Context, rideRequestID, ride
 		FOR UPDATE
 	`, rideRequestID).Scan(&actualRider, &status, &proposedAmount, &currency, &rideUnexpired); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return Trip{}, ErrMarketplaceNotOpen
+			return trip.Trip{}, ErrNotOpen
 		}
-		return Trip{}, err
+		return trip.Trip{}, err
 	}
 	if actualRider != riderUserID {
-		return Trip{}, ErrMarketplaceOfferGone
+		return trip.Trip{}, ErrOfferNotActionable
 	}
 	if status != "requested" || !rideUnexpired || !proposedAmount.Valid || !currency.Valid {
-		return Trip{}, ErrMarketplaceNotOpen
+		return trip.Trip{}, ErrNotOpen
 	}
-	if _, found, err := selectTripByRide(ctx, tx, rideRequestID); err != nil {
-		return Trip{}, err
-	} else if found {
-		return Trip{}, ErrMarketplaceNotOpen
+	exists, err := tripExistsForRide(ctx, tx, rideRequestID)
+	if err != nil {
+		return trip.Trip{}, err
+	}
+	if exists {
+		return trip.Trip{}, ErrNotOpen
 	}
 
 	var offerStatus string
@@ -64,12 +66,12 @@ func (r PostgresRepository) SelectOffer(ctx context.Context, rideRequestID, ride
 		FOR UPDATE
 	`, rideRequestID, driverUserID).Scan(&offerStatus, &offerVersion, &offerUnexpired); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return Trip{}, ErrMarketplaceOfferGone
+			return trip.Trip{}, ErrOfferNotActionable
 		}
-		return Trip{}, err
+		return trip.Trip{}, err
 	}
-	if offerStatus != "pending" || !offerUnexpired || (len(expectedVersion) > 0 && !offerVersion.Equal(expectedVersion[0])) {
-		return Trip{}, ErrMarketplaceOfferGone
+	if offerStatus != "pending" || !offerUnexpired || !offerVersion.Equal(expectedVersion) {
+		return trip.Trip{}, ErrOfferNotActionable
 	}
 
 	var opportunityStatus string
@@ -80,16 +82,16 @@ func (r PostgresRepository) SelectOffer(ctx context.Context, rideRequestID, ride
 		FOR UPDATE
 	`, rideRequestID, driverUserID).Scan(&opportunityStatus); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return Trip{}, ErrMarketplaceOfferGone
+			return trip.Trip{}, ErrOfferNotActionable
 		}
-		return Trip{}, err
+		return trip.Trip{}, err
 	}
 	if opportunityStatus != "offered" {
-		return Trip{}, ErrMarketplaceOfferGone
+		return trip.Trip{}, ErrOfferNotActionable
 	}
 
 	if err := lockEligibleMarketplaceDriver(ctx, tx, driverUserID); err != nil {
-		return Trip{}, err
+		return trip.Trip{}, err
 	}
 	var operationMatches bool
 	if err := tx.QueryRowContext(ctx, `SELECT EXISTS (
@@ -100,43 +102,43 @@ func (r PostgresRepository) SelectOffer(ctx context.Context, rideRequestID, ride
 		  AND o.operation_context->>'vehicle_id'=s.vehicle_id::text
 		  AND o.operation_context->>'service_code'=s.service_code
 	)`, rideRequestID, driverUserID).Scan(&operationMatches); err != nil {
-		return Trip{}, err
+		return trip.Trip{}, err
 	}
 	if !operationMatches {
-		return Trip{}, ErrDriverUnavailable
+		return trip.Trip{}, ErrDriverUnavailable
 	}
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE ride_offers
 		SET status = 'accepted', decided_at = statement_timestamp(), updated_at = statement_timestamp()
 		WHERE ride_request_id = $1 AND driver_user_id = $2
 	`, rideRequestID, driverUserID); err != nil {
-		return Trip{}, err
+		return trip.Trip{}, err
 	}
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE driver_ride_request_opportunities
 		SET status = 'accepted'
 		WHERE ride_request_id = $1 AND driver_user_id = $2 AND status = 'offered'
 	`, rideRequestID, driverUserID); err != nil {
-		return Trip{}, err
+		return trip.Trip{}, err
 	}
 
-	trip, err := insertMarketplaceTrip(ctx, tx, rideRequestID, riderUserID, driverUserID)
+	assignedTrip, err := insertMarketplaceTrip(ctx, tx, rideRequestID, riderUserID, driverUserID)
 	if err != nil {
-		return Trip{}, err
+		return trip.Trip{}, err
 	}
 	if err := markRideAccepted(ctx, tx, rideRequestID); err != nil {
-		return Trip{}, err
+		return trip.Trip{}, err
 	}
 	if err := closeCompetingOffers(ctx, tx, rideRequestID, driverUserID); err != nil {
-		return Trip{}, err
+		return trip.Trip{}, err
 	}
 	if err := closeCompetingOpportunities(ctx, tx, rideRequestID, driverUserID); err != nil {
-		return Trip{}, err
+		return trip.Trip{}, err
 	}
 	if err := tx.Commit(); err != nil {
-		return Trip{}, err
+		return trip.Trip{}, err
 	}
-	return trip, nil
+	return assignedTrip, nil
 }
 
 func lockEligibleMarketplaceDriver(ctx context.Context, tx *sql.Tx, driverUserID uuid.UUID) error {
@@ -150,12 +152,57 @@ func lockEligibleMarketplaceDriver(ctx context.Context, tx *sql.Tx, driverUserID
 	return nil
 }
 
-func insertMarketplaceTrip(ctx context.Context, tx *sql.Tx, rideRequestID, riderUserID, driverUserID uuid.UUID) (Trip, error) {
-	trip, err := scanTrip(tx.QueryRowContext(ctx, `
+const assignedTripColumns = `
+	ride_request_id,
+	rider_user_id,
+	driver_user_id,
+	status,
+	assigned_at,
+	started_at,
+	completed_at,
+	COALESCE(operation_context, 'null'::jsonb),
+	cancelled_at,
+	settlement_status,
+	settlement_method,
+	cash_collected_at`
+
+func scanAssignedTrip(row interface{ Scan(dest ...any) error }) (trip.Trip, error) {
+	var result trip.Trip
+	var settlementStatus string
+	var settlementMethod sql.NullString
+	if err := row.Scan(
+		&result.RideRequestID,
+		&result.RiderUserID,
+		&result.DriverUserID,
+		&result.Status,
+		&result.AssignedAt,
+		&result.StartedAt,
+		&result.CompletedAt,
+		&result.OperationContext,
+		&result.CancelledAt,
+		&settlementStatus,
+		&settlementMethod,
+		&result.Settlement.CashCollectedAt,
+	); err != nil {
+		return trip.Trip{}, err
+	}
+	result.Settlement.Status = trip.SettlementStatus(settlementStatus)
+	if result.Settlement.Status == "" {
+		result.Settlement.Status = trip.SettlementUnsettled
+	}
+	if settlementMethod.Valid {
+		method := settlementMethod.String
+		result.Settlement.Method = &method
+	}
+	return result, nil
+}
+
+func insertMarketplaceTrip(ctx context.Context, tx *sql.Tx, rideRequestID, riderUserID, driverUserID uuid.UUID) (trip.Trip, error) {
+	result, err := scanAssignedTrip(tx.QueryRowContext(ctx, `
 		INSERT INTO trips (ride_request_id, rider_user_id, driver_user_id, assigned_at, operation_context)
 		SELECT $1, $2, $3, statement_timestamp(), operation_context FROM ride_offers
 		WHERE ride_request_id=$1 AND driver_user_id=$3
-		RETURNING `+tripColumns,
+		RETURNING `+assignedTripColumns,
 		rideRequestID,
 		riderUserID,
 		driverUserID,
@@ -163,11 +210,11 @@ func insertMarketplaceTrip(ctx context.Context, tx *sql.Tx, rideRequestID, rider
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "trips_active_driver_idx" {
-			return Trip{}, ErrDriverUnavailable
+			return trip.Trip{}, ErrDriverUnavailable
 		}
-		return Trip{}, err
+		return trip.Trip{}, err
 	}
-	return trip, nil
+	return result, nil
 }
 
 func markRideAccepted(ctx context.Context, tx *sql.Tx, rideRequestID uuid.UUID) error {
@@ -184,7 +231,7 @@ func markRideAccepted(ctx context.Context, tx *sql.Tx, rideRequestID uuid.UUID) 
 		return err
 	}
 	if updated != 1 {
-		return ErrMarketplaceNotOpen
+		return ErrNotOpen
 	}
 	return nil
 }
@@ -211,17 +258,14 @@ func closeCompetingOpportunities(ctx context.Context, tx *sql.Tx, rideRequestID,
 	return err
 }
 
-func selectTripByRide(ctx context.Context, tx *sql.Tx, rideRequestID uuid.UUID) (Trip, bool, error) {
-	trip, err := scanTrip(tx.QueryRowContext(ctx, `
-		SELECT `+tripColumns+`
-		FROM trips
-		WHERE ride_request_id = $1
-	`, rideRequestID))
-	if errors.Is(err, sql.ErrNoRows) {
-		return Trip{}, false, nil
-	}
-	if err != nil {
-		return Trip{}, false, err
-	}
-	return trip, true, nil
+func tripExistsForRide(ctx context.Context, tx *sql.Tx, rideRequestID uuid.UUID) (bool, error) {
+	var exists bool
+	err := tx.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM trips
+			WHERE ride_request_id = $1
+		)
+	`, rideRequestID).Scan(&exists)
+	return exists, err
 }

@@ -162,8 +162,35 @@ func TestPostgresRepositoryCompleteIsIdempotent(t *testing.T) {
 
 func createAcceptedTripFixture(t *testing.T, db *sql.DB, rideID, riderID, driverID uuid.UUID) {
 	t.Helper()
+
 	insertTripIntegrationOffer(t, db, rideID, driverID)
-	if _, err := NewPostgresRepository(db).SelectOffer(context.Background(), rideID, riderID, driverID); err != nil {
-		t.Fatalf("select offer: %v", err)
+
+	if _, err := db.Exec(`
+		INSERT INTO trips (
+			ride_request_id,
+			rider_user_id,
+			driver_user_id,
+			assigned_at,
+			operation_context
+		)
+		SELECT
+			$1,
+			$2,
+			$3,
+			statement_timestamp(),
+			operation_context
+		FROM ride_offers
+		WHERE ride_request_id = $1
+		  AND driver_user_id = $3
+	`, rideID, riderID, driverID); err != nil {
+		t.Fatalf("insert assigned trip: %v", err)
+	}
+
+	if _, err := db.Exec(`
+		UPDATE ride_requests
+		SET status = 'accepted'
+		WHERE id = $1
+	`, rideID); err != nil {
+		t.Fatalf("mark ride accepted: %v", err)
 	}
 }

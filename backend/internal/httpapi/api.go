@@ -11,6 +11,7 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/driveronboarding"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/drivertrip"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/identity"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/offer"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/ride"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/riderlocation"
@@ -31,6 +32,7 @@ type Dependencies struct {
 	RideStatuses           ridestatus.Service
 	Cancellations          cancellation.Service
 	Offers                 offer.Service
+	MarketplaceAssignments marketplace.AssignmentService
 	Trips                  trip.Service
 	DB                     *sql.DB
 	Identity               identity.Provider
@@ -52,6 +54,7 @@ type API struct {
 	rideStatuses           ridestatus.Service
 	cancellations          cancellation.Service
 	offers                 offer.Service
+	marketplaceAssignments marketplace.AssignmentService
 	trips                  trip.Service
 	db                     *sql.DB
 	identity               identity.Provider
@@ -74,6 +77,7 @@ func New(deps Dependencies) *API {
 		rideStatuses:           deps.RideStatuses,
 		cancellations:          deps.Cancellations,
 		offers:                 deps.Offers,
+		marketplaceAssignments: deps.MarketplaceAssignments,
 		trips:                  deps.Trips,
 		db:                     deps.DB,
 		identity:               deps.Identity,

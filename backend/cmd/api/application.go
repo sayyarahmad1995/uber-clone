@@ -17,6 +17,7 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/httpapi"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/identity"
 	identitykratos "github.com/sayyarahmad1995/uber-clone/backend/internal/identity/kratos"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/offer"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/database"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/migrations"
@@ -47,6 +48,9 @@ func newApplication(cfg config) (application, func(), error) {
 		return application{}, nil, fmt.Errorf("identity infrastructure initialization failed: %w", err)
 	}
 	tripService := trip.NewService(trip.NewPostgresRepository(db))
+	marketplaceAssignmentService := marketplace.NewAssignmentService(
+		marketplace.NewPostgresAssignmentRepository(db),
+	)
 	driverOnboardingRepository := driveronboarding.NewPostgresRepository(db)
 	api := httpapi.New(httpapi.Dependencies{
 		Users:                  user.NewService(user.NewPostgresRepository(db)),
@@ -59,7 +63,8 @@ func newApplication(cfg config) (application, func(), error) {
 		Rides:                  ride.NewService(ride.NewPostgresRepository(db)),
 		RideStatuses:           ridestatus.NewService(ridestatus.NewPostgresRepository(db)),
 		Cancellations:          cancellation.NewService(cancellation.NewPostgresRepository(db)),
-		Offers:                 offer.NewService(offer.NewPostgresRepository(db), tripService),
+		Offers:                 offer.NewService(offer.NewPostgresRepository(db)),
+		MarketplaceAssignments: marketplaceAssignmentService,
 		Trips:                  tripService,
 		DB:                     db,
 		Identity:               identityProvider,

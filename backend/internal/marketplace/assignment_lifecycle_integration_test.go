@@ -1,18 +1,24 @@
-package trip
+package marketplace
 
 import (
 	"context"
 	"testing"
 )
 
-func TestPostgresSelectionMarksRideRequestAccepted(t *testing.T) {
+func TestPostgresAssignmentMarksRideRequestAccepted(t *testing.T) {
 	db := openTripIntegrationDB(t)
 	riderID := createTripIntegrationUser(t, db, "rider")
 	driverID := createTripIntegrationDriver(t, db)
 	rideID := createTripIntegrationRide(t, db, riderID)
-	insertTripIntegrationOffer(t, db, rideID, driverID)
+	offerVersion := insertTripIntegrationOffer(t, db, rideID, driverID)
 
-	if _, err := NewPostgresRepository(db).SelectOffer(context.Background(), rideID, riderID, driverID); err != nil {
+	if _, err := NewPostgresAssignmentRepository(db).SelectOffer(
+		context.Background(),
+		rideID,
+		riderID,
+		driverID,
+		offerVersion,
+	); err != nil {
 		t.Fatalf("select offer: %v", err)
 	}
 
@@ -25,7 +31,7 @@ func TestPostgresSelectionMarksRideRequestAccepted(t *testing.T) {
 	}
 }
 
-func TestPostgresSelectionBackfillMarksExistingTripsAccepted(t *testing.T) {
+func TestPostgresAssignmentBackfillMarksExistingTripsAccepted(t *testing.T) {
 	db := openTripIntegrationDB(t)
 	riderID := createTripIntegrationUser(t, db, "rider")
 	driverID := createTripIntegrationDriver(t, db)

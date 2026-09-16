@@ -10,14 +10,11 @@ import (
 )
 
 var (
-	ErrTripNotFound         = errors.New("trip not found")
-	ErrTripNotStarted       = errors.New("trip has not started")
-	ErrTripNotCompleted     = errors.New("trip is not completed")
-	ErrTripCompleted        = errors.New("trip already completed")
-	ErrTripCancelled        = errors.New("trip already cancelled")
-	ErrMarketplaceNotOpen   = errors.New("ride request marketplace is not open")
-	ErrMarketplaceOfferGone = errors.New("ride offer is not actionable")
-	ErrDriverUnavailable    = errors.New("driver is no longer available")
+	ErrTripNotFound     = errors.New("trip not found")
+	ErrTripNotStarted   = errors.New("trip has not started")
+	ErrTripNotCompleted = errors.New("trip is not completed")
+	ErrTripCompleted    = errors.New("trip already completed")
+	ErrTripCancelled    = errors.New("trip already cancelled")
 )
 
 type Status string
@@ -56,7 +53,6 @@ type Trip struct {
 }
 
 type Repository interface {
-	SelectOffer(ctx context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID, expectedVersion ...time.Time) (Trip, error)
 	Start(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Trip, error)
 	Complete(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Trip, error)
 	ConfirmCashCollected(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Trip, error)
@@ -65,10 +61,6 @@ type Repository interface {
 type Service struct{ repository Repository }
 
 func NewService(repository Repository) Service { return Service{repository: repository} }
-
-func (s Service) SelectOffer(ctx context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID, expectedVersion ...time.Time) (Trip, error) {
-	return s.repository.SelectOffer(ctx, rideRequestID, riderUserID, driverUserID, expectedVersion...)
-}
 
 func (s Service) Start(ctx context.Context, rideRequestID, driverUserID uuid.UUID) (Trip, error) {
 	return s.repository.Start(ctx, rideRequestID, driverUserID)
