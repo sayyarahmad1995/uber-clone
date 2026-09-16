@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/database"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/migrations"
 )
@@ -82,6 +83,15 @@ func TestDriverOpportunityExpiresOnce(t *testing.T) {
 	}
 	var status string
 	if err := db.QueryRow(`SELECT status FROM driver_ride_request_opportunities WHERE ride_request_id=$1 AND driver_user_id=$2`, rideID, driverID).Scan(&status); err != nil {
+		t.Fatalf("read stale opportunity state: %v", err)
+	}
+	if status != "open" {
+		t.Fatalf("business write materialized opportunity status=%q; periodic sweep must own materialization", status)
+	}
+	if err := marketplace.NewExpiryService(db).Sweep(ctx); err != nil {
+		t.Fatalf("sweep expired opportunity: %v", err)
+	}
+	if err := db.QueryRow(`SELECT status FROM driver_ride_request_opportunities WHERE ride_request_id=$1 AND driver_user_id=$2`, rideID, driverID).Scan(&status); err != nil {
 		t.Fatalf("read opportunity state: %v", err)
 	}
 	if status != "window_expired" {
@@ -123,6 +133,9 @@ func TestOfferExpiryIsTerminalForDriverPair(t *testing.T) {
 	if len(items) != 0 {
 		t.Fatalf("expired offer must disappear, got %#v", items)
 	}
+	if err := marketplace.NewExpiryService(db).Sweep(ctx); err != nil {
+		t.Fatalf("sweep expired offer: %v", err)
+	}
 	offer, err := repository.Get(ctx, rideID, driverID)
 	if err != nil {
 		t.Fatalf("get expired offer: %v", err)
@@ -163,7 +176,7 @@ func TestExpiredRideNeverEntersDriverFeed(t *testing.T) {
 		t.Fatalf("read expired ride: %v", err)
 	}
 	if status != "expired" {
-		t.Fatalf("expected ride request expired state, got %q", status)
+		t.Fatalf("expected transactional discovery sweep to materialize expired ride, got %q", status)
 	}
 }
 
