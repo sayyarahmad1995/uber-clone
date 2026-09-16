@@ -62,7 +62,17 @@ func TestExpiryServiceSweepMaterializesMarketplaceTerminalStates(t *testing.T) {
 		rideID := createTripIntegrationRide(t, db, riderID)
 		closureDriverID := createTripIntegrationDriver(t, db)
 		insertTripIntegrationOffer(t, db, rideID, closureDriverID)
-		if _, err := db.Exec(`UPDATE ride_requests SET status=$2 WHERE id=$1`, rideID, status); err != nil {
+		if status == "cancelled" {
+			if _, err := db.Exec(`
+				UPDATE ride_requests
+				SET status='cancelled',
+				    cancelled_at=statement_timestamp(),
+				    cancelled_by='rider'
+				WHERE id=$1
+			`, rideID); err != nil {
+				t.Fatal(err)
+			}
+		} else if _, err := db.Exec(`UPDATE ride_requests SET status=$2 WHERE id=$1`, rideID, status); err != nil {
 			t.Fatal(err)
 		}
 		closedRides[status] = rideID
