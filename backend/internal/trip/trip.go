@@ -2,7 +2,6 @@ package trip
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"time"
 
@@ -39,8 +38,25 @@ type Settlement struct {
 	CashCollectedAt *time.Time
 }
 
+type OperationContext struct {
+	DriverName  string    `json:"driver_name"`
+	VehicleID   uuid.UUID `json:"vehicle_id"`
+	Make        string    `json:"make"`
+	Model       string    `json:"model"`
+	ModelYear   int       `json:"model_year"`
+	Color       string    `json:"color"`
+	ServiceCode string    `json:"service_code"`
+	ServiceName string    `json:"service_name"`
+	Fare        Fare      `json:"fare"`
+}
+
+type Fare struct {
+	AmountMinor int64  `json:"amount_minor"`
+	Currency    string `json:"currency"`
+}
+
 type Trip struct {
-	OperationContext json.RawMessage
+	OperationContext *OperationContext
 	RideRequestID    uuid.UUID
 	RiderUserID      uuid.UUID
 	DriverUserID     uuid.UUID

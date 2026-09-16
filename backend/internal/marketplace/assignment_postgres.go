@@ -3,6 +3,7 @@ package marketplace
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -167,6 +168,7 @@ func scanAssignedTrip(row interface{ Scan(dest ...any) error }) (trip.Trip, erro
 	var result trip.Trip
 	var settlementStatus string
 	var settlementMethod sql.NullString
+	var operationContext []byte
 	if err := row.Scan(
 		&result.RideRequestID,
 		&result.RiderUserID,
@@ -175,7 +177,7 @@ func scanAssignedTrip(row interface{ Scan(dest ...any) error }) (trip.Trip, erro
 		&result.AssignedAt,
 		&result.StartedAt,
 		&result.CompletedAt,
-		&result.OperationContext,
+		&operationContext,
 		&result.CancelledAt,
 		&settlementStatus,
 		&settlementMethod,
@@ -184,6 +186,12 @@ func scanAssignedTrip(row interface{ Scan(dest ...any) error }) (trip.Trip, erro
 		return trip.Trip{}, err
 	}
 	result.Settlement.Status = trip.SettlementStatus(settlementStatus)
+	if string(operationContext) != "" && string(operationContext) != "null" {
+		result.OperationContext = new(trip.OperationContext)
+		if err := json.Unmarshal(operationContext, result.OperationContext); err != nil {
+			return trip.Trip{}, err
+		}
+	}
 	if result.Settlement.Status == "" {
 		result.Settlement.Status = trip.SettlementUnsettled
 	}

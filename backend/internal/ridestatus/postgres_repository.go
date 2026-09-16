@@ -83,7 +83,12 @@ func scanView(row scanner) (View, error) {
 		if tripCancelledAt.Valid {
 			projectedTrip.CancelledAt = &tripCancelledAt.Time
 		}
-		projectedTrip.OperationContext = operation
+		if string(operation) != "" && string(operation) != "null" {
+			projectedTrip.OperationContext = new(trip.OperationContext)
+			if err := json.Unmarshal(operation, projectedTrip.OperationContext); err != nil {
+				return View{}, err
+			}
+		}
 		projectedTrip.Settlement.Status = trip.SettlementUnsettled
 		if settlementStatus.Valid {
 			projectedTrip.Settlement.Status = trip.SettlementStatus(settlementStatus.String)

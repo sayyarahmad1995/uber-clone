@@ -90,8 +90,9 @@ class OperationDetails extends StatelessWidget {
 }
 
 class RideFlowPanel extends ConsumerStatefulWidget {
-  const RideFlowPanel({super.key, this.rideId});
+  const RideFlowPanel({super.key, required this.mode, this.rideId});
 
+  final RideFlowMode mode;
   final String? rideId;
 
   @override
@@ -100,7 +101,8 @@ class RideFlowPanel extends ConsumerStatefulWidget {
 
 class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
     with WidgetsBindingObserver {
-  String get flowKey => widget.rideId ?? 'driver';
+  String get flowKey =>
+      widget.mode == RideFlowMode.driver ? 'driver' : widget.rideId!;
 
   bool _syncing = false;
 
@@ -135,7 +137,7 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
     final flow = ref.watch(rideFlowControllerProvider(flowKey));
     ref.listen(rideFlowControllerProvider(flowKey), (_, next) {
       if (!next.loaded || next.busy) return;
-      if (widget.rideId == null) {
+      if (next.mode == RideFlowMode.driver) {
         ref.read(driverControllerProvider).setActiveTrip(next.current != null);
       } else if (!_syncing) {
         final request = ref.read(riderRequestControllerProvider).state.active;
@@ -154,7 +156,7 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
       children: [
         const Divider(),
         Text(
-          widget.rideId == null
+          widget.mode == RideFlowMode.driver
               ? 'Trips and requests'
               : statusText(flow.status),
           style: Theme.of(context).textTheme.titleLarge,
@@ -170,7 +172,10 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
           icon: const Icon(Icons.refresh),
           label: const Text('Refresh rides'),
         ),
-        if (widget.rideId == null) ..._driver(flow) else ..._rider(flow),
+        if (widget.mode == RideFlowMode.driver)
+          ..._driver(flow)
+        else
+          ..._rider(flow),
       ],
     );
   }
@@ -194,7 +199,7 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
                 ? null
                 : () => _confirm(
                     flow,
-                    '/v1/driver/ride-requests/$id/start',
+                    () => flow.repository.startTrip(id),
                     'Start trip?',
                     'Confirm that the Rider is on board.',
                     'Start trip',
@@ -207,7 +212,7 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
                 ? null
                 : () => _confirm(
                     flow,
-                    '/v1/driver/ride-requests/$id/complete',
+                    () => flow.repository.completeTrip(id),
                     'Complete trip?',
                     'Confirm that you have reached the destination.',
                     'Complete trip',
@@ -221,7 +226,7 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
                 ? null
                 : () => _confirm(
                     flow,
-                    '/v1/driver/ride-requests/$id/cash-collected',
+                    () => flow.repository.confirmCashCollected(id),
                     'Confirm cash collected?',
                     cashCollectionMessage(trip),
                     'Confirm cash collected',
@@ -234,7 +239,7 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
                 ? null
                 : () => _confirm(
                     flow,
-                    '/v1/driver/ride-requests/$id/cancel',
+                    () => flow.repository.cancelTrip(id),
                     'Cancel trip?',
                     'This ends the trip for both you and the Rider.',
                     'Cancel trip',
@@ -275,8 +280,10 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
                   FilledButton(
                     onPressed: flow.busy
                         ? null
-                        : () => flow.act(
-                            '/v1/driver/ride-requests/${request['id']}/accept',
+                        : () => flow.runCommand(
+                            () => flow.repository.acceptFare(
+                              request['id'] as String,
+                            ),
                           ),
                     child: const Text('Accept Rider fare'),
                   ),
@@ -360,11 +367,14 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
                       ? null
                       : () => _confirm(
                           flow,
-                          '/v1/ride-requests/${widget.rideId}/offers/${offer['driver_user_id']}/accept',
+                          () => flow.repository.selectOffer(
+                            widget.rideId!,
+                            offer['driver_user_id'] as String,
+                            offer['updated_at'] as String,
+                          ),
                           'Choose this Driver?',
                           'Agree to ${fareText(offer['fare'])} for this ride.',
                           'Choose Driver',
-                          data: {'updated_at': offer['updated_at']},
                         ),
                   child: const Text('Choose Driver'),
                 ),
@@ -372,8 +382,11 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
                   TextButton(
                     onPressed: flow.busy
                         ? null
-                        : () => flow.act(
-                            '/v1/ride-requests/${widget.rideId}/offers/${offer['driver_user_id']}/reject',
+                        : () => flow.runCommand(
+                            () => flow.repository.rejectOffer(
+                              widget.rideId!,
+                              offer['driver_user_id'] as String,
+                            ),
                           ),
                     child: const Text('Reject offer'),
                   ),
@@ -386,12 +399,11 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
 
   Future<void> _confirm(
     RideFlowController flow,
-    String path,
+    Future<void> Function() command,
     String title,
     String message,
-    String action, {
-    Json? data,
-  }) async {
+    String action,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -409,10 +421,13 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
         ],
       ),
     );
-    if (confirmed == true && mounted) await flow.act(path, data: data);
+    if (confirmed == true && mounted) await flow.runCommand(command);
   }
 
-  Future<void> _counter(RideFlowController flow, Json request) async {
+  Future<void> _counter(
+    RideFlowController flow,
+    RideFlowPayload request,
+  ) async {
     final field = TextEditingController(
       text: ((request['proposed_fare']['amount_minor'] as num) / 100)
           .toStringAsFixed(2),
@@ -461,10 +476,8 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
     await Future<void>.delayed(const Duration(milliseconds: 300));
     field.dispose();
     if (amount != null && mounted) {
-      await flow.act(
-        '/v1/driver/ride-requests/${request['id']}/offer',
-        data: {'amount_minor': amount},
-        put: true,
+      await flow.runCommand(
+        () => flow.repository.proposeFare(request['id'] as String, amount),
       );
     }
   }
@@ -480,7 +493,7 @@ int? parseFareMinor(String text) {
   return value > 0 && value <= 1000000000000 ? value : null;
 }
 
-Json? freshDriverLocation(Json? value) {
+RideFlowPayload? freshDriverLocation(RideFlowPayload? value) {
   final time = DateTime.tryParse('${value?['updated_at']}');
   if (time == null) return null;
   final age = DateTime.now().toUtc().difference(time.toUtc());
@@ -517,7 +530,7 @@ class RiderRideHistory extends ConsumerStatefulWidget {
 }
 
 class _RiderRideHistoryState extends ConsumerState<RiderRideHistory> {
-  List<Json>? _rides;
+  List<RideFlowPayload>? _rides;
   String? _error;
   bool _loading = false;
 
@@ -532,11 +545,11 @@ class _RiderRideHistoryState extends ConsumerState<RiderRideHistory> {
     try {
       final data = await ref
           .read(rideFlowRepositoryProvider)
-          .get('/v1/ride-requests');
+          .loadRiderHistory();
       if (mounted) {
         setState(() {
           _rides = (data['ride_requests'] as List? ?? [])
-              .cast<Json>()
+              .cast<RideFlowPayload>()
               .where(
                 (ride) =>
                     ride['status'] == 'cancelled' ||
@@ -572,7 +585,7 @@ class _RiderRideHistoryState extends ConsumerState<RiderRideHistory> {
       if (_error != null) Text(_error!),
       if (_rides?.isEmpty == true)
         const Text('No completed or cancelled rides.'),
-      for (final ride in _rides ?? <Json>[])
+      for (final ride in _rides ?? <RideFlowPayload>[])
         ListTile(
           title: Text(
             statusText((ride['trip']?['status'] ?? ride['status']) as String?),

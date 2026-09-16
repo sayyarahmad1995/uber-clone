@@ -7,6 +7,7 @@ import '../../../core/dashboard/ride_dashboard_scaffold.dart';
 import '../../../core/maps/ride_map.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../ride_flow/ride_flow_controller.dart';
 import '../../ride_flow/ride_flow_panels.dart';
 import '../application/driver_onboarding_controller.dart';
 import '../domain/driver_onboarding.dart';
@@ -522,7 +523,7 @@ class _DriverReadinessPanel extends StatelessWidget {
             ? profile.displayName!
             : 'Driver profile',
       ),
-      if (activeTrip) const RideFlowPanel(),
+      if (activeTrip) const RideFlowPanel(mode: RideFlowMode.driver),
       if (!activeTrip) const OperatingSelectionControl(),
       if (!activeTrip) ...[
         const SizedBox(height: AppSpacing.md),
@@ -539,7 +540,7 @@ class _DriverReadinessPanel extends StatelessWidget {
           label: Text(profile.isOnline ? 'Go offline' : 'Go online'),
         ),
       ),
-      if (!activeTrip) const RideFlowPanel(),
+      if (!activeTrip) const RideFlowPanel(mode: RideFlowMode.driver),
       const SizedBox(height: AppSpacing.sm),
       Text(
         location == null

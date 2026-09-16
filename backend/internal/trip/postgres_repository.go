@@ -3,6 +3,7 @@ package trip
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 
 	"github.com/google/uuid"
@@ -38,6 +39,7 @@ func scanTrip(row scanner) (Trip, error) {
 	var result Trip
 	var settlementStatus string
 	var settlementMethod sql.NullString
+	var operationContext []byte
 	if err := row.Scan(
 		&result.RideRequestID,
 		&result.RiderUserID,
@@ -46,7 +48,7 @@ func scanTrip(row scanner) (Trip, error) {
 		&result.AssignedAt,
 		&result.StartedAt,
 		&result.CompletedAt,
-		&result.OperationContext,
+		&operationContext,
 		&result.CancelledAt,
 		&settlementStatus,
 		&settlementMethod,
@@ -55,6 +57,12 @@ func scanTrip(row scanner) (Trip, error) {
 		return Trip{}, err
 	}
 	result.Settlement.Status = SettlementStatus(settlementStatus)
+	if string(operationContext) != "" && string(operationContext) != "null" {
+		result.OperationContext = new(OperationContext)
+		if err := json.Unmarshal(operationContext, result.OperationContext); err != nil {
+			return Trip{}, err
+		}
+	}
 	if result.Settlement.Status == "" {
 		result.Settlement.Status = SettlementUnsettled
 	}

@@ -1,4 +1,3 @@
-import 'package:uber_clone/core/network/api_exception.dart';
 import 'package:uber_clone/features/ride_flow/ride_flow_repository.dart';
 import 'package:uber_clone/features/driver_workspace/domain/operating_state.dart';
 import 'package:uber_clone/features/driver_workspace/domain/registered_vehicle.dart';
@@ -30,6 +29,7 @@ class FakeAuthRepository implements AuthRepository {
     if (loginError != null) throw loginError!;
     return account!;
   }
+
   @override
   Future<String> register(String identifier, String password) async =>
       'challenge';
@@ -145,11 +145,22 @@ class FakeDriverRepository implements DriverRepository {
   List<RegisteredVehicle> vehicles;
   @override
   Future<List<RegisteredVehicle>> listVehicles() async => vehicles;
-  OperatingState operation = const OperatingState(vehicleId:'test-vehicle', serviceCode:'economy', valid:true);
+  OperatingState operation = const OperatingState(
+    vehicleId: 'test-vehicle',
+    serviceCode: 'economy',
+    valid: true,
+  );
   @override
   Future<OperatingState> operatingState() async => operation;
   @override
-  Future<OperatingState> selectOperation(String vehicleId, String serviceCode) async => operation = OperatingState(vehicleId:vehicleId,serviceCode:serviceCode,valid:true);
+  Future<OperatingState> selectOperation(
+    String vehicleId,
+    String serviceCode,
+  ) async => operation = OperatingState(
+    vehicleId: vehicleId,
+    serviceCode: serviceCode,
+    valid: true,
+  );
   DriverProfile? profile;
   final calls = <String>[];
   bool failPublish = false;
@@ -239,13 +250,49 @@ class FakeDriverOnboardingRepository implements DriverOnboardingRepository {
 // Existing dashboard tests isolate networking; flow behavior has dedicated tests.
 class FakeRideFlowRepository implements RideFlowRepository {
   @override
-  Future<Json> get(String path) async {
-    if (path == '/v1/driver/trip') throw const ApiException('not_found','No active trip',statusCode:404);
-    if (path.endsWith('/offers')) return {'offers': <Json>[]};
-    if (path.endsWith('/trips')) return {'trips': <Json>[]};
-    if (path.contains('/marketplace/')) return {'ride_requests': <Json>[]};
-    return {'id': path.split('/').last, 'status':'requested', 'trip':null};
-  }
+  Future<RideFlowPayload?> loadDriverTrip() async => null;
   @override
-  Future<void> act(String path, {Json? data, bool put=false}) async {}
+  Future<RideFlowPayload> loadDriverOpportunities() async => {
+    'ride_requests': <RideFlowPayload>[],
+  };
+  @override
+  Future<RideFlowPayload> loadDriverHistory() async => {
+    'trips': <RideFlowPayload>[],
+  };
+  @override
+  Future<RideFlowPayload> loadRiderRide(String id) async => {
+    'id': id,
+    'status': 'requested',
+    'trip': null,
+  };
+  @override
+  Future<RideFlowPayload> loadRiderHistory() async => {
+    'ride_requests': <RideFlowPayload>[],
+  };
+  @override
+  Future<RideFlowPayload> loadRiderOffers(String id) async => {
+    'offers': <RideFlowPayload>[],
+  };
+  @override
+  Future<RideFlowPayload?> loadDriverLocation(String id) async => null;
+  @override
+  Future<void> acceptFare(String id) async {}
+  @override
+  Future<void> proposeFare(String id, int amountMinor) async {}
+  @override
+  Future<void> selectOffer(
+    String id,
+    String driverUserId,
+    String updatedAt,
+  ) async {}
+  @override
+  Future<void> rejectOffer(String id, String driverUserId) async {}
+  @override
+  Future<void> startTrip(String id) async {}
+  @override
+  Future<void> completeTrip(String id) async {}
+  @override
+  Future<void> cancelTrip(String id) async {}
+  @override
+  Future<void> confirmCashCollected(String id) async {}
 }
