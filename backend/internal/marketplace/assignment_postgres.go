@@ -13,9 +13,6 @@ import (
 )
 
 func (r PostgresAssignmentRepository) SelectOffer(ctx context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID, expectedVersion time.Time) (trip.Trip, error) {
-	if err := Expire(ctx, r.db); err != nil {
-		return trip.Trip{}, err
-	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return trip.Trip{}, err
