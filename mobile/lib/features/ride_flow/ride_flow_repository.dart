@@ -2,39 +2,42 @@ import 'package:dio/dio.dart';
 
 import '../../core/network/api_exception.dart';
 import '../../core/session/session_store.dart';
-
-typedef RideFlowPayload = Map<String, dynamic>;
+import 'domain/marketplace_request.dart';
+import 'domain/ride_offer.dart';
+import 'domain/ride_snapshot.dart';
+import 'domain/trip.dart';
 
 abstract interface class RideFlowRepository {
-  Future<RideFlowPayload?> loadDriverTrip();
-  Future<RideFlowPayload> loadDriverOpportunities();
-  Future<RideFlowPayload> loadDriverHistory();
-  Future<RideFlowPayload> loadRiderRide(String rideId);
-  Future<RideFlowPayload> loadRiderHistory();
-  Future<RideFlowPayload> loadRiderOffers(String rideId);
-  Future<RideFlowPayload?> loadDriverLocation(String rideId);
-  Future<void> acceptFare(String rideId);
-  Future<void> proposeFare(String rideId, int amountMinor);
+  Future<List<MarketplaceRequest>> listMarketplaceRequests();
+  Future<TripSnapshot?> getCurrentDriverTrip();
+  Future<List<DriverTripHistoryItem>> listDriverTrips();
+  Future<List<RiderRideSnapshot>> listRiderRides();
+  Future<RiderRideSnapshot> getRiderRide(String rideRequestId);
+  Future<List<RiderOfferComparison>> listRiderOffers(String rideRequestId);
+  Future<DriverLocationSnapshot?> getDriverLocation(String rideRequestId);
+  Future<void> submitOffer(String rideRequestId, int amountMinor);
+  Future<void> acceptProposedFare(String rideRequestId);
   Future<void> selectOffer(
-    String rideId,
+    String rideRequestId,
     String driverUserId,
-    String updatedAt,
+    DateTime updatedAt,
   );
-  Future<void> rejectOffer(String rideId, String driverUserId);
-  Future<void> startTrip(String rideId);
-  Future<void> completeTrip(String rideId);
-  Future<void> cancelTrip(String rideId);
-  Future<void> confirmCashCollected(String rideId);
+  Future<void> startTrip(String rideRequestId);
+  Future<void> completeTrip(String rideRequestId);
+  Future<void> confirmCashCollected(String rideRequestId);
+  Future<void> cancelDriverTrip(String rideRequestId);
 }
 
 class ApiRideFlowRepository implements RideFlowRepository {
   ApiRideFlowRepository(this.dio, this.sessions);
+
   final Dio dio;
   final SessionStore sessions;
-  Future<RideFlowPayload> _request(
+
+  Future<Map<String, dynamic>> _request(
     String path,
     String method,
-    RideFlowPayload? data,
+    Map<String, dynamic>? data,
   ) async {
     final token = await sessions.readValidToken();
     if (token == null) {
@@ -45,7 +48,7 @@ class ApiRideFlowRepository implements RideFlowRepository {
       );
     }
     try {
-      final response = await dio.request<RideFlowPayload>(
+      final response = await dio.request<Map<String, dynamic>>(
         path,
         data: data,
         options: Options(
@@ -59,77 +62,141 @@ class ApiRideFlowRepository implements RideFlowRepository {
     }
   }
 
-  Future<void> _post(
-    String path, {
-    RideFlowPayload? data,
-    bool put = false,
-  }) async => _request(path, put ? 'PUT' : 'POST', data);
+  List<T> _list<T>(
+    Map<String, dynamic> json,
+    String key,
+    T Function(Map<String, dynamic>) parse,
+  ) => (json[key] as List? ?? const [])
+      .map((value) => parse(Map<String, dynamic>.from(value as Map)))
+      .toList();
+
   @override
-  Future<RideFlowPayload?> loadDriverTrip() async {
+  Future<List<MarketplaceRequest>> listMarketplaceRequests() async => _list(
+    await _request('/v1/driver/marketplace/ride-requests', 'GET', null),
+    'ride_requests',
+    MarketplaceRequest.fromJson,
+  );
+
+  @override
+  Future<TripSnapshot?> getCurrentDriverTrip() async {
     try {
-      return await _request('/v1/driver/trip', 'GET', null);
-    } on ApiException catch (e) {
-      if (e.statusCode == 404) return null;
+      final json = await _request('/v1/driver/trip', 'GET', null);
+      return TripSnapshot.fromJson(json);
+    } on ApiException catch (error) {
+      if (error.statusCode == 404) return null;
       rethrow;
     }
   }
 
   @override
-  Future<RideFlowPayload> loadDriverOpportunities() =>
-      _request('/v1/driver/marketplace/ride-requests', 'GET', null);
+  Future<List<DriverTripHistoryItem>> listDriverTrips() async => _list(
+    await _request('/v1/driver/trips', 'GET', null),
+    'trips',
+    DriverTripHistoryItem.fromJson,
+  );
+
   @override
-  Future<RideFlowPayload> loadDriverHistory() =>
-      _request('/v1/driver/trips', 'GET', null);
+  Future<List<RiderRideSnapshot>> listRiderRides() async => _list(
+    await _request('/v1/ride-requests', 'GET', null),
+    'ride_requests',
+    RiderRideSnapshot.fromJson,
+  );
+
   @override
-  Future<RideFlowPayload> loadRiderRide(String id) =>
-      _request('/v1/ride-requests/$id', 'GET', null);
-  @override
-  Future<RideFlowPayload> loadRiderHistory() =>
-      _request('/v1/ride-requests', 'GET', null);
-  @override
-  Future<RideFlowPayload> loadRiderOffers(String id) =>
-      _request('/v1/ride-requests/$id/offers', 'GET', null);
-  @override
-  Future<RideFlowPayload?> loadDriverLocation(String id) async {
-    try {
-      return await _request(
-        '/v1/ride-requests/$id/driver-location',
-        'GET',
-        null,
+  Future<RiderRideSnapshot> getRiderRide(String rideRequestId) async =>
+      RiderRideSnapshot.fromJson(
+        await _request('/v1/ride-requests/$rideRequestId', 'GET', null),
       );
-    } on ApiException catch (e) {
-      if (e.statusCode == 404) return null;
+
+  @override
+  Future<List<RiderOfferComparison>> listRiderOffers(
+    String rideRequestId,
+  ) async => _list(
+    await _request('/v1/ride-requests/$rideRequestId/offers', 'GET', null),
+    'offers',
+    RiderOfferComparison.fromJson,
+  );
+
+  @override
+  Future<DriverLocationSnapshot?> getDriverLocation(
+    String rideRequestId,
+  ) async {
+    try {
+      return DriverLocationSnapshot.fromJson(
+        await _request(
+          '/v1/ride-requests/$rideRequestId/driver-location',
+          'GET',
+          null,
+        ),
+      );
+    } on ApiException catch (error) {
+      if (error.statusCode == 404) return null;
       rethrow;
     }
   }
 
   @override
-  Future<void> acceptFare(String id) =>
-      _post('/v1/driver/ride-requests/$id/accept');
+  Future<void> submitOffer(String rideRequestId, int amountMinor) async {
+    await _request('/v1/driver/ride-requests/$rideRequestId/offer', 'PUT', {
+      'amount_minor': amountMinor,
+    });
+  }
+
   @override
-  Future<void> proposeFare(String id, int amount) => _post(
-    '/v1/driver/ride-requests/$id/offer',
-    data: {'amount_minor': amount},
-    put: true,
-  );
+  Future<void> acceptProposedFare(String rideRequestId) async {
+    await _request(
+      '/v1/driver/ride-requests/$rideRequestId/accept-proposed-fare',
+      'POST',
+      null,
+    );
+  }
+
   @override
-  Future<void> selectOffer(String id, String driver, String updatedAt) => _post(
-    '/v1/ride-requests/$id/offers/$driver/accept',
-    data: {'updated_at': updatedAt},
-  );
+  Future<void> selectOffer(
+    String rideRequestId,
+    String driverUserId,
+    DateTime updatedAt,
+  ) async {
+    await _request(
+      '/v1/ride-requests/$rideRequestId/offers/$driverUserId/accept',
+      'POST',
+      {'updated_at': updatedAt.toUtc().toIso8601String()},
+    );
+  }
+
   @override
-  Future<void> rejectOffer(String id, String driver) =>
-      _post('/v1/ride-requests/$id/offers/$driver/reject');
+  Future<void> startTrip(String rideRequestId) async {
+    await _request(
+      '/v1/driver/ride-requests/$rideRequestId/start',
+      'POST',
+      null,
+    );
+  }
+
   @override
-  Future<void> startTrip(String id) =>
-      _post('/v1/driver/ride-requests/$id/start');
+  Future<void> completeTrip(String rideRequestId) async {
+    await _request(
+      '/v1/driver/ride-requests/$rideRequestId/complete',
+      'POST',
+      null,
+    );
+  }
+
   @override
-  Future<void> completeTrip(String id) =>
-      _post('/v1/driver/ride-requests/$id/complete');
+  Future<void> confirmCashCollected(String rideRequestId) async {
+    await _request(
+      '/v1/driver/ride-requests/$rideRequestId/cash-collected',
+      'POST',
+      null,
+    );
+  }
+
   @override
-  Future<void> cancelTrip(String id) =>
-      _post('/v1/driver/ride-requests/$id/cancel');
-  @override
-  Future<void> confirmCashCollected(String id) =>
-      _post('/v1/driver/ride-requests/$id/cash-collected');
+  Future<void> cancelDriverTrip(String rideRequestId) async {
+    await _request(
+      '/v1/driver/ride-requests/$rideRequestId/cancel',
+      'POST',
+      null,
+    );
+  }
 }

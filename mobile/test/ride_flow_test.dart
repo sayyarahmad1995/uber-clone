@@ -2,135 +2,168 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:uber_clone/core/network/api_exception.dart';
 import 'package:uber_clone/core/providers.dart';
+import 'package:uber_clone/features/ride_flow/domain/marketplace_request.dart';
+import 'package:uber_clone/features/ride_flow/domain/ride_offer.dart';
+import 'package:uber_clone/features/ride_flow/domain/ride_snapshot.dart';
+import 'package:uber_clone/features/ride_flow/domain/trip.dart';
+import 'package:uber_clone/features/ride_flow/application/driver_marketplace_controller.dart';
+import 'package:uber_clone/features/ride_flow/application/driver_trip_controller.dart';
+import 'package:uber_clone/features/ride_flow/application/rider_active_ride_controller.dart';
+import 'package:uber_clone/features/ride_flow/ride_flow_panels.dart';
+import 'package:uber_clone/features/ride_flow/ride_flow_repository.dart';
 import 'package:uber_clone/features/rider_request/application/rider_request_controller.dart';
 
 import 'test_doubles.dart';
 
-import 'package:flutter_test/flutter_test.dart';
-import 'package:uber_clone/core/network/api_exception.dart';
-import 'package:uber_clone/features/ride_flow/ride_flow_controller.dart';
-import 'package:uber_clone/features/ride_flow/ride_flow_repository.dart';
-import 'package:uber_clone/features/ride_flow/ride_flow_panels.dart';
+RideLocation _point(double lat, double lng) =>
+    RideLocation(latitude: lat, longitude: lng);
+
+RideFare _fare(int amount) => RideFare(amountMinor: amount, currency: 'PKR');
+
+SettlementSnapshot _settlement([String status = 'unsettled']) =>
+    SettlementSnapshot(status: status);
+
+RiderRideSnapshot _ride({TripSnapshot? trip}) => RiderRideSnapshot(
+  serviceCode: 'economy',
+  id: 'ride',
+  pickup: _point(33.68, 73.04),
+  destination: _point(33.56, 73.01),
+  proposedFare: _fare(10000),
+  status: 'requested',
+  createdAt: DateTime.utc(2026, 9, 11),
+  expiresAt: DateTime.utc(2026, 9, 11, 0, 10),
+  trip: trip,
+);
+
+TripSnapshot _trip(String status) => TripSnapshot(
+  rideRequestId: 'ride',
+  pickup: _point(33.68, 73.04),
+  destination: _point(33.56, 73.01),
+  status: status,
+  assignedAt: DateTime.utc(2026, 9, 11),
+  settlement: _settlement(),
+);
 
 class FlowFake implements RideFlowRepository {
-  RideFlowPayload ride = {'id': 'ride', 'status': 'requested', 'trip': null};
-  RideFlowPayload? trip;
+  RiderRideSnapshot ride = _ride();
+  TripSnapshot? trip;
   int reads = 0;
   int actions = 0;
   bool loseResponse = false;
   bool locationFails = false;
   bool selectable = true;
-  RideFlowPayload? lastData;
-  bool? lastPut;
+  int? lastAmountMinor;
+  DateTime? lastUpdatedAt;
   Completer<void>? blocked;
-  Future<RideFlowPayload> _get(String path) async {
+
+  Future<void> _readBarrier() async {
     reads++;
-    if (blocked != null) {
-      await blocked!.future;
-    }
-    if (path == '/v1/driver/trip') {
-      if (trip == null) {
-        throw const ApiException('missing', 'No trip', statusCode: 404);
-      }
-      return trip!;
-    }
-    if (path.endsWith('/offers')) {
-      return {
-        'offers': [
-          {
-            'driver_user_id': 'driver',
-            'selectable': selectable,
-            'status': 'pending',
-            'fare': {'amount_minor': 10000, 'currency': 'PKR'},
-            'updated_at': '2026-09-11T00:00:00Z',
-          },
-        ],
-      };
-    }
-    if (path.endsWith('/driver-location')) {
-      if (locationFails) {
-        throw const ApiException('failed', 'Location failed', statusCode: 500);
-      }
-      throw const ApiException('missing', 'No location', statusCode: 404);
-    }
-    if (path.endsWith('/trips')) return {'trips': []};
-    if (path.contains('/marketplace/')) return {'ride_requests': []};
+    if (blocked != null) await blocked!.future;
+  }
+
+  @override
+  Future<TripSnapshot?> getCurrentDriverTrip() async {
+    await _readBarrier();
+    return trip;
+  }
+
+  @override
+  Future<List<MarketplaceRequest>> listMarketplaceRequests() async {
+    await _readBarrier();
+    return const [];
+  }
+
+  @override
+  Future<List<DriverTripHistoryItem>> listDriverTrips() async {
+    await _readBarrier();
+    return const [];
+  }
+
+  @override
+  Future<List<RiderRideSnapshot>> listRiderRides() async {
+    await _readBarrier();
+    return [ride];
+  }
+
+  @override
+  Future<RiderRideSnapshot> getRiderRide(String rideRequestId) async {
+    await _readBarrier();
     return ride;
   }
 
-  Future<void> _act(
-    String path, {
-    RideFlowPayload? data,
-    bool put = false,
-  }) async {
+  @override
+  Future<List<RiderOfferComparison>> listRiderOffers(
+    String rideRequestId,
+  ) async {
+    await _readBarrier();
+    return [
+      RiderOfferComparison(
+        rideRequestId: rideRequestId,
+        driverUserId: 'driver',
+        fare: _fare(10000),
+        status: 'pending',
+        createdAt: DateTime.utc(2026, 9, 11),
+        updatedAt: DateTime.utc(2026, 9, 11),
+        expiresAt: DateTime.utc(2026, 9, 11, 0, 2),
+        pickupDistanceMeters: 500,
+        matchesProposedFare: true,
+        selectable: selectable,
+      ),
+    ];
+  }
+
+  @override
+  Future<DriverLocationSnapshot?> getDriverLocation(
+    String rideRequestId,
+  ) async {
+    await _readBarrier();
+    if (locationFails) {
+      throw const ApiException('failed', 'Location failed', statusCode: 500);
+    }
+    return null;
+  }
+
+  Future<void> _action() async {
     actions++;
-    lastData = data;
-    lastPut = put;
-    ride = {
-      'id': 'ride',
-      'status': 'requested',
-      'trip': {'status': 'assigned'},
-    };
+    ride = _ride(trip: _trip('assigned'));
     if (loseResponse) {
       throw const ApiException('network_error', 'Response lost');
     }
   }
 
   @override
-  Future<RideFlowPayload?> loadDriverTrip() async {
-    try {
-      return await _get('/v1/driver/trip');
-    } on ApiException catch (_) {
-      return null;
-    }
+  Future<void> selectOffer(
+    String rideRequestId,
+    String driverUserId,
+    DateTime updatedAt,
+  ) async {
+    lastUpdatedAt = updatedAt;
+    await _action();
   }
 
   @override
-  Future<RideFlowPayload> loadDriverOpportunities() =>
-      _get('/v1/driver/marketplace/ride-requests');
+  Future<void> submitOffer(String rideRequestId, int amountMinor) async {
+    lastAmountMinor = amountMinor;
+    await _action();
+  }
+
   @override
-  Future<RideFlowPayload> loadDriverHistory() => _get('/v1/driver/trips');
+  Future<void> acceptProposedFare(String rideRequestId) => _action();
+
   @override
-  Future<RideFlowPayload> loadRiderRide(String id) =>
-      _get('/v1/ride-requests/$id');
+  Future<void> startTrip(String rideRequestId) => _action();
+
   @override
-  Future<RideFlowPayload> loadRiderHistory() => _get('/v1/ride-requests');
+  Future<void> completeTrip(String rideRequestId) => _action();
+
   @override
-  Future<RideFlowPayload> loadRiderOffers(String id) =>
-      _get('/v1/ride-requests/$id/offers');
+  Future<void> confirmCashCollected(String rideRequestId) => _action();
+
   @override
-  Future<RideFlowPayload?> loadDriverLocation(String id) =>
-      _get('/v1/ride-requests/$id/driver-location');
-  @override
-  Future<void> acceptFare(String id) =>
-      _act('/v1/driver/ride-requests/$id/accept');
-  @override
-  Future<void> proposeFare(String id, int amount) => _act(
-    '/v1/driver/ride-requests/$id/offer',
-    data: {'amount_minor': amount},
-    put: true,
-  );
-  @override
-  Future<void> selectOffer(String id, String driver, String updatedAt) => _act(
-    '/v1/ride-requests/$id/offers/$driver/accept',
-    data: {'updated_at': updatedAt},
-  );
-  @override
-  Future<void> rejectOffer(String id, String driver) =>
-      _act('/v1/ride-requests/$id/offers/$driver/reject');
-  @override
-  Future<void> startTrip(String id) =>
-      _act('/v1/driver/ride-requests/$id/start');
-  @override
-  Future<void> completeTrip(String id) =>
-      _act('/v1/driver/ride-requests/$id/complete');
-  @override
-  Future<void> cancelTrip(String id) =>
-      _act('/v1/driver/ride-requests/$id/cancel');
-  @override
-  Future<void> confirmCashCollected(String id) =>
-      _act('/v1/driver/ride-requests/$id/cash-collected');
+  Future<void> cancelDriverTrip(String rideRequestId) => _action();
 }
 
 void main() {
@@ -138,15 +171,12 @@ void main() {
     'Rider confirms exact displayed revision and unavailable offers cannot be selected',
     (tester) async {
       final repo = FlowFake();
-      final flow = RideFlowController(
-        repo,
-        mode: RideFlowMode.rider,
-        rideId: 'ride',
-      );
+      final flow = RiderActiveRideController(repo, rideId: 'ride');
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            rideFlowControllerProvider('ride').overrideWith((ref) => flow),
+            riderActiveRideControllerProvider('ride')
+                .overrideWith((ref) => flow),
             riderRequestControllerProvider.overrideWith(
               (ref) => RiderRequestController(
                 FakeRideRequestRepository(),
@@ -157,7 +187,7 @@ void main() {
           child: const MaterialApp(
             home: Scaffold(
               body: SingleChildScrollView(
-                child: RideFlowPanel(mode: RideFlowMode.rider, rideId: 'ride'),
+                child: RideFlowPanel.rider(rideId: 'ride'),
               ),
             ),
           ),
@@ -175,8 +205,9 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(repo.actions, 1);
-      expect(repo.lastData, {'updated_at': '2026-09-11T00:00:00Z'});
-      repo.ride = {'id': 'ride', 'status': 'requested', 'trip': null};
+      expect(repo.lastUpdatedAt, DateTime.utc(2026, 9, 11));
+
+      repo.ride = _ride();
       repo.selectable = false;
       await flow.refresh();
       await tester.pumpAndSettle();
@@ -191,59 +222,48 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+
   test('lost acceptance response reloads authoritative assignment without claiming success', () async {
     final repo = FlowFake()..loseResponse = true;
-    final flow = RideFlowController(
-      repo,
-      mode: RideFlowMode.rider,
-      rideId: 'ride',
-    );
+    final flow = RiderActiveRideController(repo, rideId: 'ride');
     await Future<void>.delayed(Duration.zero);
     expect(flow.offers, hasLength(1));
-    await flow.runCommand(
-      () => repo.selectOffer('ride', 'driver', '2026-09-11T00:00:00Z'),
-    );
+
+    await flow.selectOffer('driver', DateTime.utc(2026, 9, 11));
+
     expect(flow.status, 'assigned');
     expect(flow.offers, isEmpty);
     expect(flow.error, contains('Response lost'));
     expect(flow.location, isNull);
     flow.dispose();
   });
+
   test('location failure does not hide assigned Rider trip', () async {
     final repo = FlowFake()..locationFails = true;
-    repo.ride = {
-      'id': 'ride',
-      'status': 'requested',
-      'trip': {'status': 'assigned'},
-    };
-    final flow = RideFlowController(
-      repo,
-      mode: RideFlowMode.rider,
-      rideId: 'ride',
-    );
+    repo.ride = _ride(trip: _trip('assigned'));
+    final flow = RiderActiveRideController(repo, rideId: 'ride');
     await Future<void>.delayed(Duration.zero);
     expect(flow.status, 'assigned');
     expect(flow.loaded, isTrue);
     expect(flow.location, isNull);
     flow.dispose();
   });
+
   test(
     'restores assigned Driver trip even while availability is offline',
     () async {
-      final repo = FlowFake()
-        ..trip = {'ride_request_id': 'ride', 'status': 'in_progress'};
-      final flow = RideFlowController(repo, mode: RideFlowMode.driver);
+      final repo = FlowFake()..trip = _trip('in_progress');
+      final flow = DriverTripController(repo);
       await Future<void>.delayed(Duration.zero);
-      expect(flow.status, 'in_progress');
-      expect(flow.requests, isEmpty);
+      expect(flow.trip?.status, 'in_progress');
       flow.dispose();
     },
   );
+
   test('background stops polling; dispose tolerates in-flight reads', () async {
     final repo = FlowFake();
-    final flow = RideFlowController(
+    final flow = RiderActiveRideController(
       repo,
-      mode: RideFlowMode.rider,
       rideId: 'ride',
       interval: const Duration(milliseconds: 10),
     );
@@ -258,28 +278,30 @@ void main() {
     repo.blocked!.complete();
     await Future<void>.delayed(Duration.zero);
   });
+
   test(
     'counteroffer waits for an in-flight reload instead of being dropped',
     () async {
       final repo = FlowFake()..blocked = Completer<void>();
-      final flow = RideFlowController(
-        repo,
-        mode: RideFlowMode.rider,
-        rideId: 'ride',
-      );
+      final flow = DriverMarketplaceController(repo);
+
       await Future<void>.delayed(Duration.zero);
       expect(flow.busy, isTrue);
-      final action = flow.runCommand(() => repo.proposeFare('ride', 11500));
+
+      final action = flow.submitOffer('ride', 11500);
       await Future<void>.delayed(Duration.zero);
+
       expect(repo.actions, 0);
+
       repo.blocked!.complete();
       await action;
+
       expect(repo.actions, 1);
-      expect(repo.lastData, {'amount_minor': 11500});
-      expect(repo.lastPut, isTrue);
+      expect(repo.lastAmountMinor, 11500);
       flow.dispose();
     },
   );
+
   test(
     'fare parsing is exact and rejects non-finite or excess precision input',
     () {
@@ -289,26 +311,28 @@ void main() {
       }
     },
   );
+
   test('stale or future locations are never shown as live', () {
+    DriverLocationSnapshot location(DateTime updatedAt) =>
+        DriverLocationSnapshot(
+          rideRequestId: 'ride',
+          latitude: 33.68,
+          longitude: 73.04,
+          updatedAt: updatedAt,
+        );
+
     expect(
-      freshDriverLocation({
-        'updated_at': DateTime.now()
-            .subtract(const Duration(minutes: 3))
-            .toIso8601String(),
-      }),
+      freshDriverLocation(
+        location(DateTime.now().subtract(const Duration(minutes: 3))),
+      ),
       isNull,
     );
     expect(
-      freshDriverLocation({
-        'updated_at': DateTime.now()
-            .add(const Duration(minutes: 3))
-            .toIso8601String(),
-      }),
+      freshDriverLocation(
+        location(DateTime.now().add(const Duration(minutes: 3))),
+      ),
       isNull,
     );
-    expect(
-      freshDriverLocation({'updated_at': DateTime.now().toIso8601String()}),
-      isNotNull,
-    );
+    expect(freshDriverLocation(location(DateTime.now())), isNotNull);
   });
 }

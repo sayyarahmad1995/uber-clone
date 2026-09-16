@@ -2,19 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
-import 'ride_flow_controller.dart';
-import 'ride_flow_repository.dart';
+import 'domain/marketplace_request.dart';
+import 'domain/ride_snapshot.dart';
+import 'domain/trip.dart';
+import 'application/driver_marketplace_controller.dart';
+import 'application/driver_trip_controller.dart';
+import 'application/rider_active_ride_controller.dart';
 
 String fareText(dynamic fare) {
-  if (fare is! Map || fare['amount_minor'] is! num) {
-    return 'Fare unavailable';
+  if (fare is RideFare) {
+    return '${fare.currency} ${(fare.amountMinor / 100).toStringAsFixed(2)}';
   }
-  return '${fare['currency']} ${((fare['amount_minor'] as num) / 100).toStringAsFixed(2)}';
+  if (fare is TripOperationFare) {
+    return '${fare.currency} ${(fare.amountMinor / 100).toStringAsFixed(2)}';
+  }
+  return 'Fare unavailable';
 }
 
-String pointText(dynamic point) => point is Map
-    ? '${(point['latitude'] as num).toStringAsFixed(5)}, ${(point['longitude'] as num).toStringAsFixed(5)}'
-    : 'Unavailable';
+String pointText(RideLocation? point) => point == null
+    ? 'Unavailable'
+    : '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}';
 
 String statusText(String? status) => switch (status) {
   'assigned' => 'Driver assigned',
@@ -24,51 +31,41 @@ String statusText(String? status) => switch (status) {
   _ => 'Waiting for Driver offers',
 };
 
-String settlementText(dynamic settlement) {
-  if (settlement is! Map) {
-    return 'Settlement: Not recorded';
+String settlementText(SettlementSnapshot? settlement) {
+  if (settlement == null) return 'Settlement: Not recorded';
+  if (settlement.status == 'unsettled') return 'Settlement: Cash due';
+  if (settlement.status == 'cash_collected') {
+    final collectedAt = settlement.cashCollectedAt;
+    return collectedAt == null
+        ? 'Settlement: Cash collected'
+        : 'Settlement: Cash collected · $collectedAt';
   }
-  final status = settlement['status'];
-  if (status == 'unsettled') {
-    return 'Settlement: Cash due';
-  }
-  if (status == 'cash_collected') {
-    final collectedAt = settlement['cash_collected_at'];
-    if (collectedAt == null) {
-      return 'Settlement: Cash collected';
-    }
-    return 'Settlement: Cash collected · $collectedAt';
-  }
-  return 'Settlement: ${status ?? 'Unknown'}';
+  return 'Settlement: ${settlement.status}';
 }
 
-bool settlementIsCashDue(dynamic settlement) =>
-    settlement is Map && settlement['status'] == 'unsettled';
+bool settlementIsCashDue(SettlementSnapshot settlement) =>
+    settlement.status == 'unsettled';
 
-String tripAgreedFareText(dynamic trip) {
-  if (trip is! Map || trip['operation_context'] is! Map) {
-    return 'Fare unavailable';
-  }
-  return fareText(trip['operation_context']['fare']);
+String tripAgreedFareText(TripSnapshot trip) {
+  final fare = trip.operationContext?.fare;
+  return fare == null ? 'Fare unavailable' : fareText(fare);
 }
 
-String cashCollectionMessage(dynamic trip) {
+String cashCollectionMessage(TripSnapshot trip) {
   final agreedFare = tripAgreedFareText(trip);
-  if (agreedFare == 'Fare unavailable') {
-    return 'Confirm that you collected the agreed cash fare from the Rider.';
-  }
-  return 'Confirm that you collected $agreedFare in cash from the Rider.';
+  return agreedFare == 'Fare unavailable'
+      ? 'Confirm that you collected the agreed cash fare from the Rider.'
+      : 'Confirm that you collected $agreedFare in cash from the Rider.';
 }
 
 class OperationDetails extends StatelessWidget {
   const OperationDetails(this.operation, {super.key});
-
-  final dynamic operation;
+  final TripOperationContext? operation;
 
   @override
   Widget build(BuildContext context) {
     final value = operation;
-    if (value is! Map) {
+    if (value == null) {
       return const Text(
         'Vehicle and service details unavailable for this historical trip.',
       );
@@ -76,24 +73,26 @@ class OperationDetails extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (value['driver_name'] != null) Text('${value['driver_name']}'),
+        Text(value.driverName),
         Text(
-          '${value['make'] ?? ''} ${value['model'] ?? ''} ${value['model_year'] ?? ''} · ${value['color'] ?? ''}',
+          '${value.make} ${value.model} ${value.modelYear} · ${value.color}',
         ),
-        if (value['license_plate'] != null)
-          Text('License plate: ${value['license_plate']}'),
-        Text('Service: ${value['service_name'] ?? value['service_code']}'),
-        Text('Agreed fare: ${fareText(value['fare'])}'),
+        Text('License plate: ${value.licensePlate}'),
+        Text('Service: ${value.serviceName}'),
+        Text('Agreed fare: ${fareText(value.fare)}'),
       ],
     );
   }
 }
 
 class RideFlowPanel extends ConsumerStatefulWidget {
-  const RideFlowPanel({super.key, required this.mode, this.rideId});
+  const RideFlowPanel.rider({required String this.rideId, super.key})
+    : driver = false;
 
-  final RideFlowMode mode;
+  const RideFlowPanel.driver({super.key}) : rideId = null, driver = true;
+
   final String? rideId;
+  final bool driver;
 
   @override
   ConsumerState<RideFlowPanel> createState() => _RideFlowPanelState();
@@ -101,10 +100,9 @@ class RideFlowPanel extends ConsumerStatefulWidget {
 
 class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
     with WidgetsBindingObserver {
-  String get flowKey =>
-      widget.mode == RideFlowMode.driver ? 'driver' : widget.rideId!;
-
   bool _syncing = false;
+
+  bool get _driver => widget.driver;
 
   @override
   void initState() {
@@ -120,45 +118,96 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      ref.read(rideFlowControllerProvider(flowKey)).setForeground(true);
-    }
-    if ([
+    final foreground = state == AppLifecycleState.resumed;
+    final background = [
       AppLifecycleState.paused,
       AppLifecycleState.hidden,
       AppLifecycleState.detached,
-    ].contains(state)) {
-      ref.read(rideFlowControllerProvider(flowKey)).setForeground(false);
+    ].contains(state);
+
+    if (!foreground && !background) return;
+
+    if (_driver) {
+      ref.read(driverMarketplaceControllerProvider).setForeground(foreground);
+      ref.read(driverTripControllerProvider).setForeground(foreground);
+      return;
     }
+
+    ref
+        .read(riderActiveRideControllerProvider(widget.rideId!))
+        .setForeground(foreground);
   }
 
   @override
   Widget build(BuildContext context) {
-    final flow = ref.watch(rideFlowControllerProvider(flowKey));
-    ref.listen(rideFlowControllerProvider(flowKey), (_, next) {
+    return _driver ? _buildDriver(context) : _buildRider(context);
+  }
+
+  Widget _buildDriver(BuildContext context) {
+    final marketplace = ref.watch(driverMarketplaceControllerProvider);
+    final trips = ref.watch(driverTripControllerProvider);
+
+    ref.listen(driverTripControllerProvider, (_, next) {
       if (!next.loaded || next.busy) return;
-      if (next.mode == RideFlowMode.driver) {
-        ref.read(driverControllerProvider).setActiveTrip(next.current != null);
-      } else if (!_syncing) {
-        final request = ref.read(riderRequestControllerProvider).state.active;
-        if (request?.id == widget.rideId &&
-            (request?.trip?.status ?? request?.status) != next.status) {
-          _syncing = true;
-          ref
-              .read(riderRequestControllerProvider)
-              .refreshActive()
-              .whenComplete(() => _syncing = false);
-        }
-      }
+      ref.read(driverControllerProvider).setActiveTrip(next.trip != null);
     });
+
+    final busy = marketplace.busy || trips.busy;
+    final loaded = marketplace.loaded && trips.loaded;
+    final error = trips.error ?? marketplace.error;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Divider(),
         Text(
-          widget.mode == RideFlowMode.driver
-              ? 'Trips and requests'
-              : statusText(flow.status),
+          'Trips and requests',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        if (!loaded && busy) const LinearProgressIndicator(),
+        if (error != null)
+          Text(
+            error,
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
+          ),
+        TextButton.icon(
+          onPressed: busy
+              ? null
+              : () async {
+                  await Future.wait([marketplace.refresh(), trips.refresh()]);
+                },
+          icon: const Icon(Icons.refresh),
+          label: const Text('Refresh rides'),
+        ),
+        ..._driverContent(marketplace, trips),
+      ],
+    );
+  }
+
+  Widget _buildRider(BuildContext context) {
+    final rideId = widget.rideId!;
+    final flow = ref.watch(riderActiveRideControllerProvider(rideId));
+
+    ref.listen(riderActiveRideControllerProvider(rideId), (_, next) {
+      if (!next.loaded || next.busy || _syncing) return;
+
+      final request = ref.read(riderRequestControllerProvider).state.active;
+      if (request?.id == rideId &&
+          (request?.trip?.status ?? request?.status) != next.status) {
+        _syncing = true;
+        ref
+            .read(riderRequestControllerProvider)
+            .refreshActive()
+            .whenComplete(() => _syncing = false);
+      }
+    });
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Divider(),
+        Text(
+          statusText(flow.status),
           style: Theme.of(context).textTheme.titleLarge,
         ),
         if (!flow.loaded && flow.busy) const LinearProgressIndicator(),
@@ -172,143 +221,145 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
           icon: const Icon(Icons.refresh),
           label: const Text('Refresh rides'),
         ),
-        if (widget.mode == RideFlowMode.driver)
-          ..._driver(flow)
-        else
-          ..._rider(flow),
+        ..._riderContent(flow),
       ],
     );
   }
 
-  List<Widget> _driver(RideFlowController flow) {
-    final trip = flow.current;
+  List<Widget> _driverContent(
+    DriverMarketplaceController marketplace,
+    DriverTripController trips,
+  ) {
+    final trip = trips.trip;
     if (trip != null) {
-      final id = trip['ride_request_id'];
-      final status = trip['status'];
+      final id = trip.rideRequestId!;
       final cashDue =
-          status == 'completed' && settlementIsCashDue(trip['settlement']);
+          trip.status == 'completed' && settlementIsCashDue(trip.settlement);
+
       return [
-        Text(statusText(status as String?)),
-        OperationDetails(trip['operation_context']),
-        Text(settlementText(trip['settlement'])),
-        Text('Pickup: ${pointText(trip['pickup'])}'),
-        Text('Destination: ${pointText(trip['destination'])}'),
-        if (status == 'assigned')
+        Text(statusText(trip.status)),
+        OperationDetails(trip.operationContext),
+        Text(settlementText(trip.settlement)),
+        Text('Pickup: ${pointText(trip.pickup)}'),
+        Text('Destination: ${pointText(trip.destination)}'),
+        if (trip.status == 'assigned')
           FilledButton(
-            onPressed: flow.busy
+            onPressed: trips.busy
                 ? null
                 : () => _confirm(
-                    flow,
-                    () => flow.repository.startTrip(id),
                     'Start trip?',
                     'Confirm that the Rider is on board.',
                     'Start trip',
+                    () => trips.startTrip(id),
                   ),
             child: const Text('Start trip'),
           ),
-        if (status == 'in_progress')
+        if (trip.status == 'in_progress')
           FilledButton(
-            onPressed: flow.busy
+            onPressed: trips.busy
                 ? null
                 : () => _confirm(
-                    flow,
-                    () => flow.repository.completeTrip(id),
                     'Complete trip?',
                     'Confirm that you have reached the destination.',
                     'Complete trip',
+                    () => trips.completeTrip(id),
                   ),
             child: const Text('Complete trip'),
           ),
         if (cashDue) const Text('Collect the agreed cash fare from the Rider.'),
         if (cashDue)
           FilledButton(
-            onPressed: flow.busy
+            onPressed: trips.busy
                 ? null
                 : () => _confirm(
-                    flow,
-                    () => flow.repository.confirmCashCollected(id),
                     'Confirm cash collected?',
                     cashCollectionMessage(trip),
                     'Confirm cash collected',
+                    () => trips.confirmCashCollected(id),
                   ),
             child: const Text('Confirm cash collected'),
           ),
-        if (['assigned', 'in_progress'].contains(status))
+        if (['assigned', 'in_progress'].contains(trip.status))
           TextButton(
-            onPressed: flow.busy
+            onPressed: trips.busy
                 ? null
                 : () => _confirm(
-                    flow,
-                    () => flow.repository.cancelTrip(id),
                     'Cancel trip?',
                     'This ends the trip for both you and the Rider.',
                     'Cancel trip',
+                    () => trips.cancelTrip(id),
                   ),
             child: const Text('Cancel trip'),
           ),
+        ..._tripHistory(trips),
       ];
     }
+
     final online =
         ref.watch(driverControllerProvider).profile?.isOnline == true;
+
     return [
       if (!online)
         const Text('Go online to receive requests for your selected service.'),
-      if (online && flow.loaded && flow.requests.isEmpty)
+      if (online && marketplace.loaded && marketplace.requests.isEmpty)
         const Text('No requests available. This list updates automatically.'),
       if (online)
-        for (final request in flow.requests)
+        for (final request in marketplace.requests)
           Card(
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('Rider fare: ${fareText(request['proposed_fare'])}'),
-                  Text('Pickup: ${pointText(request['pickup'])}'),
-                  Text('Destination: ${pointText(request['destination'])}'),
-                  if (request['pickup_distance_meters'] is num)
+                  Text('Rider fare: ${fareText(request.proposedFare)}'),
+                  Text('Pickup: ${pointText(request.pickup)}'),
+                  Text('Destination: ${pointText(request.destination)}'),
+                  Text(
+                    '${(request.pickupDistanceMeters / 1000).toStringAsFixed(1)} km to pickup · straight-line distance',
+                  ),
+                  if (request.ownOffer != null)
                     Text(
-                      '${((request['pickup_distance_meters'] as num) / 1000).toStringAsFixed(1)} km to pickup · straight-line distance',
-                    ),
-                  if (request['own_offer'] is Map)
-                    Text(
-                      'Your response: ${fareText(request['own_offer']['fare'])} · ${request['own_offer']['status']}',
+                      'Your response: ${fareText(request.ownOffer!.fare)} · ${request.ownOffer!.status}',
                     ),
                   const Text(
                     'The Rider chooses a Driver. Sending a response does not assign this trip.',
                   ),
                   FilledButton(
-                    onPressed: flow.busy
+                    onPressed: marketplace.busy
                         ? null
-                        : () => flow.runCommand(
-                            () => flow.repository.acceptFare(
-                              request['id'] as String,
-                            ),
-                          ),
+                        : () => marketplace.acceptProposedFare(request.id),
                     child: const Text('Accept Rider fare'),
                   ),
                   OutlinedButton(
-                    onPressed: flow.busy ? null : () => _counter(flow, request),
+                    onPressed: marketplace.busy
+                        ? null
+                        : () => _counter(marketplace, request),
                     child: const Text('Propose another fare'),
                   ),
                 ],
               ),
             ),
           ),
+      ..._tripHistory(trips),
+    ];
+  }
+
+  List<Widget> _tripHistory(DriverTripController trips) {
+    return [
       ExpansionTile(
         title: const Text('Trip history'),
         children: [
-          if (flow.history.isEmpty)
+          if (trips.history.isEmpty)
             const ListTile(title: Text('No completed or cancelled trips.')),
-          for (final item in flow.history)
+          for (final item in trips.history)
             ListTile(
-              title: Text(statusText(item['status'] as String?)),
+              title: Text(statusText(item.status)),
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Assigned: ${item['assigned_at']}'),
-                  OperationDetails(item['operation_context']),
-                  Text(settlementText(item['settlement'])),
+                  Text('Assigned: ${item.assignedAt}'),
+                  OperationDetails(item.operationContext),
+                  Text(settlementText(item.settlement)),
                 ],
               ),
             ),
@@ -317,20 +368,21 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
     ];
   }
 
-  List<Widget> _rider(RideFlowController flow) {
-    final trip = flow.current?['trip'];
-    if (trip is Map) {
+  List<Widget> _riderContent(RiderActiveRideController flow) {
+    final trip = flow.riderRide?.trip;
+    if (trip != null) {
       return [
-        OperationDetails(trip['operation_context']),
-        Text(settlementText(trip['settlement'])),
-        if (['assigned', 'in_progress'].contains(trip['status']))
+        OperationDetails(trip.operationContext),
+        Text(settlementText(trip.settlement)),
+        if (['assigned', 'in_progress'].contains(trip.status))
           Text(
             freshDriverLocation(flow.location) == null
                 ? 'Driver location is currently unavailable.'
-                : 'Driver location updated: ${flow.location!['updated_at']}',
+                : 'Driver location updated: ${flow.location!.updatedAt}',
           ),
       ];
     }
+
     return [
       if (flow.loaded && flow.offers.isEmpty)
         const Text('No offers yet. Driver responses will appear here.'),
@@ -342,54 +394,39 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  '${offer['driver']?['display_name'] ?? 'Driver'}',
+                  offer.driver?.displayName ?? 'Driver',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
-                if (offer['vehicle'] is Map)
+                if (offer.vehicle != null)
                   Text(
-                    '${offer['vehicle']['make']} ${offer['vehicle']['model']} ${offer['vehicle']['model_year'] ?? ''} · ${offer['vehicle']['color']}',
+                    '${offer.vehicle!.make} ${offer.vehicle!.model} ${offer.vehicle!.modelYear ?? ''} · ${offer.vehicle!.color}',
                   ),
                 Text(
-                  '${fareText(offer['fare'])}${offer['matches_proposed_fare'] == true ? ' · Your fare' : ''}',
+                  '${fareText(offer.fare)}${offer.matchesProposedFare ? ' · Your fare' : ''}',
                 ),
-                if (offer['pickup_distance_meters'] is num)
+                Text(
+                  '${(offer.pickupDistanceMeters / 1000).toStringAsFixed(1)} km to pickup · straight-line distance',
+                ),
+                if (!offer.selectable)
                   Text(
-                    '${((offer['pickup_distance_meters'] as num) / 1000).toStringAsFixed(1)} km to pickup · straight-line distance',
-                  ),
-                if (offer['selectable'] != true)
-                  Text(
-                    offer['status'] == 'pending'
+                    offer.status == 'pending'
                         ? 'Driver currently unavailable'
-                        : '${offer['status']}',
+                        : offer.status,
                   ),
                 FilledButton(
-                  onPressed: flow.busy || offer['selectable'] != true
+                  onPressed: flow.busy || !offer.selectable
                       ? null
                       : () => _confirm(
-                          flow,
-                          () => flow.repository.selectOffer(
-                            widget.rideId!,
-                            offer['driver_user_id'] as String,
-                            offer['updated_at'] as String,
-                          ),
                           'Choose this Driver?',
-                          'Agree to ${fareText(offer['fare'])} for this ride.',
+                          'Agree to ${fareText(offer.fare)} for this ride.',
                           'Choose Driver',
+                          () => flow.selectOffer(
+                            offer.driverUserId,
+                            offer.updatedAt,
+                          ),
                         ),
                   child: const Text('Choose Driver'),
                 ),
-                if (offer['status'] == 'pending')
-                  TextButton(
-                    onPressed: flow.busy
-                        ? null
-                        : () => flow.runCommand(
-                            () => flow.repository.rejectOffer(
-                              widget.rideId!,
-                              offer['driver_user_id'] as String,
-                            ),
-                          ),
-                    child: const Text('Reject offer'),
-                  ),
               ],
             ),
           ),
@@ -398,11 +435,10 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
   }
 
   Future<void> _confirm(
-    RideFlowController flow,
-    Future<void> Function() command,
     String title,
     String message,
     String action,
+    Future<void> Function() command,
   ) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -421,19 +457,20 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
         ],
       ),
     );
-    if (confirmed == true && mounted) await flow.runCommand(command);
+
+    if (confirmed == true && mounted) await command();
   }
 
   Future<void> _counter(
-    RideFlowController flow,
-    RideFlowPayload request,
+    DriverMarketplaceController marketplace,
+    MarketplaceRequest request,
   ) async {
     final field = TextEditingController(
-      text: ((request['proposed_fare']['amount_minor'] as num) / 100)
-          .toStringAsFixed(2),
+      text: (request.proposedFare.amountMinor / 100).toStringAsFixed(2),
     );
-    final proposed = request['proposed_fare']['amount_minor'] as int;
+    final proposed = request.proposedFare.amountMinor;
     String? error;
+
     final amount = await showDialog<int>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -444,7 +481,7 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: InputDecoration(
               labelText:
-                  '${request['proposed_fare']['currency']} · 90%–130% of Rider fare',
+                  '${request.proposedFare.currency} · 90%–130% of Rider fare',
               errorText: error,
             ),
           ),
@@ -472,13 +509,12 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
         ),
       ),
     );
-    // Dispose after the dialog transition has released its TextField.
+
     await Future<void>.delayed(const Duration(milliseconds: 300));
     field.dispose();
+
     if (amount != null && mounted) {
-      await flow.runCommand(
-        () => flow.repository.proposeFare(request['id'] as String, amount),
-      );
+      await marketplace.submitOffer(request.id, amount);
     }
   }
 }
@@ -493,10 +529,9 @@ int? parseFareMinor(String text) {
   return value > 0 && value <= 1000000000000 ? value : null;
 }
 
-RideFlowPayload? freshDriverLocation(RideFlowPayload? value) {
-  final time = DateTime.tryParse('${value?['updated_at']}');
-  if (time == null) return null;
-  final age = DateTime.now().toUtc().difference(time.toUtc());
+DriverLocationSnapshot? freshDriverLocation(DriverLocationSnapshot? value) {
+  if (value == null) return null;
+  final age = DateTime.now().toUtc().difference(value.updatedAt.toUtc());
   return age.isNegative || age > const Duration(minutes: 2) ? null : value;
 }
 
@@ -530,45 +565,33 @@ class RiderRideHistory extends ConsumerStatefulWidget {
 }
 
 class _RiderRideHistoryState extends ConsumerState<RiderRideHistory> {
-  List<RideFlowPayload>? _rides;
+  List<RiderRideSnapshot>? _rides;
   String? _error;
   bool _loading = false;
 
   Future<void> _load() async {
-    if (_loading) {
-      return;
-    }
+    if (_loading) return;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final data = await ref
-          .read(rideFlowRepositoryProvider)
-          .loadRiderHistory();
+      final data = await ref.read(rideFlowRepositoryProvider).listRiderRides();
       if (mounted) {
         setState(() {
-          _rides = (data['ride_requests'] as List? ?? [])
-              .cast<RideFlowPayload>()
+          _rides = data
               .where(
                 (ride) =>
-                    ride['status'] == 'cancelled' ||
-                    [
-                      'completed',
-                      'cancelled',
-                    ].contains(ride['trip']?['status']),
+                    ride.status == 'cancelled' ||
+                    ['completed', 'cancelled'].contains(ride.trip?.status),
               )
               .toList();
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _error = '$e');
-      }
+      if (mounted) setState(() => _error = '$e');
     } finally {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -576,27 +599,23 @@ class _RiderRideHistoryState extends ConsumerState<RiderRideHistory> {
   Widget build(BuildContext context) => ExpansionTile(
     title: const Text('Recent rides'),
     onExpansionChanged: (open) {
-      if (open) {
-        _load();
-      }
+      if (open) _load();
     },
     children: [
       if (_loading) const LinearProgressIndicator(),
       if (_error != null) Text(_error!),
       if (_rides?.isEmpty == true)
         const Text('No completed or cancelled rides.'),
-      for (final ride in _rides ?? <RideFlowPayload>[])
+      for (final ride in _rides ?? <RiderRideSnapshot>[])
         ListTile(
-          title: Text(
-            statusText((ride['trip']?['status'] ?? ride['status']) as String?),
-          ),
+          title: Text(statusText(ride.trip?.status ?? ride.status)),
           subtitle: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('${ride['created_at']}'),
-              if (ride['trip'] != null) ...[
-                OperationDetails(ride['trip']['operation_context']),
-                Text(settlementText(ride['trip']['settlement'])),
+              Text('${ride.createdAt}'),
+              if (ride.trip != null) ...[
+                OperationDetails(ride.trip!.operationContext),
+                Text(settlementText(ride.trip!.settlement)),
               ],
             ],
           ),

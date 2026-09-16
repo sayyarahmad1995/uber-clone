@@ -1,4 +1,9 @@
+import 'package:uber_clone/core/network/api_exception.dart';
 import 'package:uber_clone/features/ride_flow/ride_flow_repository.dart';
+import 'package:uber_clone/features/ride_flow/domain/marketplace_request.dart';
+import 'package:uber_clone/features/ride_flow/domain/ride_offer.dart';
+import 'package:uber_clone/features/ride_flow/domain/ride_snapshot.dart';
+import 'package:uber_clone/features/ride_flow/domain/trip.dart';
 import 'package:uber_clone/features/driver_workspace/domain/operating_state.dart';
 import 'package:uber_clone/features/driver_workspace/domain/registered_vehicle.dart';
 import 'package:uber_clone/core/models/account.dart';
@@ -10,7 +15,8 @@ import 'package:uber_clone/features/driver_workspace/domain/driver_onboarding.da
 import 'package:uber_clone/features/driver_workspace/domain/driver_profile.dart';
 import 'package:uber_clone/features/rider_request/data/device_location.dart';
 import 'package:uber_clone/features/rider_request/data/ride_request_repository.dart';
-import 'package:uber_clone/features/rider_request/domain/ride_request.dart';
+import 'package:uber_clone/features/rider_request/domain/ride_request.dart'
+    hide TripSnapshot;
 
 const riderAccount = Account(id: 'user-1', capabilities: [Capability.rider]);
 const bothCapabilities = Account(
@@ -247,52 +253,44 @@ class FakeDriverOnboardingRepository implements DriverOnboardingRepository {
   }
 }
 
-// Existing dashboard tests isolate networking; flow behavior has dedicated tests.
 class FakeRideFlowRepository implements RideFlowRepository {
   @override
-  Future<RideFlowPayload?> loadDriverTrip() async => null;
+  Future<List<MarketplaceRequest>> listMarketplaceRequests() async => const [];
   @override
-  Future<RideFlowPayload> loadDriverOpportunities() async => {
-    'ride_requests': <RideFlowPayload>[],
-  };
+  Future<TripSnapshot?> getCurrentDriverTrip() async => null;
   @override
-  Future<RideFlowPayload> loadDriverHistory() async => {
-    'trips': <RideFlowPayload>[],
-  };
+  Future<List<DriverTripHistoryItem>> listDriverTrips() async => const [];
   @override
-  Future<RideFlowPayload> loadRiderRide(String id) async => {
-    'id': id,
-    'status': 'requested',
-    'trip': null,
-  };
+  Future<List<RiderRideSnapshot>> listRiderRides() async => const [];
   @override
-  Future<RideFlowPayload> loadRiderHistory() async => {
-    'ride_requests': <RideFlowPayload>[],
-  };
+  Future<RiderRideSnapshot> getRiderRide(String rideRequestId) {
+    throw const ApiException('not_found', 'No ride', statusCode: 404);
+  }
+
   @override
-  Future<RideFlowPayload> loadRiderOffers(String id) async => {
-    'offers': <RideFlowPayload>[],
-  };
+  Future<List<RiderOfferComparison>> listRiderOffers(
+    String rideRequestId,
+  ) async => const [];
   @override
-  Future<RideFlowPayload?> loadDriverLocation(String id) async => null;
+  Future<DriverLocationSnapshot?> getDriverLocation(
+    String rideRequestId,
+  ) async => null;
   @override
-  Future<void> acceptFare(String id) async {}
+  Future<void> submitOffer(String rideRequestId, int amountMinor) async {}
   @override
-  Future<void> proposeFare(String id, int amountMinor) async {}
+  Future<void> acceptProposedFare(String rideRequestId) async {}
   @override
   Future<void> selectOffer(
-    String id,
+    String rideRequestId,
     String driverUserId,
-    String updatedAt,
+    DateTime updatedAt,
   ) async {}
   @override
-  Future<void> rejectOffer(String id, String driverUserId) async {}
+  Future<void> startTrip(String rideRequestId) async {}
   @override
-  Future<void> startTrip(String id) async {}
+  Future<void> completeTrip(String rideRequestId) async {}
   @override
-  Future<void> completeTrip(String id) async {}
+  Future<void> confirmCashCollected(String rideRequestId) async {}
   @override
-  Future<void> cancelTrip(String id) async {}
-  @override
-  Future<void> confirmCashCollected(String id) async {}
+  Future<void> cancelDriverTrip(String rideRequestId) async {}
 }

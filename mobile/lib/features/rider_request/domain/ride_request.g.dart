@@ -26,11 +26,37 @@ Map<String, dynamic> _$MoneyToJson(_Money instance) => <String, dynamic>{
   'currency': instance.currency,
 };
 
+_SettlementSnapshot _$SettlementSnapshotFromJson(Map<String, dynamic> json) =>
+    _SettlementSnapshot(
+      status: json['status'] as String,
+      method: json['method'] as String?,
+      cashCollectedAt: json['cash_collected_at'] == null
+          ? null
+          : DateTime.parse(json['cash_collected_at'] as String),
+    );
+
+Map<String, dynamic> _$SettlementSnapshotToJson(_SettlementSnapshot instance) =>
+    <String, dynamic>{
+      'status': instance.status,
+      'method': instance.method,
+      'cash_collected_at': instance.cashCollectedAt?.toIso8601String(),
+    };
+
 _TripSnapshot _$TripSnapshotFromJson(Map<String, dynamic> json) =>
-    _TripSnapshot(status: json['status'] as String);
+    _TripSnapshot(
+      status: json['status'] as String,
+      settlement: json['settlement'] == null
+          ? null
+          : SettlementSnapshot.fromJson(
+              json['settlement'] as Map<String, dynamic>,
+            ),
+    );
 
 Map<String, dynamic> _$TripSnapshotToJson(_TripSnapshot instance) =>
-    <String, dynamic>{'status': instance.status};
+    <String, dynamic>{
+      'status': instance.status,
+      'settlement': instance.settlement,
+    };
 
 _RideRequest _$RideRequestFromJson(Map<String, dynamic> json) => _RideRequest(
   id: json['id'] as String,

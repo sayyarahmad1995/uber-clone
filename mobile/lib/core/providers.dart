@@ -3,7 +3,9 @@ import '../features/driver_workspace/domain/registered_vehicle.dart';
 import 'package:dio/dio.dart';
 
 import '../features/ride_flow/ride_flow_repository.dart';
-import '../features/ride_flow/ride_flow_controller.dart';
+import '../features/ride_flow/application/driver_marketplace_controller.dart';
+import '../features/ride_flow/application/driver_trip_controller.dart';
+import '../features/ride_flow/application/rider_active_ride_controller.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -77,14 +79,31 @@ final rideFlowRepositoryProvider = Provider<RideFlowRepository>(
     ref.watch(sessionStoreProvider),
   ),
 );
-final rideFlowControllerProvider = ChangeNotifierProvider.autoDispose
-    .family<RideFlowController, String>((ref, key) {
-      ref.watch(sessionControllerProvider.select((s) => s.state.account?.id));
-      return RideFlowController(
-        ref.watch(rideFlowRepositoryProvider),
-        mode: key == 'driver' ? RideFlowMode.driver : RideFlowMode.rider,
-        rideId: key == 'driver' ? null : key,
+final riderActiveRideControllerProvider = ChangeNotifierProvider.autoDispose
+    .family<RiderActiveRideController, String>((ref, rideId) {
+      ref.watch(
+        sessionControllerProvider.select((state) => state.state.account?.id),
       );
+      return RiderActiveRideController(
+        ref.watch(rideFlowRepositoryProvider),
+        rideId: rideId,
+      );
+    });
+
+final driverMarketplaceControllerProvider =
+    ChangeNotifierProvider.autoDispose<DriverMarketplaceController>((ref) {
+      ref.watch(
+        sessionControllerProvider.select((state) => state.state.account?.id),
+      );
+      return DriverMarketplaceController(ref.watch(rideFlowRepositoryProvider));
+    });
+
+final driverTripControllerProvider =
+    ChangeNotifierProvider.autoDispose<DriverTripController>((ref) {
+      ref.watch(
+        sessionControllerProvider.select((state) => state.state.account?.id),
+      );
+      return DriverTripController(ref.watch(rideFlowRepositoryProvider));
     });
 final riderRequestControllerProvider =
     ChangeNotifierProvider.autoDispose<RiderRequestController>((ref) {
