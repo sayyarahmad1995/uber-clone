@@ -58,7 +58,7 @@ func TestExpiryServiceSweepMaterializesMarketplaceTerminalStates(t *testing.T) {
 	}
 
 	closedRides := make(map[string]uuid.UUID)
-	for _, status := range []string{"accepted", "cancelled"} {
+	for _, status := range []string{"accepted", "cancelled", "expired"} {
 		rideID := createTripIntegrationRide(t, db, riderID)
 		closureDriverID := createTripIntegrationDriver(t, db)
 		insertTripIntegrationOffer(t, db, rideID, closureDriverID)
