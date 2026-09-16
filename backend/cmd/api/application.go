@@ -73,6 +73,7 @@ func newApplication(cfg config) (application, func(), error) {
 		AdminReviewPassword:    cfg.AdminReviewPassword,
 		AdminReviewOrigin:      cfg.AdminReviewOrigin,
 	})
+
 	presenceCtx, cancelPresence := context.WithCancel(context.Background())
 	presenceDone := make(chan struct{})
 	go func() {
@@ -93,8 +94,33 @@ func newApplication(cfg config) (application, func(), error) {
 			}
 		}
 	}()
+
+	expiryService := marketplace.NewExpiryService(db)
+	expiryCtx, cancelExpiry := context.WithCancel(context.Background())
+	expiryDone := make(chan struct{})
+	go func() {
+		defer close(expiryDone)
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		for {
+			ctx, cancel := context.WithTimeout(expiryCtx, 5*time.Second)
+			err := expiryService.Sweep(ctx)
+			cancel()
+			if err != nil && expiryCtx.Err() == nil {
+				slog.Error("sweep marketplace expiry", "error", err)
+			}
+			select {
+			case <-expiryCtx.Done():
+				return
+			case <-ticker.C:
+			}
+		}
+	}()
+
 	return application{handler: api.Handler()}, func() {
+		cancelExpiry()
 		cancelPresence()
+		<-expiryDone
 		<-presenceDone
 		cleanup()
 	}, nil
