@@ -13,7 +13,7 @@ func health(w http.ResponseWriter, _ *http.Request) {
 func (api *API) ready(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
-	if err := api.db.PingContext(ctx); err != nil {
+	if err := api.health.PingContext(ctx); err != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "unavailable"})
 		return
 	}

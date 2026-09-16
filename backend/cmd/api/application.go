@@ -51,8 +51,10 @@ func newApplication(cfg config) (application, func(), error) {
 	marketplaceAssignmentService := marketplace.NewAssignmentService(
 		marketplace.NewPostgresAssignmentRepository(db),
 	)
+	marketplacePolicyService := marketplace.NewPolicyService(db)
 	driverOnboardingRepository := driveronboarding.NewPostgresRepository(db)
 	api := httpapi.New(httpapi.Dependencies{
+		Health:                 db,
 		Users:                  user.NewService(user.NewPostgresRepository(db)),
 		Drivers:                driver.NewService(driver.NewPostgresRepository(db)),
 		DriverOnboarding:       driveronboarding.NewService(driverOnboardingRepository),
@@ -65,8 +67,8 @@ func newApplication(cfg config) (application, func(), error) {
 		Cancellations:          cancellation.NewService(cancellation.NewPostgresRepository(db)),
 		Offers:                 offer.NewService(offer.NewPostgresRepository(db)),
 		MarketplaceAssignments: marketplaceAssignmentService,
+		MarketplacePolicy:      marketplacePolicyService,
 		Trips:                  tripService,
-		DB:                     db,
 		Identity:               identityProvider,
 		Auth:                   auth.NewHandler(auth.NewService(authProvider)),
 		AdminReviewUsername:    cfg.AdminReviewUsername,

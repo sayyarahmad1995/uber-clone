@@ -54,6 +54,12 @@ jobs:
             echo "$unformatted"
             exit 1
           fi
+      - name: Guard HTTP database boundary
+        run: |
+          if grep -R -n -E 'api\.db|DB[[:space:]]*\*sql\.DB' backend/internal/httpapi; then
+            echo "httpapi must not access database directly"
+            exit 1
+          fi
       - run: go vet ./...
         working-directory: backend
       - run: go test -p 1 ./...
@@ -68,7 +74,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - run: |
-          git clone --depth 1 --branch stable https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          git clone --depth 1 --branch 3.47.2 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
           echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
       - run: flutter pub get
         working-directory: mobile
