@@ -16,7 +16,13 @@ func TestExpiryServiceSweepMaterializesMarketplaceTerminalStates(t *testing.T) {
 
 	expiredOfferRide := createTripIntegrationRide(t, db, riderID)
 	insertTripIntegrationOffer(t, db, expiredOfferRide, driverID)
-	if _, err := db.Exec(`UPDATE ride_offers SET expires_at=statement_timestamp()-INTERVAL '1 second' WHERE ride_request_id=$1`, expiredOfferRide); err != nil {
+	if _, err := db.Exec(`
+		UPDATE ride_offers
+		SET created_at=statement_timestamp()-INTERVAL '2 minutes',
+		    updated_at=statement_timestamp()-INTERVAL '2 minutes',
+		    expires_at=statement_timestamp()-INTERVAL '1 second'
+		WHERE ride_request_id=$1
+	`, expiredOfferRide); err != nil {
 		t.Fatal(err)
 	}
 
@@ -30,7 +36,12 @@ func TestExpiryServiceSweepMaterializesMarketplaceTerminalStates(t *testing.T) {
 	}
 
 	expiredRide := createTripIntegrationRide(t, db, riderID)
-	if _, err := db.Exec(`UPDATE ride_requests SET expires_at=statement_timestamp()-INTERVAL '1 second' WHERE id=$1`, expiredRide); err != nil {
+	if _, err := db.Exec(`
+		UPDATE ride_requests
+		SET created_at=statement_timestamp()-INTERVAL '2 minutes',
+		    expires_at=statement_timestamp()-INTERVAL '1 second'
+		WHERE id=$1
+	`, expiredRide); err != nil {
 		t.Fatal(err)
 	}
 
