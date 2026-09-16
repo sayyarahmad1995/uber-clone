@@ -33,7 +33,7 @@ func TestExpiryServiceSweepMaterializesMarketplaceTerminalStates(t *testing.T) {
 			ride_request_id,
 			driver_user_id,
 			status,
-			created_at,
+			opened_at,
 			visible_until
 		)
 		VALUES (
