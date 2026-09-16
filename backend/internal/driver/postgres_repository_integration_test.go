@@ -48,65 +48,6 @@ func TestPostgresRepositoryListsMultipleVehiclesForDriver(t *testing.T) {
 	}
 }
 
-func TestPostgresRepositoryLegacyProfileUsesStableVehicle(t *testing.T) {
-	db := openDriverIntegrationDB(t)
-	userID := createDriverIntegrationUser(t, db)
-	repository := NewPostgresRepository(db)
-
-	if _, err := db.Exec(`
-		INSERT INTO driver_profiles (user_id, display_name, status, is_online)
-		VALUES ($1, 'Test Driver', 'active', FALSE)
-	`, userID); err != nil {
-		t.Fatalf("insert Driver profile: %v", err)
-	}
-	firstVehicleID := uuid.New()
-	secondVehicleID := uuid.New()
-	if _, err := db.Exec(`
-		INSERT INTO driver_vehicles (id, driver_user_id, make, model, model_year, color, license_plate, created_at, updated_at)
-		VALUES
-			($1, $3, 'Toyota', 'Corolla', 2024, 'White', 'ABC-123', NOW(), NOW()),
-			($2, $3, 'Honda', 'Civic', 2023, 'Black', 'XYZ-789', NOW() + INTERVAL '1 second', NOW())
-	`, firstVehicleID, secondVehicleID, userID); err != nil {
-		t.Fatalf("insert Driver vehicles: %v", err)
-	}
-
-	profile, err := repository.FindByUserID(context.Background(), userID)
-	if err != nil {
-		t.Fatalf("load legacy Driver profile: %v", err)
-	}
-	if profile.Vehicle.ID != firstVehicleID {
-		t.Fatalf("legacy Driver profile did not use stable first vehicle: %#v", profile.Vehicle)
-	}
-
-	updated, err := repository.UpsertProfile(context.Background(), userID, OnboardingInput{
-		DisplayName: "Updated Driver",
-		Vehicle: VehicleInput{
-			Make:         "Suzuki",
-			Model:        "Swift",
-			ModelYear:    2022,
-			Color:        "Blue",
-			LicensePlate: "NEW-456",
-		},
-	})
-	if err != nil {
-		t.Fatalf("update legacy Driver profile: %v", err)
-	}
-	if updated.Vehicle.ID != firstVehicleID || updated.Vehicle.LicensePlate != "NEW-456" {
-		t.Fatalf("legacy update did not update stable first vehicle: %#v", updated.Vehicle)
-	}
-
-	vehicles, err := repository.ListVehicles(context.Background(), userID)
-	if err != nil {
-		t.Fatalf("list Driver vehicles after legacy update: %v", err)
-	}
-	if len(vehicles) != 2 {
-		t.Fatalf("legacy update inserted or removed vehicles: %#v", vehicles)
-	}
-	if vehicles[1].ID != secondVehicleID || vehicles[1].LicensePlate != "XYZ-789" {
-		t.Fatalf("legacy update changed non-selected vehicle: %#v", vehicles[1])
-	}
-}
-
 func openDriverIntegrationDB(t *testing.T) *sql.DB {
 	t.Helper()
 	databaseURL := os.Getenv("TEST_DATABASE_URL")

@@ -12,17 +12,6 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/trip"
 )
 
-func TestOnboardDriverRequestUsesPublicPresentationContract(t *testing.T) {
-	var request onboardDriverRequest
-	if err := json.NewDecoder(strings.NewReader(`{"display_name":"Sayyar Ahmad","vehicle":{"make":"Toyota","model":"Corolla","model_year":2024,"color":"White","license_plate":"ABC-123"}}`)).Decode(&request); err != nil {
-		t.Fatalf("decode request: %v", err)
-	}
-	input := request.input()
-	if input.DisplayName != "Sayyar Ahmad" || input.Vehicle.Make != "Toyota" || input.Vehicle.Model != "Corolla" || input.Vehicle.ModelYear != 2024 || input.Vehicle.Color != "White" || input.Vehicle.LicensePlate != "ABC-123" {
-		t.Fatalf("unexpected onboarding input: %#v", input)
-	}
-}
-
 func TestDriverAvailabilityRequestUsesIsOnlineContract(t *testing.T) {
 	var request driverAvailabilityRequest
 	if err := json.NewDecoder(strings.NewReader(`{"is_online":true}`)).Decode(&request); err != nil {

@@ -13,65 +13,6 @@ type PostgresRepository struct{ db *sql.DB }
 
 func NewPostgresRepository(db *sql.DB) PostgresRepository { return PostgresRepository{db: db} }
 
-func (r PostgresRepository) UpsertProfile(ctx context.Context, userID uuid.UUID, input OnboardingInput) (Profile, error) {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return Profile{}, err
-	}
-	defer tx.Rollback()
-
-	now := time.Now().UTC()
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO driver_profiles (user_id, display_name, status, is_online, created_at, updated_at)
-		VALUES ($1, $2, $3, FALSE, $4, $4)
-		ON CONFLICT (user_id) DO UPDATE SET
-			display_name = EXCLUDED.display_name,
-			status = EXCLUDED.status,
-			updated_at = EXCLUDED.updated_at
-	`, userID, input.DisplayName, StatusActive, now); err != nil {
-		return Profile{}, err
-	}
-
-	vehicle := input.Vehicle
-	var vehicleID uuid.UUID
-	err = tx.QueryRowContext(ctx, `
-		SELECT id
-		FROM driver_vehicles
-		WHERE driver_user_id = $1
-		ORDER BY created_at ASC, id ASC
-		LIMIT 1
-	`, userID).Scan(&vehicleID)
-	if errors.Is(err, sql.ErrNoRows) {
-		vehicleID = uuid.New()
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO driver_vehicles (id, driver_user_id, make, model, model_year, color, license_plate, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
-		`, vehicleID, userID, vehicle.Make, vehicle.Model, vehicle.ModelYear, vehicle.Color, vehicle.LicensePlate, now); err != nil {
-			return Profile{}, err
-		}
-	} else if err != nil {
-		return Profile{}, err
-	} else {
-		if _, err := tx.ExecContext(ctx, `
-			UPDATE driver_vehicles
-			SET make = $2,
-			    model = $3,
-			    model_year = $4,
-			    color = $5,
-			    license_plate = $6,
-			    updated_at = $7
-			WHERE id = $1
-		`, vehicleID, vehicle.Make, vehicle.Model, vehicle.ModelYear, vehicle.Color, vehicle.LicensePlate, now); err != nil {
-			return Profile{}, err
-		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return Profile{}, err
-	}
-	return r.FindByUserID(ctx, userID)
-}
-
 func (r PostgresRepository) FindByUserID(ctx context.Context, userID uuid.UUID) (Profile, error) {
  if err := r.expirePresence(ctx,userID); err != nil { return Profile{}, err }
 	var p Profile
