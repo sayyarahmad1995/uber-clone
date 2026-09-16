@@ -31,6 +31,23 @@ type QueryRower interface {
 	QueryRowContext(context.Context, string, ...any) *sql.Row
 }
 
+type PolicyService interface {
+	Load(context.Context) (TimingPolicy, error)
+	Update(context.Context, TimingPolicy, string) (TimingPolicy, error)
+}
+
+type policyService struct{ db QueryRower }
+
+func NewPolicyService(db QueryRower) PolicyService { return policyService{db: db} }
+
+func (s policyService) Load(ctx context.Context) (TimingPolicy, error) {
+	return LoadTimingPolicy(ctx, s.db)
+}
+
+func (s policyService) Update(ctx context.Context, policy TimingPolicy, actor string) (TimingPolicy, error) {
+	return UpdateTimingPolicy(ctx, s.db, policy, actor)
+}
+
 func LoadTimingPolicy(ctx context.Context, db QueryRower) (TimingPolicy, error) {
 	var policy TimingPolicy
 	if err := db.QueryRowContext(ctx, `

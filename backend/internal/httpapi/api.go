@@ -1,7 +1,7 @@
 package httpapi
 
 import (
-	"database/sql"
+	"context"
 	"net/http"
 
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/auth"
@@ -21,6 +21,7 @@ import (
 )
 
 type Dependencies struct {
+	Health                 interface{ PingContext(context.Context) error }
 	Users                  user.Service
 	Drivers                driver.Service
 	DriverOnboarding       driveronboarding.Service
@@ -33,8 +34,8 @@ type Dependencies struct {
 	Cancellations          cancellation.Service
 	Offers                 offer.Service
 	MarketplaceAssignments marketplace.AssignmentService
+	MarketplacePolicy      marketplace.PolicyService
 	Trips                  trip.Service
-	DB                     *sql.DB
 	Identity               identity.Provider
 	Auth                   auth.Handler
 	AdminReviewUsername    string
@@ -43,6 +44,7 @@ type Dependencies struct {
 }
 
 type API struct {
+	health                 interface{ PingContext(context.Context) error }
 	users                  user.Service
 	drivers                driver.Service
 	driverOnboarding       driveronboarding.Service
@@ -55,8 +57,8 @@ type API struct {
 	cancellations          cancellation.Service
 	offers                 offer.Service
 	marketplaceAssignments marketplace.AssignmentService
+	marketplacePolicy      marketplace.PolicyService
 	trips                  trip.Service
-	db                     *sql.DB
 	identity               identity.Provider
 	auth                   auth.Handler
 	adminReviewUsername    string
@@ -66,6 +68,7 @@ type API struct {
 
 func New(deps Dependencies) *API {
 	return &API{
+		health:                 deps.Health,
 		users:                  deps.Users,
 		drivers:                deps.Drivers,
 		driverOnboarding:       deps.DriverOnboarding,
@@ -78,8 +81,8 @@ func New(deps Dependencies) *API {
 		cancellations:          deps.Cancellations,
 		offers:                 deps.Offers,
 		marketplaceAssignments: deps.MarketplaceAssignments,
+		marketplacePolicy:      deps.MarketplacePolicy,
 		trips:                  deps.Trips,
-		db:                     deps.DB,
 		identity:               deps.Identity,
 		auth:                   deps.Auth,
 		adminReviewUsername:    deps.AdminReviewUsername,

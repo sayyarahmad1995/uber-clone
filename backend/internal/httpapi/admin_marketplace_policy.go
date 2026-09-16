@@ -56,7 +56,7 @@ body{font-family:system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0
 </html>`))
 
 func (api *API) getAdminMarketplaceTimingPolicy(w http.ResponseWriter, r *http.Request) {
-	policy, err := marketplace.LoadTimingPolicy(r.Context(), api.db)
+	policy, err := api.marketplacePolicy.Load(r.Context())
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "unable to load marketplace timing policy"})
 		return
@@ -72,7 +72,7 @@ func (api *API) updateAdminMarketplaceTimingPolicy(w http.ResponseWriter, r *htt
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request"})
 		return
 	}
-	policy, err := marketplace.UpdateTimingPolicy(r.Context(), api.db, timingPolicyFromAdminRequest(body), adminReviewer(r))
+	policy, err := api.marketplacePolicy.Update(r.Context(), timingPolicyFromAdminRequest(body), adminReviewer(r))
 	if err != nil {
 		writeMarketplacePolicyError(w, err)
 		return
@@ -81,7 +81,7 @@ func (api *API) updateAdminMarketplaceTimingPolicy(w http.ResponseWriter, r *htt
 }
 
 func (api *API) adminOperationsIndex(w http.ResponseWriter, r *http.Request) {
-	policy, err := marketplace.LoadTimingPolicy(r.Context(), api.db)
+	policy, err := api.marketplacePolicy.Load(r.Context())
 	if err != nil {
 		http.Error(w, "Unable to load marketplace timing policy", http.StatusInternalServerError)
 		return
@@ -110,7 +110,7 @@ func (api *API) adminUpdateMarketplaceTimingPolicy(w http.ResponseWriter, r *htt
 		http.Error(w, "Invalid marketplace timing policy", http.StatusBadRequest)
 		return
 	}
-	_, err = marketplace.UpdateTimingPolicy(r.Context(), api.db, marketplace.TimingPolicy{
+	_, err = api.marketplacePolicy.Update(r.Context(), marketplace.TimingPolicy{
 		RideRequestTTLSeconds:       rideTTL,
 		DriverOpportunityTTLSeconds: opportunityTTL,
 		OfferDecisionTTLSeconds:     offerTTL,
