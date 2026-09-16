@@ -7,13 +7,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/driver"
-	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 )
 
 func (r PostgresRepository) ListForRider(ctx context.Context, rideRequestID, riderUserID uuid.UUID) ([]RiderOffer, error) {
-	if err := marketplace.Expire(ctx, r.db); err != nil {
-		return nil, err
-	}
 	var status string
 	var amount sql.NullInt64
 	var currency sql.NullString
