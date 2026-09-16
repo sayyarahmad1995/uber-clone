@@ -13,7 +13,8 @@ func TestRiderReadRejectsExpiredDeadlineBeforeExpirySweep(t *testing.T) {
 
 	if _, err := db.Exec(`
 		UPDATE ride_requests
-		SET expires_at=statement_timestamp()-INTERVAL '1 second'
+		SET created_at=statement_timestamp()-INTERVAL '2 minutes',
+		    expires_at=statement_timestamp()-INTERVAL '1 second'
 		WHERE id=$1
 	`, rideID); err != nil {
 		t.Fatal(err)
