@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/sayyarahmad1995/uber-clone/backend/internal/trip"
 )
 
 var (
@@ -100,7 +99,6 @@ type ServiceSummary struct {
 
 type Submission struct {
 	Offer Offer
-	Trip  *trip.Trip
 }
 
 type Repository interface {
@@ -115,11 +113,10 @@ type Repository interface {
 
 type Service struct {
 	repository Repository
-	trips      trip.Service
 }
 
-func NewService(repository Repository, trips trip.Service) Service {
-	return Service{repository: repository, trips: trips}
+func NewService(repository Repository) Service {
+	return Service{repository: repository}
 }
 
 func (s Service) Discover(ctx context.Context, driverUserID uuid.UUID) ([]DiscoveryItem, error) {
@@ -164,29 +161,8 @@ func (s Service) ListForRider(ctx context.Context, rideRequestID, riderUserID uu
 	return s.repository.ListForRider(ctx, rideRequestID, riderUserID)
 }
 
-func (s Service) Accept(ctx context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID, expectedVersion ...time.Time) (trip.Trip, error) {
-	result, err := s.trips.SelectOffer(ctx, rideRequestID, riderUserID, driverUserID, expectedVersion...)
-	if err != nil {
-		return trip.Trip{}, mapTripAssignmentError(err)
-	}
-	return result, nil
-}
-
 func (s Service) Reject(ctx context.Context, rideRequestID, riderUserID, driverUserID uuid.UUID) (Offer, error) {
 	return s.repository.Reject(ctx, rideRequestID, riderUserID, driverUserID)
-}
-
-func mapTripAssignmentError(err error) error {
-	switch {
-	case errors.Is(err, trip.ErrMarketplaceNotOpen):
-		return ErrRideNotOpen
-	case errors.Is(err, trip.ErrMarketplaceOfferGone):
-		return ErrOfferNotActionable
-	case errors.Is(err, trip.ErrDriverUnavailable):
-		return ErrDriverIneligible
-	default:
-		return err
-	}
 }
 
 func Bounds(proposedAmountMinor int64) (int64, int64) {

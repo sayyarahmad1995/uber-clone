@@ -64,18 +64,3 @@ func TestServiceDelegatesDriverOwnedTripLifecycle(t *testing.T) {
 		t.Fatalf("unexpected cash collection delegation: %#v", repository)
 	}
 }
-
-func TestServiceDelegatesMarketplaceAssignment(t *testing.T) {
-	rideID := uuid.New()
-	riderID := uuid.New()
-	driverID := uuid.New()
-	repository := &fakeRepository{trip: Trip{RideRequestID: rideID, RiderUserID: riderID, DriverUserID: driverID}}
-	service := NewService(repository)
-
-	if _, err := service.SelectOffer(context.Background(), rideID, riderID, driverID); err != nil {
-		t.Fatalf("select offer: %v", err)
-	}
-	if repository.operation != "select_offer" || repository.riderID != riderID {
-		t.Fatalf("unexpected offer selection delegation: %#v", repository)
-	}
-}

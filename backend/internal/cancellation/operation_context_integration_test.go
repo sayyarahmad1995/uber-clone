@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/drivertrip"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/offer"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/ridestatus"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/trip"
@@ -20,6 +21,7 @@ func TestMarketplaceRequiresMatchingReviewedOperationAndPreservesTrip(t *testing
 	driverID := createCancellationDriver(t, db)
 	rideID := createCancellationRide(t, db, rider)
 	offers := geoOffers(db)
+	assignments := marketplace.NewAssignmentService(marketplace.NewPostgresAssignmentRepository(db))
 	mustExec := func(query string, args ...any) {
 		t.Helper()
 		if _, err := db.Exec(query, args...); err != nil {
@@ -40,7 +42,8 @@ func TestMarketplaceRequiresMatchingReviewedOperationAndPreservesTrip(t *testing
 		t.Fatalf("wrong service offer: %v", err)
 	}
 	mustExec(`UPDATE ride_requests SET service_code='economy' WHERE id=$1`, rideID)
-	if _, err := offers.AcceptProposed(ctx, rideID, driverID); err != nil {
+	submission, err := offers.AcceptProposed(ctx, rideID, driverID)
+	if err != nil {
 		t.Fatal(err)
 	}
 	second := uuid.New()
@@ -51,7 +54,7 @@ func TestMarketplaceRequiresMatchingReviewedOperationAndPreservesTrip(t *testing
 	if err != nil || len(comparison) != 1 || comparison[0].Selectable || comparison[0].Vehicle.Model != "Car" {
 		t.Fatalf("changed operation selectable or snapshot lost: %+v %v", comparison, err)
 	}
-	if _, err := offers.Accept(ctx, rideID, rider, driverID); !errors.Is(err, offer.ErrDriverIneligible) {
+	if _, err := assignments.SelectOffer(ctx, rideID, rider, driverID, submission.Offer.UpdatedAt); !errors.Is(err, marketplace.ErrDriverUnavailable) {
 		t.Fatalf("stale operation assigned: %v", err)
 	}
 	if _, err := offers.Submit(ctx, rideID, driverID, 110000); !errors.Is(err, offer.ErrOpportunityNotOpen) {
@@ -60,10 +63,11 @@ func TestMarketplaceRequiresMatchingReviewedOperationAndPreservesTrip(t *testing
 
 	// A new ride can snapshot the newly selected vehicle/service operation.
 	freshRideID := createCancellationRide(t, db, rider)
-	if _, err := offers.Submit(ctx, freshRideID, driverID, 110000); err != nil {
+	freshSubmission, err := offers.Submit(ctx, freshRideID, driverID, 110000)
+	if err != nil {
 		t.Fatalf("fresh ride offer: %v", err)
 	}
-	assigned, err := offers.Accept(ctx, freshRideID, rider, driverID)
+	assigned, err := assignments.SelectOffer(ctx, freshRideID, rider, driverID, freshSubmission.Offer.UpdatedAt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,13 +104,15 @@ func TestMarketplaceFailsClosedWithoutEnrollment(t *testing.T) {
 	driverID := createCancellationDriver(t, db)
 	rideID := createCancellationRide(t, db, rider)
 	offers := geoOffers(db)
-	if _, err := offers.AcceptProposed(ctx, rideID, driverID); err != nil {
+	assignments := marketplace.NewAssignmentService(marketplace.NewPostgresAssignmentRepository(db))
+	submission, err := offers.AcceptProposed(ctx, rideID, driverID)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(`DELETE FROM driver_vehicle_service_enrollments WHERE vehicle_id IN (SELECT id FROM driver_vehicles WHERE driver_user_id=$1)`, driverID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := offers.Accept(ctx, rideID, rider, driverID); !errors.Is(err, offer.ErrDriverIneligible) {
+	if _, err := assignments.SelectOffer(ctx, rideID, rider, driverID, submission.Offer.UpdatedAt); !errors.Is(err, marketplace.ErrDriverUnavailable) {
 		t.Fatalf("revoked approval assigned: %v", err)
 	}
 	if _, err := offers.AcceptProposed(ctx, rideID, driverID); !errors.Is(err, offer.ErrOpportunityNotOpen) {
@@ -128,7 +134,8 @@ func TestDriverCannotReviseSubmittedOffer(t *testing.T) {
 	if _, err := offers.Submit(ctx, rideID, driverID, 120000); !errors.Is(err, offer.ErrOpportunityNotOpen) {
 		t.Fatalf("submitted offer was revised: %v", err)
 	}
-	if _, err := offers.Accept(ctx, rideID, rider, driverID, first.Offer.UpdatedAt); err != nil {
+	assignments := marketplace.NewAssignmentService(marketplace.NewPostgresAssignmentRepository(db))
+	if _, err := assignments.SelectOffer(ctx, rideID, rider, driverID, first.Offer.UpdatedAt); err != nil {
 		t.Fatalf("Rider could not accept original displayed offer: %v", err)
 	}
 }
@@ -181,10 +188,12 @@ func TestLegacyTripWithNullContextRemainsReadableAndExecutable(t *testing.T) {
 	driverID := createCancellationDriver(t, db)
 	rideID := createCancellationRide(t, db, rider)
 	offers := geoOffers(db)
-	if _, err := offers.AcceptProposed(ctx, rideID, driverID); err != nil {
+	assignments := marketplace.NewAssignmentService(marketplace.NewPostgresAssignmentRepository(db))
+	submission, err := offers.AcceptProposed(ctx, rideID, driverID)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := offers.Accept(ctx, rideID, rider, driverID); err != nil {
+	if _, err := assignments.SelectOffer(ctx, rideID, rider, driverID, submission.Offer.UpdatedAt); err != nil {
 		t.Fatal(err)
 	}
 	// Pre-migration trips have no captured context. Never fabricate one on read.

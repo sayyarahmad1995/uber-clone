@@ -262,18 +262,53 @@ func createCancellationRide(t *testing.T, db *sql.DB, riderID uuid.UUID) uuid.UU
 	return rideID
 }
 
-func insertCancellationTrip(t *testing.T, db *sql.DB, rideID, riderID, driverID uuid.UUID, status trip.Status) time.Time {
+func insertCancellationTrip(
+	t *testing.T,
+	db *sql.DB,
+	rideID, riderID, driverID uuid.UUID,
+	status trip.Status,
+) time.Time {
 	t.Helper()
+
 	insertCancellationOffer(t, db, rideID, driverID)
-	repository := trip.NewPostgresRepository(db)
-	if _, err := repository.SelectOffer(context.Background(), rideID, riderID, driverID); err != nil {
-		t.Fatalf("select offer: %v", err)
+
+	if _, err := db.Exec(`
+		INSERT INTO trips (
+			ride_request_id,
+			rider_user_id,
+			driver_user_id,
+			assigned_at,
+			operation_context
+		)
+		SELECT
+			$1,
+			$2,
+			$3,
+			statement_timestamp(),
+			operation_context
+		FROM ride_offers
+		WHERE ride_request_id = $1
+		  AND driver_user_id = $3
+	`, rideID, riderID, driverID); err != nil {
+		t.Fatalf("insert assigned trip: %v", err)
 	}
+
+	if _, err := db.Exec(`
+		UPDATE ride_requests
+		SET status = 'accepted'
+		WHERE id = $1
+	`, rideID); err != nil {
+		t.Fatalf("mark ride accepted: %v", err)
+	}
+
+	repository := trip.NewPostgresRepository(db)
+
 	if status == trip.StatusInProgress || status == trip.StatusCompleted {
 		if _, err := repository.Start(context.Background(), rideID, driverID); err != nil {
 			t.Fatalf("start: %v", err)
 		}
 	}
+
 	if status == trip.StatusCompleted {
 		completed, err := repository.Complete(context.Background(), rideID, driverID)
 		if err != nil {
@@ -281,6 +316,7 @@ func insertCancellationTrip(t *testing.T, db *sql.DB, rideID, riderID, driverID 
 		}
 		return *completed.CompletedAt
 	}
+
 	return time.Time{}
 }
 

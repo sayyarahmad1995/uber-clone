@@ -2,13 +2,66 @@ package httpapi
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/driver"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/offer"
 )
+
+func TestMarketplaceAssignmentErrorContract(t *testing.T) {
+	tests := []struct {
+		name    string
+		err     error
+		status  int
+		message string
+	}{
+		{"ride not open", marketplace.ErrNotOpen, http.StatusConflict, "ride request is not open for offers"},
+		{"offer not actionable", marketplace.ErrOfferNotActionable, http.StatusConflict, "ride offer is not actionable"},
+		{"driver unavailable", marketplace.ErrDriverUnavailable, http.StatusConflict, "driver is not eligible to offer or assign"},
+		{"unexpected error", errors.New("private database details"), http.StatusInternalServerError, "unable to process ride offer"},
+	}
+	for _, tt := range tests {
+		for _, wrapped := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/wrapped=%t", tt.name, wrapped), func(t *testing.T) {
+				err := tt.err
+				if wrapped {
+					err = fmt.Errorf("select offer: %w", err)
+				}
+				response := httptest.NewRecorder()
+				if !writeMarketplaceAssignmentError(response, err) {
+					t.Fatal("expected error response to stop handler processing")
+				}
+				if response.Code != tt.status {
+					t.Fatalf("status = %d, want %d: %s", response.Code, tt.status, response.Body.String())
+				}
+				var body map[string]string
+				if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+					t.Fatal(err)
+				}
+				if len(body) != 1 || body["error"] != tt.message {
+					t.Fatalf("unexpected error contract: %s", response.Body.String())
+				}
+			})
+		}
+	}
+}
+
+func TestMarketplaceAssignmentNilErrorLeavesResponseUntouched(t *testing.T) {
+	response := httptest.NewRecorder()
+	response.Code = 0
+	if writeMarketplaceAssignmentError(response, nil) {
+		t.Fatal("nil error must allow handler processing to continue")
+	}
+	if response.Code != 0 || response.Body.Len() != 0 || len(response.Header()) != 0 {
+		t.Fatalf("nil error wrote a response: %#v", response)
+	}
+}
 
 func TestRiderOfferComparisonContractAndPrivacy(t *testing.T) {
 	zero := 0.0

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/offer"
 )
 
@@ -34,9 +35,6 @@ func (api *API) submitRideOffer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response := rideOfferResponse(result.Offer)
-	if result.Trip != nil {
-		response["trip"] = tripResponse(*result.Trip)
-	}
 	writeJSON(w, http.StatusOK, response)
 }
 
@@ -93,8 +91,14 @@ func (api *API) acceptRideOffer(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "refresh offers and select the current offer version"})
 		return
 	}
-	result, err := api.offers.Accept(r.Context(), rideRequestID, u.ID, driverUserID, body.UpdatedAt)
-	if writeOfferError(w, err) {
+	result, err := api.marketplaceAssignments.SelectOffer(
+		r.Context(),
+		rideRequestID,
+		u.ID,
+		driverUserID,
+		body.UpdatedAt,
+	)
+	if writeMarketplaceAssignmentError(w, err) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"trip": tripResponse(result)})
@@ -145,6 +149,30 @@ func parseOfferPath(w http.ResponseWriter, r *http.Request) (uuid.UUID, uuid.UUI
 		return uuid.Nil, uuid.Nil, false
 	}
 	return rideRequestID, driverUserID, true
+}
+
+func writeMarketplaceAssignmentError(w http.ResponseWriter, err error) bool {
+	switch {
+	case err == nil:
+		return false
+	case errors.Is(err, marketplace.ErrNotOpen):
+		writeJSON(w, http.StatusConflict, map[string]string{
+			"error": "ride request is not open for offers",
+		})
+	case errors.Is(err, marketplace.ErrOfferNotActionable):
+		writeJSON(w, http.StatusConflict, map[string]string{
+			"error": "ride offer is not actionable",
+		})
+	case errors.Is(err, marketplace.ErrDriverUnavailable):
+		writeJSON(w, http.StatusConflict, map[string]string{
+			"error": "driver is not eligible to offer or assign",
+		})
+	default:
+		writeJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": "unable to process ride offer",
+		})
+	}
+	return true
 }
 
 func writeOfferError(w http.ResponseWriter, err error) bool {
