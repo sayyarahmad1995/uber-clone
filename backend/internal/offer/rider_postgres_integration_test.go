@@ -173,19 +173,10 @@ func TestExpiredRideNeverEntersDriverFeed(t *testing.T) {
 	}
 	var status string
 	if err := db.QueryRow(`SELECT status FROM ride_requests WHERE id=$1`, rideID).Scan(&status); err != nil {
-		t.Fatalf("read stale expired ride: %v", err)
-	}
-	if status != "requested" {
-		t.Fatalf("business read materialized ride status=%q; periodic sweep must own materialization", status)
-	}
-	if err := marketplace.NewExpiryService(db).Sweep(ctx); err != nil {
-		t.Fatalf("sweep expired ride: %v", err)
-	}
-	if err := db.QueryRow(`SELECT status FROM ride_requests WHERE id=$1`, rideID).Scan(&status); err != nil {
 		t.Fatalf("read expired ride: %v", err)
 	}
 	if status != "expired" {
-		t.Fatalf("expected ride request expired state, got %q", status)
+		t.Fatalf("expected transactional discovery sweep to materialize expired ride, got %q", status)
 	}
 }
 
