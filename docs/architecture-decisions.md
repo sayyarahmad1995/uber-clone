@@ -56,9 +56,12 @@ Platform-specific behavior must be isolated behind clear boundaries where it is 
 
 ## 7. Authentication
 
-Authentication and authorization will use an external OIDC provider.
+The mobile client authenticates only through application-owned APIs. The backend
+uses provider-neutral authentication and identity interfaces, with Ory Kratos as
+the current internal adapter for identity lifecycle and credentials.
 
-We will not introduce a custom OIDC identity provider for the MVP.
+Hydra/OIDC and Authorization Code + PKCE are deferred; the client does not call
+provider APIs or render provider-owned authentication interfaces.
 
 ## 8. Primary data technologies
 

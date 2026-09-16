@@ -20,6 +20,11 @@ details. Drivers need fresh location updates to discover requests or make offers
 See the [Flutter client architecture](docs/flutter-client-architecture.md) for
 the mobile boundaries and local configuration.
 
+Pilot deployment is separate from local development. Use
+[`docs/pilot-deployment.md`](docs/pilot-deployment.md) with
+`docker-compose.pilot.yml`; it requires externally supplied secrets, HTTPS
+termination, external SMTP, and persistent PostgreSQL storage.
+
 ## Run locally
 
 1. Start the stack:

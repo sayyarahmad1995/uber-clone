@@ -3,6 +3,7 @@ package drivertrip
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 
 	"github.com/google/uuid"
@@ -17,6 +18,7 @@ func (r PostgresRepository) GetCurrent(ctx context.Context, driverUserID uuid.UU
 	var view View
 	var settlementStatus string
 	var settlementMethod sql.NullString
+	var operationContext []byte
 	err := r.db.QueryRowContext(ctx, `
 		SELECT
 			t.ride_request_id,
@@ -49,7 +51,7 @@ func (r PostgresRepository) GetCurrent(ctx context.Context, driverUserID uuid.UU
 		&view.Status,
 		&view.AssignedAt,
 		&view.StartedAt,
-		&view.OperationContext,
+		&operationContext,
 		&settlementStatus,
 		&settlementMethod,
 		&view.Settlement.CashCollectedAt,
@@ -59,6 +61,12 @@ func (r PostgresRepository) GetCurrent(ctx context.Context, driverUserID uuid.UU
 	}
 	if err != nil {
 		return View{}, err
+	}
+	if string(operationContext) != "" && string(operationContext) != "null" {
+		view.OperationContext = new(trip.OperationContext)
+		if err := json.Unmarshal(operationContext, view.OperationContext); err != nil {
+			return View{}, err
+		}
 	}
 	applySettlement(&view, settlementStatus, settlementMethod)
 	return view, nil
@@ -98,6 +106,7 @@ func (r PostgresRepository) ListHistory(ctx context.Context, driverUserID uuid.U
 		var view View
 		var settlementStatus string
 		var settlementMethod sql.NullString
+		var operationContext []byte
 		if err := rows.Scan(
 			&view.RideRequestID,
 			&view.Pickup.Latitude,
@@ -109,12 +118,18 @@ func (r PostgresRepository) ListHistory(ctx context.Context, driverUserID uuid.U
 			&view.StartedAt,
 			&view.CompletedAt,
 			&view.CancelledAt,
-			&view.OperationContext,
+			&operationContext,
 			&settlementStatus,
 			&settlementMethod,
 			&view.Settlement.CashCollectedAt,
 		); err != nil {
 			return nil, err
+		}
+		if string(operationContext) != "" && string(operationContext) != "null" {
+			view.OperationContext = new(trip.OperationContext)
+			if err := json.Unmarshal(operationContext, view.OperationContext); err != nil {
+				return nil, err
+			}
 		}
 		applySettlement(&view, settlementStatus, settlementMethod)
 		views = append(views, view)

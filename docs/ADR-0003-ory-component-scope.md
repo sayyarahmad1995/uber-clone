@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted.
+Superseded by the implemented application-owned authentication/session boundary.
+
+This ADR records the earlier Hydra/PKCE design. It is retained as historical
+context and is not authoritative for the current MVP runtime.
 
 ## Decision
 

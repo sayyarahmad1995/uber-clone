@@ -1,0 +1,55 @@
+services:
+  api:
+    build: { context: ./backend, dockerfile: Dockerfile }
+    environment:
+      APP_PORT: 8080
+      DATABASE_URL: postgres://${POSTGRES_USER:?set POSTGRES_USER}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:?set POSTGRES_DB}?sslmode=disable
+      KRATOS_PUBLIC_URL: ${KRATOS_PUBLIC_URL:?set KRATOS_PUBLIC_URL}
+      KRATOS_ADMIN_URL: http://kratos:4434
+      ADMIN_REVIEW_USERNAME: ${ADMIN_REVIEW_USERNAME:?set ADMIN_REVIEW_USERNAME}
+      ADMIN_REVIEW_PASSWORD: ${ADMIN_REVIEW_PASSWORD:?set ADMIN_REVIEW_PASSWORD}
+      ADMIN_REVIEW_ORIGIN: ${ADMIN_REVIEW_ORIGIN:?set ADMIN_REVIEW_ORIGIN}
+    expose: ["8080"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      kratos: { condition: service_started }
+    restart: unless-stopped
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      ORY_KRATOS_DB: ${ORY_KRATOS_DB:?set ORY_KRATOS_DB}
+    volumes:
+      - pilot_postgres_data:/var/lib/postgresql/data
+      - ./identity/postgres/init-ory-db.sh:/docker-entrypoint-initdb.d/10-init-ory-db.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+  kratos-migrate:
+    image: oryd/kratos:v1.3.1
+    environment:
+      DSN: postgres://${POSTGRES_USER:?set POSTGRES_USER}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${ORY_KRATOS_DB:?set ORY_KRATOS_DB}?sslmode=disable
+    volumes: ["./identity/kratos:/etc/config/kratos:ro"]
+    command: ["migrate", "sql", "-e", "--yes", "-c", "/etc/config/kratos/kratos.yml"]
+    depends_on: { postgres: { condition: service_healthy } }
+    restart: "no"
+  kratos:
+    image: oryd/kratos:v1.3.1
+    environment:
+      DSN: postgres://${POSTGRES_USER:?set POSTGRES_USER}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${ORY_KRATOS_DB:?set ORY_KRATOS_DB}?sslmode=disable
+      SERVE_PUBLIC_BASE_URL: ${KRATOS_PUBLIC_URL:?set KRATOS_PUBLIC_URL}
+      SELF_SERVICE_DEFAULT_BROWSER_RETURN_URL: ${KRATOS_BROWSER_RETURN_URL:?set KRATOS_BROWSER_RETURN_URL}
+      COURIER_SMTP_CONNECTION_URI: ${KRATOS_SMTP_CONNECTION_URI:?set KRATOS_SMTP_CONNECTION_URI}
+      COURIER_SMTP_FROM_ADDRESS: ${KRATOS_SMTP_FROM_ADDRESS:?set KRATOS_SMTP_FROM_ADDRESS}
+      COURIER_SMTP_FROM_NAME: ${KRATOS_SMTP_FROM_NAME:?set KRATOS_SMTP_FROM_NAME}
+    volumes: ["./identity/kratos:/etc/config/kratos:ro"]
+    command: ["serve", "-c", "/etc/config/kratos/kratos.yml"]
+    depends_on: { kratos-migrate: { condition: service_completed_successfully } }
+    restart: unless-stopped
+volumes:
+  pilot_postgres_data:
