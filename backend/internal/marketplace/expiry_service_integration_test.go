@@ -29,8 +29,20 @@ func TestExpiryServiceSweepMaterializesMarketplaceTerminalStates(t *testing.T) {
 	expiredWindowRide := createTripIntegrationRide(t, db, riderID)
 	windowDriverID := createTripIntegrationDriver(t, db)
 	if _, err := db.Exec(`
-		INSERT INTO driver_ride_request_opportunities (ride_request_id,driver_user_id,status,visible_until)
-		VALUES ($1,$2,'open',statement_timestamp()-INTERVAL '1 second')
+		INSERT INTO driver_ride_request_opportunities (
+			ride_request_id,
+			driver_user_id,
+			status,
+			created_at,
+			visible_until
+		)
+		VALUES (
+			$1,
+			$2,
+			'open',
+			statement_timestamp()-INTERVAL '2 minutes',
+			statement_timestamp()-INTERVAL '1 second'
+		)
 	`, expiredWindowRide, windowDriverID); err != nil {
 		t.Fatal(err)
 	}
