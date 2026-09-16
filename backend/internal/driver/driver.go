@@ -3,7 +3,6 @@ package driver
 import (
 	"context"
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,19 +19,6 @@ const (
 	StatusApproved Status = "approved"
 	StatusActive   Status = "active"
 )
-
-type VehicleInput struct {
-	Make         string
-	Model        string
-	ModelYear    int
-	Color        string
-	LicensePlate string
-}
-
-type OnboardingInput struct {
-	DisplayName string
-	Vehicle     VehicleInput
-}
 
 type ServiceEnrollment struct {
 	ServiceCode   string
@@ -64,7 +50,6 @@ type Profile struct {
 type Repository interface {
 	OperatingState(context.Context, uuid.UUID) (OperatingState, error)
 	SelectOperation(context.Context, uuid.UUID, uuid.UUID, string) (OperatingState, error)
-	UpsertProfile(ctx context.Context, userID uuid.UUID, input OnboardingInput) (Profile, error)
 	FindByUserID(ctx context.Context, userID uuid.UUID) (Profile, error)
 	ListVehicles(ctx context.Context, userID uuid.UUID) ([]Vehicle, error)
 	SetOnline(ctx context.Context, userID uuid.UUID, online bool) (Profile, error)
@@ -73,16 +58,6 @@ type Repository interface {
 type Service struct{ repository Repository }
 
 func NewService(repository Repository) Service { return Service{repository: repository} }
-
-func (s Service) Onboard(ctx context.Context, userID uuid.UUID, input OnboardingInput) (Profile, error) {
-	input.DisplayName = strings.TrimSpace(input.DisplayName)
-	input.Vehicle = normalizeVehicle(input.Vehicle)
-	currentYear := time.Now().UTC().Year()
-	if input.DisplayName == "" || input.Vehicle.Make == "" || input.Vehicle.Model == "" || input.Vehicle.Color == "" || input.Vehicle.LicensePlate == "" || input.Vehicle.ModelYear < 1886 || input.Vehicle.ModelYear > currentYear+1 {
-		return Profile{}, ErrInvalidProfile
-	}
-	return s.repository.UpsertProfile(ctx, userID, input)
-}
 
 func (s Service) Get(ctx context.Context, userID uuid.UUID) (Profile, error) {
 	return s.repository.FindByUserID(ctx, userID)
@@ -94,12 +69,4 @@ func (s Service) ListVehicles(ctx context.Context, userID uuid.UUID) ([]Vehicle,
 
 func (s Service) SetOnline(ctx context.Context, userID uuid.UUID, online bool) (Profile, error) {
 	return s.repository.SetOnline(ctx, userID, online)
-}
-
-func normalizeVehicle(vehicle VehicleInput) VehicleInput {
-	vehicle.Make = strings.TrimSpace(vehicle.Make)
-	vehicle.Model = strings.TrimSpace(vehicle.Model)
-	vehicle.Color = strings.TrimSpace(vehicle.Color)
-	vehicle.LicensePlate = strings.ToUpper(strings.TrimSpace(vehicle.LicensePlate))
-	return vehicle
 }

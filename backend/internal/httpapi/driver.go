@@ -9,54 +9,8 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/drivertrip"
 )
 
-type onboardDriverRequest struct {
-	DisplayName string `json:"display_name"`
-	Vehicle     struct {
-		Make         string `json:"make"`
-		Model        string `json:"model"`
-		ModelYear    int    `json:"model_year"`
-		Color        string `json:"color"`
-		LicensePlate string `json:"license_plate"`
-	} `json:"vehicle"`
-}
-
-func (r onboardDriverRequest) input() driver.OnboardingInput {
-	return driver.OnboardingInput{
-		DisplayName: r.DisplayName,
-		Vehicle: driver.VehicleInput{
-			Make:         r.Vehicle.Make,
-			Model:        r.Vehicle.Model,
-			ModelYear:    r.Vehicle.ModelYear,
-			Color:        r.Vehicle.Color,
-			LicensePlate: r.Vehicle.LicensePlate,
-		},
-	}
-}
-
 type driverAvailabilityRequest struct {
 	IsOnline bool `json:"is_online"`
-}
-
-func (api *API) onboardDriver(w http.ResponseWriter, r *http.Request) {
-	u, ok := api.requireDriverCapability(w, r)
-	if !ok {
-		return
-	}
-	var body onboardDriverRequest
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request"})
-		return
-	}
-	profile, err := api.drivers.Onboard(r.Context(), u.ID, body.input())
-	if errors.Is(err, driver.ErrInvalidProfile) {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "display_name and complete vehicle details including model_year are required"})
-		return
-	}
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "unable to onboard driver"})
-		return
-	}
-	writeDriver(w, http.StatusOK, profile)
 }
 
 func (api *API) getDriver(w http.ResponseWriter, r *http.Request) {
