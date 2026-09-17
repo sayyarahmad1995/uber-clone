@@ -103,7 +103,31 @@ jobs:
       - run: dart run build_runner build --delete-conflicting-outputs
         working-directory: mobile
       - run: git diff --exit-code --ignore-space-at-eol
+      - name: Guard retired mobile contracts
+        run: |
+          if rg -n --glob '*.dart' 'repo\.onboard\(|DriverController\.onboard|Future<DriverProfile> onboard\(' mobile/lib; then
+            echo "legacy direct Driver onboarding method found in production Dart"
+            exit 1
+          fi
+
+          if rg -n -U --glob '*.dart' "/v1/driver['\"]?\s*,\s*data:" mobile/lib/features/driver_workspace; then
+            echo "legacy direct Driver onboarding write found in production Dart"
+            exit 1
+          fi
+
+          if rg -n -U --glob '*.dart' "(?:trip\.)?status\s*==\s*['\"]settled['\"]" mobile/lib/features/rider_request mobile/lib/features/ride_flow; then
+            echo "retired settled Trip status found in production Dart"
+            exit 1
+          fi
+
+          if rg -n --glob '*.dart' 'RideFlowController' mobile/lib/features/ride_flow mobile/lib/features/rider_request; then
+            echo "monolithic RideFlowController found"
+            exit 1
+          fi
       - run: flutter analyze
+        working-directory: mobile
+      - name: Verify semantic ride-flow repository adapter
+        run: flutter test test/ride_flow_repository_test.dart
         working-directory: mobile
       - run: flutter test
         working-directory: mobile
