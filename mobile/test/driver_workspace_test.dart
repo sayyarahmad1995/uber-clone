@@ -29,6 +29,21 @@ void main() {
       find.text('Choose one service for your first vehicle application.'),
       findsOneWidget,
     );
+
+    await tester.drag(
+      find.descendant(
+        of: find.byKey(const Key('dashboardPanel')),
+        matching: find.byType(ListView),
+      ),
+      const Offset(0, -900),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Back to Rider'), findsOneWidget);
+    await tester.tap(find.text('Back to Rider'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Looking for Driver offers'), findsOneWidget);
+    expect(find.text('Driver dashboard'), findsNothing);
   });
 
   testWidgets('Driver onboarding submits selected service for review', (
@@ -39,7 +54,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          rideFlowRepositoryProvider.overrideWithValue(FakeRideFlowRepository()),
+          rideFlowRepositoryProvider.overrideWithValue(
+            FakeRideFlowRepository(),
+          ),
           driverRepositoryProvider.overrideWithValue(driverRepo),
           driverOnboardingRepositoryProvider.overrideWithValue(onboardingRepo),
           deviceLocationProvider.overrideWithValue(const FakeDeviceLocation()),
@@ -105,7 +122,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          rideFlowRepositoryProvider.overrideWithValue(FakeRideFlowRepository()),
+          rideFlowRepositoryProvider.overrideWithValue(
+            FakeRideFlowRepository(),
+          ),
           driverRepositoryProvider.overrideWithValue(repo),
           driverOnboardingRepositoryProvider.overrideWithValue(
             FakeDriverOnboardingRepository(),
@@ -135,7 +154,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          rideFlowRepositoryProvider.overrideWithValue(FakeRideFlowRepository()),
+          rideFlowRepositoryProvider.overrideWithValue(
+            FakeRideFlowRepository(),
+          ),
           driverRepositoryProvider.overrideWithValue(repo),
           driverOnboardingRepositoryProvider.overrideWithValue(
             FakeDriverOnboardingRepository(),

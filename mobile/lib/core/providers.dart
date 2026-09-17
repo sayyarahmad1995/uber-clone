@@ -22,6 +22,7 @@ import '../features/driver_workspace/application/driver_controller.dart';
 import '../features/driver_workspace/application/driver_onboarding_controller.dart';
 import '../features/driver_workspace/data/driver_onboarding_repository.dart';
 import '../features/driver_workspace/data/driver_repository.dart';
+import '../features/driver_workspace/domain/driver_profile.dart';
 import '../features/driver_workspace/presentation/driver_readonly_surfaces.dart';
 import '../features/rider_request/application/rider_request_controller.dart';
 import '../features/rider_request/data/device_location.dart';
@@ -119,6 +120,17 @@ final driverRepositoryProvider = Provider<DriverRepository>(
     ref.watch(sessionStoreProvider),
   ),
 );
+final approvedDriverProfileProvider =
+    FutureProvider.autoDispose<DriverProfile?>((ref) {
+      final account = ref.watch(
+        sessionControllerProvider.select((value) => value.state.account),
+      );
+      if (account == null ||
+          !account.capabilities.contains(Capability.driver)) {
+        return Future.value(null);
+      }
+      return ref.watch(driverRepositoryProvider).get();
+    });
 final driverVehiclesProvider =
     FutureProvider.autoDispose<List<RegisteredVehicle>>((ref) {
       // Reload on account changes so records cannot survive an account switch.

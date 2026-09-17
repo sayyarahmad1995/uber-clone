@@ -90,52 +90,56 @@ void main() {
     expect(find.text('Sign in'), findsOneWidget);
   });
 
-  testWidgets('signed-out user can restart verification after unverified login', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      testApp(
-        FakeAuthRepository(
-          loginError: const ApiException(
-            'verification_required',
-            'Account verification is required.',
-            statusCode: 403,
+  testWidgets(
+    'signed-out user can restart verification after unverified login',
+    (tester) async {
+      await tester.pumpWidget(
+        testApp(
+          FakeAuthRepository(
+            loginError: const ApiException(
+              'verification_required',
+              'Account verification is required.',
+              statusCode: 403,
+            ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('Sign in'), findsOneWidget);
-    expect(find.text('Send verification email'), findsNothing);
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Sign in'), findsOneWidget);
+      expect(find.text('Send verification email'), findsNothing);
 
-    await tester.enterText(
-      find.byKey(const Key('identifierField')),
-      'rider@example.com',
-    );
-    await tester.enterText(find.byKey(const Key('passwordField')), 'password');
-    await tester.tap(find.byKey(const Key('submitButton')));
-    await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('identifierField')),
+        'rider@example.com',
+      );
+      await tester.enterText(
+        find.byKey(const Key('passwordField')),
+        'password',
+      );
+      await tester.tap(find.byKey(const Key('submitButton')));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Send verification email'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('submitButton')));
-    await tester.pumpAndSettle();
+      expect(find.text('Send verification email'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('submitButton')));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Verify email'), findsOneWidget);
-    expect(
-      find.text('Enter the verification code sent to rider@example.com.'),
-      findsOneWidget,
-    );
-    expect(find.byKey(const Key('verificationCodeField')), findsOneWidget);
+      expect(find.text('Verify email'), findsOneWidget);
+      expect(
+        find.text('Enter the verification code sent to rider@example.com.'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('verificationCodeField')), findsOneWidget);
 
-    await tester.enterText(
-      find.byKey(const Key('verificationCodeField')),
-      '123456',
-    );
-    await tester.tap(find.text('Verify'));
-    await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('verificationCodeField')),
+        '123456',
+      );
+      await tester.tap(find.text('Verify'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Welcome back'), findsOneWidget);
-  });
+      expect(find.text('Welcome back'), findsOneWidget);
+    },
+  );
 
   testWidgets('restored account enters Rider by default', (tester) async {
     await tester.pumpWidget(testApp(FakeAuthRepository(account: riderAccount)));
@@ -148,7 +152,10 @@ void main() {
     'dual-capability account preserves panel extent through drawer switch',
     (tester) async {
       await tester.pumpWidget(
-        testApp(FakeAuthRepository(account: bothCapabilities)),
+        testApp(
+          FakeAuthRepository(account: bothCapabilities),
+          driver: FakeDriverRepository(profile: driverProfile),
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -191,7 +198,10 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      testApp(FakeAuthRepository(account: bothCapabilities)),
+      testApp(
+        FakeAuthRepository(account: bothCapabilities),
+        driver: FakeDriverRepository(profile: driverProfile),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -531,11 +541,14 @@ Widget testApp(
   AuthRepository repository, {
   RideRequestRepository? rideRequests,
   DeviceLocation? deviceLocation,
+  FakeDriverRepository? driver,
 }) => ProviderScope(
   overrides: [
-      rideFlowRepositoryProvider.overrideWithValue(FakeRideFlowRepository()),
+    rideFlowRepositoryProvider.overrideWithValue(FakeRideFlowRepository()),
     authRepositoryProvider.overrideWithValue(repository),
-    driverRepositoryProvider.overrideWithValue(FakeDriverRepository()),
+    driverRepositoryProvider.overrideWithValue(
+      driver ?? FakeDriverRepository(),
+    ),
     driverOnboardingRepositoryProvider.overrideWithValue(
       FakeDriverOnboardingRepository(),
     ),

@@ -22,6 +22,18 @@ class CapabilityHomeScreen extends ConsumerWidget {
       return const SizedBox.shrink();
     }
     final canDrive = account.capabilities.contains(Capability.driver);
+    final workspaceDriverProfile = canDrive && capability == Capability.driver
+        ? ref.watch(driverControllerProvider).profile
+        : null;
+    final hasApprovedDriverProfile =
+        canDrive &&
+        (workspaceDriverProfile != null ||
+            ref
+                .watch(approvedDriverProfileProvider)
+                .maybeWhen(
+                  data: (profile) => profile != null,
+                  orElse: () => false,
+                ));
 
     Future<void> selectCapability(Capability next) async {
       Navigator.of(context).pop();
@@ -92,11 +104,21 @@ class CapabilityHomeScreen extends ConsumerWidget {
                     ? null
                     : () => selectCapability(Capability.rider),
               ),
-              if (canDrive)
+              if (hasApprovedDriverProfile)
                 ListTile(
                   key: const Key('drawerDriver'),
                   leading: const Icon(Icons.local_taxi_outlined),
                   title: const Text('Driver'),
+                  selected: capability == Capability.driver,
+                  onTap: controller.state.busy
+                      ? null
+                      : () => selectCapability(Capability.driver),
+                )
+              else if (canDrive)
+                ListTile(
+                  key: const Key('drawerDriverOnboarding'),
+                  leading: const Icon(Icons.assignment_outlined),
+                  title: const Text('Driver onboarding'),
                   selected: capability == Capability.driver,
                   onTap: controller.state.busy
                       ? null
@@ -109,7 +131,7 @@ class CapabilityHomeScreen extends ConsumerWidget {
                   title: const Text('Become a Driver'),
                   onTap: controller.state.busy ? null : enableDriver,
                 ),
-              if (canDrive) ...[
+              if (hasApprovedDriverProfile) ...[
                 const Divider(),
                 ListTile(
                   key: const Key('drawerDriverDetails'),
