@@ -57,21 +57,110 @@ void main() {
     expect(controller.state.error, 'Choose both pickup and destination.');
   });
 
-  test('keeps completed unsettled trips active until cash collection', () async {
-    final completedUnsettledRide = requestedRide.copyWith(
-      trip: const TripSnapshot(status: 'completed'),
-    );
-    final settledRide = requestedRide.copyWith(
-      id: 'ride-2',
-      trip: const TripSnapshot(status: 'settled'),
-    );
-    final controller = RiderRequestController(
-      FakeRideRequestRepository(requests: [settledRide, completedUnsettledRide]),
-      const FakeDeviceLocation(),
-    );
-    await controller.load();
+  group('active request lifecycle', () {
+    test('keeps a requested request without a trip active', () {
+      expect(stateWith(requestStatus: 'requested').active?.id, 'ride-1');
+    });
 
-    expect(controller.state.active?.id, 'ride-1');
+    test('keeps an accepted request with an assigned trip active', () {
+      expect(
+        stateWith(requestStatus: 'accepted', tripStatus: 'assigned').active?.id,
+        'ride-1',
+      );
+    });
+
+    test('keeps an accepted request with an in-progress trip active', () {
+      expect(
+        stateWith(
+          requestStatus: 'accepted',
+          tripStatus: 'in_progress',
+        ).active?.id,
+        'ride-1',
+      );
+    });
+
+    test('keeps a completed unsettled trip active until cash collection', () {
+      expect(
+        stateWith(
+          requestStatus: 'accepted',
+          tripStatus: 'completed',
+          settlementStatus: 'unsettled',
+        ).active?.id,
+        'ride-1',
+      );
+    });
+
+    test('treats a completed cash-collected trip as terminal', () {
+      expect(
+        stateWith(
+          requestStatus: 'accepted',
+          tripStatus: 'completed',
+          settlementStatus: 'cash_collected',
+        ).active,
+        isNull,
+      );
+    });
+
+    test('treats a cancelled request as terminal', () {
+      expect(stateWith(requestStatus: 'cancelled').active, isNull);
+    });
+
+    test('treats an expired request as terminal', () {
+      expect(stateWith(requestStatus: 'expired').active, isNull);
+    });
+
+    test('treats a cancelled trip as terminal', () {
+      expect(
+        stateWith(requestStatus: 'accepted', tripStatus: 'cancelled').active,
+        isNull,
+      );
+    });
+  });
+
+  group('submission after settlement', () {
+    test('allows a new ride after cash collection', () async {
+      final previousRide = requestedRide.copyWith(
+        status: 'accepted',
+        trip: const TripSnapshot(
+          status: 'completed',
+          settlement: SettlementSnapshot(status: 'cash_collected'),
+        ),
+      );
+      final repository = FakeRideRequestRepository(requests: [previousRide]);
+      final controller = RiderRequestController(
+        repository,
+        const FakeDeviceLocation(),
+      );
+      await controller.load();
+      await prepareSubmission(controller);
+
+      expect(
+        await controller.submit(amountMinor: 70000, currency: 'PKR'),
+        isTrue,
+      );
+    });
+
+    test('blocks a new ride while cash remains unsettled', () async {
+      final previousRide = requestedRide.copyWith(
+        status: 'accepted',
+        trip: const TripSnapshot(
+          status: 'completed',
+          settlement: SettlementSnapshot(status: 'unsettled'),
+        ),
+      );
+      final repository = FakeRideRequestRepository(requests: [previousRide]);
+      final controller = RiderRequestController(
+        repository,
+        const FakeDeviceLocation(),
+      );
+      await controller.load();
+      await prepareSubmission(controller);
+
+      expect(
+        await controller.submit(amountMinor: 70000, currency: 'PKR'),
+        isFalse,
+      );
+    });
   });
 
   test('cancels the active request and returns to request creation', () async {
@@ -87,4 +176,29 @@ void main() {
     expect(controller.state.active, isNull);
     expect(controller.state.requests.single.status, 'cancelled');
   });
+}
+
+RiderRequestState stateWith({
+  required String requestStatus,
+  String? tripStatus,
+  String? settlementStatus,
+}) {
+  final trip = tripStatus == null
+      ? null
+      : TripSnapshot(
+          status: tripStatus,
+          settlement: settlementStatus == null
+              ? null
+              : SettlementSnapshot(status: settlementStatus),
+        );
+  return RiderRequestState(
+    requests: [requestedRide.copyWith(status: requestStatus, trip: trip)],
+  );
+}
+
+Future<void> prepareSubmission(RiderRequestController controller) async {
+  await controller.useCurrentPickup();
+  controller.setDestination(
+    const GeoPoint(latitude: 24.9056, longitude: 67.0822),
+  );
 }

@@ -25,11 +25,14 @@ class RiderRequestState {
 
   RideRequest? get active {
     for (final request in requests) {
-      final tripStatus = request.trip?.status;
+      final trip = request.trip;
+      final tripTerminal =
+          trip?.status == 'cancelled' ||
+          (trip?.status == 'completed' &&
+              trip?.settlement?.status == 'cash_collected');
       if (request.status == 'cancelled' ||
           request.status == 'expired' ||
-          tripStatus == 'cancelled' ||
-          tripStatus == 'settled') {
+          tripTerminal) {
         continue;
       }
       return request;
