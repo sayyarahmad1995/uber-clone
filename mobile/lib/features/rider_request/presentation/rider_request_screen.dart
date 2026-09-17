@@ -413,7 +413,7 @@ class _ActiveRequestPanel extends ConsumerWidget {
           style: Theme.of(context).textTheme.headlineSmall,
         ),
         const SizedBox(height: AppSpacing.xs),
-        RideFlowPanel.rider(rideId: 'ride'),
+        RideFlowPanel.rider(rideId: request.id),
         const SizedBox(height: AppSpacing.md),
         Card(
           child: Padding(
