@@ -1,7 +1,6 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 
+import 'polling_loop.dart';
 import '../domain/marketplace_request.dart';
 import '../ride_flow_repository.dart';
 
@@ -15,16 +14,15 @@ class DriverMarketplaceController extends ChangeNotifier {
 
   final RideFlowRepository repository;
   final Duration interval;
+  late final PollingLoop _polling = PollingLoop(interval: interval);
 
   List<MarketplaceRequest> requests = [];
-  bool busy = false;
   bool loaded = false;
   String? error;
 
   bool _disposed = false;
-  bool _foreground = true;
-  Timer? _timer;
-  Completer<void>? _idle;
+
+  bool get busy => _polling.busy;
 
   Future<void> _load() async {
     final value = await repository.listMarketplaceRequests();
@@ -34,7 +32,10 @@ class DriverMarketplaceController extends ChangeNotifier {
     loaded = true;
   }
 
-  Future<void> refresh() => _run(_load);
+  Future<void> refresh() {
+    if (_polling.busy) return Future<void>.value();
+    return _polling.runRefresh(_refreshAndReport);
+  }
 
   Future<void> submitOffer(String rideRequestId, int amountMinor) =>
       _command(() => repository.submitOffer(rideRequestId, amountMinor));
@@ -42,76 +43,39 @@ class DriverMarketplaceController extends ChangeNotifier {
   Future<void> acceptProposedFare(String rideRequestId) =>
       _command(() => repository.acceptProposedFare(rideRequestId));
 
-  Future<void> _command(Future<void> Function() command) => _run(() async {
-    try {
-      await command();
-    } catch (_) {
-      try {
-        await _load();
-      } catch (_) {}
-      rethrow;
-    }
-    await _load();
-  }, waitForBusy: true);
-
-  Future<void> _run(
-    Future<void> Function() task, {
-    bool waitForBusy = false,
-  }) async {
-    if (_disposed || !_foreground) return;
-
-    if (waitForBusy) {
-      while (busy && !_disposed && _foreground) {
-        final idle = _idle;
-        if (idle == null) break;
-        await idle.future;
-      }
-    } else if (busy) {
-      return;
-    }
-
-    if (_disposed || !_foreground) return;
-
-    _timer?.cancel();
-    final idle = Completer<void>();
-    _idle = idle;
-    busy = true;
+  Future<void> _command(Future<void> Function() command) async {
     error = null;
     notifyListeners();
-
     try {
-      await task();
+      await _polling.runCommand(command, reload: _load);
     } catch (e) {
       error = '$e';
     } finally {
-      busy = false;
-      if (!idle.isCompleted) idle.complete();
-      if (identical(_idle, idle)) _idle = null;
-
-      if (!_disposed) {
-        notifyListeners();
-        _schedule();
-      }
-    }
-  }
-
-  void _schedule() {
-    _timer?.cancel();
-    if (!_disposed && _foreground) {
-      _timer = Timer(interval, refresh);
+      if (!_disposed) notifyListeners();
     }
   }
 
   void setForeground(bool value) {
-    _foreground = value;
-    _timer?.cancel();
-    if (value) refresh();
+    _polling.setForeground(value, _refreshAndReport);
+  }
+
+  Future<void> _refreshAndReport() async {
+    if (_disposed) return;
+    error = null;
+    notifyListeners();
+    try {
+      await _load();
+    } catch (e) {
+      error = '$e';
+    } finally {
+      if (!_disposed) notifyListeners();
+    }
   }
 
   @override
   void dispose() {
     _disposed = true;
-    _timer?.cancel();
+    _polling.dispose();
     super.dispose();
   }
 }
