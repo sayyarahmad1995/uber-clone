@@ -15,8 +15,7 @@ class PollingLoop {
   bool get busy => _busy;
 
   Future<void> runRefresh(Future<void> Function() task) async {
-    _refresh = task;
-    await _run(task);
+    await _run(task, refreshTask: task);
   }
 
   Future<void> runCommand(
@@ -52,6 +51,7 @@ class PollingLoop {
   Future<void> _run(
     Future<void> Function() task, {
     bool waitForBusy = false,
+    Future<void> Function()? refreshTask,
   }) async {
     if (_disposed || !_foreground) return;
 
@@ -67,6 +67,7 @@ class PollingLoop {
 
     if (_disposed || !_foreground) return;
 
+    if (refreshTask != null) _refresh = refreshTask;
     _timer?.cancel();
     _timer = null;
     final idle = Completer<void>();

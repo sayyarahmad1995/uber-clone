@@ -269,6 +269,71 @@ void main() {
     controller.dispose();
   });
 
+  test('background marketplace command preserves the existing error', () async {
+    final controller = DriverMarketplaceController(FakeRideFlowRepository());
+    await Future<void>.delayed(Duration.zero);
+    controller.setForeground(false);
+    controller.error = 'previous error';
+    var notifications = 0;
+    controller.addListener(() => notifications++);
+
+    await controller.submitOffer('ride', 11500);
+
+    expect(controller.error, 'previous error');
+    expect(notifications, 0);
+    controller.dispose();
+  });
+
+  test('background Rider command preserves the existing error', () async {
+    final controller = RiderActiveRideController(
+      FakeRideFlowRepository(),
+      rideId: 'ride',
+    );
+    await Future<void>.delayed(Duration.zero);
+    controller.setForeground(false);
+    controller.error = 'previous error';
+    var notifications = 0;
+    controller.addListener(() => notifications++);
+
+    await controller.selectOffer('driver', DateTime.utc(2026, 9, 11));
+
+    expect(controller.error, 'previous error');
+    expect(notifications, 0);
+    controller.dispose();
+  });
+
+  test('background Driver Trip command preserves the existing error', () async {
+    final controller = DriverTripController(FakeRideFlowRepository());
+    await Future<void>.delayed(Duration.zero);
+    controller.setForeground(false);
+    controller.error = 'previous error';
+    var notifications = 0;
+    controller.addListener(() => notifications++);
+
+    await controller.startTrip('ride');
+
+    expect(controller.error, 'previous error');
+    expect(notifications, 0);
+    controller.dispose();
+  });
+
+  test(
+    'disposed command preserves the existing error without notifying',
+    () async {
+      final controller = DriverMarketplaceController(FakeRideFlowRepository());
+      await Future<void>.delayed(Duration.zero);
+      controller.error = 'previous error';
+      var notifications = 0;
+      controller.addListener(() => notifications++);
+      controller.dispose();
+
+      await controller.acceptProposedFare('ride');
+
+      expect(controller.error, 'previous error');
+      expect(notifications, 0);
+    },
+  );
+
   test('ambiguous Rider command failure reloads authoritative state', () async {
     final repo = SplitFlowFake()..loseSelectResponse = true;
     final controller = RiderActiveRideController(repo, rideId: 'ride');

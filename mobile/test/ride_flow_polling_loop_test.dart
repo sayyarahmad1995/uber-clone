@@ -92,6 +92,30 @@ void main() {
     });
   });
 
+  test('ignored passive refresh cannot replace the scheduled callback', () {
+    fakeAsync((async) {
+      final firstRefresh = Completer<void>();
+      var acceptedRefreshes = 0;
+      var ignoredRefreshes = 0;
+      final loop = PollingLoop(interval: const Duration(milliseconds: 5));
+
+      loop.runRefresh(() async {
+        acceptedRefreshes++;
+        if (acceptedRefreshes == 1) await firstRefresh.future;
+      });
+      loop.runRefresh(() async => ignoredRefreshes++);
+      firstRefresh.complete();
+      async.flushMicrotasks();
+
+      async.elapse(const Duration(milliseconds: 5));
+      async.flushMicrotasks();
+
+      expect(acceptedRefreshes, 2);
+      expect(ignoredRefreshes, 0);
+      loop.dispose();
+    });
+  });
+
   test('command waits for an in-flight refresh before executing', () {
     fakeAsync((async) {
       final firstRefresh = Completer<void>();

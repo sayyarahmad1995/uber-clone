@@ -55,14 +55,18 @@ class DriverTripController extends ChangeNotifier {
       _command(() => repository.cancelDriverTrip(rideRequestId));
 
   Future<void> _command(Future<void> Function() command) async {
-    error = null;
-    notifyListeners();
+    var started = false;
     try {
-      await _polling.runCommand(command, reload: _load);
+      await _polling.runCommand(() async {
+        started = true;
+        error = null;
+        notifyListeners();
+        await command();
+      }, reload: _load);
     } catch (e) {
       error = '$e';
     } finally {
-      if (!_disposed) notifyListeners();
+      if (started && !_disposed) notifyListeners();
     }
   }
 
