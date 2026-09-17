@@ -123,7 +123,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
               point: LatLng(driverLocation.latitude, driverLocation.longitude),
               icon: Icons.local_taxi,
               color: AppColors.success,
-              label: "Driver",
+              label: 'Driver',
             ),
         ],
         onTap: active == null ? _handleMapTap : null,
@@ -354,7 +354,7 @@ class _RequestRidePanel extends StatelessWidget {
             key: const Key('requestRideButton'),
             onPressed: state.submitting ? null : () => onSubmit(),
             icon: const Icon(Icons.local_taxi),
-            label: Text(state.submitting ? 'Requestingâ€¦' : 'Request ride'),
+            label: Text(state.submitting ? 'Requesting...' : 'Request ride'),
           ),
         ),
       ],
@@ -455,7 +455,7 @@ class _ActiveRequestPanel extends ConsumerWidget {
                   ? null
                   : () => _confirmCancellation(context, ref),
               child: Text(
-                state.submitting ? 'Cancellingâ€¦' : 'Cancel request',
+                state.submitting ? 'Cancelling...' : 'Cancel request',
               ),
             ),
           ),
