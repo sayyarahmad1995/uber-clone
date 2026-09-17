@@ -49,6 +49,24 @@ void main() {
     expect(comparison.service?.code, 'car');
   });
 
+  test('parses unavailable Rider offer distance', () {
+    final comparison = RiderOfferComparison.fromJson({
+      'ride_request_id': 'ride-1',
+      'driver_user_id': 'driver-1',
+      'fare': {'amount_minor': 10000, 'currency': 'PKR'},
+      'status': 'pending',
+      'created_at': '2026-09-15T10:00:00Z',
+      'updated_at': '2026-09-15T10:01:00Z',
+      'expires_at': '2026-09-15T10:02:00Z',
+      'decided_at': null,
+      'pickup_distance_meters': null,
+      'matches_proposed_fare': true,
+      'selectable': false,
+    });
+
+    expect(comparison.pickupDistanceMeters, isNull);
+  });
+
   test('parses assigned Rider ride snapshot', () {
     final ride = RiderRideSnapshot.fromJson({
       'service_code': 'car',
@@ -142,6 +160,21 @@ void main() {
     });
     expect(ride.status, 'expired');
     expect(ride.trip, isNull);
+  });
+
+  test('parses historical Rider ride without a proposed fare', () {
+    final ride = RiderRideSnapshot.fromJson({
+      'service_code': 'car',
+      'id': 'ride-history',
+      'pickup': {'latitude': 33.6844, 'longitude': 73.0479},
+      'destination': {'latitude': 33.5651, 'longitude': 73.0169},
+      'status': 'completed',
+      'created_at': '2026-09-15T10:00:00Z',
+      'expires_at': '2026-09-15T10:10:00Z',
+      'trip': null,
+    });
+
+    expect(ride.proposedFare, isNull);
   });
 
   test('allows nullable driver location in aggregate snapshot', () {

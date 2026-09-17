@@ -14,9 +14,9 @@ _RiderRideSnapshot _$RiderRideSnapshotFromJson(Map<String, dynamic> json) =>
       destination: RideLocation.fromJson(
         json['destination'] as Map<String, dynamic>,
       ),
-      proposedFare: RideFare.fromJson(
-        json['proposed_fare'] as Map<String, dynamic>,
-      ),
+      proposedFare: json['proposed_fare'] == null
+          ? null
+          : RideFare.fromJson(json['proposed_fare'] as Map<String, dynamic>),
       status: json['status'] as String,
       createdAt: DateTime.parse(json['created_at'] as String),
       expiresAt: DateTime.parse(json['expires_at'] as String),

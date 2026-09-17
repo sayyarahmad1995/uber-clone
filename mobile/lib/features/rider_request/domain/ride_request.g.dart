@@ -62,7 +62,9 @@ _RideRequest _$RideRequestFromJson(Map<String, dynamic> json) => _RideRequest(
   id: json['id'] as String,
   pickup: GeoPoint.fromJson(json['pickup'] as Map<String, dynamic>),
   destination: GeoPoint.fromJson(json['destination'] as Map<String, dynamic>),
-  proposedFare: Money.fromJson(json['proposed_fare'] as Map<String, dynamic>),
+  proposedFare: json['proposed_fare'] == null
+      ? null
+      : Money.fromJson(json['proposed_fare'] as Map<String, dynamic>),
   status: json['status'] as String,
   createdAt: DateTime.parse(json['created_at'] as String),
   trip: json['trip'] == null

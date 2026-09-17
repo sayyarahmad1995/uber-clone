@@ -23,6 +23,13 @@ String pointText(RideLocation? point) => point == null
     ? 'Unavailable'
     : '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}';
 
+String riderOfferDistanceText(int? distance) {
+  final value = distance;
+  return value == null
+      ? 'Pickup distance unavailable'
+      : '${(value / 1000).toStringAsFixed(1)} km to pickup · straight-line distance';
+}
+
 String statusText(String? status) => switch (status) {
   'assigned' => 'Driver assigned',
   'in_progress' => 'Trip in progress',
@@ -404,9 +411,7 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
                 Text(
                   '${fareText(offer.fare)}${offer.matchesProposedFare ? ' · Your fare' : ''}',
                 ),
-                Text(
-                  '${(offer.pickupDistanceMeters / 1000).toStringAsFixed(1)} km to pickup · straight-line distance',
-                ),
+                Text(riderOfferDistanceText(offer.pickupDistanceMeters)),
                 if (!offer.selectable)
                   Text(
                     offer.status == 'pending'

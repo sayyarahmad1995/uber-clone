@@ -49,7 +49,7 @@ abstract class RideRequest with _$RideRequest {
     required String id,
     required GeoPoint pickup,
     required GeoPoint destination,
-    @JsonKey(name: 'proposed_fare') required Money proposedFare,
+    @JsonKey(name: 'proposed_fare') Money? proposedFare,
     required String status,
     @JsonKey(name: 'created_at') required DateTime createdAt,
     TripSnapshot? trip,

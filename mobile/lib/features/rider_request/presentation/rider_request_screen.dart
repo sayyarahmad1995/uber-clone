@@ -427,8 +427,10 @@ class _ActiveRequestPanel extends ConsumerWidget {
                   leading: const Icon(Icons.payments_outlined),
                   title: const Text('Your proposed fare'),
                   subtitle: Text(
-                    '${request.proposedFare.currency} '
-                    '${(request.proposedFare.amountMinor / 100).toStringAsFixed(2)}',
+                    request.proposedFare == null
+                        ? 'Fare unavailable'
+                        : '${request.proposedFare!.currency} '
+                              '${(request.proposedFare!.amountMinor / 100).toStringAsFixed(2)}',
                   ),
                 ),
               ],
