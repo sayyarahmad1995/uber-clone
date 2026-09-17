@@ -3,8 +3,47 @@ import 'package:uber_clone/features/ride_flow/domain/marketplace_request.dart';
 import 'package:uber_clone/features/ride_flow/domain/ride_offer.dart';
 import 'package:uber_clone/features/ride_flow/domain/ride_snapshot.dart';
 import 'package:uber_clone/features/ride_flow/domain/trip.dart';
+import 'package:uber_clone/features/ride_flow/domain/ride_execution.dart';
+import 'package:uber_clone/features/rider_request/domain/ride_request.dart'
+    as rider_request;
 
 void main() {
+  test(
+    'parses the canonical completed cash-collected lifecycle in both features',
+    () {
+      final lifecyclePayload = {
+        'status': 'completed',
+        'settlement': {
+          'status': 'cash_collected',
+          'method': 'cash',
+          'cash_collected_at': '2026-09-17T00:00:00Z',
+        },
+      };
+      final riderRequest = rider_request.RideRequest.fromJson({
+        'id': 'ride-1',
+        'pickup': {'latitude': 33.6844, 'longitude': 73.0479},
+        'destination': {'latitude': 33.5651, 'longitude': 73.0169},
+        'status': 'accepted',
+        'created_at': '2026-09-17T00:00:00Z',
+        'trip': lifecyclePayload,
+      });
+      final rideFlowTrip = TripSnapshot.fromJson({
+        ...lifecyclePayload,
+        'assigned_at': '2026-09-17T00:00:00Z',
+      });
+
+      expect(riderRequest.trip, isA<TripLifecycleSnapshot>());
+      expect(rideFlowTrip, isA<TripLifecycleSnapshot>());
+      expect(riderRequest.trip?.status, 'completed');
+      expect(rideFlowTrip.status, 'completed');
+      expect(riderRequest.trip?.settlement?.status, 'cash_collected');
+      expect(rideFlowTrip.settlement.status, 'cash_collected');
+      expect(riderRequest.trip?.isTerminal, isTrue);
+      expect(rideFlowTrip.isTerminal, isTrue);
+      expect(rideFlowTrip.status, isNot('settled'));
+    },
+  );
+
   test('parses pending driver offer', () {
     final offer = RideOffer.fromJson({
       'ride_request_id': 'ride-1',

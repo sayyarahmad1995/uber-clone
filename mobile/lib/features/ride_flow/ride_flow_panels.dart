@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers.dart';
 import 'domain/marketplace_request.dart';
 import 'domain/ride_snapshot.dart';
+import 'domain/ride_execution.dart';
 import 'domain/trip.dart';
 import 'application/driver_marketplace_controller.dart';
 import 'application/driver_trip_controller.dart';

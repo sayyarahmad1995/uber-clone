@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../ride_flow/domain/ride_execution.dart';
 import '../data/device_location.dart';
 import '../data/ride_request_repository.dart';
 import '../domain/ride_request.dart';
@@ -26,10 +27,7 @@ class RiderRequestState {
   RideRequest? get active {
     for (final request in requests) {
       final trip = request.trip;
-      final tripTerminal =
-          trip?.status == 'cancelled' ||
-          (trip?.status == 'completed' &&
-              trip?.settlement?.status == 'cash_collected');
+      final tripTerminal = trip?.isTerminal ?? false;
       if (request.status == 'cancelled' ||
           request.status == 'expired' ||
           tripTerminal) {

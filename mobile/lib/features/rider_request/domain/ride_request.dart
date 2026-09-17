@@ -1,4 +1,5 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:uber_clone/features/ride_flow/domain/ride_execution.dart';
 
 part 'ride_request.freezed.dart';
 part 'ride_request.g.dart';
@@ -23,18 +24,9 @@ abstract class Money with _$Money {
 }
 
 @freezed
-abstract class SettlementSnapshot with _$SettlementSnapshot {
-  const factory SettlementSnapshot({
-    required String status,
-    String? method,
-    @JsonKey(name: 'cash_collected_at') DateTime? cashCollectedAt,
-  }) = _SettlementSnapshot;
-  factory SettlementSnapshot.fromJson(Map<String, dynamic> json) =>
-      _$SettlementSnapshotFromJson(json);
-}
-
-@freezed
-abstract class TripSnapshot with _$TripSnapshot {
+abstract class TripSnapshot
+    with _$TripSnapshot
+    implements TripLifecycleSnapshot {
   const factory TripSnapshot({
     required String status,
     SettlementSnapshot? settlement,

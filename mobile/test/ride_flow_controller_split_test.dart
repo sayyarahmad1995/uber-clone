@@ -8,6 +8,7 @@ import 'package:uber_clone/features/ride_flow/application/rider_active_ride_cont
 import 'package:uber_clone/features/ride_flow/domain/marketplace_request.dart';
 import 'package:uber_clone/features/ride_flow/domain/ride_offer.dart';
 import 'package:uber_clone/features/ride_flow/domain/ride_snapshot.dart';
+import 'package:uber_clone/features/ride_flow/domain/ride_execution.dart';
 import 'package:uber_clone/features/ride_flow/domain/trip.dart';
 import 'package:uber_clone/features/ride_flow/ride_flow_repository.dart';
 
