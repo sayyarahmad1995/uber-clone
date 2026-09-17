@@ -11,13 +11,22 @@ Provide `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `ORY_KRATOS_DB`,
 `ADMIN_REVIEW_PASSWORD`, and `ADMIN_REVIEW_ORIGIN` externally. Use HTTPS URLs
 for public origins and preserve the public `Host` header through the proxy.
 
-The `pilot_postgres_data` volume is persistent. Back it up with a consistent
-dump and verify restoration into an isolated database before relying on it:
+The `pilot_postgres_data` volume is persistent. Back up both the HiGO
+application database and the Kratos identity database with consistent dumps:
 
 ```bash
 docker compose -f docker-compose.pilot.yml exec -T postgres \
-  pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" > backup.sql
+  pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" > higo-app-backup.sql
+
+docker compose -f docker-compose.pilot.yml exec -T postgres \
+  pg_dump -U "$POSTGRES_USER" "$ORY_KRATOS_DB" > higo-kratos-backup.sql
 ```
+
+Before treating the backups as valid, restore both dumps into isolated
+databases and verify them independently. Confirm that the application
+migrations and schema load successfully, and that Kratos starts against the
+restored identity database. Do not test restoration against the live pilot
+databases or remove the persistent volume during routine updates.
 
 Services use `restart: unless-stopped`. Inspect readiness with
 `docker compose -f docker-compose.pilot.yml ps`, the API `/health` endpoint,
