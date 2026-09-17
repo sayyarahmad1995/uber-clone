@@ -37,7 +37,17 @@ void main() {
       expect(riderRequest.trip?.status, 'completed');
       expect(rideFlowTrip.status, 'completed');
       expect(riderRequest.trip?.settlement?.status, 'cash_collected');
+      expect(riderRequest.trip?.settlement?.method, 'cash');
+      expect(
+        riderRequest.trip?.settlement?.cashCollectedAt,
+        DateTime.utc(2026, 9, 17),
+      );
       expect(rideFlowTrip.settlement.status, 'cash_collected');
+      expect(rideFlowTrip.settlement.method, 'cash');
+      expect(
+        rideFlowTrip.settlement.cashCollectedAt,
+        DateTime.utc(2026, 9, 17),
+      );
       expect(riderRequest.trip?.isTerminal, isTrue);
       expect(rideFlowTrip.isTerminal, isTrue);
       expect(rideFlowTrip.status, isNot('settled'));
