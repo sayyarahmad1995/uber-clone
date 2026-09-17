@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uber_clone/core/providers.dart';
+import 'package:uber_clone/features/ride_flow/domain/marketplace_request.dart';
 import 'package:uber_clone/features/ride_flow/domain/ride_snapshot.dart';
 import 'package:uber_clone/features/rider_request/application/rider_request_controller.dart';
 import 'package:uber_clone/features/rider_request/domain/ride_request.dart';
