@@ -103,6 +103,12 @@ jobs:
       - run: dart run build_runner build --delete-conflicting-outputs
         working-directory: mobile
       - run: git diff --exit-code --ignore-space-at-eol
+      - name: Guard Flutter source encoding
+        run: |
+          if rg -n --glob '*.dart' 'â|Ã|Â|�' mobile/lib; then
+            echo "mojibake marker found in production Flutter source"
+            exit 1
+          fi
       - name: Guard retired mobile contracts
         run: |
           if rg -n --glob '*.dart' 'repo\.onboard\(|DriverController\.onboard|Future<DriverProfile> onboard\(' mobile/lib; then
