@@ -63,6 +63,5 @@ void main() {
     expect(flowRepository.requestedRideIds, everyElement(rideId));
 
     await tester.pumpWidget(const SizedBox.shrink());
-    requestController.dispose();
   });
 }
