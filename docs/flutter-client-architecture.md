@@ -84,4 +84,9 @@ prompt as part of this startup behavior. Explicit current-location actions remai
 available for refocusing the map and selecting pickup. The Driver dashboard now
 supports profile setup/editing, availability, and explicit location publishing.
 Its controls reuse the shared panel contract. Marketplace discovery and offers
-remain the next client slice. See [Driver readiness](flutter-driver-readiness.md).
+are implemented with exact-fare response, counteroffer, Rider selection, Trip transitions,
+cancellation, and cash confirmation commands. Backend Driver `skip`
+and Rider offer `reject` remain supported API operations, while dedicated skip/reject mobile controls are intentionally deferred.
+Rider selection remains
+the assignment boundary and preserves Rider-selected assignment ownership. See
+[Driver readiness](flutter-driver-readiness.md).
