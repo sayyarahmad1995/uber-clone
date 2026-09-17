@@ -26,8 +26,8 @@ Future implementation must be checked against these documents before a slice is 
 - Use a separate, narrow operator boundary for Driver onboarding approval/rejection; administrator review is not a Rider/Driver capability.
 - Use one shared client application.
 - Build Android first with clear boundaries for a later iOS implementation.
-- Use an external OIDC provider for authentication and authorization.
-- Use PostgreSQL for primary persistence and Redis only where a concrete slice needs fast/ephemeral state.
+- Use application-owned authentication/session APIs backed by provider-neutral interfaces, with Ory Kratos as the current adapter.
+- Use PostgreSQL for primary persistence; Redis remains deferred until a concrete slice justifies fast/ephemeral state.
 - Deploy containerized on a self-managed server and scale vertically.
 - Use one Rider Ride Request flow: pickup, destination, and proposed fare.
 - Let eligible Drivers either accept the Rider proposed fare or submit a counteroffer.
