@@ -67,7 +67,7 @@ provider APIs or render provider-owned authentication interfaces.
 
 PostgreSQL is the primary transactional database.
 
-Redis is used for fast, ephemeral, or cache-oriented data only when a concrete vertical slice needs it.
+No cache or fast-ephemeral store is currently required by the MVP slices. Redis remains deferred until a concrete vertical slice justifies it.
 
 We will not use Redis as a replacement for transactional persistence.
 
@@ -151,7 +151,7 @@ Driver onboarding approval/rejection uses a dedicated backend review service and
 
 Approval and rejection are transactional, backend-authoritative decisions. Approval promotes the submitted Driver/vehicle/service snapshot into approved records; rejection requires a reason and creates no operational records. Decided applications remain in history.
 
-Newly approved Drivers remain non-operational until the vehicle/service operating-context slice is implemented. The reviewer slice must not reactivate the legacy immediate-write or legacy online bypass.
+Newly approved Drivers can enter the implemented operating-context flow by selecting one approved vehicle/service combination before going online. The reviewer slice must not reactivate the legacy immediate-write or legacy online bypass.
 
 See [ADR-0010: Minimal Driver Onboarding Reviewer](ADR-0010-minimal-driver-onboarding-reviewer.md).
 

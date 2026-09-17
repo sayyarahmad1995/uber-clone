@@ -41,8 +41,9 @@ committed in `pubspec.lock`. `API_BASE_URL` is a compile-time definition and
 defaults to the Android emulator host alias `http://10.0.2.2:8080`. Cleartext HTTP
 is permitted only in Android debug builds; release builds require HTTPS.
 
-Android is the only generated platform. WebSockets, push notifications, offline
-databases, and media providers remain outside the implemented client slices.
+Android is the only generated platform. HTTP polling is the implemented ride-flow
+update mechanism. Push notifications, offline databases, media providers, and
+WebSocket transports remain deferred outside the implemented client slices.
 
 ## Rider request extension
 
@@ -82,10 +83,14 @@ The Rider dashboard requests location during startup so the map can focus on the
 Rider automatically. On a first run, the platform may display its location-permission
 prompt as part of this startup behavior. Explicit current-location actions remain
 available for refocusing the map and selecting pickup. The Driver dashboard now
-supports profile setup/editing, availability, and explicit location publishing.
-Its controls reuse the shared panel contract. Marketplace discovery and offers
-are implemented with exact-fare response, counteroffer, Rider selection, Trip transitions,
-cancellation, and cash confirmation commands. Backend Driver `skip`
+supports review-based onboarding, approved vehicle/service operating selection,
+availability, and explicit location publishing. Driver details and Vehicles are
+read-only approved-information surfaces; approved-information revision editing
+remains deferred. Its controls reuse the shared panel contract. Marketplace
+discovery, typed offers, Rider selection, Trip execution, settlement display, and
+split Rider/Driver ride-flow controllers are implemented with exact-fare response,
+counteroffer, Rider selection, Trip transitions, cancellation, and cash confirmation
+commands. Backend Driver `skip`
 and Rider offer `reject` remain supported API operations, while dedicated skip/reject mobile controls are intentionally deferred.
 Rider selection remains
 the assignment boundary and preserves Rider-selected assignment ownership. See

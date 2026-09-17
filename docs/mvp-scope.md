@@ -7,13 +7,13 @@ Validate the core ride-hailing experience with a small, understandable system. T
 ## Included foundation
 
 - One user account per person.
-- External OIDC authentication.
+- Application-owned authentication/session APIs backed by provider-neutral backend interfaces, with Ory Kratos as the current adapter.
 - Rider as the default capability.
 - Shared Flutter mobile application.
 - Android as the initial client platform.
 - Go backend.
 - PostgreSQL persistence.
-- Redis only where a concrete vertical slice needs fast/ephemeral state.
+- No cache / fast ephemeral store is currently required; Redis remains deferred until a concrete slice justifies it.
 
 ## Core MVP journey
 
@@ -46,7 +46,7 @@ Trip assigned
   ↓
 Trip in progress
   ↓
-Live location/status updates
+HTTP-polled location/status updates
   ↓
 Trip completed
   ↓
