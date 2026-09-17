@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -9,7 +10,6 @@ import 'package:uber_clone/core/models/account.dart';
 import 'package:uber_clone/features/rider_request/domain/ride_request.dart';
 
 import 'ride_request_repository_test.dart' show StaticSessionStore;
-import 'test_doubles.dart';
 
 void main() {
   late DriverAdapter adapter;
@@ -21,22 +21,34 @@ void main() {
       ..httpClientAdapter = adapter;
     repo = ApiDriverRepository(dio, StaticSessionStore());
   });
+  test('DriverRepository exposes only operational operations', () {
+    final source = File(
+      'lib/features/driver_workspace/data/driver_repository.dart',
+    ).readAsStringSync();
+    final interface = RegExp(
+      r'abstract interface class DriverRepository \{([\s\S]*?)\n\}',
+    ).firstMatch(source);
+    final methods = RegExp(
+      r'^\s*Future<[\w<>?]+>\s+(\w+)\([^;]*\);',
+      multiLine: true,
+    ).allMatches(interface!.group(1)!).map((match) => match.group(1));
+
+    expect(
+      methods,
+      unorderedEquals([
+        'get',
+        'operatingState',
+        'selectOperation',
+        'listVehicles',
+        'setOnline',
+        'publishLocation',
+      ]),
+    );
+  });
   test('Driver contracts use authenticated application endpoints', () async {
     await repo.get();
     expect(adapter.request!.method, 'GET');
     expect(adapter.request!.path, '/v1/driver');
-    await repo.onboard(' Test Driver ', driverVehicle);
-    expect(adapter.request!.method, 'PUT');
-    expect(adapter.request!.data, {
-      'display_name': 'Test Driver',
-      'vehicle': {
-        'make': 'Toyota',
-        'model': 'Corolla',
-        'model_year': 2024,
-        'color': 'White',
-        'license_plate': 'ABC-123',
-      },
-    });
     await repo.setOnline(true);
     expect(adapter.request!.path, '/v1/driver/availability');
     expect(adapter.request!.data, {'is_online': true});
@@ -57,15 +69,21 @@ void main() {
     adapter.status = 403;
     await expectLater(repo.listVehicles(), throwsA(isA<ApiException>()));
   });
-  test('operating selection persists through authenticated endpoints', () async {
-    final selected = await repo.selectOperation('owned', 'economy');
-    expect(selected.valid, isTrue);
-    expect(adapter.request!.method, 'PUT');
-    expect(adapter.request!.data, {'vehicle_id':'owned','service_code':'economy'});
-    final restored = await repo.operatingState();
-    expect(adapter.request!.method, 'GET');
-    expect(restored.vehicleId, 'owned');
-  });
+  test(
+    'operating selection persists through authenticated endpoints',
+    () async {
+      final selected = await repo.selectOperation('owned', 'economy');
+      expect(selected.valid, isTrue);
+      expect(adapter.request!.method, 'PUT');
+      expect(adapter.request!.data, {
+        'vehicle_id': 'owned',
+        'service_code': 'economy',
+      });
+      final restored = await repo.operatingState();
+      expect(adapter.request!.method, 'GET');
+      expect(restored.vehicleId, 'owned');
+    },
+  );
   test('only profile 404 means onboarding required', () async {
     adapter.status = 404;
     expect(await repo.get(), isNull);
@@ -103,7 +121,14 @@ class DriverAdapter implements HttpClientAdapter {
   ) async {
     request = options;
     final Object data = options.path == '/v1/driver/operating-selection'
-        ? {'selection': {'vehicle_id':'owned', 'service_code':'economy', 'valid':true}, 'can_change':true}
+        ? {
+            'selection': {
+              'vehicle_id': 'owned',
+              'service_code': 'economy',
+              'valid': true,
+            },
+            'can_change': true,
+          }
         : options.path == '/v1/driver/vehicles'
         ? {'vehicles': <Object>[]}
         : options.path.endsWith('/capabilities/driver')

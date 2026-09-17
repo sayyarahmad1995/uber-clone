@@ -174,15 +174,6 @@ class FakeDriverRepository implements DriverRepository {
   @override
   Future<DriverProfile?> get() async => profile;
   @override
-  Future<DriverProfile> onboard(String name, DriverVehicle vehicle) async {
-    calls.add('onboard');
-    return profile = driverProfile.copyWith(
-      displayName: name,
-      vehicle: vehicle,
-    );
-  }
-
-  @override
   Future<DriverProfile> setOnline(bool online) async {
     calls.add('online=$online');
     if (failAvailability) throw Exception('Availability failed');

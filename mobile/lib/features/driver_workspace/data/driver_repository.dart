@@ -1,4 +1,5 @@
 import '../domain/operating_state.dart';
+
 import 'package:dio/dio.dart';
 
 import '../../../core/network/api_exception.dart';
@@ -12,7 +13,6 @@ abstract interface class DriverRepository {
   Future<OperatingState> operatingState();
   Future<OperatingState> selectOperation(String vehicleId, String serviceCode);
   Future<List<RegisteredVehicle>> listVehicles();
-  Future<DriverProfile> onboard(String displayName, DriverVehicle vehicle);
   Future<DriverProfile> setOnline(bool online);
   Future<PublishedDriverLocation> publishLocation(GeoPoint point);
 }
@@ -50,14 +50,25 @@ class ApiDriverRepository implements DriverRepository {
   }
 
   @override
-  Future<OperatingState> operatingState() async => OperatingState.fromJson(await _request('/v1/driver/operating-selection'));
+  Future<OperatingState> operatingState() async =>
+      OperatingState.fromJson(await _request('/v1/driver/operating-selection'));
   @override
-  Future<OperatingState> selectOperation(String vehicleId, String serviceCode) async => OperatingState.fromJson(await _request('/v1/driver/operating-selection', data: {'vehicle_id':vehicleId, 'service_code':serviceCode}));
+  Future<OperatingState> selectOperation(
+    String vehicleId,
+    String serviceCode,
+  ) async => OperatingState.fromJson(
+    await _request(
+      '/v1/driver/operating-selection',
+      data: {'vehicle_id': vehicleId, 'service_code': serviceCode},
+    ),
+  );
 
   @override
   Future<List<RegisteredVehicle>> listVehicles() async {
     final data = await _request('/v1/driver/vehicles');
-    return (data['vehicles'] as List).map((item) => RegisteredVehicle.fromJson(item as Map<String, dynamic>)).toList();
+    return (data['vehicles'] as List)
+        .map((item) => RegisteredVehicle.fromJson(item as Map<String, dynamic>))
+        .toList();
   }
 
   @override
@@ -69,17 +80,6 @@ class ApiDriverRepository implements DriverRepository {
       rethrow;
     }
   }
-
-  @override
-  Future<DriverProfile> onboard(
-    String displayName,
-    DriverVehicle vehicle,
-  ) async => DriverProfile.fromJson(
-    await _request(
-      '/v1/driver',
-      data: {'display_name': displayName.trim(), 'vehicle': vehicle.toJson()},
-    ),
-  );
 
   @override
   Future<DriverProfile> setOnline(bool online) async => DriverProfile.fromJson(

@@ -19,27 +19,33 @@ void main() {
     return controller;
   }
 
-  test('new app session starts offline even if previous session was online', () async {
-    final repo = FakeDriverRepository(
-      profile: driverProfile.copyWith(isOnline: true),
-    );
-    final controller = await create(repo);
-    expect(controller.profile!.isOnline, isFalse);
-    expect(repo.calls, ['online=false', 'location']);
-    expect(controller.operation!.serviceCode, 'economy');
-  });
+  test(
+    'new app session starts offline even if previous session was online',
+    () async {
+      final repo = FakeDriverRepository(
+        profile: driverProfile.copyWith(isOnline: true),
+      );
+      final controller = await create(repo);
+      expect(controller.profile!.isOnline, isFalse);
+      expect(repo.calls, ['online=false', 'location']);
+      expect(controller.operation!.serviceCode, 'economy');
+    },
+  );
 
-  test('background requests offline and resume does not restore online', () async {
-    final repo = FakeDriverRepository(profile: driverProfile);
-    final controller = await create(repo);
-    await controller.setOnline(true);
-    controller.setForeground(false);
-    await Future<void>.delayed(Duration.zero);
-    expect(controller.profile!.isOnline, isFalse);
-    controller.setForeground(true);
-    await Future<void>.delayed(Duration.zero);
-    expect(controller.profile!.isOnline, isFalse);
-  });
+  test(
+    'background requests offline and resume does not restore online',
+    () async {
+      final repo = FakeDriverRepository(profile: driverProfile);
+      final controller = await create(repo);
+      await controller.setOnline(true);
+      controller.setForeground(false);
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.profile!.isOnline, isFalse);
+      controller.setForeground(true);
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.profile!.isOnline, isFalse);
+    },
+  );
 
   test('background during location lookup cannot turn Driver online', () async {
     final repo = FakeDriverRepository(profile: driverProfile);
@@ -63,16 +69,6 @@ void main() {
     expect(controller.operation!.vehicleId, 'owned');
     await controller.load();
     expect(controller.operation!.serviceCode, 'economy');
-  });
-
-  test('missing profile loads setup, onboarding persists profile', () async {
-    final repo = FakeDriverRepository();
-    final controller = await create(repo);
-    expect(controller.loaded, isTrue);
-    expect(controller.profile, isNull);
-    await controller.onboard('Driver', driverVehicle);
-    expect(controller.profile!.displayName, 'Driver');
-    expect(controller.profile!.isOnline, isFalse);
   });
 
   test('going online publishes location before availability', () async {
