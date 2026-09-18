@@ -10,17 +10,13 @@ import 'package:uber_clone/features/driver_workspace/presentation/operating_sele
 import 'test_doubles.dart';
 
 void main() {
-  testWidgets('shows selected and unavailable operating contexts', (
+  testWidgets('shows one selected vehicle with all eligible services', (
     tester,
   ) async {
     final repo = FakeDriverRepository(
       profile: driverProfile,
       vehicles: operatingVehicles,
-    )..operation = const OperatingState(
-        vehicleId: 'vehicle-b',
-        serviceCode: 'comfort',
-        valid: true,
-      );
+    )..operation = const OperatingState(vehicleId: 'vehicle-a', valid: true);
 
     await _pump(tester, repo);
 
@@ -29,67 +25,54 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Current selection'), findsOneWidget);
-    expect(find.text('Honda Civic 2025 • NEW-456'), findsWidgets);
-    expect(find.text('Service: Comfort'), findsOneWidget);
+    expect(find.text('Toyota Corolla 2024 • ABC-123'), findsWidgets);
+    expect(find.text('Available services: Economy, Comfort'), findsWidgets);
     expect(
-      find.byKey(const ValueKey('operating-option-vehicle-a-economy')),
+      find.byKey(const ValueKey('operating-option-vehicle-a')),
       findsOneWidget,
     );
     expect(
-      find.byKey(const ValueKey('operating-option-vehicle-b-comfort')),
+      find.byKey(const ValueKey('operating-option-vehicle-b')),
       findsOneWidget,
     );
     expect(
-      find.byKey(const ValueKey('operating-unavailable-vehicle-c-comfort')),
+      find.byKey(const ValueKey('operating-unavailable-vehicle-c')),
       findsOneWidget,
     );
-    expect(find.text('Comfort (currently unavailable)'), findsOneWidget);
+    expect(find.text('No active approved services'), findsOneWidget);
   });
 
-  testWidgets('selects another approved vehicle service combination', (
-    tester,
-  ) async {
+  testWidgets('selects another approved vehicle once', (tester) async {
     final repo = FakeDriverRepository(
       profile: driverProfile,
       vehicles: operatingVehicles,
-    )..operation = const OperatingState(
-        vehicleId: 'vehicle-a',
-        serviceCode: 'economy',
-        valid: true,
-      );
+    )..operation = const OperatingState(vehicleId: 'vehicle-a', valid: true);
 
     await _pump(tester, repo);
-    await tester.tap(
-      find.byKey(const ValueKey('operating-option-vehicle-b-comfort')),
-    );
+    await tester.tap(find.byKey(const ValueKey('operating-option-vehicle-b')));
     await tester.pumpAndSettle();
 
     expect(repo.operation.vehicleId, 'vehicle-b');
-    expect(repo.operation.serviceCode, 'comfort');
     expect(repo.operation.valid, isTrue);
   });
 
-  testWidgets('locked Driver cannot change operating context', (
-    tester,
-  ) async {
-    final repo = FakeDriverRepository(
-      profile: driverProfile,
-      vehicles: operatingVehicles,
-    )..operation = const OperatingState(
-        vehicleId: 'vehicle-a',
-        serviceCode: 'economy',
-        valid: true,
-        canChange: false,
-      );
+  testWidgets('locked Driver cannot change operating context', (tester) async {
+    final repo =
+        FakeDriverRepository(
+            profile: driverProfile,
+            vehicles: operatingVehicles,
+          )
+          ..operation = const OperatingState(
+            vehicleId: 'vehicle-a',
+            valid: true,
+            canChange: false,
+          );
 
     await _pump(tester, repo);
-    await tester.tap(
-      find.byKey(const ValueKey('operating-option-vehicle-b-comfort')),
-    );
+    await tester.tap(find.byKey(const ValueKey('operating-option-vehicle-b')));
     await tester.pumpAndSettle();
 
     expect(repo.operation.vehicleId, 'vehicle-a');
-    expect(repo.operation.serviceCode, 'economy');
     expect(
       find.text(
         'Go offline and finish any active trip before changing selection.',
@@ -131,6 +114,12 @@ final operatingVehicles = [
         serviceCode: 'economy',
         displayName: 'Economy',
         approvedAt: DateTime.utc(2026, 9, 10),
+        serviceActive: true,
+      ),
+      ApprovedServiceEnrollment(
+        serviceCode: 'comfort',
+        displayName: 'Comfort',
+        approvedAt: DateTime.utc(2026, 9, 11),
         serviceActive: true,
       ),
     ],

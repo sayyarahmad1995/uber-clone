@@ -120,10 +120,9 @@ class DriverController extends ChangeNotifier {
     }
   }
 
-  Future<void> selectOperation(String vehicleId, String serviceCode) =>
-      _run(() async {
-        operation = await _repository.selectOperation(vehicleId, serviceCode);
-      });
+  Future<void> selectOperation(String vehicleId) => _run(() async {
+    operation = await _repository.selectOperation(vehicleId);
+  });
 
   Future<void> _publish() async {
     final point = await _location.current().timeout(
@@ -161,7 +160,9 @@ class DriverController extends ChangeNotifier {
     if (profile == null) return;
     // A failed location update must not turn an offline Driver online.
     if (online && operation?.valid != true) {
-      throw StateError('Select an approved vehicle and service first.');
+      throw StateError(
+        'Select an approved vehicle with an available service first.',
+      );
     }
     if (online) await _publish();
     if (_disposed || (online && !_foreground)) return;

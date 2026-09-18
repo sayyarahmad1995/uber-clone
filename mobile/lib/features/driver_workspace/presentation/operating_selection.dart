@@ -14,13 +14,13 @@ class OperatingSelectionControl extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final driver = ref.watch(driverControllerProvider);
     final operation = driver.operation;
-    final choices = _choices(driver.vehicles);
+    final choices = driver.vehicles.map(_OperatingChoice.new).toList();
     final activeChoices = choices
-        .where((choice) => choice.service.serviceActive)
-        .toList(growable: false);
+        .where((choice) => choice.activeServices.isNotEmpty)
+        .toList();
     final inactiveChoices = choices
-        .where((choice) => !choice.service.serviceActive)
-        .toList(growable: false);
+        .where((choice) => choice.activeServices.isEmpty)
+        .toList();
     final selected = _selectedChoice(activeChoices, operation);
     final canChangeSelection =
         operation?.canChange == true &&
@@ -33,21 +33,21 @@ class OperatingSelectionControl extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Operating vehicle and service',
+          'Operating vehicle',
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: AppSpacing.xs),
         if (selected != null) _SelectedOperatingContext(choice: selected),
         if (selected == null && activeChoices.isNotEmpty)
-          const Text('Choose an approved combination before going online.'),
+          const Text('No operating vehicle selected.'),
         if (activeChoices.isEmpty)
           const Text(
-            'No approved active vehicle/service combination is available.',
+            'No vehicle with an approved active service is available.',
           ),
         if (activeChoices.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Approved operating options',
+            'Approved vehicles',
             style: Theme.of(context).textTheme.labelLarge,
           ),
           const SizedBox(height: AppSpacing.xs),
@@ -57,19 +57,14 @@ class OperatingSelectionControl extends ConsumerWidget {
                 choice: choice,
                 selected: choice.matches(operation),
                 enabled: !driver.busy && canChangeSelection,
-                onSelect: () {
-                  driver.selectOperation(
-                    choice.record.id,
-                    choice.service.serviceCode,
-                  );
-                },
+                onSelect: () => driver.selectOperation(choice.record.id),
               ),
             ),
         ],
         if (inactiveChoices.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.md),
           Text(
-            'Unavailable enrollments',
+            'Unavailable vehicles',
             style: Theme.of(context).textTheme.labelLarge,
           ),
           const SizedBox(height: AppSpacing.xs),
@@ -103,14 +98,14 @@ class _OperatingChoiceTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      key: ValueKey('operating-option-${choice.key}'),
+      key: ValueKey('operating-option-${choice.record.id}'),
       contentPadding: EdgeInsets.zero,
       enabled: selected || enabled,
       leading: Icon(
         selected ? Icons.check_circle : Icons.radio_button_unchecked,
       ),
       title: Text(choice.vehicleLabel),
-      subtitle: Text(choice.service.displayName),
+      subtitle: Text('Available services: ${choice.activeServiceNames}'),
       trailing: selected ? const Text('Selected') : null,
       onTap: selected || !enabled ? null : onSelect,
     );
@@ -125,12 +120,12 @@ class _UnavailableChoiceTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      key: ValueKey('operating-unavailable-${choice.key}'),
+      key: ValueKey('operating-unavailable-${choice.record.id}'),
       contentPadding: EdgeInsets.zero,
       enabled: false,
       leading: const Icon(Icons.block),
       title: Text(choice.vehicleLabel),
-      subtitle: Text('${choice.service.displayName} (currently unavailable)'),
+      subtitle: const Text('No active approved services'),
     );
   }
 }
@@ -158,7 +153,7 @@ class _SelectedOperatingContext extends StatelessWidget {
               style: Theme.of(context).textTheme.labelLarge,
             ),
             Text(choice.vehicleLabel),
-            Text('Service: ${choice.service.displayName}'),
+            Text('Available services: ${choice.activeServiceNames}'),
           ],
         ),
       ),
@@ -167,12 +162,16 @@ class _SelectedOperatingContext extends StatelessWidget {
 }
 
 class _OperatingChoice {
-  const _OperatingChoice({required this.record, required this.service});
+  const _OperatingChoice(this.record);
 
   final RegisteredVehicle record;
-  final ApprovedServiceEnrollment service;
 
-  String get key => '${record.id}-${service.serviceCode}';
+  List<ApprovedServiceEnrollment> get activeServices => record.enrollments
+      .where((service) => service.serviceActive)
+      .toList(growable: false);
+
+  String get activeServiceNames =>
+      activeServices.map((service) => service.displayName).join(', ');
 
   String get vehicleLabel {
     final vehicle = record.vehicle;
@@ -181,18 +180,8 @@ class _OperatingChoice {
   }
 
   bool matches(OperatingState? operation) {
-    return operation?.valid == true &&
-        operation?.vehicleId == record.id &&
-        operation?.serviceCode == service.serviceCode;
+    return operation?.valid == true && operation?.vehicleId == record.id;
   }
-}
-
-List<_OperatingChoice> _choices(List<RegisteredVehicle> vehicles) {
-  return [
-    for (final record in vehicles)
-      for (final service in record.enrollments)
-        _OperatingChoice(record: record, service: service),
-  ];
 }
 
 _OperatingChoice? _selectedChoice(

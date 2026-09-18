@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
 import '../domain/driver_onboarding.dart';
 import '../domain/driver_profile.dart';
+import '../domain/registered_vehicle.dart';
 
 class DriverDetailsScreen extends ConsumerWidget {
   const DriverDetailsScreen({super.key});
@@ -30,6 +31,10 @@ class DriverDetailsScreen extends ConsumerWidget {
         child: _DriverDetailsContent(
           profile: profile,
           application: application,
+          selectedVehicle: _selectedVehicle(
+            driver.vehicles,
+            driver.operation?.vehicleId,
+          ),
         ),
       ),
     );
@@ -48,35 +53,74 @@ class DriverVehiclesScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Vehicles')),
       body: records.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Unable to load vehicles'),
-            TextButton(onPressed: () => ref.invalidate(driverVehiclesProvider), child: const Text('Retry')),
-          ],
-        )),
+        error: (error, stack) => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Unable to load vehicles'),
+              TextButton(
+                onPressed: () => ref.invalidate(driverVehiclesProvider),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
         data: (vehicles) => _ReadOnlyBody(
           loading: vehicles.isEmpty && !onboarding.loaded,
           error: onboarding.error,
           empty: vehicles.isEmpty && application == null,
           emptyTitle: 'No vehicle submitted yet',
           emptyMessage: 'Complete Driver onboarding from the Driver dashboard to submit a vehicle.',
-          child: Column(children: [
-            for (final record in vehicles)
-              Card(key: ValueKey(record.id), child: Column(children: [
-                _ReadOnlyTile(icon: Icons.directions_car_outlined, label: 'Vehicle', value: '${record.vehicle.make} ${record.vehicle.model}'),
-                if (record.vehicle.modelYear != null)
-                  _ReadOnlyTile(icon: Icons.calendar_today_outlined, label: 'Model year', value: '${record.vehicle.modelYear}'),
-                _ReadOnlyTile(icon: Icons.palette_outlined, label: 'Color', value: record.vehicle.color),
-                _ReadOnlyTile(icon: Icons.pin_outlined, label: 'License plate', value: record.vehicle.licensePlate),
-                if (record.enrollments.isEmpty)
-                  const ListTile(title: Text('No approved service enrollments')),
-                for (final enrollment in record.enrollments)
-                  _ReadOnlyTile(icon: Icons.verified_outlined, label: 'Approved service', value: '${enrollment.displayName}${enrollment.serviceActive ? '' : ' (currently unavailable)'}'),
-              ])),
-            if (vehicles.isEmpty && application != null)
-              _VehicleContent(vehicle: application.vehicle, profile: null, application: application),
-          ]),
+          child: Column(
+            children: [
+              for (final record in vehicles)
+                Card(
+                  key: ValueKey(record.id),
+                  child: Column(
+                    children: [
+                      _ReadOnlyTile(
+                        icon: Icons.directions_car_outlined,
+                        label: 'Vehicle',
+                        value: '${record.vehicle.make} ${record.vehicle.model}',
+                      ),
+                      if (record.vehicle.modelYear != null)
+                        _ReadOnlyTile(
+                          icon: Icons.calendar_today_outlined,
+                          label: 'Model year',
+                          value: '${record.vehicle.modelYear}',
+                        ),
+                      _ReadOnlyTile(
+                        icon: Icons.palette_outlined,
+                        label: 'Color',
+                        value: record.vehicle.color,
+                      ),
+                      _ReadOnlyTile(
+                        icon: Icons.pin_outlined,
+                        label: 'License plate',
+                        value: record.vehicle.licensePlate,
+                      ),
+                      if (record.enrollments.isEmpty)
+                        const ListTile(
+                          title: Text('No approved service enrollments'),
+                        ),
+                      for (final enrollment in record.enrollments)
+                        _ReadOnlyTile(
+                          icon: Icons.verified_outlined,
+                          label: 'Approved service',
+                          value:
+                              '${enrollment.displayName}${enrollment.serviceActive ? '' : ' (currently unavailable)'}',
+                        ),
+                    ],
+                  ),
+                ),
+              if (vehicles.isEmpty && application != null)
+                _VehicleContent(
+                  vehicle: application.vehicle,
+                  profile: null,
+                  application: application,
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -182,10 +226,12 @@ class _DriverDetailsContent extends StatelessWidget {
   const _DriverDetailsContent({
     required this.profile,
     required this.application,
+    required this.selectedVehicle,
   });
 
   final DriverProfile? profile;
   final DriverOnboardingApplication? application;
+  final RegisteredVehicle? selectedVehicle;
 
   @override
   Widget build(BuildContext context) {
@@ -210,11 +256,24 @@ class _DriverDetailsContent extends StatelessWidget {
               label: 'Availability',
               value: profile!.isOnline ? 'Online' : 'Offline',
             ),
-          if (application != null)
+          if (profile != null)
+            _ReadOnlyTile(
+              icon: Icons.directions_car_outlined,
+              label: 'Selected vehicle',
+              value: selectedVehicle == null
+                  ? 'Not selected'
+                  : '${selectedVehicle!.vehicle.make} ${selectedVehicle!.vehicle.model}',
+            ),
+          if (profile != null)
             _ReadOnlyTile(
               icon: Icons.local_taxi_outlined,
-              label: 'Selected service',
-              value: application!.service.displayName,
+              label: 'Available services',
+              value: selectedVehicle == null
+                  ? 'No operating vehicle selected'
+                  : selectedVehicle!.enrollments
+                        .where((enrollment) => enrollment.serviceActive)
+                        .map((enrollment) => enrollment.displayName)
+                        .join(', '),
             ),
           if (application?.rejectionReason != null)
             _ReadOnlyTile(
@@ -261,7 +320,10 @@ class _VehicleContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Submitted vehicle', style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          'Submitted vehicle',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
         const SizedBox(height: 8),
         Card(
           child: Column(
@@ -305,7 +367,7 @@ class _VehicleContent extends StatelessWidget {
               if (application != null)
                 _ReadOnlyTile(
                   icon: Icons.local_taxi_outlined,
-                  label: 'Selected service',
+                  label: 'Application service',
                   value: application!.service.displayName,
                 ),
             ],
@@ -319,6 +381,17 @@ class _VehicleContent extends StatelessWidget {
       ],
     );
   }
+}
+
+RegisteredVehicle? _selectedVehicle(
+  List<RegisteredVehicle> vehicles,
+  String? selectedVehicleId,
+) {
+  if (selectedVehicleId == null) return null;
+  for (final vehicle in vehicles) {
+    if (vehicle.id == selectedVehicleId) return vehicle;
+  }
+  return null;
 }
 
 class _ReadOnlyTile extends StatelessWidget {
