@@ -49,7 +49,7 @@ type Profile struct {
 
 type Repository interface {
 	OperatingState(context.Context, uuid.UUID) (OperatingState, error)
-	SelectOperation(context.Context, uuid.UUID, uuid.UUID, string) (OperatingState, error)
+	SelectOperation(context.Context, uuid.UUID, uuid.UUID) (OperatingState, error)
 	FindByUserID(ctx context.Context, userID uuid.UUID) (Profile, error)
 	ListVehicles(ctx context.Context, userID uuid.UUID) ([]Vehicle, error)
 	SetOnline(ctx context.Context, userID uuid.UUID, online bool) (Profile, error)

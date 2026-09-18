@@ -220,8 +220,8 @@ func createCancellationDriver(t *testing.T, db *sql.DB) uuid.UUID {
 		SELECT id, 'economy', NOW(), 'test-reviewer' FROM driver_vehicles WHERE driver_user_id=$1`, userID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`INSERT INTO driver_operating_selections (driver_user_id,vehicle_id,service_code)
-		SELECT driver_user_id,id,'economy' FROM driver_vehicles WHERE driver_user_id=$1`, userID); err != nil {
+	if _, err := db.Exec(`INSERT INTO driver_operating_selections (driver_user_id,vehicle_id)
+		SELECT driver_user_id,id FROM driver_vehicles WHERE driver_user_id=$1`, userID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(`INSERT INTO driver_locations (driver_user_id, latitude, longitude, updated_at) VALUES ($1, 24.86, 67.0, NOW())`, userID); err != nil {

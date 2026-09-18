@@ -162,16 +162,16 @@ func TestOperatingSelectionAndAvailability(t *testing.T) {
 	if _, err := repo.SetOnline(context.Background(), id, true); !errors.Is(err, ErrSelectionInvalid) {
 		t.Fatalf("missing selection accepted: %v", err)
 	}
-	if _, err := repo.SelectOperation(context.Background(), id, vehicle, "economy"); !errors.Is(err, ErrSelectionInvalid) {
+	if _, err := repo.SelectOperation(context.Background(), id, vehicle); !errors.Is(err, ErrSelectionInvalid) {
 		t.Fatalf("unapproved selection accepted: %v", err)
 	}
 	if _, err := db.Exec(`INSERT INTO driver_vehicle_service_enrollments(vehicle_id,service_code,approved_at,approved_by) VALUES ($1,'economy',NOW(),'reviewer')`, vehicle); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := repo.SelectOperation(context.Background(), id, uuid.New(), "economy"); !errors.Is(err, ErrSelectionInvalid) {
+	if _, err := repo.SelectOperation(context.Background(), id, uuid.New()); !errors.Is(err, ErrSelectionInvalid) {
 		t.Fatalf("foreign vehicle accepted: %v", err)
 	}
-	state, err := repo.SelectOperation(context.Background(), id, vehicle, "economy")
+	state, err := repo.SelectOperation(context.Background(), id, vehicle)
 	if err != nil || state.Selection == nil || !state.Selection.Valid {
 		t.Fatalf("selection failed: %#v %v", state, err)
 	}
@@ -195,7 +195,7 @@ func TestOperatingSelectionAndAvailability(t *testing.T) {
 	if err != nil || !profile.IsOnline || profile.Status != StatusActive {
 		t.Fatalf("approved Driver cannot go online: %#v %v", profile, err)
 	}
-	if _, err := repo.SelectOperation(context.Background(), id, vehicle, "economy"); !errors.Is(err, ErrSelectionLocked) {
+	if _, err := repo.SelectOperation(context.Background(), id, vehicle); !errors.Is(err, ErrSelectionLocked) {
 		t.Fatalf("online selection allowed: %v", err)
 	}
 	if _, err := repo.SetOnline(context.Background(), id, false); err != nil {
@@ -214,7 +214,7 @@ func TestOperatingSelectionAndAvailability(t *testing.T) {
 	if _, err := db.Exec(`INSERT INTO trips(ride_request_id,rider_user_id,driver_user_id,status,assigned_at) VALUES ($1,$2,$3,'assigned',NOW())`, rideID, rider, id); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := repo.SelectOperation(context.Background(), id, vehicle, "economy"); !errors.Is(err, ErrSelectionLocked) {
+	if _, err := repo.SelectOperation(context.Background(), id, vehicle); !errors.Is(err, ErrSelectionLocked) {
 		t.Fatalf("trip selection allowed: %v", err)
 	}
 	if _, err := repo.SetOnline(context.Background(), id, true); !errors.Is(err, ErrTripActive) {

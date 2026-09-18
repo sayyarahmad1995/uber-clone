@@ -28,13 +28,14 @@ func (r PostgresAssignmentRepository) SelectOffer(ctx context.Context, rideReque
 	var proposedAmount sql.NullInt64
 	var currency sql.NullString
 	var rideUnexpired bool
+	var serviceCode string
 	if err := tx.QueryRowContext(ctx, `
-		SELECT rider_user_id, status, proposed_fare_minor, currency,
+		SELECT rider_user_id, status, proposed_fare_minor, currency, service_code,
 		       expires_at > statement_timestamp()
 		FROM ride_requests
 		WHERE id = $1
 		FOR UPDATE
-	`, rideRequestID).Scan(&actualRider, &status, &proposedAmount, &currency, &rideUnexpired); err != nil {
+	`, rideRequestID).Scan(&actualRider, &status, &proposedAmount, &currency, &serviceCode, &rideUnexpired); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return trip.Trip{}, ErrNotOpen
 		}
@@ -88,17 +89,19 @@ func (r PostgresAssignmentRepository) SelectOffer(ctx context.Context, rideReque
 		return trip.Trip{}, ErrOfferNotActionable
 	}
 
-	if err := lockEligibleMarketplaceDriver(ctx, tx, driverUserID); err != nil {
+	if err := lockEligibleMarketplaceDriver(ctx, tx, driverUserID, serviceCode); err != nil {
 		return trip.Trip{}, err
 	}
 	var operationMatches bool
 	if err := tx.QueryRowContext(ctx, `SELECT EXISTS (
 		SELECT 1 FROM ride_offers o
 		JOIN driver_operating_selections s ON s.driver_user_id=o.driver_user_id
-		JOIN ride_requests rr ON rr.id=o.ride_request_id AND rr.service_code=s.service_code
+		JOIN ride_requests rr ON rr.id=o.ride_request_id
+		JOIN driver_vehicle_service_enrollments e ON e.vehicle_id=s.vehicle_id AND e.service_code=rr.service_code
+		JOIN driver_service_catalog sc ON sc.code=e.service_code AND sc.is_active
 		WHERE o.ride_request_id=$1 AND o.driver_user_id=$2
 		  AND o.operation_context->>'vehicle_id'=s.vehicle_id::text
-		  AND o.operation_context->>'service_code'=s.service_code
+		  AND o.operation_context->>'service_code'=rr.service_code
 	)`, rideRequestID, driverUserID).Scan(&operationMatches); err != nil {
 		return trip.Trip{}, err
 	}
@@ -139,8 +142,8 @@ func (r PostgresAssignmentRepository) SelectOffer(ctx context.Context, rideReque
 	return assignedTrip, nil
 }
 
-func lockEligibleMarketplaceDriver(ctx context.Context, tx *sql.Tx, driverUserID uuid.UUID) error {
-	eligible, err := driver.LockMarketplaceEligible(ctx, tx, driverUserID)
+func lockEligibleMarketplaceDriver(ctx context.Context, tx *sql.Tx, driverUserID uuid.UUID, serviceCode string) error {
+	eligible, err := driver.LockMarketplaceEligible(ctx, tx, driverUserID, serviceCode)
 	if err != nil {
 		return err
 	}

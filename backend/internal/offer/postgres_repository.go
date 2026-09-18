@@ -67,13 +67,14 @@ func (r PostgresRepository) Upsert(ctx context.Context, rideRequestID, driverUse
 	var riderUserID uuid.UUID
 	var status string
 	var unexpired bool
+	var serviceCode string
 	if err := tx.QueryRowContext(ctx, `
-		SELECT currency, proposed_fare_minor, rider_user_id, status,
+		SELECT currency, proposed_fare_minor, rider_user_id, status, service_code,
 		       expires_at > statement_timestamp()
 		FROM ride_requests
 		WHERE id = $1
 		FOR UPDATE
-	`, rideRequestID).Scan(&actualCurrency, &proposedAmount, &riderUserID, &status, &unexpired); err != nil {
+	`, rideRequestID).Scan(&actualCurrency, &proposedAmount, &riderUserID, &status, &serviceCode, &unexpired); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Offer{}, ErrRideNotFound
 		}
@@ -111,7 +112,7 @@ func (r PostgresRepository) Upsert(ctx context.Context, rideRequestID, driverUse
 		return Offer{}, ErrOpportunityNotOpen
 	}
 
-	eligible, err := driver.LockMarketplaceEligible(ctx, tx, driverUserID)
+	eligible, err := driver.LockMarketplaceEligible(ctx, tx, driverUserID, serviceCode)
 	if err != nil {
 		return Offer{}, err
 	}
@@ -120,7 +121,7 @@ func (r PostgresRepository) Upsert(ctx context.Context, rideRequestID, driverUse
 	}
 	var operation []byte
 	err = tx.QueryRowContext(ctx, `
-		SELECT jsonb_build_object('vehicle_id', v.id, 'service_code', s.service_code,
+		SELECT jsonb_build_object('vehicle_id', v.id, 'service_code', rr.service_code,
 		  'service_name', sc.display_name, 'driver_name', p.display_name,
 		  'make', v.make, 'model', v.model, 'model_year', v.model_year,
 		  'color', v.color, 'license_plate', v.license_plate,
@@ -128,8 +129,9 @@ func (r PostgresRepository) Upsert(ctx context.Context, rideRequestID, driverUse
 		FROM driver_operating_selections s
 		JOIN driver_profiles p ON p.user_id=s.driver_user_id
 		JOIN driver_vehicles v ON v.id=s.vehicle_id AND v.driver_user_id=p.user_id
-		JOIN driver_service_catalog sc ON sc.code=s.service_code AND sc.is_active
-		JOIN ride_requests rr ON rr.id=$1 AND rr.service_code=s.service_code
+		JOIN ride_requests rr ON rr.id=$1
+		JOIN driver_vehicle_service_enrollments e ON e.vehicle_id=v.id AND e.service_code=rr.service_code
+		JOIN driver_service_catalog sc ON sc.code=e.service_code AND sc.is_active
 		WHERE s.driver_user_id=$2
 	`, rideRequestID, driverUserID, amountMinor, currency).Scan(&operation)
 	if errors.Is(err, sql.ErrNoRows) {

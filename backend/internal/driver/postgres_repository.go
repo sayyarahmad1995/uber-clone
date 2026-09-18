@@ -110,7 +110,7 @@ func (r PostgresRepository) SetOnline(ctx context.Context, userID uuid.UUID, onl
 		err = tx.QueryRowContext(ctx, `SELECT v.id FROM driver_profiles p
             JOIN driver_operating_selections s ON s.driver_user_id=p.user_id
             JOIN driver_vehicles v ON v.id=s.vehicle_id AND v.driver_user_id=p.user_id
-            JOIN driver_vehicle_service_enrollments e ON e.vehicle_id=v.id AND e.service_code=s.service_code
+            JOIN driver_vehicle_service_enrollments e ON e.vehicle_id=v.id
             JOIN driver_service_catalog c ON c.code=e.service_code AND c.is_active
             JOIN user_capabilities u ON u.user_id=p.user_id AND u.capability='driver'
             WHERE p.user_id=$1 AND p.status IN ('approved','active')
