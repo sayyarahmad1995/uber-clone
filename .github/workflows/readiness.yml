@@ -105,31 +105,81 @@ jobs:
       - run: git diff --exit-code --ignore-space-at-eol
       - name: Guard Flutter source encoding
         run: |
-          if rg -n --glob '*.dart' 'â|Ã|Â|�' mobile/lib; then
-            echo "mojibake marker found in production Flutter source"
-            exit 1
-          fi
+          guard_absent() {
+            message="$1"
+            shift
+            set +e
+            output=$("$@" 2>&1)
+            status=$?
+            set -e
+            case "$status" in
+              0)
+                printf '%s\n' "$output"
+                echo "$message"
+                exit 1
+                ;;
+              1)
+                return 0
+                ;;
+              *)
+                printf '%s\n' "$output" >&2
+                echo "guard command failed with exit code $status" >&2
+                exit "$status"
+                ;;
+            esac
+          }
+
+          guard_absent \
+            "mojibake marker found in production Flutter source" \
+            grep -RInE --include='*.dart' 'â|Ã|Â|�' mobile/lib
       - name: Guard retired mobile contracts
         run: |
-          if rg -n --glob '*.dart' 'repo\.onboard\(|DriverController\.onboard|Future<DriverProfile> onboard\(' mobile/lib; then
-            echo "legacy direct Driver onboarding method found in production Dart"
-            exit 1
-          fi
+          guard_absent() {
+            message="$1"
+            shift
+            set +e
+            output=$("$@" 2>&1)
+            status=$?
+            set -e
+            case "$status" in
+              0)
+                printf '%s\n' "$output"
+                echo "$message"
+                exit 1
+                ;;
+              1)
+                return 0
+                ;;
+              *)
+                printf '%s\n' "$output" >&2
+                echo "guard command failed with exit code $status" >&2
+                exit "$status"
+                ;;
+            esac
+          }
 
-          if rg -n -U --glob '*.dart' "/v1/driver['\"]?\s*,\s*data:" mobile/lib/features/driver_workspace; then
-            echo "legacy direct Driver onboarding write found in production Dart"
-            exit 1
-          fi
+          guard_absent \
+            "legacy direct Driver onboarding method found in production Dart" \
+            grep -RInE --include='*.dart' \
+            'repo\.onboard\(|DriverController\.onboard|Future<DriverProfile> onboard\(' \
+            mobile/lib
 
-          if rg -n -U --glob '*.dart' "(?:trip\.)?status\s*==\s*['\"]settled['\"]" mobile/lib/features/rider_request mobile/lib/features/ride_flow; then
-            echo "retired settled Trip status found in production Dart"
-            exit 1
-          fi
+          guard_absent \
+            "legacy direct Driver onboarding write found in production Dart" \
+            grep -RIlPz --include='*.dart' \
+            "/v1/driver['\"]?\s*,\s*data:" \
+            mobile/lib/features/driver_workspace
 
-          if rg -n --glob '*.dart' 'RideFlowController' mobile/lib/features/ride_flow mobile/lib/features/rider_request; then
-            echo "monolithic RideFlowController found"
-            exit 1
-          fi
+          guard_absent \
+            "retired settled Trip status found in production Dart" \
+            grep -RIlPz --include='*.dart' \
+            "(?:trip\.)?status\s*==\s*['\"]settled['\"]" \
+            mobile/lib/features/rider_request mobile/lib/features/ride_flow
+
+          guard_absent \
+            "monolithic RideFlowController found" \
+            grep -RIn --include='*.dart' 'RideFlowController' \
+            mobile/lib/features/ride_flow mobile/lib/features/rider_request
       - run: flutter analyze
         working-directory: mobile
       - name: Verify semantic ride-flow repository adapter
