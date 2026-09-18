@@ -127,11 +127,20 @@ func insertTripIntegrationOffer(
 			100000,
 			'PKR',
 			jsonb_build_object(
-				'vehicle_id', vehicle_id,
-				'service_code', 'economy'
+				'driver_name', 'Test Driver',
+				'vehicle_id', selection.vehicle_id,
+				'make', 'Test',
+				'model', 'Car',
+				'model_year', 2024,
+				'color', 'White',
+				'license_plate', 'XYZ 987',
+				'service_code', ride.service_code,
+				'service_name', 'Economy',
+				'fare', jsonb_build_object('amount_minor', 100000, 'currency', 'PKR')
 			)
-		FROM driver_operating_selections
-		WHERE driver_user_id = $2
+		FROM driver_operating_selections selection
+		JOIN ride_requests ride ON ride.id = $1
+		WHERE selection.driver_user_id = $2
 		RETURNING updated_at
 	`, rideRequestID, driverUserID).Scan(&updatedAt); err != nil {
 		t.Fatalf("insert offer: %v", err)
