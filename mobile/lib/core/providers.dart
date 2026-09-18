@@ -210,7 +210,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/splash',
     refreshListenable: session,
-    redirect: (context, state) {
+    redirect: (context, state) async {
       final status = session.state.status;
       final location = state.matchedLocation;
       if (status == SessionStatus.bootstrapping) {
@@ -232,6 +232,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       if ((location == '/driver' || location.startsWith('/driver/')) &&
           !hasDriver) {
         return '/rider';
+      }
+      if (location == '/driver/details' || location == '/driver/vehicles') {
+        try {
+          final profile = await ref.read(approvedDriverProfileProvider.future);
+          if (profile == null) return '/driver';
+        } catch (_) {
+          return '/driver';
+        }
       }
       return null;
     },

@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:uber_clone/app.dart';
 import 'package:uber_clone/core/dashboard/ride_dashboard_scaffold.dart';
 import 'package:uber_clone/core/models/account.dart';
 import 'package:uber_clone/core/network/api_exception.dart';
 import 'package:uber_clone/core/providers.dart';
 import 'package:uber_clone/features/authentication/data/auth_repository.dart';
+import 'package:uber_clone/features/driver_workspace/domain/driver_onboarding.dart';
 import 'package:uber_clone/features/rider_request/data/device_location.dart';
 import 'package:uber_clone/features/rider_request/data/ride_request_repository.dart';
 import 'package:uber_clone/features/rider_request/domain/ride_request.dart';
@@ -147,6 +149,83 @@ void main() {
     expect(find.text('Looking for Driver offers'), findsOneWidget);
     expect(find.text('Rider'), findsOneWidget);
   });
+
+  final restrictedDriverStates = <String, DriverOnboardingApplication?>{
+    'without an application': null,
+    'with a pending application': DriverOnboardingApplication(
+      id: 'application-pending',
+      displayName: 'Pending Driver',
+      status: 'pending',
+      service: comfortService,
+      vehicle: driverVehicle,
+      submittedAt: DateTime.utc(2026, 9, 17),
+    ),
+    'with a rejected application': DriverOnboardingApplication(
+      id: 'application-rejected',
+      displayName: 'Rejected Driver',
+      status: 'rejected',
+      service: comfortService,
+      vehicle: driverVehicle,
+      rejectionReason: 'Document review failed.',
+      submittedAt: DateTime.utc(2026, 9, 17),
+      decidedAt: DateTime.utc(2026, 9, 18),
+    ),
+  };
+  for (final route in ['/driver/details', '/driver/vehicles']) {
+    for (final state in restrictedDriverStates.entries) {
+      testWidgets('$route blocks a Driver-capable account ${state.key}', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          testApp(
+            FakeAuthRepository(account: bothCapabilities),
+            onboarding: FakeDriverOnboardingRepository(
+              application: state.value,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        GoRouter.of(
+          tester.element(find.byKey(const Key('capabilityMenuButton'))),
+        ).go(route);
+        await tester.pumpAndSettle();
+
+        expect(find.text('Driver dashboard'), findsOneWidget);
+        if (state.value == null) {
+          expect(find.text('Become a Driver'), findsOneWidget);
+        } else if (state.value!.isPending) {
+          expect(find.text('Application under review'), findsOneWidget);
+        } else {
+          expect(find.text('Application rejected'), findsOneWidget);
+        }
+      });
+    }
+
+    testWidgets('$route allows an approved Driver profile', (tester) async {
+      await tester.pumpWidget(
+        testApp(
+          FakeAuthRepository(account: bothCapabilities),
+          driver: FakeDriverRepository(profile: driverProfile),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      GoRouter.of(tester.element(find.byKey(const Key('capabilityMenuButton'))))
+          .go(route);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.text(
+            route == '/driver/details' ? 'Driver details' : 'Vehicles',
+          ),
+        ),
+        findsOneWidget,
+      );
+    });
+  }
 
   testWidgets(
     'dual-capability account preserves panel extent through drawer switch',
@@ -542,6 +621,7 @@ Widget testApp(
   RideRequestRepository? rideRequests,
   DeviceLocation? deviceLocation,
   FakeDriverRepository? driver,
+  FakeDriverOnboardingRepository? onboarding,
 }) => ProviderScope(
   overrides: [
     rideFlowRepositoryProvider.overrideWithValue(FakeRideFlowRepository()),
@@ -550,7 +630,7 @@ Widget testApp(
       driver ?? FakeDriverRepository(),
     ),
     driverOnboardingRepositoryProvider.overrideWithValue(
-      FakeDriverOnboardingRepository(),
+      onboarding ?? FakeDriverOnboardingRepository(),
     ),
     capabilityStoreProvider.overrideWithValue(MemoryCapabilityStore()),
     rideRequestRepositoryProvider.overrideWithValue(
