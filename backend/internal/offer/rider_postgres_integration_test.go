@@ -186,7 +186,12 @@ func TestRiderCannotRejectExpiredOffer(t *testing.T) {
 	if _, err := repository.Upsert(ctx, rideID, driverID, 100000, 90000, 130000, "PKR"); err != nil {
 		t.Fatalf("submit offer: %v", err)
 	}
-	if _, err := db.Exec(`UPDATE ride_offers SET expires_at=statement_timestamp()-INTERVAL '1 second' WHERE ride_request_id=$1 AND driver_user_id=$2`, rideID, driverID); err != nil {
+	if _, err := db.Exec(`
+		UPDATE ride_offers
+		SET created_at=statement_timestamp()-INTERVAL '20 seconds',
+		    expires_at=statement_timestamp()-INTERVAL '1 second'
+		WHERE ride_request_id=$1 AND driver_user_id=$2
+	`, rideID, driverID); err != nil {
 		t.Fatalf("expire offer: %v", err)
 	}
 	if _, err := repository.Reject(ctx, rideID, riderID, driverID); !errors.Is(err, ErrOfferNotActionable) {
