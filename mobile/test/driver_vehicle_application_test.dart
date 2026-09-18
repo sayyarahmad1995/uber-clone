@@ -14,65 +14,68 @@ import 'package:uber_clone/features/driver_workspace/presentation/vehicle_servic
 import 'test_doubles.dart';
 
 void main() {
-  testWidgets('approved Driver submits an additional vehicle service application', (
-    tester,
-  ) async {
-    final onboarding = AdditionalApplicationRepository(
-      application: initialApprovedApplication,
-    );
-    await _pumpDriverWorkspace(tester, onboarding);
-    await _expandPanel(tester);
+  testWidgets(
+    'approved Driver submits an additional vehicle service application',
+    (tester) async {
+      final onboarding = AdditionalApplicationRepository(
+        application: initialApprovedApplication,
+      );
+      await _pumpDriverWorkspace(tester, onboarding);
+      await _expandPanel(tester);
 
-    expect(find.text('Vehicle/service applications'), findsOneWidget);
-    expect(find.text('Add vehicle/service'), findsOneWidget);
+      expect(find.text('Vehicle/service applications'), findsOneWidget);
+      expect(find.text('Add vehicle/service'), findsOneWidget);
 
-    await tester.ensureVisible(
-      find.byKey(const Key('driverAddVehicleServiceApplicationButton')),
-    );
-    await tester.tap(
-      find.byKey(const Key('driverAddVehicleServiceApplicationButton')),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const Key('additional-service-field')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Comfort').last);
-    await tester.pumpAndSettle();
-
-    final values = ['Honda', 'Civic', '2025', 'Black', 'NEW-456'];
-    for (var i = 0; i < values.length; i++) {
-      final field = find.byKey(ValueKey('additional-vehicle-field-$i'));
-      await tester.ensureVisible(field);
+      await tester.ensureVisible(
+        find.byKey(const Key('driverAddVehicleServiceApplicationButton')),
+      );
+      await tester.tap(
+        find.byKey(const Key('driverAddVehicleServiceApplicationButton')),
+      );
       await tester.pumpAndSettle();
-      await tester.enterText(field, values[i]);
-    }
 
-    await tester.ensureVisible(find.text('Review application'));
-    await tester.tap(find.text('Review application'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('additional-service-field')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Comfort').last);
+      await tester.pumpAndSettle();
 
-    expect(onboarding.calls, contains('precheck:comfort'));
-    expect(find.text('Review vehicle/service application'), findsOneWidget);
-    expect(find.text('Service: Comfort'), findsOneWidget);
+      final values = ['Honda', 'Civic', '2025', 'Black', 'NEW-456'];
+      for (var i = 0; i < values.length; i++) {
+        final field = find.byKey(ValueKey('additional-vehicle-field-$i'));
+        await tester.ensureVisible(field);
+        await tester.pumpAndSettle();
+        await tester.enterText(field, values[i]);
+      }
 
-    await tester.tap(find.text('Submit for review'));
-    await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Review application'));
+      await tester.tap(find.text('Review application'));
+      await tester.pumpAndSettle();
 
-    expect(onboarding.calls, contains('submit:comfort'));
-    expect(
-      onboarding.application!.applicationType,
-      'additional_vehicle_service',
-    );
-    expect(onboarding.application!.isPending, isTrue);
-    expect(onboarding.application!.vehicle.licensePlate, 'NEW-456');
-  });
+      expect(onboarding.calls, contains('precheck:comfort'));
+      expect(find.text('Review vehicle/service application'), findsOneWidget);
+      expect(find.text('Service: Comfort'), findsOneWidget);
+
+      await tester.tap(find.text('Submit for review'));
+      await tester.pumpAndSettle();
+
+      expect(onboarding.calls, contains('submit:comfort'));
+      expect(
+        onboarding.application!.applicationType,
+        'additional_vehicle_service',
+      );
+      expect(onboarding.application!.isPending, isTrue);
+      expect(onboarding.application!.vehicle.licensePlate, 'NEW-456');
+    },
+  );
 
   testWidgets('pending additional application disables another submission', (
     tester,
   ) async {
     await _pumpDriverWorkspace(
       tester,
-      AdditionalApplicationRepository(application: pendingAdditionalApplication),
+      AdditionalApplicationRepository(
+        application: pendingAdditionalApplication,
+      ),
     );
     await _expandPanel(tester);
 
@@ -104,7 +107,7 @@ void main() {
     await _pumpRefreshSurface(tester, onboarding, driver);
 
     expect(
-      find.byKey(const ValueKey('operating-option-vehicle-b-comfort')),
+      find.byKey(const ValueKey('operating-option-vehicle-b')),
       findsNothing,
     );
 
@@ -113,9 +116,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.byKey(const ValueKey('operating-option-vehicle-b-comfort')),
+      find.byKey(const ValueKey('operating-option-vehicle-b')),
       findsOneWidget,
     );
+    expect(find.text('Available services: Comfort'), findsOneWidget);
   });
 }
 
