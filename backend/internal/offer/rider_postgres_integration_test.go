@@ -61,6 +61,139 @@ func TestRiderRejectClosesDriverOpportunity(t *testing.T) {
 	}
 }
 
+func TestDriverSkipAffectsOnlyThatDriversOpportunity(t *testing.T) {
+	db := openOfferIntegrationDB(t)
+	ctx := context.Background()
+	riderID := createOfferTestUser(t, db, "rider")
+	driverA := createOfferTestDriver(t, db)
+	driverB := createOfferTestDriver(t, db)
+	rideID := createOfferTestRide(t, db, riderID)
+	repository := NewPostgresRepository(db)
+
+	openOfferOpportunity(t, repository, driverA, rideID)
+	openOfferOpportunity(t, repository, driverB, rideID)
+	if err := repository.Skip(ctx, rideID, driverA); err != nil {
+		t.Fatalf("skip Driver A opportunity: %v", err)
+	}
+
+	feedA, err := repository.Discover(ctx, driverA, DiscoveryLimit)
+	if err != nil {
+		t.Fatalf("discover for Driver A: %v", err)
+	}
+	if len(feedA) != 0 {
+		t.Fatalf("skipped request reappeared for Driver A: %#v", feedA)
+	}
+	feedB, err := repository.Discover(ctx, driverB, DiscoveryLimit)
+	if err != nil {
+		t.Fatalf("discover for Driver B: %v", err)
+	}
+	assertDiscoveredRides(t, feedB, rideID)
+
+	var rideStatus string
+	if err := db.QueryRow(`SELECT status FROM ride_requests WHERE id=$1`, rideID).Scan(&rideStatus); err != nil {
+		t.Fatalf("read ride status: %v", err)
+	}
+	if rideStatus != "requested" {
+		t.Fatalf("Driver skip changed ride status to %q", rideStatus)
+	}
+	var offerCount, tripCount int
+	if err := db.QueryRow(`SELECT count(*) FROM ride_offers WHERE ride_request_id=$1`, rideID).Scan(&offerCount); err != nil {
+		t.Fatalf("count offers: %v", err)
+	}
+	if err := db.QueryRow(`SELECT count(*) FROM trips WHERE ride_request_id=$1`, rideID).Scan(&tripCount); err != nil {
+		t.Fatalf("count trips: %v", err)
+	}
+	if offerCount != 0 || tripCount != 0 {
+		t.Fatalf("Driver skip created offer/trip: offers=%d trips=%d", offerCount, tripCount)
+	}
+}
+
+func TestDriverCannotSkipAfterSubmittingOffer(t *testing.T) {
+	db := openOfferIntegrationDB(t)
+	ctx := context.Background()
+	riderID := createOfferTestUser(t, db, "rider")
+	driverID := createOfferTestDriver(t, db)
+	rideID := createOfferTestRide(t, db, riderID)
+	repository := NewPostgresRepository(db)
+
+	openOfferOpportunity(t, repository, driverID, rideID)
+	if _, err := repository.Upsert(ctx, rideID, driverID, 100000, 90000, 130000, "PKR"); err != nil {
+		t.Fatalf("submit offer: %v", err)
+	}
+	if err := repository.Skip(ctx, rideID, driverID); !errors.Is(err, ErrOpportunityNotOpen) {
+		t.Fatalf("skip after offer error=%v, want ErrOpportunityNotOpen", err)
+	}
+}
+
+func TestRiderRejectsOneOfferAndPreservesAnother(t *testing.T) {
+	db := openOfferIntegrationDB(t)
+	ctx := context.Background()
+	riderID := createOfferTestUser(t, db, "rider")
+	driverA := createOfferTestDriver(t, db)
+	driverB := createOfferTestDriver(t, db)
+	rideID := createOfferTestRide(t, db, riderID)
+	repository := NewPostgresRepository(db)
+
+	for _, driverID := range []uuid.UUID{driverA, driverB} {
+		openOfferOpportunity(t, repository, driverID, rideID)
+		if _, err := repository.Upsert(ctx, rideID, driverID, 100000, 90000, 130000, "PKR"); err != nil {
+			t.Fatalf("submit offer for %s: %v", driverID, err)
+		}
+	}
+	if _, err := repository.Reject(ctx, rideID, riderID, driverA); err != nil {
+		t.Fatalf("reject Driver A: %v", err)
+	}
+
+	offers, err := repository.ListForRider(ctx, rideID, riderID)
+	if err != nil {
+		t.Fatalf("list remaining offers: %v", err)
+	}
+	if len(offers) != 1 || offers[0].DriverUserID != driverB || !offers[0].Selectable {
+		t.Fatalf("expected only Driver B to remain selectable, got %#v", offers)
+	}
+	driverAOffer, err := repository.Get(ctx, rideID, driverA)
+	if err != nil {
+		t.Fatalf("get rejected offer: %v", err)
+	}
+	if driverAOffer.Status != StatusRejected {
+		t.Fatalf("Driver A offer status=%q, want rejected", driverAOffer.Status)
+	}
+	var rideStatus string
+	if err := db.QueryRow(`SELECT status FROM ride_requests WHERE id=$1`, rideID).Scan(&rideStatus); err != nil {
+		t.Fatalf("read ride status: %v", err)
+	}
+	if rideStatus != "requested" {
+		t.Fatalf("Rider offer rejection changed ride status to %q", rideStatus)
+	}
+	var tripCount int
+	if err := db.QueryRow(`SELECT count(*) FROM trips WHERE ride_request_id=$1`, rideID).Scan(&tripCount); err != nil {
+		t.Fatalf("count trips: %v", err)
+	}
+	if tripCount != 0 {
+		t.Fatalf("Rider offer rejection created %d trips", tripCount)
+	}
+}
+
+func TestRiderCannotRejectExpiredOffer(t *testing.T) {
+	db := openOfferIntegrationDB(t)
+	ctx := context.Background()
+	riderID := createOfferTestUser(t, db, "rider")
+	driverID := createOfferTestDriver(t, db)
+	rideID := createOfferTestRide(t, db, riderID)
+	repository := NewPostgresRepository(db)
+
+	openOfferOpportunity(t, repository, driverID, rideID)
+	if _, err := repository.Upsert(ctx, rideID, driverID, 100000, 90000, 130000, "PKR"); err != nil {
+		t.Fatalf("submit offer: %v", err)
+	}
+	if _, err := db.Exec(`UPDATE ride_offers SET expires_at=statement_timestamp()-INTERVAL '1 second' WHERE ride_request_id=$1 AND driver_user_id=$2`, rideID, driverID); err != nil {
+		t.Fatalf("expire offer: %v", err)
+	}
+	if _, err := repository.Reject(ctx, rideID, riderID, driverID); !errors.Is(err, ErrOfferNotActionable) {
+		t.Fatalf("reject expired offer error=%v, want ErrOfferNotActionable", err)
+	}
+}
+
 func TestDriverOpportunityExpiresOnce(t *testing.T) {
 	db := openOfferIntegrationDB(t)
 	ctx := context.Background()
