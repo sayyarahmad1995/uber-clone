@@ -49,6 +49,7 @@ func TestPostgresRepositoryCancelByRiderCancelsAssignedTripAndFreesDriver(t *tes
 	if result.Trip == nil || result.Trip.Status != trip.StatusCancelled || result.Trip.CancelledAt == nil {
 		t.Fatalf("expected cancelled trip, got %#v", result.Trip)
 	}
+	assertCancellationOperationContext(t, result.Trip.OperationContext)
 	if !result.Trip.CancelledAt.Equal(result.CancelledAt) {
 		t.Fatalf("expected ride/trip cancellation timestamps to match, ride=%v trip=%v", result.CancelledAt, result.Trip.CancelledAt)
 	}
@@ -69,6 +70,7 @@ func TestPostgresRepositoryCancelByDriverCancelsInProgressTrip(t *testing.T) {
 	if result.CancelledBy != ride.CancellationActorDriver || result.Trip == nil || result.Trip.Status != trip.StatusCancelled {
 		t.Fatalf("unexpected driver cancellation result: %#v", result)
 	}
+	assertCancellationOperationContext(t, result.Trip.OperationContext)
 	assertRideCancelledAt(t, db, rideID, "driver", result.CancelledAt)
 	assertDriverAvailable(t, db, riderID, driverID)
 }
@@ -335,12 +337,36 @@ func insertCancellationOffer(t *testing.T, db *sql.DB, rideID, driverID uuid.UUI
 	if _, err := db.Exec(`
 		INSERT INTO ride_offers (ride_request_id, driver_user_id, amount_minor, currency, status, operation_context)
 		SELECT $1, $2, 90000, 'PKR', 'pending',
-		       jsonb_build_object('vehicle_id', selection.vehicle_id, 'service_code', ride.service_code)
+		       jsonb_build_object(
+		           'driver_name', 'Test Driver',
+		           'vehicle_id', selection.vehicle_id,
+		           'make', 'Test',
+		           'model', 'Car',
+		           'model_year', 2024,
+		           'color', 'White',
+		           'license_plate', 'TEST',
+		           'service_code', ride.service_code,
+		           'service_name', 'Economy',
+		           'fare', jsonb_build_object('amount_minor', 90000, 'currency', 'PKR')
+		       )
 		FROM driver_operating_selections selection
 		JOIN ride_requests ride ON ride.id=$1
 		WHERE selection.driver_user_id=$2
 	`, rideID, driverID); err != nil {
 		t.Fatalf("insert ride offer: %v", err)
+	}
+}
+
+func assertCancellationOperationContext(t *testing.T, context *trip.OperationContext) {
+	t.Helper()
+	if context == nil {
+		t.Fatal("cancelled trip lost operation context")
+	}
+	if context.DriverName != "Test Driver" || context.Make != "Test" || context.Model != "Car" ||
+		context.ModelYear != 2024 || context.Color != "White" || context.LicensePlate != "TEST" ||
+		context.ServiceCode != "economy" || context.ServiceName != "Economy" ||
+		context.Fare.AmountMinor != 90000 || context.Fare.Currency != "PKR" {
+		t.Fatalf("cancelled trip changed operation context: %+v", context)
 	}
 }
 

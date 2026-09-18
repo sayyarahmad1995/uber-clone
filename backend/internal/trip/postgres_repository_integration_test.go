@@ -128,7 +128,15 @@ func insertTripIntegrationOffer(
 			'PKR',
 			jsonb_build_object(
 				'vehicle_id', selection.vehicle_id,
-				'service_code', ride.service_code
+				'service_code', ride.service_code,
+				'service_name', 'Economy',
+				'driver_name', 'Test Driver',
+				'make', 'Test',
+				'model', 'Car',
+				'model_year', 2024,
+				'color', 'White',
+				'license_plate', 'XYZ 987',
+				'fare', jsonb_build_object('amount_minor', 100000, 'currency', 'PKR')
 			)
 		FROM driver_operating_selections selection
 		JOIN ride_requests ride ON ride.id = $1

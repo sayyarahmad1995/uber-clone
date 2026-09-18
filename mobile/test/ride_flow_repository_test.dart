@@ -6,6 +6,19 @@ import 'package:uber_clone/features/ride_flow/ride_flow_repository.dart';
 
 import 'ride_request_repository_test.dart' show StaticSessionStore;
 
+const assignedOperationContext = <String, dynamic>{
+  'driver_name': 'Ayesha Khan',
+  'vehicle_id': '11111111-1111-1111-1111-111111111111',
+  'make': 'Toyota',
+  'model': 'Corolla',
+  'model_year': 2024,
+  'color': 'White',
+  'license_plate': 'XYZ 987',
+  'service_code': 'comfort',
+  'service_name': 'Comfort',
+  'fare': {'amount_minor': 125000, 'currency': 'PKR'},
+};
+
 void main() {
   late RecordingRideFlowAdapter adapter;
   late ApiRideFlowRepository repository;
@@ -23,10 +36,12 @@ void main() {
     expectRequest(adapter, 'GET', '/v1/driver/marketplace/ride-requests');
   });
 
-  test('get current driver trip uses the current trip route', () async {
-    await repository.getCurrentDriverTrip();
+  test('Driver polling parses the complete assigned trip contract', () async {
+    final trip = await repository.getCurrentDriverTrip();
 
     expectRequest(adapter, 'GET', '/v1/driver/trip');
+    expect(trip?.operationContext?.licensePlate, 'XYZ 987');
+    expect(trip?.operationContext?.serviceCode, 'comfort');
   });
 
   test('list driver trips uses the driver trips route', () async {
@@ -41,10 +56,12 @@ void main() {
     expectRequest(adapter, 'GET', '/v1/ride-requests');
   });
 
-  test('get rider ride uses the ride request route', () async {
-    await repository.getRiderRide('ride-1');
+  test('Rider polling parses the complete assigned trip contract', () async {
+    final ride = await repository.getRiderRide('ride-1');
 
     expectRequest(adapter, 'GET', '/v1/ride-requests/ride-1');
+    expect(ride.trip?.operationContext?.licensePlate, 'XYZ 987');
+    expect(ride.trip?.operationContext?.serviceCode, 'comfort');
   });
 
   test('list rider offers uses the offers route', () async {
@@ -160,9 +177,20 @@ class RecordingRideFlowAdapter implements HttpClientAdapter {
     final body = switch (options.path) {
       '/v1/driver/marketplace/ride-requests' => {'ride_requests': []},
       '/v1/driver/trip' => {
+        'operation_context': assignedOperationContext,
+        'ride_request_id': 'ride-1',
+        'rider_user_id': 'rider-1',
+        'driver_user_id': 'driver-1',
         'status': 'assigned',
         'assigned_at': '2026-09-17T10:00:00Z',
-        'settlement': {'status': 'pending'},
+        'started_at': null,
+        'completed_at': null,
+        'cancelled_at': null,
+        'settlement': {
+          'status': 'unsettled',
+          'method': null,
+          'cash_collected_at': null,
+        },
       },
       '/v1/driver/trips' => {'trips': []},
       '/v1/ride-requests' => {'ride_requests': []},
@@ -172,9 +200,23 @@ class RecordingRideFlowAdapter implements HttpClientAdapter {
         'pickup': {'latitude': 24.86, 'longitude': 67.00},
         'destination': {'latitude': 24.90, 'longitude': 67.08},
         'proposed_fare': {'amount_minor': 11500, 'currency': 'PKR'},
-        'status': 'open',
+        'status': 'accepted',
         'created_at': '2026-09-17T10:00:00Z',
         'expires_at': '2026-09-17T10:15:00Z',
+        'trip': {
+          'operation_context': assignedOperationContext,
+          'driver_user_id': 'driver-1',
+          'status': 'assigned',
+          'assigned_at': '2026-09-17T10:01:00Z',
+          'started_at': null,
+          'completed_at': null,
+          'cancelled_at': null,
+          'settlement': {
+            'status': 'unsettled',
+            'method': null,
+            'cash_collected_at': null,
+          },
+        },
       },
       '/v1/ride-requests/ride-1/offers' => {'offers': []},
       '/v1/ride-requests/ride-1/driver-location' => {

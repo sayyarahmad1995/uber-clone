@@ -2,10 +2,13 @@ package marketplace
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/trip"
 )
 
@@ -62,6 +65,10 @@ func TestPostgresAssignmentSuccessClosesCompetingOpportunities(t *testing.T) {
 	observer := createTripIntegrationDriver(t, db)
 	ride := createTripIntegrationRide(t, db, rider)
 	version := insertTripIntegrationOffer(t, db, ride, driver)
+	var selectedVehicle uuid.UUID
+	if err := db.QueryRow(`SELECT vehicle_id FROM driver_operating_selections WHERE driver_user_id=$1`, driver).Scan(&selectedVehicle); err != nil {
+		t.Fatal(err)
+	}
 	insertTripIntegrationOffer(t, db, ride, competitor)
 	if _, err := db.Exec(`INSERT INTO driver_ride_request_opportunities (ride_request_id,driver_user_id,status,visible_until) VALUES ($1,$2,'open',statement_timestamp()+INTERVAL '30 seconds')`, ride, observer); err != nil {
 		t.Fatal(err)
@@ -73,6 +80,7 @@ func TestPostgresAssignmentSuccessClosesCompetingOpportunities(t *testing.T) {
 	if assigned.RideRequestID != ride || assigned.RiderUserID != rider || assigned.DriverUserID != driver || assigned.Status != trip.StatusAssigned {
 		t.Fatalf("unexpected assigned Trip: %+v", assigned)
 	}
+	assertCompleteOperationContext(t, assigned.OperationContext, selectedVehicle)
 	var winnerOffer, winnerOpportunity, competingOffer string
 	if err := db.QueryRow(`SELECT o.status,p.status FROM ride_offers o JOIN driver_ride_request_opportunities p USING (ride_request_id,driver_user_id) WHERE o.ride_request_id=$1 AND o.driver_user_id=$2`, ride, driver).Scan(&winnerOffer, &winnerOpportunity); err != nil {
 		t.Fatal(err)
@@ -91,6 +99,36 @@ func TestPostgresAssignmentSuccessClosesCompetingOpportunities(t *testing.T) {
 		if err := db.QueryRow(`SELECT status FROM driver_ride_request_opportunities WHERE ride_request_id=$1 AND driver_user_id=$2`, ride, other.id).Scan(&status); err != nil || status != "closed" {
 			t.Fatalf("competing %s opportunity=%s err=%v", other.name, status, err)
 		}
+	}
+}
+
+func assertCompleteOperationContext(t *testing.T, context *trip.OperationContext, vehicleID uuid.UUID) {
+	t.Helper()
+	if context == nil {
+		t.Fatal("operation context is nil")
+	}
+	encoded, err := json.Marshal(context)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(encoded, &got); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]any{
+		"driver_name":   "Test Driver",
+		"vehicle_id":    vehicleID.String(),
+		"make":          "Test",
+		"model":         "Car",
+		"model_year":    float64(2024),
+		"color":         "White",
+		"license_plate": "XYZ 987",
+		"service_code":  "economy",
+		"service_name":  "Economy",
+		"fare":          map[string]any{"amount_minor": float64(100000), "currency": "PKR"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("assigned operation context mismatch:\n got: %s\nwant: %#v", encoded, want)
 	}
 }
 

@@ -6,13 +6,47 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/driver"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/drivertrip"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/offer"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/ride"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/trip"
 )
+
+func TestRiderAndDriverTripResponsesPreserveCompleteOperationContext(t *testing.T) {
+	const snapshotJSON = `{"driver_name":"Ayesha Khan","vehicle_id":"11111111-1111-1111-1111-111111111111","make":"Toyota","model":"Corolla","model_year":2024,"color":"White","license_plate":"XYZ 987","service_code":"comfort","service_name":"Comfort","fare":{"amount_minor":125000,"currency":"PKR"}}`
+	var operation trip.OperationContext
+	if err := json.Unmarshal([]byte(snapshotJSON), &operation); err != nil {
+		t.Fatal(err)
+	}
+	assignedAt := time.Date(2026, 9, 19, 10, 0, 0, 0, time.UTC)
+	assigned := trip.Trip{OperationContext: &operation, Status: trip.StatusAssigned, AssignedAt: assignedAt}
+	rider := rideRequestStatusResponse(ride.Request{}, &assigned)
+	driver := driverCurrentTripResponse(drivertrip.View{OperationContext: &operation, Status: trip.StatusAssigned, AssignedAt: assignedAt})
+
+	for name, response := range map[string]map[string]any{"rider": rider["trip"].(map[string]any), "driver": driver} {
+		body, err := json.Marshal(response["operation_context"])
+		if err != nil {
+			t.Fatal(err)
+		}
+		var want, got map[string]any
+		if err := json.Unmarshal([]byte(snapshotJSON), &want); err != nil {
+			t.Fatal(err)
+		}
+		if err := json.Unmarshal(body, &got); err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("%s trip response changed operation context: got %s want %s", name, body, snapshotJSON)
+		}
+	}
+}
 
 func TestMarketplaceAssignmentErrorContract(t *testing.T) {
 	tests := []struct {

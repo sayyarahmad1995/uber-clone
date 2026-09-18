@@ -3,6 +3,7 @@ package cancellation
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -149,7 +150,8 @@ func lockRide(ctx context.Context, tx *sql.Tx, rideRequestID uuid.UUID, riderUse
 
 func lockTrip(ctx context.Context, tx *sql.Tx, rideRequestID uuid.UUID, driverUserID *uuid.UUID) (trip.Trip, bool, error) {
 	query := `
-		SELECT ride_request_id, rider_user_id, driver_user_id, status, assigned_at, started_at, completed_at, cancelled_at
+		SELECT ride_request_id, rider_user_id, driver_user_id, status, assigned_at, started_at, completed_at, cancelled_at,
+		       COALESCE(operation_context, 'null'::jsonb)
 		FROM trips
 		WHERE ride_request_id = $1
 	`
@@ -161,6 +163,7 @@ func lockTrip(ctx context.Context, tx *sql.Tx, rideRequestID uuid.UUID, driverUs
 	query += " FOR UPDATE"
 
 	var result trip.Trip
+	var operationContext []byte
 	if err := tx.QueryRowContext(ctx, query, args...).Scan(
 		&result.RideRequestID,
 		&result.RiderUserID,
@@ -170,11 +173,18 @@ func lockTrip(ctx context.Context, tx *sql.Tx, rideRequestID uuid.UUID, driverUs
 		&result.StartedAt,
 		&result.CompletedAt,
 		&result.CancelledAt,
+		&operationContext,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return trip.Trip{}, false, nil
 		}
 		return trip.Trip{}, false, err
+	}
+	if string(operationContext) != "" && string(operationContext) != "null" {
+		result.OperationContext = new(trip.OperationContext)
+		if err := json.Unmarshal(operationContext, result.OperationContext); err != nil {
+			return trip.Trip{}, false, err
+		}
 	}
 	return result, true, nil
 }
