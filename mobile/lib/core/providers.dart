@@ -22,6 +22,7 @@ import '../features/driver_workspace/application/driver_controller.dart';
 import '../features/driver_workspace/application/driver_onboarding_controller.dart';
 import '../features/driver_workspace/data/driver_onboarding_repository.dart';
 import '../features/driver_workspace/data/driver_repository.dart';
+import '../features/driver_workspace/domain/driver_onboarding.dart';
 import '../features/driver_workspace/domain/driver_profile.dart';
 import '../features/driver_workspace/presentation/driver_readonly_surfaces.dart';
 import '../features/rider_request/application/rider_request_controller.dart';
@@ -146,6 +147,17 @@ final driverOnboardingRepositoryProvider = Provider<DriverOnboardingRepository>(
     ref.watch(sessionStoreProvider),
   ),
 );
+final latestDriverOnboardingApplicationProvider =
+    FutureProvider.autoDispose<DriverOnboardingApplication?>((ref) {
+      final account = ref.watch(
+        sessionControllerProvider.select((value) => value.state.account),
+      );
+      if (account == null ||
+          !account.capabilities.contains(Capability.driver)) {
+        return Future.value(null);
+      }
+      return ref.watch(driverOnboardingRepositoryProvider).getLatest();
+    });
 final driverControllerProvider =
     ChangeNotifierProvider.autoDispose<DriverController>((ref) {
       ref.watch(

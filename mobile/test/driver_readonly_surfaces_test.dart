@@ -63,7 +63,7 @@ void main() {
   });
 
   testWidgets(
-    'Driver capability without approved profile exposes onboarding only',
+    'Driver capability without an application still shows Become a Driver',
     (tester) async {
       await tester.pumpWidget(
         _testApp(
@@ -78,11 +78,13 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('drawerDriver')), findsNothing);
-      expect(find.byKey(const Key('drawerDriverOnboarding')), findsOneWidget);
+      expect(find.byKey(const Key('drawerDriverOnboarding')), findsNothing);
+      expect(find.byKey(const Key('drawerBecomeDriver')), findsOneWidget);
+      expect(find.text('Become a Driver'), findsOneWidget);
       expect(find.byKey(const Key('drawerDriverDetails')), findsNothing);
       expect(find.byKey(const Key('drawerVehicles')), findsNothing);
 
-      await tester.tap(find.byKey(const Key('drawerDriverOnboarding')));
+      await tester.tap(find.byKey(const Key('drawerBecomeDriver')));
       await tester.pumpAndSettle();
 
       expect(find.text('Become a Driver'), findsOneWidget);
@@ -117,11 +119,13 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('drawerRider')), findsOneWidget);
-      expect(find.byKey(const Key('drawerDriverOnboarding')), findsOneWidget);
+      expect(find.byKey(const Key('drawerDriver')), findsOneWidget);
+      expect(find.byKey(const Key('drawerDriverOnboarding')), findsNothing);
+      expect(find.byKey(const Key('drawerBecomeDriver')), findsNothing);
       expect(find.byKey(const Key('drawerDriverDetails')), findsNothing);
       expect(find.byKey(const Key('drawerVehicles')), findsNothing);
 
-      await tester.tap(find.byKey(const Key('drawerDriverOnboarding')));
+      await tester.tap(find.byKey(const Key('drawerDriver')));
       await tester.pumpAndSettle();
 
       expect(find.text('Application under review'), findsOneWidget);
@@ -143,6 +147,45 @@ void main() {
       expect(find.byKey(const Key('drawerVehicles')), findsOneWidget);
     },
   );
+
+  testWidgets('rejected Driver application remains accessible as Driver', (
+    tester,
+  ) async {
+    final application = DriverOnboardingApplication(
+      id: 'application-rejected',
+      displayName: 'Rejected Driver',
+      status: 'rejected',
+      service: comfortService,
+      vehicle: driverVehicle,
+      rejectionReason: 'Document review failed.',
+      submittedAt: DateTime.utc(2026, 9, 17),
+      decidedAt: DateTime.utc(2026, 9, 18),
+    );
+
+    await tester.pumpWidget(
+      _testApp(
+        accountHasDriver: true,
+        driverRepository: FakeDriverRepository(),
+        onboardingRepository: FakeDriverOnboardingRepository(
+          application: application,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('capabilityMenuButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('drawerDriver')), findsOneWidget);
+    expect(find.byKey(const Key('drawerBecomeDriver')), findsNothing);
+    expect(find.byKey(const Key('drawerDriverDetails')), findsNothing);
+    expect(find.byKey(const Key('drawerVehicles')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('drawerDriver')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Application rejected'), findsOneWidget);
+  });
 
   testWidgets('approved profile exposes Driver details and Vehicles', (
     tester,

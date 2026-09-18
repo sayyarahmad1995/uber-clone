@@ -25,6 +25,12 @@ class CapabilityHomeScreen extends ConsumerWidget {
     final workspaceDriverProfile = canDrive && capability == Capability.driver
         ? ref.watch(driverControllerProvider).profile
         : null;
+    final workspaceOnboardingApplication =
+        canDrive &&
+            capability == Capability.driver &&
+            workspaceDriverProfile == null
+        ? ref.watch(driverOnboardingControllerProvider).application
+        : null;
     final hasApprovedDriverProfile =
         canDrive &&
         (workspaceDriverProfile != null ||
@@ -32,6 +38,15 @@ class CapabilityHomeScreen extends ConsumerWidget {
                 .watch(approvedDriverProfileProvider)
                 .maybeWhen(
                   data: (profile) => profile != null,
+                  orElse: () => false,
+                ));
+    final hasSubmittedDriverApplication =
+        canDrive &&
+        (workspaceOnboardingApplication != null ||
+            ref
+                .watch(latestDriverOnboardingApplicationProvider)
+                .maybeWhen(
+                  data: (application) => application != null,
                   orElse: () => false,
                 ));
 
@@ -104,21 +119,11 @@ class CapabilityHomeScreen extends ConsumerWidget {
                     ? null
                     : () => selectCapability(Capability.rider),
               ),
-              if (hasApprovedDriverProfile)
+              if (hasApprovedDriverProfile || hasSubmittedDriverApplication)
                 ListTile(
                   key: const Key('drawerDriver'),
                   leading: const Icon(Icons.local_taxi_outlined),
                   title: const Text('Driver'),
-                  selected: capability == Capability.driver,
-                  onTap: controller.state.busy
-                      ? null
-                      : () => selectCapability(Capability.driver),
-                )
-              else if (canDrive)
-                ListTile(
-                  key: const Key('drawerDriverOnboarding'),
-                  leading: const Icon(Icons.assignment_outlined),
-                  title: const Text('Driver onboarding'),
                   selected: capability == Capability.driver,
                   onTap: controller.state.busy
                       ? null
@@ -129,7 +134,11 @@ class CapabilityHomeScreen extends ConsumerWidget {
                   key: const Key('drawerBecomeDriver'),
                   leading: const Icon(Icons.add_circle_outline),
                   title: const Text('Become a Driver'),
-                  onTap: controller.state.busy ? null : enableDriver,
+                  onTap: controller.state.busy
+                      ? null
+                      : canDrive
+                      ? () => selectCapability(Capability.driver)
+                      : enableDriver,
                 ),
               if (hasApprovedDriverProfile) ...[
                 const Divider(),
