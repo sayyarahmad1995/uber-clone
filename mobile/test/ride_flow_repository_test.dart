@@ -75,6 +75,22 @@ void main() {
     expect(adapter.request!.data, isNull);
   });
 
+  test('Driver decline uses the opportunity skip route', () async {
+    await repository.declineRideRequest('ride-1');
+
+    expectRequest(adapter, 'POST', '/v1/driver/ride-requests/ride-1/skip');
+  });
+
+  test('Rider decline uses the specific offer rejection route', () async {
+    await repository.declineOffer('ride-1', 'driver-1');
+
+    expectRequest(
+      adapter,
+      'POST',
+      '/v1/ride-requests/ride-1/offers/driver-1/reject',
+    );
+  });
+
   test(
     'select offer uses the offer acceptance route and UTC payload',
     () async {

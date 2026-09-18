@@ -43,6 +43,9 @@ class DriverMarketplaceController extends ChangeNotifier {
   Future<void> acceptProposedFare(String rideRequestId) =>
       _command(() => repository.acceptProposedFare(rideRequestId));
 
+  Future<void> declineRideRequest(String rideRequestId) =>
+      _command(() => repository.declineRideRequest(rideRequestId));
+
   Future<void> _command(Future<void> Function() command) async {
     var started = false;
     try {

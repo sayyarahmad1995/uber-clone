@@ -58,8 +58,11 @@ class SplitFlowFake implements RideFlowRepository {
 
   int? lastAmountMinor;
   DateTime? lastUpdatedAt;
+  String? declinedRideRequestId;
+  String? declinedDriverUserId;
 
   bool loseSelectResponse = false;
+  bool failDecline = false;
 
   Completer<void>? riderBarrier;
   Completer<void>? marketplaceBarrier;
@@ -149,6 +152,25 @@ class SplitFlowFake implements RideFlowRepository {
   @override
   Future<void> acceptProposedFare(String rideRequestId) async {
     actions++;
+  }
+
+  @override
+  Future<void> declineRideRequest(String rideRequestId) async {
+    actions++;
+    declinedRideRequestId = rideRequestId;
+    if (failDecline) {
+      throw const ApiException('conflict', 'Opportunity is not open');
+    }
+  }
+
+  @override
+  Future<void> declineOffer(String rideRequestId, String driverUserId) async {
+    actions++;
+    declinedRideRequestId = rideRequestId;
+    declinedDriverUserId = driverUserId;
+    if (failDecline) {
+      throw const ApiException('conflict', 'Offer is not actionable');
+    }
   }
 
   @override
@@ -266,6 +288,62 @@ void main() {
     expect(repo.actions, 1);
     expect(repo.lastAmountMinor, 11500);
 
+    controller.dispose();
+  });
+
+  test('Driver decline is serialized and reloads marketplace state', () async {
+    final repo = SplitFlowFake();
+    final controller = DriverMarketplaceController(repo);
+    await Future<void>.delayed(Duration.zero);
+    final readsBefore = repo.marketplaceReads;
+
+    await controller.declineRideRequest('ride');
+
+    expect(repo.actions, 1);
+    expect(repo.declinedRideRequestId, 'ride');
+    expect(repo.marketplaceReads, readsBefore + 1);
+    controller.dispose();
+  });
+
+  test('Rider decline rejects one offer and reloads Rider state', () async {
+    final repo = SplitFlowFake();
+    final controller = RiderActiveRideController(repo, rideId: 'ride');
+    await Future<void>.delayed(Duration.zero);
+    final readsBefore = repo.riderReads;
+
+    await controller.declineOffer('driver');
+
+    expect(repo.actions, 1);
+    expect(repo.declinedRideRequestId, 'ride');
+    expect(repo.declinedDriverUserId, 'driver');
+    expect(repo.riderReads, readsBefore + 1);
+    controller.dispose();
+  });
+
+  test('failed Driver decline reloads and exposes the server error', () async {
+    final repo = SplitFlowFake()..failDecline = true;
+    final controller = DriverMarketplaceController(repo);
+    await Future<void>.delayed(Duration.zero);
+    final readsBefore = repo.marketplaceReads;
+
+    await controller.declineRideRequest('ride');
+
+    expect(controller.error, contains('Opportunity is not open'));
+    expect(repo.marketplaceReads, readsBefore + 1);
+    controller.dispose();
+  });
+
+  test('failed Rider decline reloads and exposes the server error', () async {
+    final repo = SplitFlowFake()..failDecline = true;
+    final controller = RiderActiveRideController(repo, rideId: 'ride');
+    await Future<void>.delayed(Duration.zero);
+    final readsBefore = repo.riderReads;
+
+    await controller.declineOffer('driver');
+
+    expect(controller.error, contains('Offer is not actionable'));
+    expect(controller.offers, hasLength(1));
+    expect(repo.riderReads, readsBefore + 1);
     controller.dispose();
   });
 
