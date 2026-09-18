@@ -11,7 +11,7 @@ It connects the marketplace and trip lifecycle to both mobile dashboards.
 ## Flow
 
 1. Rider chooses pickup, destination, Economy or Comfort, and a proposed PKR fare.
-2. An online Driver with the matching selected, explicitly approved vehicle/service and fresh location sees requests ranked by straight-line pickup distance.
+2. An online Driver with a selected vehicle, a matching active approved service enrollment on that vehicle, and fresh location sees requests ranked by straight-line pickup distance.
 3. Driver accepts the Rider fare or counteroffers within 90–130%. Responses do not reserve the Driver or assign a trip.
 4. Rider compares the captured Driver/vehicle details, fare, and current pickup distance and chooses a selectable offer. Rejection is also available.
 5. Selection checks the displayed offer's `updated_at` revision and current operating eligibility under transaction locks. A revised fare or changed vehicle cannot silently replace the Rider's choice.

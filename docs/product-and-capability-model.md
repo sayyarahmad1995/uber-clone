@@ -113,7 +113,7 @@ A service hierarchy may explicitly establish derived technical eligibility. For 
 
 ## Driver online operating context
 
-For the MVP, an online Driver operates with one selected verified vehicle and one selected approved service at a time.
+For the MVP, an online Driver selects one verified operating vehicle. Effective marketplace services are all active approved enrollments on that vehicle; each Ride Request and assignment still carries one concrete service code.
 
 Conceptually:
 

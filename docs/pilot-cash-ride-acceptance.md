@@ -112,13 +112,13 @@ Steps:
 
 1. Sign in as the Driver.
 2. Enter Driver capability.
-3. Ensure the Driver has a selected approved vehicle/service context.
+3. Ensure the Driver has selected an approved vehicle with an active approved enrollment for the test request's service.
 4. Publish a fresh location by going online.
 5. Open the Driver marketplace/request list.
 
 Expected result:
 
-- The Driver can discover only eligible requests for the selected approved service.
+- The Driver can discover requests matching any active approved service enrollment on the selected vehicle.
 - The request card shows Rider fare, pickup, destination, and pickup distance when available.
 - The request is not assigned merely because the Driver can see it.
 

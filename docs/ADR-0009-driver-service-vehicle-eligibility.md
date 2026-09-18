@@ -98,27 +98,25 @@ Approval or rejection of one service does not automatically approve another serv
 
 Rejection should use structured reasons where possible, including the selected service, failed requirement, actual value/evidence, required value/evidence, and eligible alternatives when known.
 
-### 7. Online operation uses one vehicle and one approved service
+### 7. Online operation selects one vehicle; services are derived
 
-For the MVP, an online Driver operates with exactly one selected vehicle and one selected approved service at a time.
+For the MVP, an online Driver selects exactly one operating vehicle. There is no global selected service. The Driver is eligible for every ride service for which that selected vehicle has an active approved enrollment.
 
-The client presents only vehicles and services that the backend confirms are operationally eligible. Selection is server-authoritative.
+The client presents only vehicles that the backend confirms are operationally eligible and shows all active approved services for each vehicle. Vehicle selection is server-authoritative.
 
 Conceptually:
 
 ```text
 Select verified vehicle
   ↓
-Select one approved service for that vehicle
+Derive all active approved services for that vehicle
   ↓
 Publish current location
   ↓
 Go online
 ```
 
-If the selected vehicle has only one approved service, the client may omit the redundant service selector.
-
-Changing the operating vehicle or service requires the Driver to go offline first. Marketplace discovery, offers, assignment, and Trip history must preserve the vehicle/service context that applied at the time; later selection changes must not rewrite historical associations.
+Changing the operating vehicle requires the Driver to go offline first. Each Ride Request still has one concrete `service_code`. Offers, assignment, and Trip history snapshot that ride service with the selected vehicle; later vehicle or enrollment changes must not rewrite historical associations. The service recorded by Driver onboarding is a historical application snapshot, not a current operating preference.
 
 ### 8. Operational eligibility is broader than online state
 
@@ -127,7 +125,8 @@ Marketplace eligibility requires all applicable invariants, including:
 - Driver capability;
 - active/approved Driver state;
 - selected verified vehicle;
-- selected approved service enrollment for that vehicle;
+- at least one active approved service enrollment for the selected vehicle;
+- a Ride Request service matching an active approved enrollment on that vehicle;
 - online state;
 - fresh location;
 - no conflicting active Trip or other applicable commitment.
@@ -166,6 +165,6 @@ The concrete revision tables, review tooling, appeal workflow, and administratio
 - Driver onboarding APIs must represent a selected service and a vehicle/service application rather than treating one vehicle as the permanent Driver profile.
 - Service catalog and eligibility rules require an application-owned boundary.
 - Vehicle verification and service enrollment remain distinct states.
-- Driver dashboards should keep operational vehicle/service selection separate from profile and vehicle administration.
+- Driver dashboards should keep operating-vehicle selection separate from profile, onboarding history, and vehicle administration.
 - Future Driver/vehicle edit flows must submit revisions rather than overwriting approved records.
 - Full administrator operations, sophisticated rules engines, and generalized compliance infrastructure remain deferred until required by a concrete slice.

@@ -132,10 +132,11 @@ one Driver-selected service. After approval, the same vehicle may apply for addi
 services without being registered again. Vehicle verification and service enrollment
 are separate concerns.
 
-For the MVP, an online Driver operates with one selected verified vehicle and one
-selected approved service at a time. Marketplace, offer, assignment, and Trip history
-must preserve the vehicle/service context that applied when the business action
-occurred.
+For the MVP, an online Driver selects one operating vehicle. Marketplace eligibility
+is derived from every active approved service enrollment on that vehicle; there is no
+global selected service. Each Ride Request and its offer/assignment/Trip snapshot keep
+one concrete service code. The onboarding service remains historical application data,
+not a current operating preference.
 
 Driver and vehicle edits must not be designed as immediate replacement of approved
 information. Approved values remain authoritative until a submitted revision is
@@ -151,7 +152,7 @@ Driver onboarding approval/rejection uses a dedicated backend review service and
 
 Approval and rejection are transactional, backend-authoritative decisions. Approval promotes the submitted Driver/vehicle/service snapshot into approved records; rejection requires a reason and creates no operational records. Decided applications remain in history.
 
-Newly approved Drivers can enter the implemented operating-context flow by selecting one approved vehicle/service combination before going online. The reviewer slice must not reactivate the legacy immediate-write or legacy online bypass.
+Newly approved Drivers can enter the implemented operating-context flow by selecting one approved vehicle with at least one active approved service enrollment before going online. The reviewer slice must not reactivate the legacy immediate-write or legacy online bypass.
 
 See [ADR-0010: Minimal Driver Onboarding Reviewer](ADR-0010-minimal-driver-onboarding-reviewer.md).
 

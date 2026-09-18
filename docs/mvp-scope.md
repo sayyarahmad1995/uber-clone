@@ -97,7 +97,7 @@ Approved / Rejected with reason
 
 A Driver may register multiple vehicles. After a service is approved for a vehicle, the Driver may apply the same vehicle to additional services without registering the vehicle again.
 
-For the MVP, going online uses one selected verified vehicle and one selected approved service at a time. The backend remains authoritative for vehicle verification, service approval, location freshness, and marketplace eligibility.
+For the MVP, going online uses one selected verified vehicle with at least one active approved service enrollment. The backend derives marketplace service eligibility from all active approved enrollments on that vehicle and remains authoritative for vehicle verification, service approval, location freshness, and marketplace eligibility.
 
 The exact slice boundaries and data model are defined as implementation reaches each step, but they must follow ADR-0009 rather than the original single-vehicle onboarding assumption.
 
