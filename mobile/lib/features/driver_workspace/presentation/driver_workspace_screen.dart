@@ -171,6 +171,7 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
           onboardingFailed: onboardingFailed,
           profile: profile,
           application: application,
+          onlinePresenceReady: driver.onlinePresenceReady,
         ),
       ),
       panelBuilder: (_, scrollController, scrollEnabled) {
@@ -196,6 +197,7 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
         if (profile != null) {
           return _DriverReadinessPanel(
             profile: profile,
+            onlinePresenceReady: driver.onlinePresenceReady,
             location: location,
             busy: driver.busy,
             error: driver.error,
@@ -258,10 +260,14 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
     required bool onboardingFailed,
     required DriverProfile? profile,
     required DriverOnboardingApplication? application,
+    required bool onlinePresenceReady,
   }) {
     if (loading) return 'Loading Driver status.';
     if (onboardingFailed) return 'Unable to load Driver onboarding.';
     if (profile != null) {
+      if (profile.isOnline && !onlinePresenceReady) {
+        return 'Online presence unavailable. Go offline or retry.';
+      }
       return profile.isOnline
           ? 'You are online. Keep your location updated.'
           : 'You are offline.';
@@ -490,6 +496,7 @@ class _DriverApplicationStatusPanel extends StatelessWidget {
 class _DriverReadinessPanel extends StatelessWidget {
   const _DriverReadinessPanel({
     required this.profile,
+    required this.onlinePresenceReady,
     required this.location,
     required this.busy,
     required this.error,
@@ -503,6 +510,7 @@ class _DriverReadinessPanel extends StatelessWidget {
   });
 
   final DriverProfile profile;
+  final bool onlinePresenceReady;
   final bool selectionValid;
   final bool activeTrip;
   final PublishedDriverLocation? location;
@@ -523,6 +531,8 @@ class _DriverReadinessPanel extends StatelessWidget {
       Text(
         activeTrip
             ? 'Your active trip'
+            : profile.isOnline && !onlinePresenceReady
+            ? 'Online presence unavailable'
             : profile.isOnline
             ? 'You are online'
             : selectionValid

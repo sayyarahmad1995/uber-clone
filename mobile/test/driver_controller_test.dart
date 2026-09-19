@@ -12,38 +12,41 @@ void main() {
   Future<DriverController> create(
     FakeDriverRepository repo, [
     DeviceLocation location = const FakeDeviceLocation(),
+    FakeDriverPresenceService? presence,
   ]) async {
-    final controller = DriverController(repo, location);
+    final controller = DriverController(
+      repo,
+      location,
+      presence ?? FakeDriverPresenceService(),
+    );
     addTearDown(controller.dispose);
     await Future<void>.delayed(Duration.zero);
     return controller;
   }
 
-  test(
-    'new app session starts offline even if previous session was online',
-    () async {
-      final repo = FakeDriverRepository(
-        profile: driverProfile.copyWith(isOnline: true),
-      );
-      final controller = await create(repo);
-      expect(controller.profile!.isOnline, isFalse);
-      expect(repo.calls, ['online=false', 'location']);
-      expect(controller.operation!.vehicleId, 'test-vehicle');
-    },
-  );
+  test('first load preserves server-confirmed online profile', () async {
+    final repo = FakeDriverRepository(
+      profile: driverProfile.copyWith(isOnline: true),
+    );
+    final controller = await create(repo);
+    expect(controller.profile!.isOnline, isTrue);
+    expect(repo.calls, isNot(contains('online=false')));
+    expect(controller.operation!.vehicleId, 'test-vehicle');
+  });
 
   test(
-    'background requests offline and resume does not restore online',
+    'background leaves online state intact and resume reloads server truth',
     () async {
       final repo = FakeDriverRepository(profile: driverProfile);
       final controller = await create(repo);
       await controller.setOnline(true);
       controller.setForeground(false);
       await Future<void>.delayed(Duration.zero);
-      expect(controller.profile!.isOnline, isFalse);
+      expect(repo.calls, isNot(contains('online=false')));
+      expect(controller.profile!.isOnline, isTrue);
       controller.setForeground(true);
       await Future<void>.delayed(Duration.zero);
-      expect(controller.profile!.isOnline, isFalse);
+      expect(controller.profile!.isOnline, isTrue);
     },
   );
 
@@ -73,9 +76,11 @@ void main() {
 
   test('going online publishes location before availability', () async {
     final repo = FakeDriverRepository(profile: driverProfile);
-    final controller = await create(repo);
+    final presence = FakeDriverPresenceService(events: repo.calls);
+    final controller = await create(repo, const FakeDeviceLocation(), presence);
+    repo.calls.clear();
     await controller.setOnline(true);
-    expect(repo.calls, ['location', 'location', 'online=true']);
+    expect(repo.calls, ['location', 'online=true', 'service.start:user-1']);
     expect(controller.profile!.isOnline, isTrue);
     expect(controller.location!.updatedAt, DateTime.utc(2026, 9, 5));
   });
@@ -128,7 +133,11 @@ void main() {
     () async {
       final repo = FakeDriverRepository(profile: driverProfile);
       final pending = PendingLocation();
-      final controller = DriverController(repo, pending);
+      final controller = DriverController(
+        repo,
+        pending,
+        FakeDriverPresenceService(),
+      );
       await Future<void>.delayed(Duration.zero);
       final operation = controller.setOnline(true);
       controller.dispose();
@@ -137,6 +146,113 @@ void main() {
       expect(repo.calls, isEmpty);
     },
   );
+
+  test('disposing an online controller never mutates availability', () async {
+    final repo = FakeDriverRepository(
+      profile: driverProfile.copyWith(isOnline: true),
+    );
+    final controller = DriverController(
+      repo,
+      const FakeDeviceLocation(),
+      FakeDriverPresenceService(),
+    );
+    await Future<void>.delayed(Duration.zero);
+    controller.dispose();
+    await Future<void>.delayed(Duration.zero);
+    expect(repo.calls, isNot(contains('online=false')));
+  });
+
+  test('repeat online and resume do not start a second service', () async {
+    final repo = FakeDriverRepository(profile: driverProfile);
+    final presence = FakeDriverPresenceService();
+    final controller = await create(repo, const FakeDeviceLocation(), presence);
+    await controller.setOnline(true);
+    await controller.setOnline(true);
+    controller.setForeground(false);
+    controller.setForeground(true);
+    await Future<void>.delayed(Duration.zero);
+    expect(presence.events, ['service.start:user-1']);
+  });
+
+  test('failed service start rolls confirmed online back offline', () async {
+    final repo = FakeDriverRepository(profile: driverProfile);
+    final presence = FakeDriverPresenceService(events: repo.calls)
+      ..failStart = true;
+    final controller = await create(repo, const FakeDeviceLocation(), presence);
+    repo.calls.clear();
+    await controller.setOnline(true);
+    expect(
+      repo.calls,
+      containsAllInOrder([
+        'location',
+        'online=true',
+        'service.start:user-1',
+        'online=false',
+      ]),
+    );
+    expect(controller.profile!.isOnline, isFalse);
+    expect(controller.error, contains('service unavailable'));
+  });
+
+  test(
+    'explicit offline stops service only after server confirmation',
+    () async {
+      final repo = FakeDriverRepository(profile: driverProfile);
+      final presence = FakeDriverPresenceService(events: repo.calls);
+      final controller = await create(
+        repo,
+        const FakeDeviceLocation(),
+        presence,
+      );
+      await controller.setOnline(true);
+      repo.calls.clear();
+      await controller.setOnline(false);
+      expect(repo.calls, ['online=false', 'service.stop']);
+      expect(controller.profile!.isOnline, isFalse);
+    },
+  );
+
+  test('failed offline request keeps online service running', () async {
+    final repo = FakeDriverRepository(profile: driverProfile);
+    final presence = FakeDriverPresenceService();
+    final controller = await create(repo, const FakeDeviceLocation(), presence);
+    await controller.setOnline(true);
+    repo.failAvailability = true;
+    await controller.setOnline(false);
+    expect(presence.runningFor, 'user-1');
+    expect(presence.events, isNot(contains('service.stop')));
+    expect(controller.profile!.isOnline, isTrue);
+  });
+
+  test(
+    'failed service stop leaves server-confirmed offline and an error',
+    () async {
+      final repo = FakeDriverRepository(profile: driverProfile);
+      final presence = FakeDriverPresenceService()..failStop = true;
+      final controller = await create(
+        repo,
+        const FakeDeviceLocation(),
+        presence,
+      );
+      await controller.setOnline(true);
+      await controller.setOnline(false);
+      expect(repo.profile!.isOnline, isFalse);
+      expect(controller.profile!.isOnline, isFalse);
+      expect(controller.error, contains('service stop failed'));
+      expect(presence.runningFor, 'user-1');
+    },
+  );
+
+  test('failed rollback never claims durable online presence', () async {
+    final repo = FakeDriverRepository(profile: driverProfile)
+      ..failOffline = true;
+    final presence = FakeDriverPresenceService()..failStart = true;
+    final controller = await create(repo, const FakeDeviceLocation(), presence);
+    await controller.setOnline(true);
+    expect(repo.profile!.isOnline, isTrue);
+    expect(controller.onlinePresenceReady, isFalse);
+    expect(controller.error, contains('presence'));
+  });
 }
 
 class DeniedLocation implements DeviceLocation {

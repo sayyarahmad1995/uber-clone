@@ -11,6 +11,7 @@ import 'package:uber_clone/core/session/session_store.dart';
 import 'package:uber_clone/features/authentication/data/auth_repository.dart';
 import 'package:uber_clone/features/driver_workspace/data/driver_onboarding_repository.dart';
 import 'package:uber_clone/features/driver_workspace/data/driver_repository.dart';
+import 'package:uber_clone/features/driver_workspace/application/driver_presence_service.dart';
 import 'package:uber_clone/features/driver_workspace/domain/driver_onboarding.dart';
 import 'package:uber_clone/features/driver_workspace/domain/driver_profile.dart';
 import 'package:uber_clone/features/rider_request/data/device_location.dart';
@@ -164,12 +165,15 @@ class FakeDriverRepository implements DriverRepository {
   final calls = <String>[];
   bool failPublish = false;
   bool failAvailability = false;
+  bool failOffline = false;
   @override
   Future<DriverProfile?> get() async => profile;
   @override
   Future<DriverProfile> setOnline(bool online) async {
     calls.add('online=$online');
-    if (failAvailability) throw Exception('Availability failed');
+    if (failAvailability || (!online && failOffline)) {
+      throw Exception('Availability failed');
+    }
     return profile = profile!.copyWith(isOnline: online);
   }
 
@@ -182,6 +186,32 @@ class FakeDriverRepository implements DriverRepository {
       longitude: point.longitude,
       updatedAt: DateTime.utc(2026, 9, 5),
     );
+  }
+}
+
+class FakeDriverPresenceService implements DriverPresenceService {
+  FakeDriverPresenceService({List<String>? events}) : events = events ?? [];
+  final List<String> events;
+  String? runningFor;
+  bool failStart = false;
+  bool failStop = false;
+
+  @override
+  Future<bool> isRunningFor(String driverUserId) async =>
+      runningFor == driverUserId;
+
+  @override
+  Future<void> start(String driverUserId) async {
+    events.add('service.start:$driverUserId');
+    if (failStart) throw StateError('service unavailable');
+    runningFor = driverUserId;
+  }
+
+  @override
+  Future<void> stop() async {
+    events.add('service.stop');
+    if (failStop) throw StateError('service stop failed');
+    runningFor = null;
   }
 }
 

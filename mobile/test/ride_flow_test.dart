@@ -224,6 +224,7 @@ void main() {
       final driver = DriverController(
         FakeDriverRepository(profile: driverProfile.copyWith(isOnline: true)),
         const FakeDeviceLocation(),
+        FakeDriverPresenceService(),
       );
 
       await tester.pumpWidget(
