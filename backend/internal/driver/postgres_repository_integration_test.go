@@ -261,3 +261,92 @@ func TestPresenceExpiryPreservesFreshAndClearsStale(t *testing.T) {
 		t.Fatalf("stale presence remained online: %v", err)
 	}
 }
+
+func TestPresenceRenewalKeepsMarketplaceEligibleUntilLocationStale(t *testing.T) {
+	db := openDriverIntegrationDB(t)
+	id := createDriverIntegrationUser(t, db)
+	vehicle := uuid.New()
+	repo := NewPostgresRepository(db)
+	ctx := context.Background()
+	if _, err := db.Exec(`INSERT INTO driver_profiles(user_id,status) VALUES ($1,'approved')`, id); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO driver_vehicles(id,driver_user_id,make,model,color,license_plate) VALUES ($1,$2,'Toyota','Corolla','White',$3)`, vehicle, id, vehicle.String()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO driver_vehicle_service_enrollments(vehicle_id,service_code,approved_at,approved_by) VALUES ($1,'economy',NOW(),'reviewer')`, vehicle); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.SelectOperation(ctx, id, vehicle); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO driver_locations(driver_user_id,latitude,longitude,updated_at) VALUES ($1,24,67,NOW())`, id); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.SetOnline(ctx, id, true); err != nil {
+		t.Fatal(err)
+	}
+	eligible := func() bool {
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tx.Rollback()
+		ok, err := LockMarketplaceEligible(ctx, tx, id, "economy")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ok
+	}
+	if !eligible() {
+		t.Fatal("freshly renewed Driver must be marketplace eligible")
+	}
+	if _, err := db.Exec(`UPDATE driver_locations SET updated_at=NOW()-INTERVAL '3 minutes' WHERE driver_user_id=$1`, id); err != nil {
+		t.Fatal(err)
+	}
+	if eligible() {
+		t.Fatal("stale Driver remained marketplace eligible before cleanup")
+	}
+	if err := repo.ExpirePresence(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var online bool
+	if err := db.QueryRow(`SELECT is_online FROM driver_profiles WHERE user_id=$1`, id).Scan(&online); err != nil || online {
+		t.Fatalf("stale online flag was not cleared: %v", err)
+	}
+}
+
+func TestPresenceExpiryLeavesAssignedTripIntact(t *testing.T) {
+	db := openDriverIntegrationDB(t)
+	id := createDriverIntegrationUser(t, db)
+	rider := createDriverIntegrationUser(t, db)
+	rideID := uuid.New()
+	if _, err := db.Exec(`INSERT INTO driver_profiles(user_id,status,is_online) VALUES ($1,'approved',TRUE)`, id); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO driver_locations(driver_user_id,latitude,longitude,updated_at) VALUES ($1,24,67,NOW()-INTERVAL '3 minutes')`, id); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO ride_requests(id,rider_user_id,pickup_latitude,pickup_longitude,destination_latitude,destination_longitude,status)
+		VALUES ($1,$2,24,67,25,68,'requested')`, rideID, rider); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = db.Exec(`DELETE FROM trips WHERE ride_request_id=$1`, rideID)
+		_, _ = db.Exec(`DELETE FROM ride_requests WHERE id=$1`, rideID)
+	})
+	if _, err := db.Exec(`INSERT INTO trips(ride_request_id,rider_user_id,driver_user_id,status,assigned_at) VALUES ($1,$2,$3,'assigned',NOW())`, rideID, rider, id); err != nil {
+		t.Fatal(err)
+	}
+	if err := NewPostgresRepository(db).ExpirePresence(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	var online bool
+	var tripStatus string
+	if err := db.QueryRow(`SELECT is_online FROM driver_profiles WHERE user_id=$1`, id).Scan(&online); err != nil || online {
+		t.Fatalf("stale Driver remained online: %v", err)
+	}
+	if err := db.QueryRow(`SELECT status FROM trips WHERE ride_request_id=$1`, rideID).Scan(&tripStatus); err != nil || tripStatus != "assigned" {
+		t.Fatalf("presence expiry altered assigned trip: %q, %v", tripStatus, err)
+	}
+}
