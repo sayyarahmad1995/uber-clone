@@ -184,6 +184,7 @@ final sessionControllerProvider = ChangeNotifierProvider<SessionController>(
   (ref) => SessionController(
     ref.watch(authRepositoryProvider),
     ref.watch(capabilityStoreProvider),
+    ref.watch(driverPresenceServiceProvider),
   ),
 );
 

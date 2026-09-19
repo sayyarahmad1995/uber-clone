@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../../core/models/account.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/session/session_store.dart';
+import '../../driver_workspace/application/driver_presence_service.dart';
 import '../data/auth_repository.dart';
 
 enum SessionStatus { bootstrapping, signedOut, signedIn }
@@ -47,11 +48,12 @@ class SessionState {
 }
 
 class SessionController extends ChangeNotifier {
-  SessionController(this._auth, this._capabilities) {
+  SessionController(this._auth, this._capabilities, this._presence) {
     restore();
   }
   final AuthRepository _auth;
   final CapabilityStore _capabilities;
+  final DriverPresenceService _presence;
   SessionState _state = const SessionState.bootstrapping();
   SessionState get state => _state;
 
@@ -59,6 +61,11 @@ class SessionController extends ChangeNotifier {
     try {
       final account = await _auth.restore();
       if (account == null) {
+        try {
+          await _presence.stop();
+        } catch (_) {
+          // The absent session prevents a stale task from publishing.
+        }
         _set(const SessionState(status: SessionStatus.signedOut));
         return;
       }
@@ -74,6 +81,11 @@ class SessionController extends ChangeNotifier {
         ),
       );
     } catch (_) {
+      try {
+        await _presence.stop();
+      } catch (_) {
+        // Server lease expiry remains authoritative on process/service loss.
+      }
       _set(
         const SessionState(
           status: SessionStatus.signedOut,
@@ -86,6 +98,7 @@ class SessionController extends ChangeNotifier {
   Future<bool> login(String identifier, String password) async {
     _set(_state.copyWith(busy: true, clearError: true));
     try {
+      await _presence.stop();
       final account = await _auth.login(identifier, password);
       await _capabilities.save(Capability.rider);
       _set(SessionState(status: SessionStatus.signedIn, account: account));
@@ -163,9 +176,16 @@ class SessionController extends ChangeNotifier {
   Future<void> logout() async {
     _set(_state.copyWith(busy: true, clearError: true));
     try {
-      await _auth.logout();
-    } catch (_) {
-      // Local sign-out remains authoritative when the remote session is gone.
+      try {
+        await _presence.stop();
+      } catch (_) {
+        // Token invalidation below makes a lingering task harmless.
+      }
+      try {
+        await _auth.logout();
+      } catch (_) {
+        // Local sign-out remains authoritative when the remote session is gone.
+      }
     } finally {
       await _capabilities.clear();
       _set(const SessionState(status: SessionStatus.signedOut));

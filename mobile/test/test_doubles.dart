@@ -26,9 +26,10 @@ const bothCapabilities = Account(
 );
 
 class FakeAuthRepository implements AuthRepository {
-  FakeAuthRepository({this.account, this.loginError});
+  FakeAuthRepository({this.account, this.loginError, this.logoutError});
   final Account? account;
   final Object? loginError;
+  final Object? logoutError;
   @override
   Future<Account?> restore() async => account;
   @override
@@ -45,7 +46,10 @@ class FakeAuthRepository implements AuthRepository {
   @override
   Future<void> completeVerification(String verificationId, String code) async {}
   @override
-  Future<void> logout() async {}
+  Future<void> logout() async {
+    if (logoutError != null) throw logoutError!;
+  }
+
   @override
   Future<Account> enableDriver() async => bothCapabilities;
 }
