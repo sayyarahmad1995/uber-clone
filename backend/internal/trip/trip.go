@@ -39,15 +39,16 @@ type Settlement struct {
 }
 
 type OperationContext struct {
-	DriverName  string    `json:"driver_name"`
-	VehicleID   uuid.UUID `json:"vehicle_id"`
-	Make        string    `json:"make"`
-	Model       string    `json:"model"`
-	ModelYear   int       `json:"model_year"`
-	Color       string    `json:"color"`
-	ServiceCode string    `json:"service_code"`
-	ServiceName string    `json:"service_name"`
-	Fare        Fare      `json:"fare"`
+	DriverName   string    `json:"driver_name"`
+	VehicleID    uuid.UUID `json:"vehicle_id"`
+	Make         string    `json:"make"`
+	Model        string    `json:"model"`
+	ModelYear    int       `json:"model_year"`
+	Color        string    `json:"color"`
+	LicensePlate string    `json:"license_plate"`
+	ServiceCode  string    `json:"service_code"`
+	ServiceName  string    `json:"service_name"`
+	Fare         Fare      `json:"fare"`
 }
 
 type Fare struct {
