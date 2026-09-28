@@ -264,6 +264,10 @@ class FakeRideFlowRepository implements RideFlowRepository {
   @override
   Future<void> acceptProposedFare(String rideRequestId) async {}
   @override
+  Future<void> declineRideRequest(String rideRequestId) async {}
+  @override
+  Future<void> declineOffer(String rideRequestId, String driverUserId) async {}
+  @override
   Future<void> selectOffer(
     String rideRequestId,
     String driverUserId,

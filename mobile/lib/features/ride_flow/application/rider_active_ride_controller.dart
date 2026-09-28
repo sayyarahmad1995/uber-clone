@@ -65,6 +65,9 @@ class RiderActiveRideController extends ChangeNotifier {
   Future<void> selectOffer(String driverUserId, DateTime updatedAt) =>
       _command(() => repository.selectOffer(rideId, driverUserId, updatedAt));
 
+  Future<void> declineOffer(String driverUserId) =>
+      _command(() => repository.declineOffer(rideId, driverUserId));
+
   Future<void> _command(Future<void> Function() command) async {
     var started = false;
     try {

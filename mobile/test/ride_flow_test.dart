@@ -15,6 +15,7 @@ import 'package:uber_clone/features/ride_flow/application/driver_trip_controller
 import 'package:uber_clone/features/ride_flow/application/rider_active_ride_controller.dart';
 import 'package:uber_clone/features/ride_flow/ride_flow_panels.dart';
 import 'package:uber_clone/features/ride_flow/ride_flow_repository.dart';
+import 'package:uber_clone/features/driver_workspace/application/driver_controller.dart';
 import 'package:uber_clone/features/rider_request/application/rider_request_controller.dart';
 
 import 'test_doubles.dart';
@@ -48,6 +49,33 @@ TripSnapshot _trip(String status) => TripSnapshot(
   settlement: _settlement(),
 );
 
+RiderOfferComparison _offer(String driverUserId, {bool selectable = true}) =>
+    RiderOfferComparison(
+      rideRequestId: 'ride',
+      driverUserId: driverUserId,
+      fare: _fare(10000),
+      status: 'pending',
+      createdAt: DateTime.utc(2026, 9, 11),
+      updatedAt: DateTime.utc(2026, 9, 11),
+      expiresAt: DateTime.utc(2026, 9, 11, 0, 2),
+      pickupDistanceMeters: 500,
+      matchesProposedFare: true,
+      selectable: selectable,
+    );
+
+MarketplaceRequest _marketplaceRequest(String id, {RideOffer? ownOffer}) =>
+    MarketplaceRequest(
+      id: id,
+      pickup: _point(33.68, 73.04),
+      destination: _point(33.56, 73.01),
+      proposedFare: _fare(10000),
+      createdAt: DateTime.utc(2026, 9, 11),
+      expiresAt: DateTime.utc(2026, 9, 11, 0, 10),
+      responseDeadline: DateTime.utc(2026, 9, 11, 0, 2),
+      ownOffer: ownOffer,
+      pickupDistanceMeters: 500,
+    );
+
 class FlowFake implements RideFlowRepository {
   RiderRideSnapshot ride = _ride();
   TripSnapshot? trip;
@@ -59,6 +87,8 @@ class FlowFake implements RideFlowRepository {
   int? lastAmountMinor;
   DateTime? lastUpdatedAt;
   Completer<void>? blocked;
+  List<MarketplaceRequest> marketplaceRequests = const [];
+  List<RiderOfferComparison> riderOffers = const [];
 
   Future<void> _readBarrier() async {
     reads++;
@@ -74,7 +104,7 @@ class FlowFake implements RideFlowRepository {
   @override
   Future<List<MarketplaceRequest>> listMarketplaceRequests() async {
     await _readBarrier();
-    return const [];
+    return marketplaceRequests;
   }
 
   @override
@@ -100,20 +130,8 @@ class FlowFake implements RideFlowRepository {
     String rideRequestId,
   ) async {
     await _readBarrier();
-    return [
-      RiderOfferComparison(
-        rideRequestId: rideRequestId,
-        driverUserId: 'driver',
-        fare: _fare(10000),
-        status: 'pending',
-        createdAt: DateTime.utc(2026, 9, 11),
-        updatedAt: DateTime.utc(2026, 9, 11),
-        expiresAt: DateTime.utc(2026, 9, 11, 0, 2),
-        pickupDistanceMeters: 500,
-        matchesProposedFare: true,
-        selectable: selectable,
-      ),
-    ];
+    if (riderOffers.isNotEmpty) return riderOffers;
+    return [_offer('driver', selectable: selectable)];
   }
 
   @override
@@ -155,6 +173,22 @@ class FlowFake implements RideFlowRepository {
   Future<void> acceptProposedFare(String rideRequestId) => _action();
 
   @override
+  Future<void> declineRideRequest(String rideRequestId) async {
+    actions++;
+    marketplaceRequests = marketplaceRequests
+        .where((request) => request.id != rideRequestId)
+        .toList();
+  }
+
+  @override
+  Future<void> declineOffer(String rideRequestId, String driverUserId) async {
+    actions++;
+    riderOffers = riderOffers
+        .where((offer) => offer.driverUserId != driverUserId)
+        .toList();
+  }
+
+  @override
   Future<void> startTrip(String rideRequestId) => _action();
 
   @override
@@ -168,6 +202,71 @@ class FlowFake implements RideFlowRepository {
 }
 
 void main() {
+  testWidgets(
+    'Driver can decline only an open opportunity after confirmation',
+    (tester) async {
+      final offered = RideOffer(
+        rideRequestId: 'offered-ride',
+        driverUserId: 'driver',
+        fare: _fare(10000),
+        status: 'pending',
+        createdAt: DateTime.utc(2026, 9, 11),
+        updatedAt: DateTime.utc(2026, 9, 11),
+        expiresAt: DateTime.utc(2026, 9, 11, 0, 2),
+      );
+      final repo = FlowFake()
+        ..marketplaceRequests = [
+          _marketplaceRequest('open-ride'),
+          _marketplaceRequest('offered-ride', ownOffer: offered),
+        ];
+      final marketplace = DriverMarketplaceController(repo);
+      final trips = DriverTripController(repo);
+      final driver = DriverController(
+        FakeDriverRepository(profile: driverProfile.copyWith(isOnline: true)),
+        const FakeDeviceLocation(),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            driverMarketplaceControllerProvider.overrideWith(
+              (ref) => marketplace,
+            ),
+            driverTripControllerProvider.overrideWith((ref) => trips),
+            driverControllerProvider.overrideWith((ref) => driver),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(child: RideFlowPanel.driver()),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await driver.setOnline(true);
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.widgetWithText(OutlinedButton, 'Decline'), findsOneWidget);
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Decline'));
+      await tester.pump();
+      expect(find.text('Decline request?'), findsOneWidget);
+      expect(find.textContaining("only from your marketplace"), findsOneWidget);
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.widgetWithText(FilledButton, 'Decline'),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(repo.actions, 1);
+      expect(find.widgetWithText(OutlinedButton, 'Decline'), findsNothing);
+      expect(find.textContaining('Your response:'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
   testWidgets(
     'Rider confirms exact displayed revision and unavailable offers cannot be selected',
     (tester) async {
@@ -223,6 +322,53 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+
+  testWidgets('Rider declines one offer and keeps another selectable', (
+    tester,
+  ) async {
+    final repo = FlowFake()
+      ..riderOffers = [_offer('driver-a'), _offer('driver-b')];
+    final flow = RiderActiveRideController(repo, rideId: 'ride');
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          riderActiveRideControllerProvider('ride').overrideWith((ref) => flow),
+          riderRequestControllerProvider.overrideWith(
+            (ref) => RiderRequestController(
+              FakeRideRequestRepository(),
+              const FakeDeviceLocation(),
+            ),
+          ),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: RideFlowPanel.rider(rideId: 'ride'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(OutlinedButton, 'Decline'), findsNWidgets(2));
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Decline').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Decline offer?'), findsOneWidget);
+    expect(find.textContaining('Only this Driver offer'), findsOneWidget);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(FilledButton, 'Decline'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repo.actions, 1);
+    expect(find.widgetWithText(FilledButton, 'Choose Driver'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, 'Decline'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   test('lost acceptance response reloads authoritative assignment without claiming success', () async {
     final repo = FlowFake()..loseResponse = true;

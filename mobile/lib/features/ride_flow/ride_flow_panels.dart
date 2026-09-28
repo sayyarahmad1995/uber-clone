@@ -344,6 +344,18 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
                         : () => _counter(marketplace, request),
                     child: const Text('Propose another fare'),
                   ),
+                  if (request.ownOffer == null)
+                    OutlinedButton(
+                      onPressed: marketplace.busy
+                          ? null
+                          : () => _confirm(
+                              'Decline request?',
+                              'This removes the request only from your marketplace. The Rider can still receive responses from other Drivers.',
+                              'Decline',
+                              () => marketplace.declineRideRequest(request.id),
+                            ),
+                      child: const Text('Decline'),
+                    ),
                 ],
               ),
             ),
@@ -433,6 +445,18 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
                         ),
                   child: const Text('Choose Driver'),
                 ),
+                if (offer.status == 'pending')
+                  OutlinedButton(
+                    onPressed: flow.busy
+                        ? null
+                        : () => _confirm(
+                            'Decline offer?',
+                            'Only this Driver offer will be declined. Your ride request and other Driver offers remain open.',
+                            'Decline',
+                            () => flow.declineOffer(offer.driverUserId),
+                          ),
+                    child: const Text('Decline'),
+                  ),
               ],
             ),
           ),

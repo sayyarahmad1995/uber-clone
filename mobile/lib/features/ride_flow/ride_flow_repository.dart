@@ -17,6 +17,8 @@ abstract interface class RideFlowRepository {
   Future<DriverLocationSnapshot?> getDriverLocation(String rideRequestId);
   Future<void> submitOffer(String rideRequestId, int amountMinor);
   Future<void> acceptProposedFare(String rideRequestId);
+  Future<void> declineRideRequest(String rideRequestId);
+  Future<void> declineOffer(String rideRequestId, String driverUserId);
   Future<void> selectOffer(
     String rideRequestId,
     String driverUserId,
@@ -146,6 +148,24 @@ class ApiRideFlowRepository implements RideFlowRepository {
   Future<void> acceptProposedFare(String rideRequestId) async {
     await _request(
       '/v1/driver/ride-requests/$rideRequestId/accept',
+      'POST',
+      null,
+    );
+  }
+
+  @override
+  Future<void> declineRideRequest(String rideRequestId) async {
+    await _request(
+      '/v1/driver/ride-requests/$rideRequestId/skip',
+      'POST',
+      null,
+    );
+  }
+
+  @override
+  Future<void> declineOffer(String rideRequestId, String driverUserId) async {
+    await _request(
+      '/v1/ride-requests/$rideRequestId/offers/$driverUserId/reject',
       'POST',
       null,
     );
