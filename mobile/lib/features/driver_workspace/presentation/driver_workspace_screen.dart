@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../core/dashboard/ride_dashboard_scaffold.dart';
 import '../../../core/maps/ride_map.dart';
+import '../../../core/models/account.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../ride_flow/ride_flow_panels.dart';
@@ -171,7 +173,7 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
           application: application,
         ),
       ),
-      panelBuilder: (context, scrollController, scrollEnabled) {
+      panelBuilder: (_, scrollController, scrollEnabled) {
         final physics = scrollEnabled
             ? const ClampingScrollPhysics()
             : const NeverScrollableScrollPhysics();
@@ -239,7 +241,13 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
           ),
           onCancel: _reapplying
               ? () => setState(() => _reapplying = false)
-              : null,
+              : () async {
+                  await ref
+                      .read(sessionControllerProvider)
+                      .selectCapability(Capability.rider);
+                  if (context.mounted) context.go('/rider');
+                },
+          cancelLabel: _reapplying ? 'Cancel new application' : 'Back to Rider',
         );
       },
     );
@@ -585,6 +593,7 @@ class _DriverSetupForm extends StatefulWidget {
     required this.physics,
     required this.onReview,
     this.onCancel,
+    this.cancelLabel = 'Cancel new application',
   });
 
   final List<DriverServiceOption> services;
@@ -595,6 +604,7 @@ class _DriverSetupForm extends StatefulWidget {
   final Future<void> Function(String, DriverServiceOption, DriverVehicle)
   onReview;
   final VoidCallback? onCancel;
+  final String cancelLabel;
 
   @override
   State<_DriverSetupForm> createState() => _DriverSetupFormState();
@@ -751,7 +761,7 @@ class _DriverSetupFormState extends State<_DriverSetupForm> {
             DashboardPanelControl(
               child: TextButton(
                 onPressed: widget.busy ? null : widget.onCancel,
-                child: const Text('Cancel new application'),
+                child: Text(widget.cancelLabel),
               ),
             ),
         ],

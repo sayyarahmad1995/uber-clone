@@ -22,6 +22,8 @@ import '../features/driver_workspace/application/driver_controller.dart';
 import '../features/driver_workspace/application/driver_onboarding_controller.dart';
 import '../features/driver_workspace/data/driver_onboarding_repository.dart';
 import '../features/driver_workspace/data/driver_repository.dart';
+import '../features/driver_workspace/domain/driver_onboarding.dart';
+import '../features/driver_workspace/domain/driver_profile.dart';
 import '../features/driver_workspace/presentation/driver_readonly_surfaces.dart';
 import '../features/rider_request/application/rider_request_controller.dart';
 import '../features/rider_request/data/device_location.dart';
@@ -119,6 +121,17 @@ final driverRepositoryProvider = Provider<DriverRepository>(
     ref.watch(sessionStoreProvider),
   ),
 );
+final approvedDriverProfileProvider =
+    FutureProvider.autoDispose<DriverProfile?>((ref) {
+      final account = ref.watch(
+        sessionControllerProvider.select((value) => value.state.account),
+      );
+      if (account == null ||
+          !account.capabilities.contains(Capability.driver)) {
+        return Future.value(null);
+      }
+      return ref.watch(driverRepositoryProvider).get();
+    });
 final driverVehiclesProvider =
     FutureProvider.autoDispose<List<RegisteredVehicle>>((ref) {
       // Reload on account changes so records cannot survive an account switch.
@@ -134,6 +147,17 @@ final driverOnboardingRepositoryProvider = Provider<DriverOnboardingRepository>(
     ref.watch(sessionStoreProvider),
   ),
 );
+final latestDriverOnboardingApplicationProvider =
+    FutureProvider.autoDispose<DriverOnboardingApplication?>((ref) {
+      final account = ref.watch(
+        sessionControllerProvider.select((value) => value.state.account),
+      );
+      if (account == null ||
+          !account.capabilities.contains(Capability.driver)) {
+        return Future.value(null);
+      }
+      return ref.watch(driverOnboardingRepositoryProvider).getLatest();
+    });
 final driverControllerProvider =
     ChangeNotifierProvider.autoDispose<DriverController>((ref) {
       ref.watch(
@@ -186,7 +210,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/splash',
     refreshListenable: session,
-    redirect: (context, state) {
+    redirect: (context, state) async {
       final status = session.state.status;
       final location = state.matchedLocation;
       if (status == SessionStatus.bootstrapping) {
@@ -208,6 +232,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       if ((location == '/driver' || location.startsWith('/driver/')) &&
           !hasDriver) {
         return '/rider';
+      }
+      if (location == '/driver/details' || location == '/driver/vehicles') {
+        try {
+          final profile = await ref.read(approvedDriverProfileProvider.future);
+          if (profile == null) return '/driver';
+        } catch (_) {
+          return '/driver';
+        }
       }
       return null;
     },

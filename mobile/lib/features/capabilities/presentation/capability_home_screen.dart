@@ -22,6 +22,33 @@ class CapabilityHomeScreen extends ConsumerWidget {
       return const SizedBox.shrink();
     }
     final canDrive = account.capabilities.contains(Capability.driver);
+    final workspaceDriverProfile = canDrive && capability == Capability.driver
+        ? ref.watch(driverControllerProvider).profile
+        : null;
+    final workspaceOnboardingApplication =
+        canDrive &&
+            capability == Capability.driver &&
+            workspaceDriverProfile == null
+        ? ref.watch(driverOnboardingControllerProvider).application
+        : null;
+    final hasApprovedDriverProfile =
+        canDrive &&
+        (workspaceDriverProfile != null ||
+            ref
+                .watch(approvedDriverProfileProvider)
+                .maybeWhen(
+                  data: (profile) => profile != null,
+                  orElse: () => false,
+                ));
+    final hasSubmittedDriverApplication =
+        canDrive &&
+        (workspaceOnboardingApplication != null ||
+            ref
+                .watch(latestDriverOnboardingApplicationProvider)
+                .maybeWhen(
+                  data: (application) => application != null,
+                  orElse: () => false,
+                ));
 
     Future<void> selectCapability(Capability next) async {
       Navigator.of(context).pop();
@@ -92,7 +119,7 @@ class CapabilityHomeScreen extends ConsumerWidget {
                     ? null
                     : () => selectCapability(Capability.rider),
               ),
-              if (canDrive)
+              if (hasApprovedDriverProfile || hasSubmittedDriverApplication)
                 ListTile(
                   key: const Key('drawerDriver'),
                   leading: const Icon(Icons.local_taxi_outlined),
@@ -107,9 +134,13 @@ class CapabilityHomeScreen extends ConsumerWidget {
                   key: const Key('drawerBecomeDriver'),
                   leading: const Icon(Icons.add_circle_outline),
                   title: const Text('Become a Driver'),
-                  onTap: controller.state.busy ? null : enableDriver,
+                  onTap: controller.state.busy
+                      ? null
+                      : canDrive
+                      ? () => selectCapability(Capability.driver)
+                      : enableDriver,
                 ),
-              if (canDrive) ...[
+              if (hasApprovedDriverProfile) ...[
                 const Divider(),
                 ListTile(
                   key: const Key('drawerDriverDetails'),
