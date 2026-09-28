@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers.dart';
 import 'domain/marketplace_request.dart';
 import 'domain/ride_snapshot.dart';
+import 'domain/ride_execution.dart';
 import 'domain/trip.dart';
 import 'application/driver_marketplace_controller.dart';
 import 'application/driver_trip_controller.dart';
@@ -22,6 +23,13 @@ String fareText(dynamic fare) {
 String pointText(RideLocation? point) => point == null
     ? 'Unavailable'
     : '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}';
+
+String riderOfferDistanceText(int? distance) {
+  final value = distance;
+  return value == null
+      ? 'Pickup distance unavailable'
+      : '${(value / 1000).toStringAsFixed(1)} km to pickup · straight-line distance';
+}
 
 String statusText(String? status) => switch (status) {
   'assigned' => 'Driver assigned',
@@ -404,9 +412,7 @@ class _RideFlowPanelState extends ConsumerState<RideFlowPanel>
                 Text(
                   '${fareText(offer.fare)}${offer.matchesProposedFare ? ' · Your fare' : ''}',
                 ),
-                Text(
-                  '${(offer.pickupDistanceMeters / 1000).toStringAsFixed(1)} km to pickup · straight-line distance',
-                ),
+                Text(riderOfferDistanceText(offer.pickupDistanceMeters)),
                 if (!offer.selectable)
                   Text(
                     offer.status == 'pending'

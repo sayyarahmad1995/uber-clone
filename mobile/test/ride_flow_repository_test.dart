@@ -1,69 +1,183 @@
+import 'dart:convert';
+
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:uber_clone/features/ride_flow/domain/marketplace_request.dart';
-import 'package:uber_clone/features/ride_flow/domain/ride_offer.dart';
-import 'package:uber_clone/features/ride_flow/domain/ride_snapshot.dart';
-import 'package:uber_clone/features/ride_flow/domain/trip.dart';
 import 'package:uber_clone/features/ride_flow/ride_flow_repository.dart';
 
-class SemanticRideFlowFake implements RideFlowRepository {
-  @override
-  Future<List<RiderRideSnapshot>> listRiderRides() async => const [];
-
-  @override
-  Future<List<MarketplaceRequest>> listMarketplaceRequests() async => const [];
-
-  @override
-  Future<TripSnapshot?> getCurrentDriverTrip() async => null;
-
-  @override
-  Future<List<DriverTripHistoryItem>> listDriverTrips() async => const [];
-
-  @override
-  Future<RiderRideSnapshot> getRiderRide(String rideRequestId) =>
-      throw UnimplementedError();
-
-  @override
-  Future<List<RiderOfferComparison>> listRiderOffers(
-    String rideRequestId,
-  ) async => const [];
-
-  @override
-  Future<DriverLocationSnapshot?> getDriverLocation(
-    String rideRequestId,
-  ) async => null;
-
-  @override
-  Future<void> submitOffer(String rideRequestId, int amountMinor) async {}
-
-  @override
-  Future<void> acceptProposedFare(String rideRequestId) async {}
-
-  @override
-  Future<void> selectOffer(
-    String rideRequestId,
-    String driverUserId,
-    DateTime updatedAt,
-  ) async {}
-
-  @override
-  Future<void> startTrip(String rideRequestId) async {}
-
-  @override
-  Future<void> completeTrip(String rideRequestId) async {}
-
-  @override
-  Future<void> confirmCashCollected(String rideRequestId) async {}
-
-  @override
-  Future<void> cancelDriverTrip(String rideRequestId) async {}
-}
+import 'ride_request_repository_test.dart' show StaticSessionStore;
 
 void main() {
+  late RecordingRideFlowAdapter adapter;
+  late ApiRideFlowRepository repository;
+
+  setUp(() {
+    adapter = RecordingRideFlowAdapter();
+    final dio = Dio(BaseOptions(baseUrl: 'http://application.test'))
+      ..httpClientAdapter = adapter;
+    repository = ApiRideFlowRepository(dio, StaticSessionStore());
+  });
+
+  test('list marketplace requests uses the marketplace route', () async {
+    await repository.listMarketplaceRequests();
+
+    expectRequest(adapter, 'GET', '/v1/driver/marketplace/ride-requests');
+  });
+
+  test('get current driver trip uses the current trip route', () async {
+    await repository.getCurrentDriverTrip();
+
+    expectRequest(adapter, 'GET', '/v1/driver/trip');
+  });
+
+  test('list driver trips uses the driver trips route', () async {
+    await repository.listDriverTrips();
+
+    expectRequest(adapter, 'GET', '/v1/driver/trips');
+  });
+
+  test('list rider rides uses the rider rides route', () async {
+    await repository.listRiderRides();
+
+    expectRequest(adapter, 'GET', '/v1/ride-requests');
+  });
+
+  test('get rider ride uses the ride request route', () async {
+    await repository.getRiderRide('ride-1');
+
+    expectRequest(adapter, 'GET', '/v1/ride-requests/ride-1');
+  });
+
+  test('list rider offers uses the offers route', () async {
+    await repository.listRiderOffers('ride-1');
+
+    expectRequest(adapter, 'GET', '/v1/ride-requests/ride-1/offers');
+  });
+
+  test('get driver location uses the driver location route', () async {
+    await repository.getDriverLocation('ride-1');
+
+    expectRequest(adapter, 'GET', '/v1/ride-requests/ride-1/driver-location');
+  });
+
+  test('submit offer uses the offer route and amount payload', () async {
+    await repository.submitOffer('ride-1', 11500);
+
+    expectRequest(adapter, 'PUT', '/v1/driver/ride-requests/ride-1/offer', {
+      'amount_minor': 11500,
+    });
+  });
+
+  test('accept proposed fare uses existing backend accept route', () async {
+    await repository.acceptProposedFare('ride-1');
+
+    expect(adapter.request!.method, 'POST');
+    expect(adapter.request!.path, '/v1/driver/ride-requests/ride-1/accept');
+    expect(adapter.request!.data, isNull);
+  });
+
   test(
-    'ride flow repository exposes semantic operations instead of raw paths',
-    () {
-      final repository = SemanticRideFlowFake();
-      expect(repository, isA<RideFlowRepository>());
+    'select offer uses the offer acceptance route and UTC payload',
+    () async {
+      final updatedAt = DateTime(2026, 9, 17, 14, 30);
+
+      await repository.selectOffer('ride-1', 'driver-1', updatedAt);
+
+      expectRequest(
+        adapter,
+        'POST',
+        '/v1/ride-requests/ride-1/offers/driver-1/accept',
+        {'updated_at': updatedAt.toUtc().toIso8601String()},
+      );
     },
   );
+
+  test('start trip uses the start route', () async {
+    await repository.startTrip('ride-1');
+
+    expectRequest(adapter, 'POST', '/v1/driver/ride-requests/ride-1/start');
+  });
+
+  test('complete trip uses the complete route', () async {
+    await repository.completeTrip('ride-1');
+
+    expectRequest(adapter, 'POST', '/v1/driver/ride-requests/ride-1/complete');
+  });
+
+  test('confirm cash collected uses the cash-collected route', () async {
+    await repository.confirmCashCollected('ride-1');
+
+    expectRequest(
+      adapter,
+      'POST',
+      '/v1/driver/ride-requests/ride-1/cash-collected',
+    );
+  });
+
+  test('cancel driver trip uses the cancel route', () async {
+    await repository.cancelDriverTrip('ride-1');
+
+    expectRequest(adapter, 'POST', '/v1/driver/ride-requests/ride-1/cancel');
+  });
+}
+
+void expectRequest(
+  RecordingRideFlowAdapter adapter,
+  String method,
+  String path, [
+  Map<String, dynamic>? data,
+]) {
+  expect(adapter.request!.method, method);
+  expect(adapter.request!.path, path);
+  expect(adapter.request!.data, data);
+}
+
+class RecordingRideFlowAdapter implements HttpClientAdapter {
+  RequestOptions? request;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<List<int>>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    request = options;
+    final body = switch (options.path) {
+      '/v1/driver/marketplace/ride-requests' => {'ride_requests': []},
+      '/v1/driver/trip' => {
+        'status': 'assigned',
+        'assigned_at': '2026-09-17T10:00:00Z',
+        'settlement': {'status': 'pending'},
+      },
+      '/v1/driver/trips' => {'trips': []},
+      '/v1/ride-requests' => {'ride_requests': []},
+      '/v1/ride-requests/ride-1' => {
+        'service_code': 'standard',
+        'id': 'ride-1',
+        'pickup': {'latitude': 24.86, 'longitude': 67.00},
+        'destination': {'latitude': 24.90, 'longitude': 67.08},
+        'proposed_fare': {'amount_minor': 11500, 'currency': 'PKR'},
+        'status': 'open',
+        'created_at': '2026-09-17T10:00:00Z',
+        'expires_at': '2026-09-17T10:15:00Z',
+      },
+      '/v1/ride-requests/ride-1/offers' => {'offers': []},
+      '/v1/ride-requests/ride-1/driver-location' => {
+        'ride_request_id': 'ride-1',
+        'latitude': 24.86,
+        'longitude': 67.00,
+        'updated_at': '2026-09-17T10:00:00Z',
+      },
+      _ => <String, dynamic>{},
+    };
+    return ResponseBody.fromString(
+      jsonEncode(body),
+      200,
+      headers: {
+        Headers.contentTypeHeader: [Headers.jsonContentType],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
 }

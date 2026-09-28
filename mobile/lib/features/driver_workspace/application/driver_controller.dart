@@ -125,11 +125,6 @@ class DriverController extends ChangeNotifier {
         operation = await _repository.selectOperation(vehicleId, serviceCode);
       });
 
-  Future<void> onboard(String name, DriverVehicle vehicle) => _run(() async {
-    profile = await _repository.onboard(name, vehicle);
-    loaded = true;
-  });
-
   Future<void> _publish() async {
     final point = await _location.current().timeout(
       const Duration(seconds: 20),

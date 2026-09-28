@@ -35,6 +35,12 @@ The Rider sees actionable Driver offers and explicitly selects one. Rider select
 
 An offer equal to the Rider proposed fare should be presented as accepting the Rider's price (for example, a `Your fare` label). This is presentation derived from the offer amount matching the Ride Request proposed fare; it is not a separate booking mode or assignment path.
 
+The backend retains explicit Driver skip and Rider offer rejection operations.
+The current mobile MVP is not required to expose dedicated controls for those
+operations; omission of a mobile button is not a different assignment model.
+If either control is added later, it must use semantic repository operations and
+must not change Rider-selected assignment ownership.
+
 Conceptually:
 
 ```text

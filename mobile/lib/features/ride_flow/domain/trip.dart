@@ -1,21 +1,10 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import 'marketplace_request.dart';
+import 'ride_execution.dart';
 
 part 'trip.freezed.dart';
 part 'trip.g.dart';
-
-@freezed
-abstract class SettlementSnapshot with _$SettlementSnapshot {
-  const factory SettlementSnapshot({
-    required String status,
-    String? method,
-    @JsonKey(name: 'cash_collected_at') DateTime? cashCollectedAt,
-  }) = _SettlementSnapshot;
-
-  factory SettlementSnapshot.fromJson(Map<String, dynamic> json) =>
-      _$SettlementSnapshotFromJson(json);
-}
 
 @freezed
 abstract class TripOperationFare with _$TripOperationFare {
@@ -48,7 +37,9 @@ abstract class TripOperationContext with _$TripOperationContext {
 }
 
 @freezed
-abstract class TripSnapshot with _$TripSnapshot {
+abstract class TripSnapshot
+    with _$TripSnapshot
+    implements TripLifecycleSnapshot {
   const factory TripSnapshot({
     @JsonKey(name: 'operation_context') TripOperationContext? operationContext,
     @JsonKey(name: 'ride_request_id') String? rideRequestId,
@@ -69,7 +60,9 @@ abstract class TripSnapshot with _$TripSnapshot {
 }
 
 @freezed
-abstract class DriverTripHistoryItem with _$DriverTripHistoryItem {
+abstract class DriverTripHistoryItem
+    with _$DriverTripHistoryItem
+    implements TripLifecycleSnapshot {
   const factory DriverTripHistoryItem({
     @JsonKey(name: 'operation_context') TripOperationContext? operationContext,
     @JsonKey(name: 'ride_request_id') required String rideRequestId,

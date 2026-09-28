@@ -52,6 +52,44 @@ void main() {
     expect(rides[1].trip?.status, 'completed');
     expect(rides[1].trip?.settlement?.status, 'cash_collected');
   });
+
+  test('parses historical Rider request with a null proposed fare', () async {
+    final adapter = RideListAdapter(
+      response: {
+        'ride_requests': [
+          {...rideJson('ride-history-null', trip: null), 'proposed_fare': null},
+        ],
+      },
+    );
+    final repository = ApiRideRequestRepository(
+      Dio(BaseOptions(baseUrl: 'http://application.test'))
+        ..httpClientAdapter = adapter,
+      StaticSessionStore(),
+    );
+
+    final rides = await repository.list();
+
+    expect(rides.single.proposedFare, isNull);
+  });
+
+  test('parses historical Rider request without a proposed fare', () async {
+    final historicalRide = rideJson('ride-history-absent', trip: null)
+      ..remove('proposed_fare');
+    final adapter = RideListAdapter(
+      response: {
+        'ride_requests': [historicalRide],
+      },
+    );
+    final repository = ApiRideRequestRepository(
+      Dio(BaseOptions(baseUrl: 'http://application.test'))
+        ..httpClientAdapter = adapter,
+      StaticSessionStore(),
+    );
+
+    final rides = await repository.list();
+
+    expect(rides.single.proposedFare, isNull);
+  });
 }
 
 class StaticSessionStore implements SessionStore {
@@ -89,24 +127,31 @@ class RideContractAdapter implements HttpClientAdapter {
 }
 
 class RideListAdapter implements HttpClientAdapter {
+  RideListAdapter({this.response});
+
+  final Map<String, dynamic>? response;
+
   @override
   Future<ResponseBody> fetch(
     RequestOptions options,
     Stream<List<int>>? requestStream,
     Future<void>? cancelFuture,
   ) async => ResponseBody.fromString(
-    jsonEncode({
-      'ride_requests': [
-        rideJson(
-          'ride-unsettled',
-          trip: tripJson(settlementStatus: 'unsettled'),
-        ),
-        rideJson(
-          'ride-settled',
-          trip: tripJson(settlementStatus: 'cash_collected'),
-        ),
-      ],
-    }),
+    jsonEncode(
+      response ??
+          {
+            'ride_requests': [
+              rideJson(
+                'ride-unsettled',
+                trip: tripJson(settlementStatus: 'unsettled'),
+              ),
+              rideJson(
+                'ride-settled',
+                trip: tripJson(settlementStatus: 'cash_collected'),
+              ),
+            ],
+          },
+    ),
     200,
     headers: {
       Headers.contentTypeHeader: [Headers.jsonContentType],

@@ -385,7 +385,7 @@ class _LoadingPanel extends StatelessWidget {
     physics: physics,
     padding: const EdgeInsets.all(AppSpacing.md),
     children: [
-      Text(busy ? 'Loading Driver statusâ€¦' : 'Unable to load Driver status'),
+      Text(busy ? 'Loading Driver status...' : 'Unable to load Driver status'),
       if (error != null) Text(error!),
       DashboardPanelControl(
         child: TextButton(
@@ -432,7 +432,7 @@ class _DriverApplicationStatusPanel extends StatelessWidget {
         const SizedBox(height: AppSpacing.sm),
         Text('Service: ${application.service.displayName}'),
         Text(
-          '${application.vehicle.make} ${application.vehicle.model} ${application.vehicle.modelYear ?? ''} â€¢ ${application.vehicle.color}',
+          '${application.vehicle.make} ${application.vehicle.model} ${application.vehicle.modelYear ?? ''} - ${application.vehicle.color}',
         ),
         Text(application.vehicle.licensePlate),
         Text('Submitted ${application.submittedAt.toLocal()}'),
@@ -744,7 +744,7 @@ class _DriverSetupFormState extends State<_DriverSetupForm> {
                         ),
                       );
                     },
-              child: Text(widget.busy ? 'Checkingâ€¦' : 'Review application'),
+              child: Text(widget.busy ? 'Checking...' : 'Review application'),
             ),
           ),
           if (widget.onCancel != null)

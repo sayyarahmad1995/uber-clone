@@ -16,7 +16,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$RiderRideSnapshot {
 
-@JsonKey(name: 'service_code') String get serviceCode; String get id; RideLocation get pickup; RideLocation get destination;@JsonKey(name: 'proposed_fare') RideFare get proposedFare; String get status;@JsonKey(name: 'created_at') DateTime get createdAt;@JsonKey(name: 'expires_at') DateTime get expiresAt; TripSnapshot? get trip;
+@JsonKey(name: 'service_code') String get serviceCode; String get id; RideLocation get pickup; RideLocation get destination;@JsonKey(name: 'proposed_fare') RideFare? get proposedFare; String get status;@JsonKey(name: 'created_at') DateTime get createdAt;@JsonKey(name: 'expires_at') DateTime get expiresAt; TripSnapshot? get trip;
 /// Create a copy of RiderRideSnapshot
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -54,11 +54,11 @@ abstract mixin class $RiderRideSnapshotCopyWith<$Res>  {
   factory $RiderRideSnapshotCopyWith(RiderRideSnapshot value, $Res Function(RiderRideSnapshot) _then) = _$RiderRideSnapshotCopyWithImpl;
 @useResult
 $Res call({
-@JsonKey(name: 'service_code') String serviceCode, String id, RideLocation pickup, RideLocation destination,@JsonKey(name: 'proposed_fare') RideFare proposedFare, String status,@JsonKey(name: 'created_at') DateTime createdAt,@JsonKey(name: 'expires_at') DateTime expiresAt, TripSnapshot? trip
+@JsonKey(name: 'service_code') String serviceCode, String id, RideLocation pickup, RideLocation destination,@JsonKey(name: 'proposed_fare') RideFare? proposedFare, String status,@JsonKey(name: 'created_at') DateTime createdAt,@JsonKey(name: 'expires_at') DateTime expiresAt, TripSnapshot? trip
 });
 
 
-$RideLocationCopyWith<$Res> get pickup;$RideLocationCopyWith<$Res> get destination;$RideFareCopyWith<$Res> get proposedFare;$TripSnapshotCopyWith<$Res>? get trip;
+$RideLocationCopyWith<$Res> get pickup;$RideLocationCopyWith<$Res> get destination;$RideFareCopyWith<$Res>? get proposedFare;$TripSnapshotCopyWith<$Res>? get trip;
 
 }
 /// @nodoc
@@ -71,14 +71,14 @@ class _$RiderRideSnapshotCopyWithImpl<$Res>
 
 /// Create a copy of RiderRideSnapshot
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? serviceCode = null,Object? id = null,Object? pickup = null,Object? destination = null,Object? proposedFare = null,Object? status = null,Object? createdAt = null,Object? expiresAt = null,Object? trip = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? serviceCode = null,Object? id = null,Object? pickup = null,Object? destination = null,Object? proposedFare = freezed,Object? status = null,Object? createdAt = null,Object? expiresAt = null,Object? trip = freezed,}) {
   return _then(RiderRideSnapshot(
 serviceCode: null == serviceCode ? _self.serviceCode : serviceCode // ignore: cast_nullable_to_non_nullable
 as String,id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,pickup: null == pickup ? _self.pickup : pickup // ignore: cast_nullable_to_non_nullable
 as RideLocation,destination: null == destination ? _self.destination : destination // ignore: cast_nullable_to_non_nullable
-as RideLocation,proposedFare: null == proposedFare ? _self.proposedFare : proposedFare // ignore: cast_nullable_to_non_nullable
-as RideFare,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
+as RideLocation,proposedFare: freezed == proposedFare ? _self.proposedFare : proposedFare // ignore: cast_nullable_to_non_nullable
+as RideFare?,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as String,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
 as DateTime,expiresAt: null == expiresAt ? _self.expiresAt : expiresAt // ignore: cast_nullable_to_non_nullable
 as DateTime,trip: freezed == trip ? _self.trip : trip // ignore: cast_nullable_to_non_nullable
@@ -90,7 +90,7 @@ as TripSnapshot?,
 @override
 @pragma('vm:prefer-inline')
 $RideLocationCopyWith<$Res> get pickup {
-
+  
   return $RideLocationCopyWith<$Res>(_self.pickup, (value) {
     return _then(_self.copyWith(pickup: value));
   });
@@ -99,7 +99,7 @@ $RideLocationCopyWith<$Res> get pickup {
 @override
 @pragma('vm:prefer-inline')
 $RideLocationCopyWith<$Res> get destination {
-
+  
   return $RideLocationCopyWith<$Res>(_self.destination, (value) {
     return _then(_self.copyWith(destination: value));
   });
@@ -107,9 +107,12 @@ $RideLocationCopyWith<$Res> get destination {
 /// with the given fields replaced by the non-null parameter values.
 @override
 @pragma('vm:prefer-inline')
-$RideFareCopyWith<$Res> get proposedFare {
+$RideFareCopyWith<$Res>? get proposedFare {
+    if (_self.proposedFare == null) {
+    return null;
+  }
 
-  return $RideFareCopyWith<$Res>(_self.proposedFare, (value) {
+  return $RideFareCopyWith<$Res>(_self.proposedFare!, (value) {
     return _then(_self.copyWith(proposedFare: value));
   });
 }/// Create a copy of RiderRideSnapshot
@@ -206,7 +209,7 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'service_code')  String serviceCode,  String id,  RideLocation pickup,  RideLocation destination, @JsonKey(name: 'proposed_fare')  RideFare proposedFare,  String status, @JsonKey(name: 'created_at')  DateTime createdAt, @JsonKey(name: 'expires_at')  DateTime expiresAt,  TripSnapshot? trip)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'service_code')  String serviceCode,  String id,  RideLocation pickup,  RideLocation destination, @JsonKey(name: 'proposed_fare')  RideFare? proposedFare,  String status, @JsonKey(name: 'created_at')  DateTime createdAt, @JsonKey(name: 'expires_at')  DateTime expiresAt,  TripSnapshot? trip)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _RiderRideSnapshot() when $default != null:
 return $default(_that.serviceCode,_that.id,_that.pickup,_that.destination,_that.proposedFare,_that.status,_that.createdAt,_that.expiresAt,_that.trip);case _:
@@ -227,7 +230,7 @@ return $default(_that.serviceCode,_that.id,_that.pickup,_that.destination,_that.
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'service_code')  String serviceCode,  String id,  RideLocation pickup,  RideLocation destination, @JsonKey(name: 'proposed_fare')  RideFare proposedFare,  String status, @JsonKey(name: 'created_at')  DateTime createdAt, @JsonKey(name: 'expires_at')  DateTime expiresAt,  TripSnapshot? trip)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'service_code')  String serviceCode,  String id,  RideLocation pickup,  RideLocation destination, @JsonKey(name: 'proposed_fare')  RideFare? proposedFare,  String status, @JsonKey(name: 'created_at')  DateTime createdAt, @JsonKey(name: 'expires_at')  DateTime expiresAt,  TripSnapshot? trip)  $default,) {final _that = this;
 switch (_that) {
 case _RiderRideSnapshot():
 return $default(_that.serviceCode,_that.id,_that.pickup,_that.destination,_that.proposedFare,_that.status,_that.createdAt,_that.expiresAt,_that.trip);case _:
@@ -247,7 +250,7 @@ return $default(_that.serviceCode,_that.id,_that.pickup,_that.destination,_that.
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'service_code')  String serviceCode,  String id,  RideLocation pickup,  RideLocation destination, @JsonKey(name: 'proposed_fare')  RideFare proposedFare,  String status, @JsonKey(name: 'created_at')  DateTime createdAt, @JsonKey(name: 'expires_at')  DateTime expiresAt,  TripSnapshot? trip)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'service_code')  String serviceCode,  String id,  RideLocation pickup,  RideLocation destination, @JsonKey(name: 'proposed_fare')  RideFare? proposedFare,  String status, @JsonKey(name: 'created_at')  DateTime createdAt, @JsonKey(name: 'expires_at')  DateTime expiresAt,  TripSnapshot? trip)?  $default,) {final _that = this;
 switch (_that) {
 case _RiderRideSnapshot() when $default != null:
 return $default(_that.serviceCode,_that.id,_that.pickup,_that.destination,_that.proposedFare,_that.status,_that.createdAt,_that.expiresAt,_that.trip);case _:
@@ -262,14 +265,14 @@ return $default(_that.serviceCode,_that.id,_that.pickup,_that.destination,_that.
 @JsonSerializable()
 
 class _RiderRideSnapshot implements RiderRideSnapshot {
-  const _RiderRideSnapshot({@JsonKey(name: 'service_code') required this.serviceCode, required this.id, required this.pickup, required this.destination, @JsonKey(name: 'proposed_fare') required this.proposedFare, required this.status, @JsonKey(name: 'created_at') required this.createdAt, @JsonKey(name: 'expires_at') required this.expiresAt, this.trip});
+  const _RiderRideSnapshot({@JsonKey(name: 'service_code') required this.serviceCode, required this.id, required this.pickup, required this.destination, @JsonKey(name: 'proposed_fare') this.proposedFare, required this.status, @JsonKey(name: 'created_at') required this.createdAt, @JsonKey(name: 'expires_at') required this.expiresAt, this.trip});
   factory _RiderRideSnapshot.fromJson(Map<String, dynamic> json) => _$RiderRideSnapshotFromJson(json);
 
 @override@JsonKey(name: 'service_code') final  String serviceCode;
 @override final  String id;
 @override final  RideLocation pickup;
 @override final  RideLocation destination;
-@override@JsonKey(name: 'proposed_fare') final  RideFare proposedFare;
+@override@JsonKey(name: 'proposed_fare') final  RideFare? proposedFare;
 @override final  String status;
 @override@JsonKey(name: 'created_at') final  DateTime createdAt;
 @override@JsonKey(name: 'expires_at') final  DateTime expiresAt;
@@ -310,11 +313,11 @@ abstract mixin class _$RiderRideSnapshotCopyWith<$Res> implements $RiderRideSnap
   factory _$RiderRideSnapshotCopyWith(_RiderRideSnapshot value, $Res Function(_RiderRideSnapshot) _then) = __$RiderRideSnapshotCopyWithImpl;
 @override @useResult
 $Res call({
-@JsonKey(name: 'service_code') String serviceCode, String id, RideLocation pickup, RideLocation destination,@JsonKey(name: 'proposed_fare') RideFare proposedFare, String status,@JsonKey(name: 'created_at') DateTime createdAt,@JsonKey(name: 'expires_at') DateTime expiresAt, TripSnapshot? trip
+@JsonKey(name: 'service_code') String serviceCode, String id, RideLocation pickup, RideLocation destination,@JsonKey(name: 'proposed_fare') RideFare? proposedFare, String status,@JsonKey(name: 'created_at') DateTime createdAt,@JsonKey(name: 'expires_at') DateTime expiresAt, TripSnapshot? trip
 });
 
 
-@override $RideLocationCopyWith<$Res> get pickup;@override $RideLocationCopyWith<$Res> get destination;@override $RideFareCopyWith<$Res> get proposedFare;@override $TripSnapshotCopyWith<$Res>? get trip;
+@override $RideLocationCopyWith<$Res> get pickup;@override $RideLocationCopyWith<$Res> get destination;@override $RideFareCopyWith<$Res>? get proposedFare;@override $TripSnapshotCopyWith<$Res>? get trip;
 
 }
 /// @nodoc
@@ -327,14 +330,14 @@ class __$RiderRideSnapshotCopyWithImpl<$Res>
 
 /// Create a copy of RiderRideSnapshot
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? serviceCode = null,Object? id = null,Object? pickup = null,Object? destination = null,Object? proposedFare = null,Object? status = null,Object? createdAt = null,Object? expiresAt = null,Object? trip = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? serviceCode = null,Object? id = null,Object? pickup = null,Object? destination = null,Object? proposedFare = freezed,Object? status = null,Object? createdAt = null,Object? expiresAt = null,Object? trip = freezed,}) {
   return _then(_RiderRideSnapshot(
 serviceCode: null == serviceCode ? _self.serviceCode : serviceCode // ignore: cast_nullable_to_non_nullable
 as String,id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,pickup: null == pickup ? _self.pickup : pickup // ignore: cast_nullable_to_non_nullable
 as RideLocation,destination: null == destination ? _self.destination : destination // ignore: cast_nullable_to_non_nullable
-as RideLocation,proposedFare: null == proposedFare ? _self.proposedFare : proposedFare // ignore: cast_nullable_to_non_nullable
-as RideFare,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
+as RideLocation,proposedFare: freezed == proposedFare ? _self.proposedFare : proposedFare // ignore: cast_nullable_to_non_nullable
+as RideFare?,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as String,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
 as DateTime,expiresAt: null == expiresAt ? _self.expiresAt : expiresAt // ignore: cast_nullable_to_non_nullable
 as DateTime,trip: freezed == trip ? _self.trip : trip // ignore: cast_nullable_to_non_nullable
@@ -347,7 +350,7 @@ as TripSnapshot?,
 @override
 @pragma('vm:prefer-inline')
 $RideLocationCopyWith<$Res> get pickup {
-
+  
   return $RideLocationCopyWith<$Res>(_self.pickup, (value) {
     return _then(_self.copyWith(pickup: value));
   });
@@ -356,7 +359,7 @@ $RideLocationCopyWith<$Res> get pickup {
 @override
 @pragma('vm:prefer-inline')
 $RideLocationCopyWith<$Res> get destination {
-
+  
   return $RideLocationCopyWith<$Res>(_self.destination, (value) {
     return _then(_self.copyWith(destination: value));
   });
@@ -364,9 +367,12 @@ $RideLocationCopyWith<$Res> get destination {
 /// with the given fields replaced by the non-null parameter values.
 @override
 @pragma('vm:prefer-inline')
-$RideFareCopyWith<$Res> get proposedFare {
+$RideFareCopyWith<$Res>? get proposedFare {
+    if (_self.proposedFare == null) {
+    return null;
+  }
 
-  return $RideFareCopyWith<$Res>(_self.proposedFare, (value) {
+  return $RideFareCopyWith<$Res>(_self.proposedFare!, (value) {
     return _then(_self.copyWith(proposedFare: value));
   });
 }/// Create a copy of RiderRideSnapshot

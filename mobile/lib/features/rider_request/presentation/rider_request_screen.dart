@@ -123,7 +123,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
               point: LatLng(driverLocation.latitude, driverLocation.longitude),
               icon: Icons.local_taxi,
               color: AppColors.success,
-              label: "Driver",
+              label: 'Driver',
             ),
         ],
         onTap: active == null ? _handleMapTap : null,
@@ -354,7 +354,7 @@ class _RequestRidePanel extends StatelessWidget {
             key: const Key('requestRideButton'),
             onPressed: state.submitting ? null : () => onSubmit(),
             icon: const Icon(Icons.local_taxi),
-            label: Text(state.submitting ? 'Requestingâ€¦' : 'Request ride'),
+            label: Text(state.submitting ? 'Requesting...' : 'Request ride'),
           ),
         ),
       ],
@@ -413,7 +413,7 @@ class _ActiveRequestPanel extends ConsumerWidget {
           style: Theme.of(context).textTheme.headlineSmall,
         ),
         const SizedBox(height: AppSpacing.xs),
-        RideFlowPanel.rider(rideId: 'ride'),
+        RideFlowPanel.rider(rideId: request.id),
         const SizedBox(height: AppSpacing.md),
         Card(
           child: Padding(
@@ -427,8 +427,10 @@ class _ActiveRequestPanel extends ConsumerWidget {
                   leading: const Icon(Icons.payments_outlined),
                   title: const Text('Your proposed fare'),
                   subtitle: Text(
-                    '${request.proposedFare.currency} '
-                    '${(request.proposedFare.amountMinor / 100).toStringAsFixed(2)}',
+                    request.proposedFare == null
+                        ? 'Fare unavailable'
+                        : '${request.proposedFare!.currency} '
+                              '${(request.proposedFare!.amountMinor / 100).toStringAsFixed(2)}',
                   ),
                 ),
               ],
@@ -453,7 +455,7 @@ class _ActiveRequestPanel extends ConsumerWidget {
                   ? null
                   : () => _confirmCancellation(context, ref),
               child: Text(
-                state.submitting ? 'Cancellingâ€¦' : 'Cancel request',
+                state.submitting ? 'Cancelling...' : 'Cancel request',
               ),
             ),
           ),

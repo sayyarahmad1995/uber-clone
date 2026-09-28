@@ -78,7 +78,7 @@ _RiderOfferComparison _$RiderOfferComparisonFromJson(
   decidedAt: json['decided_at'] == null
       ? null
       : DateTime.parse(json['decided_at'] as String),
-  pickupDistanceMeters: (json['pickup_distance_meters'] as num).toInt(),
+  pickupDistanceMeters: (json['pickup_distance_meters'] as num?)?.toInt(),
   matchesProposedFare: json['matches_proposed_fare'] as bool,
   selectable: json['selectable'] as bool,
   driver: json['driver'] == null

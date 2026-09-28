@@ -20,7 +20,7 @@ type scanner interface{ Scan(dest ...any) error }
 
 func scanView(row scanner) (View, error) {
 	var view View
-	var operation json.RawMessage
+	var operation []byte
 	var service sql.NullString
 	var proposedAmount sql.NullInt64
 	var proposedCurrency sql.NullString
@@ -106,8 +106,8 @@ func scanView(row scanner) (View, error) {
 	return view, nil
 }
 
-// A LEFT JOIN without a Trip returns SQL NULL. json.RawMessage accepts JSON
-// bytes, so project JSON null rather than asking database/sql to scan SQL NULL.
+// The query below normalizes a missing Trip operation context to JSON null
+// before database/sql scans it into the byte representation.
 const viewColumns = `
 	rr.id,
 	rr.rider_user_id,

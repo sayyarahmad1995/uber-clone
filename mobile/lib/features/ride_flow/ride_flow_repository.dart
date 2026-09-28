@@ -145,7 +145,7 @@ class ApiRideFlowRepository implements RideFlowRepository {
   @override
   Future<void> acceptProposedFare(String rideRequestId) async {
     await _request(
-      '/v1/driver/ride-requests/$rideRequestId/accept-proposed-fare',
+      '/v1/driver/ride-requests/$rideRequestId/accept',
       'POST',
       null,
     );

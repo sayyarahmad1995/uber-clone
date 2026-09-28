@@ -89,7 +89,7 @@ as DateTime?,
 @override
 @pragma('vm:prefer-inline')
 $RideFareCopyWith<$Res> get fare {
-
+  
   return $RideFareCopyWith<$Res>(_self.fare, (value) {
     return _then(_self.copyWith(fare: value));
   });
@@ -314,7 +314,7 @@ as DateTime?,
 @override
 @pragma('vm:prefer-inline')
 $RideFareCopyWith<$Res> get fare {
-
+  
   return $RideFareCopyWith<$Res>(_self.fare, (value) {
     return _then(_self.copyWith(fare: value));
   });
@@ -1147,7 +1147,7 @@ as String,
 /// @nodoc
 mixin _$RiderOfferComparison {
 
-@JsonKey(name: 'ride_request_id') String get rideRequestId;@JsonKey(name: 'driver_user_id') String get driverUserId; RideFare get fare; String get status;@JsonKey(name: 'created_at') DateTime get createdAt;@JsonKey(name: 'updated_at') DateTime get updatedAt;@JsonKey(name: 'expires_at') DateTime get expiresAt;@JsonKey(name: 'decided_at') DateTime? get decidedAt;@JsonKey(name: 'pickup_distance_meters') int get pickupDistanceMeters;@JsonKey(name: 'matches_proposed_fare') bool get matchesProposedFare; bool get selectable; DriverSummary? get driver; VehicleSummary? get vehicle; ServiceSummary? get service;
+@JsonKey(name: 'ride_request_id') String get rideRequestId;@JsonKey(name: 'driver_user_id') String get driverUserId; RideFare get fare; String get status;@JsonKey(name: 'created_at') DateTime get createdAt;@JsonKey(name: 'updated_at') DateTime get updatedAt;@JsonKey(name: 'expires_at') DateTime get expiresAt;@JsonKey(name: 'decided_at') DateTime? get decidedAt;@JsonKey(name: 'pickup_distance_meters') int? get pickupDistanceMeters;@JsonKey(name: 'matches_proposed_fare') bool get matchesProposedFare; bool get selectable; DriverSummary? get driver; VehicleSummary? get vehicle; ServiceSummary? get service;
 /// Create a copy of RiderOfferComparison
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -1185,7 +1185,7 @@ abstract mixin class $RiderOfferComparisonCopyWith<$Res>  {
   factory $RiderOfferComparisonCopyWith(RiderOfferComparison value, $Res Function(RiderOfferComparison) _then) = _$RiderOfferComparisonCopyWithImpl;
 @useResult
 $Res call({
-@JsonKey(name: 'ride_request_id') String rideRequestId,@JsonKey(name: 'driver_user_id') String driverUserId, RideFare fare, String status,@JsonKey(name: 'created_at') DateTime createdAt,@JsonKey(name: 'updated_at') DateTime updatedAt,@JsonKey(name: 'expires_at') DateTime expiresAt,@JsonKey(name: 'decided_at') DateTime? decidedAt,@JsonKey(name: 'pickup_distance_meters') int pickupDistanceMeters,@JsonKey(name: 'matches_proposed_fare') bool matchesProposedFare, bool selectable, DriverSummary? driver, VehicleSummary? vehicle, ServiceSummary? service
+@JsonKey(name: 'ride_request_id') String rideRequestId,@JsonKey(name: 'driver_user_id') String driverUserId, RideFare fare, String status,@JsonKey(name: 'created_at') DateTime createdAt,@JsonKey(name: 'updated_at') DateTime updatedAt,@JsonKey(name: 'expires_at') DateTime expiresAt,@JsonKey(name: 'decided_at') DateTime? decidedAt,@JsonKey(name: 'pickup_distance_meters') int? pickupDistanceMeters,@JsonKey(name: 'matches_proposed_fare') bool matchesProposedFare, bool selectable, DriverSummary? driver, VehicleSummary? vehicle, ServiceSummary? service
 });
 
 
@@ -1202,7 +1202,7 @@ class _$RiderOfferComparisonCopyWithImpl<$Res>
 
 /// Create a copy of RiderOfferComparison
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? rideRequestId = null,Object? driverUserId = null,Object? fare = null,Object? status = null,Object? createdAt = null,Object? updatedAt = null,Object? expiresAt = null,Object? decidedAt = freezed,Object? pickupDistanceMeters = null,Object? matchesProposedFare = null,Object? selectable = null,Object? driver = freezed,Object? vehicle = freezed,Object? service = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? rideRequestId = null,Object? driverUserId = null,Object? fare = null,Object? status = null,Object? createdAt = null,Object? updatedAt = null,Object? expiresAt = null,Object? decidedAt = freezed,Object? pickupDistanceMeters = freezed,Object? matchesProposedFare = null,Object? selectable = null,Object? driver = freezed,Object? vehicle = freezed,Object? service = freezed,}) {
   return _then(RiderOfferComparison(
 rideRequestId: null == rideRequestId ? _self.rideRequestId : rideRequestId // ignore: cast_nullable_to_non_nullable
 as String,driverUserId: null == driverUserId ? _self.driverUserId : driverUserId // ignore: cast_nullable_to_non_nullable
@@ -1212,8 +1212,8 @@ as String,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: 
 as DateTime,updatedAt: null == updatedAt ? _self.updatedAt : updatedAt // ignore: cast_nullable_to_non_nullable
 as DateTime,expiresAt: null == expiresAt ? _self.expiresAt : expiresAt // ignore: cast_nullable_to_non_nullable
 as DateTime,decidedAt: freezed == decidedAt ? _self.decidedAt : decidedAt // ignore: cast_nullable_to_non_nullable
-as DateTime?,pickupDistanceMeters: null == pickupDistanceMeters ? _self.pickupDistanceMeters : pickupDistanceMeters // ignore: cast_nullable_to_non_nullable
-as int,matchesProposedFare: null == matchesProposedFare ? _self.matchesProposedFare : matchesProposedFare // ignore: cast_nullable_to_non_nullable
+as DateTime?,pickupDistanceMeters: freezed == pickupDistanceMeters ? _self.pickupDistanceMeters : pickupDistanceMeters // ignore: cast_nullable_to_non_nullable
+as int?,matchesProposedFare: null == matchesProposedFare ? _self.matchesProposedFare : matchesProposedFare // ignore: cast_nullable_to_non_nullable
 as bool,selectable: null == selectable ? _self.selectable : selectable // ignore: cast_nullable_to_non_nullable
 as bool,driver: freezed == driver ? _self.driver : driver // ignore: cast_nullable_to_non_nullable
 as DriverSummary?,vehicle: freezed == vehicle ? _self.vehicle : vehicle // ignore: cast_nullable_to_non_nullable
@@ -1226,7 +1226,7 @@ as ServiceSummary?,
 @override
 @pragma('vm:prefer-inline')
 $RideFareCopyWith<$Res> get fare {
-
+  
   return $RideFareCopyWith<$Res>(_self.fare, (value) {
     return _then(_self.copyWith(fare: value));
   });
@@ -1348,7 +1348,7 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'ride_request_id')  String rideRequestId, @JsonKey(name: 'driver_user_id')  String driverUserId,  RideFare fare,  String status, @JsonKey(name: 'created_at')  DateTime createdAt, @JsonKey(name: 'updated_at')  DateTime updatedAt, @JsonKey(name: 'expires_at')  DateTime expiresAt, @JsonKey(name: 'decided_at')  DateTime? decidedAt, @JsonKey(name: 'pickup_distance_meters')  int pickupDistanceMeters, @JsonKey(name: 'matches_proposed_fare')  bool matchesProposedFare,  bool selectable,  DriverSummary? driver,  VehicleSummary? vehicle,  ServiceSummary? service)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'ride_request_id')  String rideRequestId, @JsonKey(name: 'driver_user_id')  String driverUserId,  RideFare fare,  String status, @JsonKey(name: 'created_at')  DateTime createdAt, @JsonKey(name: 'updated_at')  DateTime updatedAt, @JsonKey(name: 'expires_at')  DateTime expiresAt, @JsonKey(name: 'decided_at')  DateTime? decidedAt, @JsonKey(name: 'pickup_distance_meters')  int? pickupDistanceMeters, @JsonKey(name: 'matches_proposed_fare')  bool matchesProposedFare,  bool selectable,  DriverSummary? driver,  VehicleSummary? vehicle,  ServiceSummary? service)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _RiderOfferComparison() when $default != null:
 return $default(_that.rideRequestId,_that.driverUserId,_that.fare,_that.status,_that.createdAt,_that.updatedAt,_that.expiresAt,_that.decidedAt,_that.pickupDistanceMeters,_that.matchesProposedFare,_that.selectable,_that.driver,_that.vehicle,_that.service);case _:
@@ -1369,7 +1369,7 @@ return $default(_that.rideRequestId,_that.driverUserId,_that.fare,_that.status,_
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'ride_request_id')  String rideRequestId, @JsonKey(name: 'driver_user_id')  String driverUserId,  RideFare fare,  String status, @JsonKey(name: 'created_at')  DateTime createdAt, @JsonKey(name: 'updated_at')  DateTime updatedAt, @JsonKey(name: 'expires_at')  DateTime expiresAt, @JsonKey(name: 'decided_at')  DateTime? decidedAt, @JsonKey(name: 'pickup_distance_meters')  int pickupDistanceMeters, @JsonKey(name: 'matches_proposed_fare')  bool matchesProposedFare,  bool selectable,  DriverSummary? driver,  VehicleSummary? vehicle,  ServiceSummary? service)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'ride_request_id')  String rideRequestId, @JsonKey(name: 'driver_user_id')  String driverUserId,  RideFare fare,  String status, @JsonKey(name: 'created_at')  DateTime createdAt, @JsonKey(name: 'updated_at')  DateTime updatedAt, @JsonKey(name: 'expires_at')  DateTime expiresAt, @JsonKey(name: 'decided_at')  DateTime? decidedAt, @JsonKey(name: 'pickup_distance_meters')  int? pickupDistanceMeters, @JsonKey(name: 'matches_proposed_fare')  bool matchesProposedFare,  bool selectable,  DriverSummary? driver,  VehicleSummary? vehicle,  ServiceSummary? service)  $default,) {final _that = this;
 switch (_that) {
 case _RiderOfferComparison():
 return $default(_that.rideRequestId,_that.driverUserId,_that.fare,_that.status,_that.createdAt,_that.updatedAt,_that.expiresAt,_that.decidedAt,_that.pickupDistanceMeters,_that.matchesProposedFare,_that.selectable,_that.driver,_that.vehicle,_that.service);case _:
@@ -1389,7 +1389,7 @@ return $default(_that.rideRequestId,_that.driverUserId,_that.fare,_that.status,_
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'ride_request_id')  String rideRequestId, @JsonKey(name: 'driver_user_id')  String driverUserId,  RideFare fare,  String status, @JsonKey(name: 'created_at')  DateTime createdAt, @JsonKey(name: 'updated_at')  DateTime updatedAt, @JsonKey(name: 'expires_at')  DateTime expiresAt, @JsonKey(name: 'decided_at')  DateTime? decidedAt, @JsonKey(name: 'pickup_distance_meters')  int pickupDistanceMeters, @JsonKey(name: 'matches_proposed_fare')  bool matchesProposedFare,  bool selectable,  DriverSummary? driver,  VehicleSummary? vehicle,  ServiceSummary? service)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'ride_request_id')  String rideRequestId, @JsonKey(name: 'driver_user_id')  String driverUserId,  RideFare fare,  String status, @JsonKey(name: 'created_at')  DateTime createdAt, @JsonKey(name: 'updated_at')  DateTime updatedAt, @JsonKey(name: 'expires_at')  DateTime expiresAt, @JsonKey(name: 'decided_at')  DateTime? decidedAt, @JsonKey(name: 'pickup_distance_meters')  int? pickupDistanceMeters, @JsonKey(name: 'matches_proposed_fare')  bool matchesProposedFare,  bool selectable,  DriverSummary? driver,  VehicleSummary? vehicle,  ServiceSummary? service)?  $default,) {final _that = this;
 switch (_that) {
 case _RiderOfferComparison() when $default != null:
 return $default(_that.rideRequestId,_that.driverUserId,_that.fare,_that.status,_that.createdAt,_that.updatedAt,_that.expiresAt,_that.decidedAt,_that.pickupDistanceMeters,_that.matchesProposedFare,_that.selectable,_that.driver,_that.vehicle,_that.service);case _:
@@ -1404,7 +1404,7 @@ return $default(_that.rideRequestId,_that.driverUserId,_that.fare,_that.status,_
 @JsonSerializable()
 
 class _RiderOfferComparison implements RiderOfferComparison {
-  const _RiderOfferComparison({@JsonKey(name: 'ride_request_id') required this.rideRequestId, @JsonKey(name: 'driver_user_id') required this.driverUserId, required this.fare, required this.status, @JsonKey(name: 'created_at') required this.createdAt, @JsonKey(name: 'updated_at') required this.updatedAt, @JsonKey(name: 'expires_at') required this.expiresAt, @JsonKey(name: 'decided_at') this.decidedAt, @JsonKey(name: 'pickup_distance_meters') required this.pickupDistanceMeters, @JsonKey(name: 'matches_proposed_fare') required this.matchesProposedFare, required this.selectable, this.driver, this.vehicle, this.service});
+  const _RiderOfferComparison({@JsonKey(name: 'ride_request_id') required this.rideRequestId, @JsonKey(name: 'driver_user_id') required this.driverUserId, required this.fare, required this.status, @JsonKey(name: 'created_at') required this.createdAt, @JsonKey(name: 'updated_at') required this.updatedAt, @JsonKey(name: 'expires_at') required this.expiresAt, @JsonKey(name: 'decided_at') this.decidedAt, @JsonKey(name: 'pickup_distance_meters') this.pickupDistanceMeters, @JsonKey(name: 'matches_proposed_fare') required this.matchesProposedFare, required this.selectable, this.driver, this.vehicle, this.service});
   factory _RiderOfferComparison.fromJson(Map<String, dynamic> json) => _$RiderOfferComparisonFromJson(json);
 
 @override@JsonKey(name: 'ride_request_id') final  String rideRequestId;
@@ -1415,7 +1415,7 @@ class _RiderOfferComparison implements RiderOfferComparison {
 @override@JsonKey(name: 'updated_at') final  DateTime updatedAt;
 @override@JsonKey(name: 'expires_at') final  DateTime expiresAt;
 @override@JsonKey(name: 'decided_at') final  DateTime? decidedAt;
-@override@JsonKey(name: 'pickup_distance_meters') final  int pickupDistanceMeters;
+@override@JsonKey(name: 'pickup_distance_meters') final  int? pickupDistanceMeters;
 @override@JsonKey(name: 'matches_proposed_fare') final  bool matchesProposedFare;
 @override final  bool selectable;
 @override final  DriverSummary? driver;
@@ -1457,7 +1457,7 @@ abstract mixin class _$RiderOfferComparisonCopyWith<$Res> implements $RiderOffer
   factory _$RiderOfferComparisonCopyWith(_RiderOfferComparison value, $Res Function(_RiderOfferComparison) _then) = __$RiderOfferComparisonCopyWithImpl;
 @override @useResult
 $Res call({
-@JsonKey(name: 'ride_request_id') String rideRequestId,@JsonKey(name: 'driver_user_id') String driverUserId, RideFare fare, String status,@JsonKey(name: 'created_at') DateTime createdAt,@JsonKey(name: 'updated_at') DateTime updatedAt,@JsonKey(name: 'expires_at') DateTime expiresAt,@JsonKey(name: 'decided_at') DateTime? decidedAt,@JsonKey(name: 'pickup_distance_meters') int pickupDistanceMeters,@JsonKey(name: 'matches_proposed_fare') bool matchesProposedFare, bool selectable, DriverSummary? driver, VehicleSummary? vehicle, ServiceSummary? service
+@JsonKey(name: 'ride_request_id') String rideRequestId,@JsonKey(name: 'driver_user_id') String driverUserId, RideFare fare, String status,@JsonKey(name: 'created_at') DateTime createdAt,@JsonKey(name: 'updated_at') DateTime updatedAt,@JsonKey(name: 'expires_at') DateTime expiresAt,@JsonKey(name: 'decided_at') DateTime? decidedAt,@JsonKey(name: 'pickup_distance_meters') int? pickupDistanceMeters,@JsonKey(name: 'matches_proposed_fare') bool matchesProposedFare, bool selectable, DriverSummary? driver, VehicleSummary? vehicle, ServiceSummary? service
 });
 
 
@@ -1474,7 +1474,7 @@ class __$RiderOfferComparisonCopyWithImpl<$Res>
 
 /// Create a copy of RiderOfferComparison
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? rideRequestId = null,Object? driverUserId = null,Object? fare = null,Object? status = null,Object? createdAt = null,Object? updatedAt = null,Object? expiresAt = null,Object? decidedAt = freezed,Object? pickupDistanceMeters = null,Object? matchesProposedFare = null,Object? selectable = null,Object? driver = freezed,Object? vehicle = freezed,Object? service = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? rideRequestId = null,Object? driverUserId = null,Object? fare = null,Object? status = null,Object? createdAt = null,Object? updatedAt = null,Object? expiresAt = null,Object? decidedAt = freezed,Object? pickupDistanceMeters = freezed,Object? matchesProposedFare = null,Object? selectable = null,Object? driver = freezed,Object? vehicle = freezed,Object? service = freezed,}) {
   return _then(_RiderOfferComparison(
 rideRequestId: null == rideRequestId ? _self.rideRequestId : rideRequestId // ignore: cast_nullable_to_non_nullable
 as String,driverUserId: null == driverUserId ? _self.driverUserId : driverUserId // ignore: cast_nullable_to_non_nullable
@@ -1484,8 +1484,8 @@ as String,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: 
 as DateTime,updatedAt: null == updatedAt ? _self.updatedAt : updatedAt // ignore: cast_nullable_to_non_nullable
 as DateTime,expiresAt: null == expiresAt ? _self.expiresAt : expiresAt // ignore: cast_nullable_to_non_nullable
 as DateTime,decidedAt: freezed == decidedAt ? _self.decidedAt : decidedAt // ignore: cast_nullable_to_non_nullable
-as DateTime?,pickupDistanceMeters: null == pickupDistanceMeters ? _self.pickupDistanceMeters : pickupDistanceMeters // ignore: cast_nullable_to_non_nullable
-as int,matchesProposedFare: null == matchesProposedFare ? _self.matchesProposedFare : matchesProposedFare // ignore: cast_nullable_to_non_nullable
+as DateTime?,pickupDistanceMeters: freezed == pickupDistanceMeters ? _self.pickupDistanceMeters : pickupDistanceMeters // ignore: cast_nullable_to_non_nullable
+as int?,matchesProposedFare: null == matchesProposedFare ? _self.matchesProposedFare : matchesProposedFare // ignore: cast_nullable_to_non_nullable
 as bool,selectable: null == selectable ? _self.selectable : selectable // ignore: cast_nullable_to_non_nullable
 as bool,driver: freezed == driver ? _self.driver : driver // ignore: cast_nullable_to_non_nullable
 as DriverSummary?,vehicle: freezed == vehicle ? _self.vehicle : vehicle // ignore: cast_nullable_to_non_nullable
@@ -1499,7 +1499,7 @@ as ServiceSummary?,
 @override
 @pragma('vm:prefer-inline')
 $RideFareCopyWith<$Res> get fare {
-
+  
   return $RideFareCopyWith<$Res>(_self.fare, (value) {
     return _then(_self.copyWith(fare: value));
   });

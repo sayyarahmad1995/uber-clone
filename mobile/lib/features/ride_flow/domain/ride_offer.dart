@@ -67,7 +67,7 @@ abstract class RiderOfferComparison with _$RiderOfferComparison {
     @JsonKey(name: 'updated_at') required DateTime updatedAt,
     @JsonKey(name: 'expires_at') required DateTime expiresAt,
     @JsonKey(name: 'decided_at') DateTime? decidedAt,
-    @JsonKey(name: 'pickup_distance_meters') required int pickupDistanceMeters,
+    @JsonKey(name: 'pickup_distance_meters') int? pickupDistanceMeters,
     @JsonKey(name: 'matches_proposed_fare') required bool matchesProposedFare,
     required bool selectable,
     DriverSummary? driver,

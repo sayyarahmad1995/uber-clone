@@ -14,7 +14,7 @@ abstract class RiderRideSnapshot with _$RiderRideSnapshot {
     required String id,
     required RideLocation pickup,
     required RideLocation destination,
-    @JsonKey(name: 'proposed_fare') required RideFare proposedFare,
+    @JsonKey(name: 'proposed_fare') RideFare? proposedFare,
     required String status,
     @JsonKey(name: 'created_at') required DateTime createdAt,
     @JsonKey(name: 'expires_at') required DateTime expiresAt,
