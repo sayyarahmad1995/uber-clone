@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:uber_clone/core/network/api_exception.dart';
 import 'package:uber_clone/features/ride_flow/ride_flow_repository.dart';
 import 'package:uber_clone/features/ride_flow/domain/marketplace_request.dart';
@@ -11,6 +13,7 @@ import 'package:uber_clone/core/session/session_store.dart';
 import 'package:uber_clone/features/authentication/data/auth_repository.dart';
 import 'package:uber_clone/features/driver_workspace/data/driver_onboarding_repository.dart';
 import 'package:uber_clone/features/driver_workspace/data/driver_repository.dart';
+import 'package:uber_clone/features/driver_workspace/application/driver_presence_service.dart';
 import 'package:uber_clone/features/driver_workspace/domain/driver_onboarding.dart';
 import 'package:uber_clone/features/driver_workspace/domain/driver_profile.dart';
 import 'package:uber_clone/features/rider_request/data/device_location.dart';
@@ -25,9 +28,10 @@ const bothCapabilities = Account(
 );
 
 class FakeAuthRepository implements AuthRepository {
-  FakeAuthRepository({this.account, this.loginError});
+  FakeAuthRepository({this.account, this.loginError, this.logoutError});
   final Account? account;
   final Object? loginError;
+  final Object? logoutError;
   @override
   Future<Account?> restore() async => account;
   @override
@@ -44,7 +48,10 @@ class FakeAuthRepository implements AuthRepository {
   @override
   Future<void> completeVerification(String verificationId, String code) async {}
   @override
-  Future<void> logout() async {}
+  Future<void> logout() async {
+    if (logoutError != null) throw logoutError!;
+  }
+
   @override
   Future<Account> enableDriver() async => bothCapabilities;
 }
@@ -162,14 +169,24 @@ class FakeDriverRepository implements DriverRepository {
       operation = OperatingState(vehicleId: vehicleId, valid: true);
   DriverProfile? profile;
   final calls = <String>[];
+  Object? getFailure;
+  int getCalls = 0;
   bool failPublish = false;
   bool failAvailability = false;
+  bool failOffline = false;
   @override
-  Future<DriverProfile?> get() async => profile;
+  Future<DriverProfile?> get() async {
+    getCalls++;
+    if (getFailure != null) throw getFailure!;
+    return profile;
+  }
+
   @override
   Future<DriverProfile> setOnline(bool online) async {
     calls.add('online=$online');
-    if (failAvailability) throw Exception('Availability failed');
+    if (failAvailability || (!online && failOffline)) {
+      throw Exception('Availability failed');
+    }
     return profile = profile!.copyWith(isOnline: online);
   }
 
@@ -182,6 +199,32 @@ class FakeDriverRepository implements DriverRepository {
       longitude: point.longitude,
       updatedAt: DateTime.utc(2026, 9, 5),
     );
+  }
+}
+
+class FakeDriverPresenceService implements DriverPresenceService {
+  FakeDriverPresenceService({List<String>? events}) : events = events ?? [];
+  final List<String> events;
+  String? runningFor;
+  bool failStart = false;
+  bool failStop = false;
+
+  @override
+  Future<bool> isRunningFor(String driverUserId) async =>
+      runningFor == driverUserId;
+
+  @override
+  Future<void> start(String driverUserId) async {
+    events.add('service.start:$driverUserId');
+    if (failStart) throw StateError('service unavailable');
+    runningFor = driverUserId;
+  }
+
+  @override
+  Future<void> stop() async {
+    events.add('service.stop');
+    if (failStop) throw StateError('service stop failed');
+    runningFor = null;
   }
 }
 
@@ -238,10 +281,27 @@ class FakeDriverOnboardingRepository implements DriverOnboardingRepository {
 }
 
 class FakeRideFlowRepository implements RideFlowRepository {
+  FakeRideFlowRepository({
+    this.currentTrip,
+    this.currentTripFailure,
+    this.currentTripCompleter,
+  });
+
+  TripSnapshot? currentTrip;
+  Object? currentTripFailure;
+  Completer<TripSnapshot?>? currentTripCompleter;
+  int currentTripCalls = 0;
+
   @override
   Future<List<MarketplaceRequest>> listMarketplaceRequests() async => const [];
   @override
-  Future<TripSnapshot?> getCurrentDriverTrip() async => null;
+  Future<TripSnapshot?> getCurrentDriverTrip() async {
+    currentTripCalls++;
+    if (currentTripFailure != null) throw currentTripFailure!;
+    if (currentTripCompleter != null) return currentTripCompleter!.future;
+    return currentTrip;
+  }
+
   @override
   Future<List<DriverTripHistoryItem>> listDriverTrips() async => const [];
   @override

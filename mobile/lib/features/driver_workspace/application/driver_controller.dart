@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../rider_request/data/device_location.dart';
+import 'driver_presence_service.dart';
 import '../data/driver_repository.dart';
 import '../domain/driver_profile.dart';
 import '../domain/operating_state.dart';
@@ -10,17 +11,19 @@ import '../domain/registered_vehicle.dart';
 
 /// Serializes explicit Driver operations; availability is always server-confirmed.
 class DriverController extends ChangeNotifier {
-  DriverController(this._repository, this._location) {
+  DriverController(this._repository, this._location, this._presence) {
     load();
   }
 
   final DriverRepository _repository;
   final DeviceLocation _location;
+  final DriverPresenceService _presence;
   DriverProfile? profile;
   OperatingState? operation;
   List<RegisteredVehicle> vehicles = [];
   PublishedDriverLocation? location;
   bool hasActiveTrip = false;
+  bool onlinePresenceReady = false;
 
   void setActiveTrip(bool active) {
     if (hasActiveTrip == active) return;
@@ -34,7 +37,6 @@ class DriverController extends ChangeNotifier {
   String? error;
   bool _disposed = false;
   bool _foreground = true;
-  bool _firstLoad = true;
   bool _entryPublishInFlight = false;
   Timer? _heartbeat;
 
@@ -42,7 +44,6 @@ class DriverController extends ChangeNotifier {
     _foreground = foreground;
     if (!foreground) {
       _heartbeat?.cancel();
-      if (profile?.isOnline == true) unawaited(setOnline(false));
     } else {
       unawaited(load());
     }
@@ -52,7 +53,8 @@ class DriverController extends ChangeNotifier {
     _heartbeat?.cancel();
     if (_disposed ||
         !_foreground ||
-        (profile?.isOnline != true && !hasActiveTrip)) {
+        !hasActiveTrip ||
+        profile?.isOnline == true) {
       return;
     }
     _heartbeat = Timer(const Duration(seconds: 20), () {
@@ -81,9 +83,6 @@ class DriverController extends ChangeNotifier {
     notifyListeners();
     try {
       await action();
-      if ((!_foreground || _disposed) && profile?.isOnline == true) {
-        profile = await _repository.setOnline(false);
-      }
     } catch (failure) {
       if (reportError) {
         error = '$failure';
@@ -98,22 +97,26 @@ class DriverController extends ChangeNotifier {
   Future<void> load() async {
     await _run(() async {
       profile = await _repository.get();
-      // A new controller/session never silently resumes online availability.
-      if (_firstLoad && profile?.isOnline == true) {
-        profile = await _repository.setOnline(false);
-      }
-      _firstLoad = false;
       operation = null;
       vehicles = [];
       if (profile != null) {
         vehicles = await _repository.listVehicles();
         operation = await _repository.operatingState();
+        loaded = true;
+        if (_foreground && profile!.isOnline) {
+          await _ensurePresence(profile!.userId);
+        } else if (!profile!.isOnline &&
+            await _presence.isRunningFor(profile!.userId)) {
+          await _presence.stop();
+        }
+        if (!profile!.isOnline) onlinePresenceReady = false;
       }
       loaded = true;
     });
     if (!_disposed &&
         _foreground &&
         profile != null &&
+        profile?.isOnline != true &&
         operation?.valid == true &&
         location == null) {
       unawaited(_publishForDriverModeEntry());
@@ -164,21 +167,55 @@ class DriverController extends ChangeNotifier {
         'Select an approved vehicle with an available service first.',
       );
     }
+    if (online && profile!.isOnline) {
+      await _ensurePresence(profile!.userId);
+      return;
+    }
     if (online) await _publish();
     if (_disposed || (online && !_foreground)) return;
     profile = await _repository.setOnline(online);
+    if (online) {
+      await _ensurePresence(profile!.userId);
+    } else {
+      onlinePresenceReady = false;
+      await _presence.stop();
+    }
     operation = await _repository.operatingState();
   });
+
+  Future<void> _ensurePresence(String driverUserId) async {
+    if (await _presence.isRunningFor(driverUserId)) {
+      onlinePresenceReady = true;
+      return;
+    }
+    try {
+      await _presence.start(driverUserId);
+      onlinePresenceReady = true;
+    } catch (failure) {
+      onlinePresenceReady = false;
+      Object? rollbackFailure;
+      try {
+        profile = await _repository.setOnline(false);
+      } catch (error) {
+        rollbackFailure = error;
+      } finally {
+        try {
+          await _presence.stop();
+        } catch (_) {
+          // Task checks server state before any location request.
+        }
+      }
+      throw StateError(
+        'Driver presence unavailable: $failure'
+        '${rollbackFailure == null ? '' : '; server rollback failed: $rollbackFailure'}',
+      );
+    }
+  }
 
   @override
   void dispose() {
     _disposed = true;
     _heartbeat?.cancel();
-    if (profile?.isOnline == true) {
-      unawaited(
-        _repository.setOnline(false).then<void>((_) {}, onError: (Object _) {}),
-      );
-    }
     super.dispose();
   }
 }

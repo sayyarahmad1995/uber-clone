@@ -126,6 +126,9 @@ void main() {
             FakeRideFlowRepository(),
           ),
           driverRepositoryProvider.overrideWithValue(repo),
+          driverPresenceServiceProvider.overrideWithValue(
+            FakeDriverPresenceService(),
+          ),
           driverOnboardingRepositoryProvider.overrideWithValue(
             FakeDriverOnboardingRepository(),
           ),
@@ -151,6 +154,7 @@ void main() {
     tester,
   ) async {
     final repo = FakeDriverRepository(profile: driverProfile);
+    final presence = FakeDriverPresenceService();
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -158,6 +162,7 @@ void main() {
             FakeRideFlowRepository(),
           ),
           driverRepositoryProvider.overrideWithValue(repo),
+          driverPresenceServiceProvider.overrideWithValue(presence),
           driverOnboardingRepositoryProvider.overrideWithValue(
             FakeDriverOnboardingRepository(),
           ),
@@ -185,5 +190,55 @@ void main() {
     expect(repo.calls, ['location', 'location', 'online=true']);
     expect(repo.profile!.isOnline, isTrue);
     expect(find.text('Go offline'), findsOneWidget);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+    expect(repo.calls, isNot(contains('online=false')));
+    expect(presence.runningFor, 'user-1');
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    expect(repo.profile!.isOnline, isTrue);
+  });
+
+  testWidgets('failed rollback never labels presence as online', (
+    tester,
+  ) async {
+    final repo = FakeDriverRepository(profile: driverProfile)
+      ..failOffline = true;
+    final presence = FakeDriverPresenceService()..failStart = true;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          rideFlowRepositoryProvider.overrideWithValue(
+            FakeRideFlowRepository(),
+          ),
+          driverRepositoryProvider.overrideWithValue(repo),
+          driverPresenceServiceProvider.overrideWithValue(presence),
+          driverOnboardingRepositoryProvider.overrideWithValue(
+            FakeDriverOnboardingRepository(),
+          ),
+          deviceLocationProvider.overrideWithValue(const FakeDeviceLocation()),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(body: DriverWorkspaceScreen(accountID: 'user-1')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byKey(const Key('dashboardPanelDragHandle')),
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.text('Vehicle/service applications'),
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Go online'));
+    await tester.tap(find.text('Go online'));
+    await tester.pumpAndSettle();
+    expect(repo.profile!.isOnline, isTrue);
+    expect(find.text('You are online'), findsNothing);
+    expect(find.textContaining('Online presence unavailable'), findsWidgets);
   });
 }

@@ -1,0 +1,32 @@
+# Driver background presence (Android) — design
+
+## Intent and boundary
+
+An approved Driver who explicitly goes online must remain available when the shared Flutter app is minimized, the screen locks, or the Driver screen is disposed. A fresh server-side location lease, not UI lifecycle, determines availability. Keep PostgreSQL authoritative, existing two-minute freshness and ten-second cleanup, foreground marketplace polling, and independent trip lifecycle. This milestone supports Android; no iOS project exists here.
+
+## Existing state and root cause
+
+`DriverController` currently issues availability-offline requests on background/hidden, first load of an online profile, completion of operations after background/disposal, and controller disposal. Its 20-second Dart timer only runs in foreground. The controller is `autoDispose` and tied to the Driver UI, so screen navigation can terminate an online session. The backend already expires stale online presence and checks fresh location before marketplace discovery; expiry does not change a trip.
+
+## Components and ownership
+
+- `DriverController` owns user-driven Go online/offline, operating-selection validation, current UI state, foreground trip tracking, and reconciliation. `dispose()` cancels local work only. Lifecycle pause/hidden/detached cancels UI-only polling; resume reloads profile and selection; neither lifecycle nor first load invokes offline.
+- An app/session-scoped `DriverPresenceService` abstraction starts, stops, reports running status, and reconciles with the server profile. It is not owned by the auto-disposed Driver controller. Starting twice for the same session is idempotent. A different or signed-out session cannot inherit a previous Driver's publisher.
+- Android implementation uses a pinned, compatible `flutter_foreground_task` version: one notification-backed `location` foreground service, started while the activity is visible after server-confirmed online. Its independent task repeatedly obtains a fresh geolocator position, even when stationary, and calls the existing semantic `ApiDriverRepository.publishLocation`. It does not poll offers or touch trip state. No automatic boot restart or background launch.
+- The service callback creates its own `SecureSessionStore` backed by the existing `FlutterSecureStorage`, plus `ApiDriverRepository` and configured Dio in its Flutter engine; it calls `readValidToken()` on each write through the repository. It does **not** pass a bearer token through service arguments, store a second credential, or duplicate auth expiry logic. Verify that plugin registration permits secure-storage and geolocator calls in the service engine with a focused adapter test and an Android build/device check. If registration fails, stop and resolve the adapter; do not silently fall back to a UI timer.
+- Existing Android fine/coarse location permissions remain. Declare `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_LOCATION`, and `POST_NOTIFICATIONS` as needed, plus a non-exported service with `android:foregroundServiceType="location"`. Seek notification permission as required to meet the visible-notification acceptance check. Do not add `ACCESS_BACKGROUND_LOCATION` merely to start a foreground-created service.
+
+## State transitions and failures
+
+1. Go online: validate approved selected vehicle; obtain location permission and fresh position; publish location; request online; on server confirmation, start service exactly once while app is foregrounded. If start fails, request offline, stop any partial service, reload server truth, and surface a controlled error. If rollback fails, never advertise durable online locally; retry/reconcile and let lease expiry clear server eligibility.
+2. Background/lock/navigate away: service remains sole publisher for online marketplace presence, including foreground periods. Controller may retain its separate active-trip location requirement when offline; avoid duplicate online heartbeat writers. Foreground UI can reload profile/selection, but cannot send overlapping presence writes.
+3. Resume/reopen: fetch profile/selection. If server online, ensure the service is running while visible; if service cannot be started, use the same safe rollback. If server offline, stop stale service. This handles process recreation without treating it as an explicit offline command.
+4. Go offline: request server offline first, then stop service, and refresh profile. If server request fails, preserve server truth and the service until reconciliation; if stop fails after server confirms offline, retry stopping, report the error, and do not report online. The service itself stops on missing/invalid session or server rejection; transient network/location errors do not counterfeit freshness.
+5. Logout/account switch: stop the service before or as credentials are cleared. A task checks the session on each publish and must not renew a previous account's presence with a new account's token. Server expiry remains the fallback if a clean shutdown is unavailable.
+6. Process/service force-stop: no guaranteed final API call. Once updates stop, marketplace freshness excludes the Driver and existing cleanup marks online false. Active assigned trips are not cancelled by presence expiry.
+
+## Acceptance matrix and test sequence
+
+Start with failing Flutter tests for background/hidden/disposal, first load, resume, offline/online ordering, start failure/rollback, idempotence, account switching, and one online publisher. Add a focused test of the callback's repository/session adapter, expired-token behavior, and static Android manifest guards. Then implement minimally. Strengthen PostgreSQL-backed tests for fresh renewals, stale expiry/marketplace exclusion, and active-trip independence without changing backend production behavior unless a failing test proves necessary.
+
+Validate formatting, Go vet and serial full tests; Flutter generation/drift, analyze, focused and full tests; Android debug/profile builds; encoding/architecture guards; then Readiness CI on the exact pushed HEAD. Physical Android acceptance separately checks minimize and locked-screen periods longer than one heartbeat, persistent notification, server freshness, resume, explicit offline, and lease expiry after process/service termination. An OS force-stop or denied location/notification capability may stop updates; no immediate-offline guarantee. iOS remains unsupported and unverified in this milestone.

@@ -53,8 +53,14 @@ class CapabilityHomeScreen extends ConsumerWidget {
     Future<void> selectCapability(Capability next) async {
       Navigator.of(context).pop();
       if (next == capability) return;
-      await controller.selectCapability(next);
-      if (context.mounted) context.go('/${next.name}');
+      final result = await controller.selectCapability(next);
+      if (!context.mounted) return;
+      if (result.selected) {
+        context.go('/${next.name}');
+      } else if (result.message != null) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(result.message!)));
+      }
     }
 
     Future<void> enableDriver() async {
@@ -62,8 +68,14 @@ class CapabilityHomeScreen extends ConsumerWidget {
       final enabled = await controller.enableDriver();
       if (!context.mounted) return;
       if (enabled) {
-        await controller.selectCapability(Capability.driver);
-        if (context.mounted) context.go('/driver');
+        final result = await controller.selectCapability(Capability.driver);
+        if (!context.mounted) return;
+        if (result.selected) {
+          context.go('/driver');
+        } else if (result.message != null) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(result.message!)));
+        }
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(

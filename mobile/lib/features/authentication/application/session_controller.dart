@@ -3,9 +3,32 @@ import 'package:flutter/foundation.dart';
 import '../../../core/models/account.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/session/session_store.dart';
+import '../../driver_workspace/application/driver_presence_service.dart';
+import '../../driver_workspace/data/driver_repository.dart';
+import '../../ride_flow/ride_flow_repository.dart';
 import '../data/auth_repository.dart';
 
 enum SessionStatus { bootstrapping, signedOut, signedIn }
+
+enum CapabilitySelectionOutcome {
+  selected,
+  unavailable,
+  busy,
+  activeTrip,
+  driverOnline,
+  verificationFailed,
+  cleanupFailed,
+}
+
+@immutable
+class CapabilitySelectionResult {
+  const CapabilitySelectionResult(this.outcome, [this.message]);
+
+  final CapabilitySelectionOutcome outcome;
+  final String? message;
+
+  bool get selected => outcome == CapabilitySelectionOutcome.selected;
+}
 
 @immutable
 class SessionState {
@@ -47,11 +70,20 @@ class SessionState {
 }
 
 class SessionController extends ChangeNotifier {
-  SessionController(this._auth, this._capabilities) {
+  SessionController(
+    this._auth,
+    this._capabilities,
+    this._presence,
+    this._drivers,
+    this._rides,
+  ) {
     restore();
   }
   final AuthRepository _auth;
   final CapabilityStore _capabilities;
+  final DriverPresenceService _presence;
+  final DriverRepository _drivers;
+  final RideFlowRepository _rides;
   SessionState _state = const SessionState.bootstrapping();
   SessionState get state => _state;
 
@@ -59,6 +91,11 @@ class SessionController extends ChangeNotifier {
     try {
       final account = await _auth.restore();
       if (account == null) {
+        try {
+          await _presence.stop();
+        } catch (_) {
+          // The absent session prevents a stale task from publishing.
+        }
         _set(const SessionState(status: SessionStatus.signedOut));
         return;
       }
@@ -74,6 +111,11 @@ class SessionController extends ChangeNotifier {
         ),
       );
     } catch (_) {
+      try {
+        await _presence.stop();
+      } catch (_) {
+        // Server lease expiry remains authoritative on process/service loss.
+      }
       _set(
         const SessionState(
           status: SessionStatus.signedOut,
@@ -86,6 +128,7 @@ class SessionController extends ChangeNotifier {
   Future<bool> login(String identifier, String password) async {
     _set(_state.copyWith(busy: true, clearError: true));
     try {
+      await _presence.stop();
       final account = await _auth.login(identifier, password);
       await _capabilities.save(Capability.rider);
       _set(SessionState(status: SessionStatus.signedIn, account: account));
@@ -141,10 +184,83 @@ class SessionController extends ChangeNotifier {
     }
   }
 
-  Future<void> selectCapability(Capability capability) async {
-    if (!(_state.account?.capabilities.contains(capability) ?? false)) return;
-    await _capabilities.save(capability);
-    _set(_state.copyWith(capability: capability, clearError: true));
+  Future<CapabilitySelectionResult> selectCapability(
+    Capability capability,
+  ) async {
+    if (_state.busy) {
+      return const CapabilitySelectionResult(
+        CapabilitySelectionOutcome.busy,
+        'A mode switch is already in progress.',
+      );
+    }
+    if (!(_state.account?.capabilities.contains(capability) ?? false)) {
+      return const CapabilitySelectionResult(
+        CapabilitySelectionOutcome.unavailable,
+        'That mode is not available for this account.',
+      );
+    }
+    if (_state.capability == capability) {
+      return const CapabilitySelectionResult(
+        CapabilitySelectionOutcome.selected,
+      );
+    }
+
+    _set(_state.copyWith(busy: true, clearError: true));
+    try {
+      if (_state.capability == Capability.driver &&
+          capability == Capability.rider) {
+        try {
+          if (await _rides.getCurrentDriverTrip() != null) {
+            return const CapabilitySelectionResult(
+              CapabilitySelectionOutcome.activeTrip,
+              'Finish or cancel your active trip before switching to Rider mode.',
+            );
+          }
+        } catch (_) {
+          return const CapabilitySelectionResult(
+            CapabilitySelectionOutcome.verificationFailed,
+            'Unable to verify Driver status. Check your connection and try again.',
+          );
+        }
+
+        try {
+          final profile = await _drivers.get();
+          if (profile?.isOnline == true) {
+            return const CapabilitySelectionResult(
+              CapabilitySelectionOutcome.driverOnline,
+              'Go offline before switching to Rider mode.',
+            );
+          }
+        } catch (_) {
+          return const CapabilitySelectionResult(
+            CapabilitySelectionOutcome.verificationFailed,
+            'Unable to verify Driver availability. Check your connection and try again.',
+          );
+        }
+
+        try {
+          await _presence.stop();
+        } catch (_) {
+          return const CapabilitySelectionResult(
+            CapabilitySelectionOutcome.cleanupFailed,
+            'Unable to stop Driver presence. Try again.',
+          );
+        }
+      }
+
+      await _capabilities.save(capability);
+      _set(_state.copyWith(capability: capability, busy: false));
+      return const CapabilitySelectionResult(
+        CapabilitySelectionOutcome.selected,
+      );
+    } catch (_) {
+      return const CapabilitySelectionResult(
+        CapabilitySelectionOutcome.verificationFailed,
+        'Unable to switch modes. Check your connection and try again.',
+      );
+    } finally {
+      if (_state.busy) _set(_state.copyWith(busy: false));
+    }
   }
 
   Future<bool> enableDriver() async {
@@ -163,9 +279,16 @@ class SessionController extends ChangeNotifier {
   Future<void> logout() async {
     _set(_state.copyWith(busy: true, clearError: true));
     try {
-      await _auth.logout();
-    } catch (_) {
-      // Local sign-out remains authoritative when the remote session is gone.
+      try {
+        await _presence.stop();
+      } catch (_) {
+        // Token invalidation below makes a lingering task harmless.
+      }
+      try {
+        await _auth.logout();
+      } catch (_) {
+        // Local sign-out remains authoritative when the remote session is gone.
+      }
     } finally {
       await _capabilities.clear();
       _set(const SessionState(status: SessionStatus.signedOut));

@@ -19,6 +19,8 @@ import '../features/authentication/presentation/verification_screen.dart';
 import '../features/capabilities/presentation/capability_home_screen.dart';
 import '../features/capabilities/presentation/splash_screen.dart';
 import '../features/driver_workspace/application/driver_controller.dart';
+import '../features/driver_workspace/application/driver_presence_service.dart';
+import '../features/driver_workspace/data/android_driver_presence_service.dart';
 import '../features/driver_workspace/application/driver_onboarding_controller.dart';
 import '../features/driver_workspace/data/driver_onboarding_repository.dart';
 import '../features/driver_workspace/data/driver_repository.dart';
@@ -121,6 +123,9 @@ final driverRepositoryProvider = Provider<DriverRepository>(
     ref.watch(sessionStoreProvider),
   ),
 );
+final driverPresenceServiceProvider = Provider<DriverPresenceService>(
+  (ref) => AndroidDriverPresenceService(),
+);
 final approvedDriverProfileProvider =
     FutureProvider.autoDispose<DriverProfile?>((ref) {
       final account = ref.watch(
@@ -166,6 +171,7 @@ final driverControllerProvider =
       return DriverController(
         ref.watch(driverRepositoryProvider),
         ref.watch(deviceLocationProvider),
+        ref.watch(driverPresenceServiceProvider),
       );
     });
 final driverOnboardingControllerProvider =
@@ -178,6 +184,9 @@ final sessionControllerProvider = ChangeNotifierProvider<SessionController>(
   (ref) => SessionController(
     ref.watch(authRepositoryProvider),
     ref.watch(capabilityStoreProvider),
+    ref.watch(driverPresenceServiceProvider),
+    ref.watch(driverRepositoryProvider),
+    ref.watch(rideFlowRepositoryProvider),
   ),
 );
 
@@ -232,6 +241,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       if ((location == '/driver' || location.startsWith('/driver/')) &&
           !hasDriver) {
         return '/rider';
+      }
+      if (location == '/rider' &&
+          session.state.capability == Capability.driver) {
+        return '/driver';
       }
       if (location == '/driver/details' || location == '/driver/vehicles') {
         try {
