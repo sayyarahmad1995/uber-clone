@@ -90,9 +90,11 @@ read-only approved-information surfaces; approved-information revision editing
 remains deferred. Its controls reuse the shared panel contract. Marketplace
 discovery, typed offers, Rider selection, Trip execution, settlement display, and
 split Rider/Driver ride-flow controllers are implemented with exact-fare response,
-counteroffer, Rider selection, Trip transitions, cancellation, and cash confirmation
-commands. Backend Driver `skip`
-and Rider offer `reject` remain supported API operations, while dedicated skip/reject mobile controls are intentionally deferred.
-Rider selection remains
-the assignment boundary and preserves Rider-selected assignment ownership. See
+counteroffer, Driver decline of an open marketplace opportunity, Rider rejection
+of an individual pending Driver offer, Rider selection, Trip transitions,
+cancellation, and cash confirmation commands. Both decline actions use semantic
+ride-flow repository operations: Driver decline affects only the open opportunity,
+while Rider decline affects only the selected offer and leaves the Ride Request and
+other offers intact. Rider selection remains the only assignment boundary and
+preserves Rider-selected assignment ownership. See
 [Driver readiness](flutter-driver-readiness.md).

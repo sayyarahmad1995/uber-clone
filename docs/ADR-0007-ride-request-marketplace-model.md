@@ -37,11 +37,11 @@ The Rider sees actionable Driver offers and explicitly selects one. Rider select
 
 An offer equal to the Rider proposed fare should be presented as accepting the Rider's price (for example, a `Your fare` label). This is presentation derived from the offer amount matching the Ride Request proposed fare; it is not a separate booking mode or assignment path.
 
-The backend retains explicit Driver skip and Rider offer rejection operations.
-The current mobile MVP is not required to expose dedicated controls for those
-operations; omission of a mobile button is not a different assignment model.
-If either control is added later, it must use semantic repository operations and
-must not change Rider-selected assignment ownership.
+The mobile MVP exposes the backend's explicit Driver skip and Rider offer rejection
+operations through semantic ride-flow repository commands. A Driver may decline an
+open marketplace opportunity before submitting an offer. A Rider may reject one
+pending Driver offer without closing the Ride Request or affecting other offers.
+Neither action assigns a Trip; Rider selection remains the only assignment boundary.
 
 Conceptually:
 
@@ -183,8 +183,8 @@ See [the rollout guide](candidate-retirement-rollout.md).
 
 This model keeps the Rider experience simple while preserving Rider choice over fare, proximity, and vehicle. It also makes exact-fare acceptance and counteroffers one coherent Driver-offer concept instead of separate assignment strategies.
 
-Rider creation, Driver responses, and Rider selection follow this decision. The
-remaining geographic discovery and Rider offer presentation work should build
-on this marketplace without restoring an automatic-candidate abstraction.
+Rider creation, geographic discovery, Driver responses, Rider offer presentation,
+and Rider selection follow this decision without restoring an automatic-candidate
+abstraction.
 
 Migration 017 adds nullable Driver display name and vehicle model year for legacy compatibility. New/re-onboarding requires both; missing presentation data does not disable legacy Drivers. Unknown model years are returned as null. See [Driver public presentation](driver-public-presentation.md).
