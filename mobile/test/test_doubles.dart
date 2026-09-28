@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:uber_clone/core/network/api_exception.dart';
 import 'package:uber_clone/features/ride_flow/ride_flow_repository.dart';
 import 'package:uber_clone/features/ride_flow/domain/marketplace_request.dart';
@@ -167,11 +169,18 @@ class FakeDriverRepository implements DriverRepository {
       operation = OperatingState(vehicleId: vehicleId, valid: true);
   DriverProfile? profile;
   final calls = <String>[];
+  Object? getFailure;
+  int getCalls = 0;
   bool failPublish = false;
   bool failAvailability = false;
   bool failOffline = false;
   @override
-  Future<DriverProfile?> get() async => profile;
+  Future<DriverProfile?> get() async {
+    getCalls++;
+    if (getFailure != null) throw getFailure!;
+    return profile;
+  }
+
   @override
   Future<DriverProfile> setOnline(bool online) async {
     calls.add('online=$online');
@@ -272,10 +281,27 @@ class FakeDriverOnboardingRepository implements DriverOnboardingRepository {
 }
 
 class FakeRideFlowRepository implements RideFlowRepository {
+  FakeRideFlowRepository({
+    this.currentTrip,
+    this.currentTripFailure,
+    this.currentTripCompleter,
+  });
+
+  TripSnapshot? currentTrip;
+  Object? currentTripFailure;
+  Completer<TripSnapshot?>? currentTripCompleter;
+  int currentTripCalls = 0;
+
   @override
   Future<List<MarketplaceRequest>> listMarketplaceRequests() async => const [];
   @override
-  Future<TripSnapshot?> getCurrentDriverTrip() async => null;
+  Future<TripSnapshot?> getCurrentDriverTrip() async {
+    currentTripCalls++;
+    if (currentTripFailure != null) throw currentTripFailure!;
+    if (currentTripCompleter != null) return currentTripCompleter!.future;
+    return currentTrip;
+  }
+
   @override
   Future<List<DriverTripHistoryItem>> listDriverTrips() async => const [];
   @override

@@ -4,9 +4,31 @@ import '../../../core/models/account.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/session/session_store.dart';
 import '../../driver_workspace/application/driver_presence_service.dart';
+import '../../driver_workspace/data/driver_repository.dart';
+import '../../ride_flow/ride_flow_repository.dart';
 import '../data/auth_repository.dart';
 
 enum SessionStatus { bootstrapping, signedOut, signedIn }
+
+enum CapabilitySelectionOutcome {
+  selected,
+  unavailable,
+  busy,
+  activeTrip,
+  driverOnline,
+  verificationFailed,
+  cleanupFailed,
+}
+
+@immutable
+class CapabilitySelectionResult {
+  const CapabilitySelectionResult(this.outcome, [this.message]);
+
+  final CapabilitySelectionOutcome outcome;
+  final String? message;
+
+  bool get selected => outcome == CapabilitySelectionOutcome.selected;
+}
 
 @immutable
 class SessionState {
@@ -48,12 +70,20 @@ class SessionState {
 }
 
 class SessionController extends ChangeNotifier {
-  SessionController(this._auth, this._capabilities, this._presence) {
+  SessionController(
+    this._auth,
+    this._capabilities,
+    this._presence,
+    this._drivers,
+    this._rides,
+  ) {
     restore();
   }
   final AuthRepository _auth;
   final CapabilityStore _capabilities;
   final DriverPresenceService _presence;
+  final DriverRepository _drivers;
+  final RideFlowRepository _rides;
   SessionState _state = const SessionState.bootstrapping();
   SessionState get state => _state;
 
@@ -154,10 +184,83 @@ class SessionController extends ChangeNotifier {
     }
   }
 
-  Future<void> selectCapability(Capability capability) async {
-    if (!(_state.account?.capabilities.contains(capability) ?? false)) return;
-    await _capabilities.save(capability);
-    _set(_state.copyWith(capability: capability, clearError: true));
+  Future<CapabilitySelectionResult> selectCapability(
+    Capability capability,
+  ) async {
+    if (_state.busy) {
+      return const CapabilitySelectionResult(
+        CapabilitySelectionOutcome.busy,
+        'A mode switch is already in progress.',
+      );
+    }
+    if (!(_state.account?.capabilities.contains(capability) ?? false)) {
+      return const CapabilitySelectionResult(
+        CapabilitySelectionOutcome.unavailable,
+        'That mode is not available for this account.',
+      );
+    }
+    if (_state.capability == capability) {
+      return const CapabilitySelectionResult(
+        CapabilitySelectionOutcome.selected,
+      );
+    }
+
+    _set(_state.copyWith(busy: true, clearError: true));
+    try {
+      if (_state.capability == Capability.driver &&
+          capability == Capability.rider) {
+        try {
+          if (await _rides.getCurrentDriverTrip() != null) {
+            return const CapabilitySelectionResult(
+              CapabilitySelectionOutcome.activeTrip,
+              'Finish or cancel your active trip before switching to Rider mode.',
+            );
+          }
+        } catch (_) {
+          return const CapabilitySelectionResult(
+            CapabilitySelectionOutcome.verificationFailed,
+            'Unable to verify Driver status. Check your connection and try again.',
+          );
+        }
+
+        try {
+          final profile = await _drivers.get();
+          if (profile?.isOnline == true) {
+            return const CapabilitySelectionResult(
+              CapabilitySelectionOutcome.driverOnline,
+              'Go offline before switching to Rider mode.',
+            );
+          }
+        } catch (_) {
+          return const CapabilitySelectionResult(
+            CapabilitySelectionOutcome.verificationFailed,
+            'Unable to verify Driver availability. Check your connection and try again.',
+          );
+        }
+
+        try {
+          await _presence.stop();
+        } catch (_) {
+          return const CapabilitySelectionResult(
+            CapabilitySelectionOutcome.cleanupFailed,
+            'Unable to stop Driver presence. Try again.',
+          );
+        }
+      }
+
+      await _capabilities.save(capability);
+      _set(_state.copyWith(capability: capability, busy: false));
+      return const CapabilitySelectionResult(
+        CapabilitySelectionOutcome.selected,
+      );
+    } catch (_) {
+      return const CapabilitySelectionResult(
+        CapabilitySelectionOutcome.verificationFailed,
+        'Unable to switch modes. Check your connection and try again.',
+      );
+    } finally {
+      if (_state.busy) _set(_state.copyWith(busy: false));
+    }
   }
 
   Future<bool> enableDriver() async {

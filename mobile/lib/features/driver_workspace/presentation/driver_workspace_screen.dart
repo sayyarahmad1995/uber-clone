@@ -244,10 +244,16 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
           onCancel: _reapplying
               ? () => setState(() => _reapplying = false)
               : () async {
-                  await ref
+                  final result = await ref
                       .read(sessionControllerProvider)
                       .selectCapability(Capability.rider);
-                  if (context.mounted) context.go('/rider');
+                  if (!context.mounted) return;
+                  if (result.selected) {
+                    context.go('/rider');
+                  } else if (result.message != null) {
+                    ScaffoldMessenger.of(context)
+                        .showSnackBar(SnackBar(content: Text(result.message!)));
+                  }
                 },
           cancelLabel: _reapplying ? 'Cancel new application' : 'Back to Rider',
         );

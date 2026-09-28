@@ -9,9 +9,13 @@ import 'package:uber_clone/core/network/api_exception.dart';
 import 'package:uber_clone/core/providers.dart';
 import 'package:uber_clone/features/authentication/data/auth_repository.dart';
 import 'package:uber_clone/features/driver_workspace/domain/driver_onboarding.dart';
+import 'package:uber_clone/features/ride_flow/domain/ride_execution.dart';
+import 'package:uber_clone/features/ride_flow/domain/trip.dart';
+import 'package:uber_clone/features/ride_flow/ride_flow_repository.dart';
 import 'package:uber_clone/features/rider_request/data/device_location.dart';
 import 'package:uber_clone/features/rider_request/data/ride_request_repository.dart';
-import 'package:uber_clone/features/rider_request/domain/ride_request.dart';
+import 'package:uber_clone/features/rider_request/domain/ride_request.dart'
+    hide TripSnapshot;
 
 import 'test_doubles.dart';
 
@@ -272,6 +276,159 @@ void main() {
       expect(tester.getSize(panel).height, dashboardHeight * 0.60);
     },
   );
+
+  testWidgets('online Driver drawer switch is blocked with guidance', (
+    tester,
+  ) async {
+    final presence = FakeDriverPresenceService()..runningFor = 'user-1';
+    await tester.pumpWidget(
+      testApp(
+        FakeAuthRepository(account: bothCapabilities),
+        driver: FakeDriverRepository(
+          profile: driverProfile.copyWith(isOnline: true),
+        ),
+        presence: presence,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _switchFromRiderToDriver(tester);
+
+    await tester.tap(find.byKey(const Key('capabilityMenuButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('drawerRider')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Driver dashboard'), findsOneWidget);
+    expect(
+      find.text('Go offline before switching to Rider mode.'),
+      findsOneWidget,
+    );
+    expect(presence.runningFor, 'user-1');
+    expect(presence.events, isEmpty);
+  });
+
+  testWidgets('active trip message takes precedence in drawer', (tester) async {
+    final presence = FakeDriverPresenceService()..runningFor = 'user-1';
+    await tester.pumpWidget(
+      testApp(
+        FakeAuthRepository(account: bothCapabilities),
+        driver: FakeDriverRepository(
+          profile: driverProfile.copyWith(isOnline: true),
+        ),
+        rideFlow: FakeRideFlowRepository(
+          currentTrip: _activeDriverTrip('assigned'),
+        ),
+        presence: presence,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _switchFromRiderToDriver(tester);
+
+    await tester.tap(find.byKey(const Key('capabilityMenuButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('drawerRider')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Driver dashboard'), findsOneWidget);
+    expect(
+      find.text(
+        'Finish or cancel your active trip before switching to Rider mode.',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Go offline before switching to Rider mode.'),
+      findsNothing,
+    );
+    expect(presence.runningFor, 'user-1');
+  });
+
+  testWidgets('offline Driver without a trip can switch to Rider', (
+    tester,
+  ) async {
+    final presence = FakeDriverPresenceService()..runningFor = 'user-1';
+    await tester.pumpWidget(
+      testApp(
+        FakeAuthRepository(account: bothCapabilities),
+        driver: FakeDriverRepository(profile: driverProfile),
+        presence: presence,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _switchFromRiderToDriver(tester);
+
+    await tester.tap(find.byKey(const Key('capabilityMenuButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('drawerRider')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Looking for Driver offers'), findsOneWidget);
+    expect(presence.runningFor, isNull);
+  });
+
+  testWidgets('direct Rider route cannot bypass an online Driver guard', (
+    tester,
+  ) async {
+    final presence = FakeDriverPresenceService()..runningFor = 'user-1';
+    await tester.pumpWidget(
+      testApp(
+        FakeAuthRepository(account: bothCapabilities),
+        driver: FakeDriverRepository(
+          profile: driverProfile.copyWith(isOnline: true),
+        ),
+        presence: presence,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _switchFromRiderToDriver(tester);
+
+    GoRouter.of(tester.element(find.text('Driver dashboard'))).go('/rider');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Driver dashboard'), findsOneWidget);
+    expect(find.text('Looking for Driver offers'), findsNothing);
+    expect(presence.runningFor, 'user-1');
+  });
+
+  testWidgets('onboarding Back to Rider uses guarded switch result', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      testApp(
+        FakeAuthRepository(account: bothCapabilities),
+        rideFlow: FakeRideFlowRepository(
+          currentTripFailure: Exception('network down'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('capabilityMenuButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('drawerBecomeDriver')));
+    await tester.pumpAndSettle();
+
+    await tester.drag(
+      find.byKey(const Key('dashboardPanelDragHandle')),
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.descendant(
+        of: find.byKey(const Key('dashboardPanel')),
+        matching: find.byType(ListView),
+      ),
+      const Offset(0, -900),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Back to Rider'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Driver dashboard'), findsOneWidget);
+    expect(
+      find.textContaining('Unable to verify Driver status'),
+      findsOneWidget,
+    );
+  });
 
   testWidgets('collapsed panel uses each capability collapsed extent', (
     tester,
@@ -622,9 +779,14 @@ Widget testApp(
   DeviceLocation? deviceLocation,
   FakeDriverRepository? driver,
   FakeDriverOnboardingRepository? onboarding,
+  RideFlowRepository? rideFlow,
+  FakeDriverPresenceService? presence,
+  MemoryCapabilityStore? capabilityStore,
 }) => ProviderScope(
   overrides: [
-    rideFlowRepositoryProvider.overrideWithValue(FakeRideFlowRepository()),
+    rideFlowRepositoryProvider.overrideWithValue(
+      rideFlow ?? FakeRideFlowRepository(),
+    ),
     authRepositoryProvider.overrideWithValue(repository),
     driverRepositoryProvider.overrideWithValue(
       driver ?? FakeDriverRepository(),
@@ -632,7 +794,12 @@ Widget testApp(
     driverOnboardingRepositoryProvider.overrideWithValue(
       onboarding ?? FakeDriverOnboardingRepository(),
     ),
-    capabilityStoreProvider.overrideWithValue(MemoryCapabilityStore()),
+    capabilityStoreProvider.overrideWithValue(
+      capabilityStore ?? MemoryCapabilityStore(),
+    ),
+    driverPresenceServiceProvider.overrideWithValue(
+      presence ?? FakeDriverPresenceService(),
+    ),
     rideRequestRepositoryProvider.overrideWithValue(
       rideRequests ?? FakeRideRequestRepository(requests: [requestedRide]),
     ),
@@ -641,6 +808,21 @@ Widget testApp(
     ),
   ],
   child: const UberCloneApp(),
+);
+
+Future<void> _switchFromRiderToDriver(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('capabilityMenuButton')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const Key('drawerDriver')));
+  await tester.pumpAndSettle();
+  expect(find.text('Driver dashboard'), findsOneWidget);
+}
+
+TripSnapshot _activeDriverTrip(String status) => TripSnapshot(
+  rideRequestId: 'ride-1',
+  status: status,
+  assignedAt: DateTime.utc(2026, 9, 28),
+  settlement: const SettlementSnapshot(status: 'unsettled'),
 );
 
 class CountingDeviceLocation implements DeviceLocation {

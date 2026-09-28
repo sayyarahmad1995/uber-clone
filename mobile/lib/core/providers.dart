@@ -185,6 +185,8 @@ final sessionControllerProvider = ChangeNotifierProvider<SessionController>(
     ref.watch(authRepositoryProvider),
     ref.watch(capabilityStoreProvider),
     ref.watch(driverPresenceServiceProvider),
+    ref.watch(driverRepositoryProvider),
+    ref.watch(rideFlowRepositoryProvider),
   ),
 );
 
@@ -239,6 +241,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       if ((location == '/driver' || location.startsWith('/driver/')) &&
           !hasDriver) {
         return '/rider';
+      }
+      if (location == '/rider' &&
+          session.state.capability == Capability.driver) {
+        return '/driver';
       }
       if (location == '/driver/details' || location == '/driver/vehicles') {
         try {
