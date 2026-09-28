@@ -157,7 +157,7 @@ void main() {
     expect(repo.calls, ['location']);
   });
 
-  test('offline task self-stops before GPS if Android stop failed', () async {
+  test('offline task retries Android stop without requesting GPS', () async {
     final repo = FakeDriverRepository(profile: driverProfile);
     final location = CountingLocation();
     var stops = 0;
@@ -170,10 +170,12 @@ void main() {
       driverUserId: 'user-1',
       onStop: () async {
         stops++;
+        if (stops == 1) throw StateError('native stop failed');
       },
     );
     await loop.tick();
-    expect(stops, 1);
+    await loop.tick();
+    expect(stops, 2);
     expect(location.reads, 0);
     expect(repo.calls, isEmpty);
   });

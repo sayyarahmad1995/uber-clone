@@ -54,7 +54,15 @@ class DriverPresenceLoop {
   bool _stopped = false;
 
   Future<bool> tick() async {
-    if (_inFlight || _stopped) return false;
+    if (_inFlight) return false;
+    if (_stopped) {
+      try {
+        await _onStop();
+      } catch (_) {
+        // Retry on the next native event; never resume presence publication.
+      }
+      return false;
+    }
     _inFlight = true;
     try {
       if (!await _publisher.renew(_driverUserId)) {
