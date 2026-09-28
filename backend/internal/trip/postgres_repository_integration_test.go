@@ -65,8 +65,8 @@ func createTripIntegrationDriver(t *testing.T, db *sql.DB) uuid.UUID {
 		SELECT id, 'economy', NOW(), 'test-reviewer' FROM driver_vehicles WHERE driver_user_id=$1`, userID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`INSERT INTO driver_operating_selections (driver_user_id,vehicle_id,service_code)
-		SELECT driver_user_id,id,'economy' FROM driver_vehicles WHERE driver_user_id=$1`, userID); err != nil {
+	if _, err := db.Exec(`INSERT INTO driver_operating_selections (driver_user_id,vehicle_id)
+		SELECT driver_user_id,id FROM driver_vehicles WHERE driver_user_id=$1`, userID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(`INSERT INTO driver_locations (driver_user_id, latitude, longitude, updated_at) VALUES ($1, 24.86, 67.0, NOW())`, userID); err != nil {
@@ -127,11 +127,12 @@ func insertTripIntegrationOffer(
 			100000,
 			'PKR',
 			jsonb_build_object(
-				'vehicle_id', vehicle_id,
-				'service_code', service_code
+				'vehicle_id', selection.vehicle_id,
+				'service_code', ride.service_code
 			)
-		FROM driver_operating_selections
-		WHERE driver_user_id = $2
+		FROM driver_operating_selections selection
+		JOIN ride_requests ride ON ride.id = $1
+		WHERE selection.driver_user_id = $2
 		RETURNING updated_at
 	`, rideRequestID, driverUserID).Scan(&updatedAt); err != nil {
 		t.Fatalf("insert offer: %v", err)

@@ -72,13 +72,10 @@ void main() {
   test(
     'operating selection persists through authenticated endpoints',
     () async {
-      final selected = await repo.selectOperation('owned', 'economy');
+      final selected = await repo.selectOperation('owned');
       expect(selected.valid, isTrue);
       expect(adapter.request!.method, 'PUT');
-      expect(adapter.request!.data, {
-        'vehicle_id': 'owned',
-        'service_code': 'economy',
-      });
+      expect(adapter.request!.data, {'vehicle_id': 'owned'});
       final restored = await repo.operatingState();
       expect(adapter.request!.method, 'GET');
       expect(restored.vehicleId, 'owned');
@@ -122,11 +119,7 @@ class DriverAdapter implements HttpClientAdapter {
     request = options;
     final Object data = options.path == '/v1/driver/operating-selection'
         ? {
-            'selection': {
-              'vehicle_id': 'owned',
-              'service_code': 'economy',
-              'valid': true,
-            },
+            'selection': {'vehicle_id': 'owned', 'valid': true},
             'can_change': true,
           }
         : options.path == '/v1/driver/vehicles'

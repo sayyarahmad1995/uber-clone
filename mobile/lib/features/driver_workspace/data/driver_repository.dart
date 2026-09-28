@@ -11,7 +11,7 @@ import '../domain/registered_vehicle.dart';
 abstract interface class DriverRepository {
   Future<DriverProfile?> get();
   Future<OperatingState> operatingState();
-  Future<OperatingState> selectOperation(String vehicleId, String serviceCode);
+  Future<OperatingState> selectOperation(String vehicleId);
   Future<List<RegisteredVehicle>> listVehicles();
   Future<DriverProfile> setOnline(bool online);
   Future<PublishedDriverLocation> publishLocation(GeoPoint point);
@@ -53,15 +53,13 @@ class ApiDriverRepository implements DriverRepository {
   Future<OperatingState> operatingState() async =>
       OperatingState.fromJson(await _request('/v1/driver/operating-selection'));
   @override
-  Future<OperatingState> selectOperation(
-    String vehicleId,
-    String serviceCode,
-  ) async => OperatingState.fromJson(
-    await _request(
-      '/v1/driver/operating-selection',
-      data: {'vehicle_id': vehicleId, 'service_code': serviceCode},
-    ),
-  );
+  Future<OperatingState> selectOperation(String vehicleId) async =>
+      OperatingState.fromJson(
+        await _request(
+          '/v1/driver/operating-selection',
+          data: {'vehicle_id': vehicleId},
+        ),
+      );
 
   @override
   Future<List<RegisteredVehicle>> listVehicles() async {

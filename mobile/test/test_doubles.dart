@@ -153,20 +153,13 @@ class FakeDriverRepository implements DriverRepository {
   Future<List<RegisteredVehicle>> listVehicles() async => vehicles;
   OperatingState operation = const OperatingState(
     vehicleId: 'test-vehicle',
-    serviceCode: 'economy',
     valid: true,
   );
   @override
   Future<OperatingState> operatingState() async => operation;
   @override
-  Future<OperatingState> selectOperation(
-    String vehicleId,
-    String serviceCode,
-  ) async => operation = OperatingState(
-    vehicleId: vehicleId,
-    serviceCode: serviceCode,
-    valid: true,
-  );
+  Future<OperatingState> selectOperation(String vehicleId) async =>
+      operation = OperatingState(vehicleId: vehicleId, valid: true);
   DriverProfile? profile;
   final calls = <String>[];
   bool failPublish = false;

@@ -180,6 +180,133 @@ func TestExpiredRideNeverEntersDriverFeed(t *testing.T) {
 	}
 }
 
+func TestDiscoveryUsesEveryActiveEnrollmentOnSelectedVehicle(t *testing.T) {
+	db := openOfferIntegrationDB(t)
+	ctx := context.Background()
+	riderID := createOfferTestUser(t, db, "rider")
+	driverID := createOfferTestDriver(t, db)
+	var vehicleID uuid.UUID
+	if err := db.QueryRow(`SELECT vehicle_id FROM driver_operating_selections WHERE driver_user_id=$1`, driverID).Scan(&vehicleID); err != nil {
+		t.Fatalf("load selected vehicle: %v", err)
+	}
+	economyRide := createOfferTestRide(t, db, riderID)
+	comfortRide := createOfferTestRide(t, db, riderID)
+	if _, err := db.Exec(`UPDATE ride_requests SET service_code='comfort' WHERE id=$1`, comfortRide); err != nil {
+		t.Fatalf("set comfort ride: %v", err)
+	}
+
+	repository := NewPostgresRepository(db)
+	feed, err := repository.Discover(ctx, driverID, DiscoveryLimit)
+	if err != nil {
+		t.Fatalf("discover Economy-only rides: %v", err)
+	}
+	assertDiscoveredRides(t, feed, economyRide)
+
+	if _, err := db.Exec(`INSERT INTO driver_vehicle_service_enrollments (vehicle_id, service_code, approved_at, approved_by) VALUES ($1, 'comfort', NOW(), 'test-reviewer')`, vehicleID); err != nil {
+		t.Fatalf("insert comfort enrollment: %v", err)
+	}
+	feed, err = repository.Discover(ctx, driverID, DiscoveryLimit)
+	if err != nil {
+		t.Fatalf("discover multi-service rides: %v", err)
+	}
+	assertDiscoveredRides(t, feed, economyRide, comfortRide)
+
+	if _, err := db.Exec(`UPDATE driver_service_catalog SET is_active=FALSE WHERE code='comfort'`); err != nil {
+		t.Fatalf("deactivate comfort: %v", err)
+	}
+	t.Cleanup(func() { _, _ = db.Exec(`UPDATE driver_service_catalog SET is_active=TRUE WHERE code='comfort'`) })
+	feed, err = repository.Discover(ctx, driverID, DiscoveryLimit)
+	if err != nil {
+		t.Fatalf("discover with inactive enrollment: %v", err)
+	}
+	assertDiscoveredRides(t, feed, economyRide)
+
+	if _, err := db.Exec(`UPDATE driver_service_catalog SET is_active=TRUE WHERE code='comfort'`); err != nil {
+		t.Fatalf("reactivate comfort: %v", err)
+	}
+	if _, err := db.Exec(`DELETE FROM driver_vehicle_service_enrollments WHERE vehicle_id=$1 AND service_code='comfort'`, vehicleID); err != nil {
+		t.Fatalf("remove selected-vehicle comfort: %v", err)
+	}
+	otherVehicle := uuid.New()
+	if _, err := db.Exec(`INSERT INTO driver_vehicles (id, driver_user_id, make, model, color, license_plate) VALUES ($1,$2,'Other','Car','Black','OTHER')`, otherVehicle, driverID); err != nil {
+		t.Fatalf("insert other vehicle: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO driver_vehicle_service_enrollments (vehicle_id,service_code,approved_at,approved_by) VALUES ($1,'comfort',NOW(),'test-reviewer')`, otherVehicle); err != nil {
+		t.Fatalf("enroll other vehicle: %v", err)
+	}
+	feed, err = repository.Discover(ctx, driverID, DiscoveryLimit)
+	if err != nil {
+		t.Fatalf("discover with enrollment on another vehicle: %v", err)
+	}
+	assertDiscoveredRides(t, feed, economyRide)
+
+	otherDriver := createOfferTestDriver(t, db)
+	if _, err := db.Exec(`INSERT INTO driver_vehicle_service_enrollments (vehicle_id,service_code,approved_at,approved_by)
+		SELECT vehicle_id,'comfort',NOW(),'test-reviewer' FROM driver_operating_selections WHERE driver_user_id=$1`, otherDriver); err != nil {
+		t.Fatalf("enroll another Driver: %v", err)
+	}
+	feed, err = repository.Discover(ctx, driverID, DiscoveryLimit)
+	if err != nil {
+		t.Fatalf("discover with another Driver enrollment: %v", err)
+	}
+	assertDiscoveredRides(t, feed, economyRide)
+
+	if _, err := db.Exec(`DELETE FROM driver_operating_selections WHERE driver_user_id=$1`, driverID); err != nil {
+		t.Fatalf("clear operating selection: %v", err)
+	}
+	feed, err = repository.Discover(ctx, driverID, DiscoveryLimit)
+	if err != nil {
+		t.Fatalf("discover without selection: %v", err)
+	}
+	assertDiscoveredRides(t, feed)
+}
+
+func assertDiscoveredRides(t *testing.T, feed []DiscoveryItem, expected ...uuid.UUID) {
+	t.Helper()
+	seen := make(map[uuid.UUID]bool, len(feed))
+	for _, item := range feed {
+		seen[item.RideRequestID] = true
+	}
+	if len(seen) != len(expected) {
+		t.Fatalf("expected rides %v, got %#v", expected, feed)
+	}
+	for _, rideID := range expected {
+		if !seen[rideID] {
+			t.Fatalf("expected ride %s, got %#v", rideID, feed)
+		}
+	}
+}
+
+func TestOfferSnapshotsConcreteRideServiceFromMultiServiceVehicle(t *testing.T) {
+	db := openOfferIntegrationDB(t)
+	ctx := context.Background()
+	riderID := createOfferTestUser(t, db, "rider")
+	driverID := createOfferTestDriver(t, db)
+	var vehicleID uuid.UUID
+	if err := db.QueryRow(`SELECT vehicle_id FROM driver_operating_selections WHERE driver_user_id=$1`, driverID).Scan(&vehicleID); err != nil {
+		t.Fatalf("load selected vehicle: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO driver_vehicle_service_enrollments (vehicle_id,service_code,approved_at,approved_by) VALUES ($1,'comfort',NOW(),'test-reviewer')`, vehicleID); err != nil {
+		t.Fatalf("insert comfort enrollment: %v", err)
+	}
+	rideID := createOfferTestRide(t, db, riderID)
+	if _, err := db.Exec(`UPDATE ride_requests SET service_code='comfort' WHERE id=$1`, rideID); err != nil {
+		t.Fatalf("set comfort ride: %v", err)
+	}
+	repository := NewPostgresRepository(db)
+	openOfferOpportunity(t, repository, driverID, rideID)
+	if _, err := repository.Upsert(ctx, rideID, driverID, 100000, 90000, 130000, "PKR"); err != nil {
+		t.Fatalf("submit comfort offer: %v", err)
+	}
+	var serviceCode string
+	if err := db.QueryRow(`SELECT operation_context->>'service_code' FROM ride_offers WHERE ride_request_id=$1 AND driver_user_id=$2`, rideID, driverID).Scan(&serviceCode); err != nil {
+		t.Fatalf("read operation context: %v", err)
+	}
+	if serviceCode != "comfort" {
+		t.Fatalf("expected ride service comfort in immutable context, got %q", serviceCode)
+	}
+}
+
 func openOfferOpportunity(t *testing.T, repository PostgresRepository, driverID, rideID uuid.UUID) {
 	t.Helper()
 	feed, err := repository.Discover(context.Background(), driverID, DiscoveryLimit)
@@ -241,7 +368,7 @@ func createOfferTestDriver(t *testing.T, db *sql.DB) uuid.UUID {
 	if _, err := db.Exec(`INSERT INTO driver_vehicle_service_enrollments (vehicle_id, service_code, approved_at, approved_by) VALUES ($1, 'economy', NOW(), 'test-reviewer')`, vehicleID); err != nil {
 		t.Fatalf("insert service enrollment: %v", err)
 	}
-	if _, err := db.Exec(`INSERT INTO driver_operating_selections (driver_user_id, vehicle_id, service_code) VALUES ($1, $2, 'economy')`, userID, vehicleID); err != nil {
+	if _, err := db.Exec(`INSERT INTO driver_operating_selections (driver_user_id, vehicle_id) VALUES ($1, $2)`, userID, vehicleID); err != nil {
 		t.Fatalf("insert operating selection: %v", err)
 	}
 	if _, err := db.Exec(`INSERT INTO driver_locations (driver_user_id, latitude, longitude, updated_at) VALUES ($1, 24.86, 67.0, NOW())`, userID); err != nil {

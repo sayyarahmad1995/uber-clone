@@ -207,7 +207,7 @@ func TestRiderComparisonRefreshOwnershipAndHistory(t *testing.T) {
 	}
 	geoExec(t, db, `INSERT INTO driver_vehicle_service_enrollments(vehicle_id,service_code,approved_at,approved_by) VALUES ($1,'economy',NOW(),'reviewer') ON CONFLICT DO NOTHING`, vehicleID)
 	drivers := driverops.NewPostgresRepository(db)
-	if _, err := drivers.SelectOperation(ctx, stale, vehicleID, "economy"); err != nil {
+	if _, err := drivers.SelectOperation(ctx, stale, vehicleID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := drivers.SetOnline(ctx, stale, true); err != nil {

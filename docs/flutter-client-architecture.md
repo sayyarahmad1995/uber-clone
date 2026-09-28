@@ -83,7 +83,8 @@ The Rider dashboard requests location during startup so the map can focus on the
 Rider automatically. On a first run, the platform may display its location-permission
 prompt as part of this startup behavior. Explicit current-location actions remain
 available for refocusing the map and selecting pickup. The Driver dashboard now
-supports review-based onboarding, approved vehicle/service operating selection,
+supports review-based onboarding, approved operating-vehicle selection with
+effective services derived from that vehicle's active approved enrollments,
 availability, and explicit location publishing. Driver details and Vehicles are
 read-only approved-information surfaces; approved-information revision editing
 remains deferred. Its controls reuse the shared panel contract. Marketplace

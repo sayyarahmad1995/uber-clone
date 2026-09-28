@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:uber_clone/app.dart';
 import 'package:uber_clone/core/providers.dart';
 import 'package:uber_clone/features/driver_workspace/domain/driver_onboarding.dart';
+import 'package:uber_clone/features/driver_workspace/domain/operating_state.dart';
+import 'package:uber_clone/features/driver_workspace/domain/registered_vehicle.dart';
 
 import 'test_doubles.dart';
 
@@ -208,7 +210,8 @@ void main() {
             displayName: 'Approved Driver',
             status: 'approved',
           ),
-        ),
+          vehicles: selectedCorollaVehicles,
+        )..operation = const OperatingState(vehicleId: 'corolla', valid: true),
         onboardingRepository: FakeDriverOnboardingRepository(
           application: application,
         ),
@@ -235,7 +238,11 @@ void main() {
     expect(shellScaffold.isDrawerOpen, isTrue);
     expect(find.text('Approved Driver'), findsOneWidget);
     expect(find.text('Approved'), findsOneWidget);
-    expect(find.text('Comfort'), findsOneWidget);
+    expect(find.text('Selected vehicle'), findsOneWidget);
+    expect(find.text('Toyota Corolla'), findsOneWidget);
+    expect(find.text('Available services'), findsOneWidget);
+    expect(find.text('Economy, Comfort'), findsOneWidget);
+    expect(find.text('Selected service'), findsNothing);
 
     await tester.pageBack();
     await tester.pumpAndSettle();
@@ -255,12 +262,12 @@ void main() {
     expect(find.text('Vehicles'), findsNWidgets(2));
     expect(vehiclesTitle, findsOneWidget);
     expect(ModalRoute.of(tester.element(vehiclesTitle))!.opaque, isFalse);
-    expect(find.text('Toyota'), findsOneWidget);
-    expect(find.text('Corolla'), findsOneWidget);
+    expect(find.text('Toyota Corolla'), findsOneWidget);
     expect(find.text('2024'), findsOneWidget);
     expect(find.text('ABC-123'), findsOneWidget);
+    expect(find.text('Economy'), findsOneWidget);
     expect(find.text('Comfort'), findsOneWidget);
-    expect(find.text('Driver onboarding application'), findsOneWidget);
+    expect(find.text('Driver onboarding application'), findsNothing);
 
     await tester.pageBack();
     await tester.pumpAndSettle();
@@ -290,6 +297,27 @@ void main() {
     expect(find.byKey(const Key('drawerBecomeDriver')), findsOneWidget);
   });
 }
+
+final selectedCorollaVehicles = [
+  RegisteredVehicle(
+    id: 'corolla',
+    vehicle: driverVehicle,
+    enrollments: [
+      ApprovedServiceEnrollment(
+        serviceCode: 'economy',
+        displayName: 'Economy',
+        approvedAt: DateTime.utc(2026, 9, 8),
+        serviceActive: true,
+      ),
+      ApprovedServiceEnrollment(
+        serviceCode: 'comfort',
+        displayName: 'Comfort',
+        approvedAt: DateTime.utc(2026, 9, 9),
+        serviceActive: true,
+      ),
+    ],
+  ),
+];
 
 Widget _testApp({
   required bool accountHasDriver,

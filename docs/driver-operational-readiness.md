@@ -4,15 +4,15 @@ This milestone delivers operating selection and Go Online enforcement. Marketpla
 
 ## Approval evidence
 
-For this MVP, the explicit reviewed vehicle/service enrollment is the authorization evidence for that exact combination. Vehicle existence and legacy active status are insufficient. This does not invent an independent vehicle-verification flag or claim physical inspection occurred. Reviewers remain responsible for their actual review policy.
+For this MVP, explicit reviewed vehicle/service enrollments are the authorization evidence for the services a vehicle may offer. Vehicle existence and legacy active status are insufficient. This does not invent an independent vehicle-verification flag or claim physical inspection occurred. Reviewers remain responsible for their actual review policy.
 
 ## Contract
 
-Authenticated Driver-only GET and PUT `/v1/driver/operating-selection` return `selection` (null or vehicle_id, service_code, valid) and `can_change`. PUT accepts vehicle_id and service_code. The server requires ownership, approved enrollment, and an active catalog service. Selection is persisted across sessions. Changes require offline state and no assigned/in-progress trip.
+Authenticated Driver-only GET and PUT `/v1/driver/operating-selection` return `selection` (null or `vehicle_id` and `valid`) and `can_change`. PUT accepts only `vehicle_id`. The server requires ownership and at least one active approved enrollment. Selection is persisted across sessions. Changes require offline state and no assigned/in-progress trip.
 
-GET `/v1/driver` now exposes approved profiles as well as active ones. Approved profiles may publish location. Going online requires a selected approved combination, Driver capability, fresh location under the existing two-minute policy, and no active trip. Successful Go Online promotes approved status to active. Going offline remains available without selection or fresh location.
+GET `/v1/driver` now exposes approved profiles as well as active ones. Approved profiles may publish location. Going online requires a selected eligible vehicle, Driver capability, fresh location under the existing two-minute policy, and no active trip. Marketplace requests match any active approved enrollment on that vehicle. Successful Go Online promotes approved status to active. Going offline remains available without selection or fresh location.
 
-Selection and availability acquire the Driver profile lock also used by marketplace assignment. Authorization rows are locked through the write. Migration 021 clears preexisting online flags so old sessions must explicitly select an approved combination. No vehicles or enrollments are automatically selected or granted.
+Selection and availability acquire the Driver profile lock also used by marketplace assignment. Authorization rows are locked through the write. Migration 021 clears preexisting online flags so old sessions must explicitly select an approved vehicle. Migration 027 preserves selected vehicle IDs while removing the obsolete selected-service column. No vehicles or enrollments are automatically selected or granted.
 
 ## Acceptance
 

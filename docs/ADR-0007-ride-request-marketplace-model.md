@@ -26,6 +26,8 @@ A Ride Request is one marketplace request with:
 
 Eligible Drivers receive or discover the Ride Request according to application-owned marketplace policy.
 
+A Driver selects one operating vehicle. A request is discoverable when its concrete `service_code` matches any active approved service enrollment on that selected vehicle. Offer and assignment operation-context snapshots retain that request service; no service is inferred from enrollment ordering or onboarding history.
+
 For an actionable Ride Request, a Driver submits one actionable commercial response:
 
 1. **Accept the Rider proposed fare.** This creates or updates a Driver offer at exactly the Rider proposed fare. It does not assign the Trip.

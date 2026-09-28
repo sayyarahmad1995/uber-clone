@@ -220,8 +220,8 @@ func createCancellationDriver(t *testing.T, db *sql.DB) uuid.UUID {
 		SELECT id, 'economy', NOW(), 'test-reviewer' FROM driver_vehicles WHERE driver_user_id=$1`, userID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`INSERT INTO driver_operating_selections (driver_user_id,vehicle_id,service_code)
-		SELECT driver_user_id,id,'economy' FROM driver_vehicles WHERE driver_user_id=$1`, userID); err != nil {
+	if _, err := db.Exec(`INSERT INTO driver_operating_selections (driver_user_id,vehicle_id)
+		SELECT driver_user_id,id FROM driver_vehicles WHERE driver_user_id=$1`, userID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(`INSERT INTO driver_locations (driver_user_id, latitude, longitude, updated_at) VALUES ($1, 24.86, 67.0, NOW())`, userID); err != nil {
@@ -334,7 +334,11 @@ func insertCancellationOffer(t *testing.T, db *sql.DB, rideID, driverID uuid.UUI
 	}
 	if _, err := db.Exec(`
 		INSERT INTO ride_offers (ride_request_id, driver_user_id, amount_minor, currency, status, operation_context)
-		SELECT $1, $2, 90000, 'PKR', 'pending', jsonb_build_object('vehicle_id',vehicle_id,'service_code',service_code) FROM driver_operating_selections WHERE driver_user_id=$2
+		SELECT $1, $2, 90000, 'PKR', 'pending',
+		       jsonb_build_object('vehicle_id', selection.vehicle_id, 'service_code', ride.service_code)
+		FROM driver_operating_selections selection
+		JOIN ride_requests ride ON ride.id=$1
+		WHERE selection.driver_user_id=$2
 	`, rideID, driverID); err != nil {
 		t.Fatalf("insert ride offer: %v", err)
 	}

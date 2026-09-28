@@ -30,7 +30,7 @@ func (r PostgresRepository) Discover(ctx context.Context, driverUserID uuid.UUID
 			JOIN driver_profiles p ON p.user_id = $1 AND p.status = 'active' AND p.is_online
 			JOIN driver_operating_selections s ON s.driver_user_id = p.user_id
 			JOIN driver_vehicles v ON v.id = s.vehicle_id AND v.driver_user_id = p.user_id
-			JOIN driver_vehicle_service_enrollments e ON e.vehicle_id = v.id AND e.service_code = s.service_code
+			JOIN driver_vehicle_service_enrollments e ON e.vehicle_id = v.id AND e.service_code = rr.service_code
 			JOIN driver_service_catalog sc ON sc.code = e.service_code AND sc.is_active
 			JOIN user_capabilities c ON c.user_id = p.user_id AND c.capability = 'driver'
 			JOIN driver_locations l ON l.driver_user_id = p.user_id
@@ -39,7 +39,6 @@ func (r PostgresRepository) Discover(ctx context.Context, driverUserID uuid.UUID
 			 AND existing.driver_user_id = $1
 			WHERE rr.status = 'requested'
 			  AND rr.expires_at > statement_timestamp()
-			  AND rr.service_code = s.service_code
 			  AND l.updated_at BETWEEN statement_timestamp() - ($3 * INTERVAL '1 second') AND statement_timestamp()
 			  AND NOT EXISTS (SELECT 1 FROM trips active WHERE active.driver_user_id = p.user_id AND active.status IN ('assigned', 'in_progress'))
 			  AND rr.proposed_fare_minor IS NOT NULL
@@ -90,7 +89,7 @@ func (r PostgresRepository) Discover(ctx context.Context, driverUserID uuid.UUID
 		JOIN driver_profiles p ON p.user_id = $1 AND p.status = 'active' AND p.is_online
 		JOIN driver_operating_selections s ON s.driver_user_id = p.user_id
 		JOIN driver_vehicles v ON v.id = s.vehicle_id AND v.driver_user_id = p.user_id
-		JOIN driver_vehicle_service_enrollments e ON e.vehicle_id = v.id AND e.service_code = s.service_code
+		JOIN driver_vehicle_service_enrollments e ON e.vehicle_id = v.id AND e.service_code = rr.service_code
 		JOIN driver_service_catalog sc ON sc.code = e.service_code AND sc.is_active
 		JOIN driver_locations l ON l.driver_user_id = p.user_id
 		WHERE opportunity.driver_user_id = $1
@@ -98,7 +97,6 @@ func (r PostgresRepository) Discover(ctx context.Context, driverUserID uuid.UUID
 		  AND opportunity.visible_until > statement_timestamp()
 		  AND rr.status = 'requested'
 		  AND rr.expires_at > statement_timestamp()
-		  AND rr.service_code = s.service_code
 		  AND l.updated_at BETWEEN statement_timestamp() - ($3 * INTERVAL '1 second') AND statement_timestamp()
 		  AND NOT EXISTS (SELECT 1 FROM trips active WHERE active.driver_user_id = p.user_id AND active.status IN ('assigned', 'in_progress'))
 		  AND NOT EXISTS (SELECT 1 FROM trips t WHERE t.ride_request_id = rr.id)

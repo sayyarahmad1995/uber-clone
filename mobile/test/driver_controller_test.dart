@@ -28,7 +28,7 @@ void main() {
       final controller = await create(repo);
       expect(controller.profile!.isOnline, isFalse);
       expect(repo.calls, ['online=false', 'location']);
-      expect(controller.operation!.serviceCode, 'economy');
+      expect(controller.operation!.vehicleId, 'test-vehicle');
     },
   );
 
@@ -65,10 +65,10 @@ void main() {
     await controller.setOnline(true);
     expect(repo.calls, isEmpty);
     expect(controller.error, contains('Select an approved'));
-    await controller.selectOperation('owned', 'economy');
+    await controller.selectOperation('owned');
     expect(controller.operation!.vehicleId, 'owned');
     await controller.load();
-    expect(controller.operation!.serviceCode, 'economy');
+    expect(controller.operation!.vehicleId, 'owned');
   });
 
   test('going online publishes location before availability', () async {

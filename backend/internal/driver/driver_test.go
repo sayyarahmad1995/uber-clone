@@ -48,6 +48,6 @@ func TestSetOnlineRequiresExistingDriverProfile(t *testing.T) {
 func (f *fakeRepository) OperatingState(context.Context, uuid.UUID) (OperatingState, error) {
 	return OperatingState{}, nil
 }
-func (f *fakeRepository) SelectOperation(context.Context, uuid.UUID, uuid.UUID, string) (OperatingState, error) {
+func (f *fakeRepository) SelectOperation(context.Context, uuid.UUID, uuid.UUID) (OperatingState, error) {
 	return OperatingState{}, nil
 }

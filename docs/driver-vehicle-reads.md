@@ -8,8 +8,8 @@ Vehicles are ordered by creation time then ID. Enrollments are ordered by catalo
 
 The read works for approved Drivers before operational activation. Legacy vehicles without enrollments remain visible with an empty enrollment list; neither vehicle verification nor operating eligibility is inferred from their existence. Independent vehicle verification state is not yet represented by the schema.
 
-The mobile Vehicles screen reads these records, displays all vehicles and their explicit approved services, and supports retry after a failed read. If there are no persisted vehicles, the onboarding application remains visible as a submitted snapshot. Driver details continue to use the existing profile/application read.
+The mobile Vehicles screen reads these records, displays all vehicles and their explicit approved services, and supports retry after a failed read. If there are no persisted vehicles, the onboarding application remains visible as a submitted historical snapshot. Driver Details uses the current operating vehicle selection and its active approved enrollments; it does not treat the onboarding service as a current selection.
 
-This slice does not add vehicle registration, editing, active operating selection, or availability enforcement. Those follow ADR-0009 and the agreed roadmap.
+Vehicle registration and editing remain separate from operating selection. Operating selection chooses a vehicle only; marketplace service eligibility is derived from that selected vehicle's active approved enrollments under ADR-0009.
 
 Validation: run `go test ./...` and, with `TEST_DATABASE_URL` pointing to a dedicated database ending `_test`, `go test ./internal/driver -run TestPostgresRepository -count=1 -v`. In mobile run `dart format lib test` and `flutter test`.
