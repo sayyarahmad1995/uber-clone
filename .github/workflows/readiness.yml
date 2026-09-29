@@ -28,6 +28,20 @@ jobs:
         with:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
+      - name: Emit Go formatter patch (temporary PR diagnostic)
+        run: |
+          python3 - <<'PY'
+          import difflib, json, pathlib, subprocess
+          files = ["backend/cmd/api/application.go","backend/internal/httpapi/api.go","backend/internal/httpapi/ride_services.go","backend/internal/httpapi/ride_services_test.go","backend/internal/ride/ride.go","backend/internal/ride/postgres_repository.go","backend/internal/ride/ride_test.go","backend/internal/rideservice/catalog.go","backend/internal/rideservice/postgres_repository.go","backend/internal/rideservice/postgres_repository_integration_test.go"]
+          for name in files:
+              path = pathlib.Path(name)
+              before = path.read_text()
+              subprocess.run(["gofmt","-w"] + [name], check=True, stdout=subprocess.DEVNULL)
+              after = path.read_text()
+              a, b = before.split('\\n'), after.split('\\n')
+              edits = [{'start': i1, 'end': i2, 'old': a[i1:i2], 'new': b[j1:j2]} for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b, autojunk=False).get_opcodes() if tag != 'equal']
+              print('FORMATTED_PATCH:' + json.dumps({'path': name, 'edits': edits}), flush=True)
+          PY
       - name: Check changed Go file formatting
         env:
           EVENT_BEFORE: ${{ github.event.before }}
@@ -78,6 +92,20 @@ jobs:
           echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
       - run: flutter pub get
         working-directory: mobile
+      - name: Emit Dart formatter patch (temporary PR diagnostic)
+        run: |
+          python3 - <<'PY'
+          import difflib, json, pathlib, subprocess
+          files = ["mobile/lib/core/providers.dart","mobile/lib/features/rider_request/application/rider_request_controller.dart","mobile/lib/features/rider_request/presentation/rider_request_screen.dart","mobile/lib/features/ride_flow/ride_flow_panels.dart","mobile/lib/features/rider_request/data/ride_service_repository.dart","mobile/lib/features/rider_request/domain/ride_service.dart","mobile/test/rider_service_catalog_test.dart","mobile/test/app_routing_test.dart","mobile/test/test_doubles.dart"]
+          for name in files:
+              path = pathlib.Path(name)
+              before = path.read_text()
+              subprocess.run(["dart","format","--output=write"] + [name], check=True, stdout=subprocess.DEVNULL)
+              after = path.read_text()
+              a, b = before.split('\\n'), after.split('\\n')
+              edits = [{'start': i1, 'end': i2, 'old': a[i1:i2], 'new': b[j1:j2]} for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b, autojunk=False).get_opcodes() if tag != 'equal']
+              print('FORMATTED_PATCH:' + json.dumps({'path': name, 'edits': edits}), flush=True)
+          PY
       - name: Check changed Dart file formatting
         env:
           EVENT_BEFORE: ${{ github.event.before }}
