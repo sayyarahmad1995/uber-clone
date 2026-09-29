@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — selected as the next MVP implementation slice.
+Accepted — implemented through cash-settlement backend and mobile follow-up PRs #83–#88. The full pilot cash-loop physical-device acceptance checklist remains a separate release prerequisite; the next feature slice is governed by ADR-0012/ADR-0013.
 
 ## Date
 
@@ -59,6 +59,10 @@ This ADR does not authorize:
 - Courier/Freight settlement behavior.
 
 Those may become separate decisions only when a concrete vertical slice needs them.
+
+## Historical scope note
+
+The non-goals below describe what PR #83's **cash settlement** slice did not authorize. They are not a permanent prohibition on independent follow-up features. The owner subsequently selected ADR-0012 (dynamic Rider service catalog) and ADR-0013 (Google trip preview and **advisory** service-specific fare calculation). These follow-up decisions preserve the previously selected Driver offer as the immutable amount to settle.
 
 ## Consequences
 
