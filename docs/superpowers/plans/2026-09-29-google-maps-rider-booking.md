@@ -1,6 +1,6 @@
 # HiGO Dynamic Ride Services and Google Maps Rider Booking Experience — implementation plan
 
-**Status:** Proposed; planning only. No feature code is authorized by this document alone.
+**Status:** Selected for implementation; PR 0 documentation is committed on this branch for review. No application code is included.
 **Prepared:** 2026-09-29
 **Revised:** 2026-09-29 — dynamic Rider service catalog is the first implementation dependency.
 **Baseline reviewed:** main at 2285d8febf455e31db4049f0d2e1464bdcd410af (2026-09-28)
@@ -77,10 +77,10 @@ Before writing implementation code, create **ADR-0012: Dynamic Rider Ride Servic
 
 ### PR 0 — Document the next slice
 
-- [ ] Record ADR-0012 (dynamic catalog) and ADR-0013 (Google Maps/route preview/advisory fares), including their architectural ownership, MVP limit, route/fare data semantics, server-driven UI rules and clear deferrals.
-- [ ] Update docs listed above; mark PR #83/#86 cash settlement complete, distinguish physical pilot validation from completed code.
-- [ ] Note the current vehicle-only Driver operating context, not the outdated single-global-service wording in the WORKLOG.
-- [ ] Add a focused acceptance matrix for dynamic catalog refresh, future compatible services and the new booking preview; do not replace the existing cash checklist.
+- [x] Record ADR-0012 (dynamic catalog) and ADR-0013 (Google Maps/route preview/advisory fares), including their architectural ownership, MVP limit, route/fare data semantics, server-driven UI rules and clear deferrals.
+- [x] Update docs listed above; mark PR #83/#86 cash settlement complete, distinguish physical pilot validation from completed code.
+- [x] Note the current vehicle-only Driver operating context, not the outdated single-global-service wording in the WORKLOG.
+- [x] Add a focused acceptance matrix for dynamic catalog refresh, future compatible services and the new booking preview; do not replace the existing cash checklist.
 - **Done when:** Documentation no longer names cash settlement as the next feature, accepted marketplace/dashboard/settlement rules remain consistent, and the PR is documentation-only.
 
 ### PR 1 — Dynamic Rider service catalog (backend + Flutter)
@@ -211,4 +211,4 @@ Current Google documentation to re-check when each adapter is implemented:
 - Google Maps Platform terms: https://cloud.google.com/maps-platform/terms
 - Service-specific terms: https://cloud.google.com/maps-platform/terms/maps-service-terms
 
-**Planning branch only:** This document does not implement or merge any of PR 0–6. Start only after the plan and any required production tariff decisions are approved.
+**Documentation PR branch:** ADRs and documentation for PR 0 are committed for review. PRs 1–6 remain unimplemented. Do not enable production fare suggestions without the owner's explicit approval of real per-service tariffs.
