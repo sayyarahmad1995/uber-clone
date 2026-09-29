@@ -38,7 +38,7 @@ jobs:
               before = path.read_text()
               subprocess.run(["gofmt","-w"] + [name], check=True, stdout=subprocess.DEVNULL)
               after = path.read_text()
-              a, b = before.split('\\n'), after.split('\\n')
+              a, b = before.split('\n'), after.split('\n')
               edits = [{'start': i1, 'end': i2, 'old': a[i1:i2], 'new': b[j1:j2]} for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b, autojunk=False).get_opcodes() if tag != 'equal']
               print('FORMATTED_PATCH:' + json.dumps({'path': name, 'edits': edits}), flush=True)
           PY
@@ -102,7 +102,7 @@ jobs:
               before = path.read_text()
               subprocess.run(["dart","format","--output=write"] + [name], check=True, stdout=subprocess.DEVNULL)
               after = path.read_text()
-              a, b = before.split('\\n'), after.split('\\n')
+              a, b = before.split('\n'), after.split('\n')
               edits = [{'start': i1, 'end': i2, 'old': a[i1:i2], 'new': b[j1:j2]} for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b, autojunk=False).get_opcodes() if tag != 'equal']
               print('FORMATTED_PATCH:' + json.dumps({'path': name, 'edits': edits}), flush=True)
           PY
