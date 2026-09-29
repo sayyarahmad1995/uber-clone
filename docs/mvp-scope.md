@@ -28,9 +28,13 @@ Load user account
   ↓
 Enter Rider capability
   ↓
+Fetch currently bookable ride services (next milestone)
+  ↓
 Set pickup
   ↓
 Set destination
+  ↓
+Preview road route and suggested fare (next milestone)
   ↓
 Propose fare
   ↓
@@ -65,9 +69,17 @@ Driver commercial response is the differentiator:
 
 The selected offer's agreed fare is the authoritative commercial amount for the MVP Trip. The cash-settlement and receipt milestone closes the ride loop commercially with minimal cash handling and receipt/history display, as defined by ADR-0011. It does not introduce a general payment platform.
 
-The pilot acceptance boundary for this loop is defined in [Pilot cash ride acceptance checklist](pilot-cash-ride-acceptance.md). The next implementation slice after that checklist should be selected from actual pilot blockers or the smallest visible receipt/history polish still needed for the cash ride loop.
+The pilot acceptance boundary for the existing cash loop is defined in [Pilot cash ride acceptance checklist](pilot-cash-ride-acceptance.md). The code implementing minimal cash settlement and receipts is complete, but a comprehensive physical-device pass has not yet been recorded in this document. Resolve any blocking failures before enabling the expanded booking experience in the pilot.
 
-Geographic matching is marketplace policy used to determine which Drivers are eligible to receive/discover a request and how requests/Drivers are ranked. It is not a second Rider booking mode.
+The owner-selected next feature milestone, governed by ADR-0012 and ADR-0013, is a dynamic Rider ride service catalog followed by Google Maps rendering, address search, road route/estimated duration/polyline, and service-specific advisory fare suggestions. This is an incremental improvement of the same Rider-proposed-fare flow, not an automatic-price booking mode. See [the implementation plan](superpowers/plans/2026-09-29-google-maps-rider-booking.md) and [its acceptance matrix](pilot-google-booking-acceptance.md).
+
+Geographic matching is marketplace policy used to determine which Drivers are eligible to receive/discover a request and how requests/Drivers are ranked. It is not a second Rider booking mode. Driver discovery retains its cheap Haversine straight-line distances; a Rider's selected-trip route preview uses the Google road network and must not be confused with Driver pickup ETA.
+
+## Dynamic ride services and advisory pricing (next feature milestone)
+
+The existing `driver_service_catalog` is the authoritative service list. A new authenticated Rider catalog endpoint will expose currently bookable, compatible services and their display order. The updated Flutter app fetches this list; after the initial app update, another compatible car category can be added, renamed or disabled through reviewed backend configuration and reflected at the next successful catalog refresh. Additional Driver/vehicle approval and enrollment still apply before a Driver can accept a request for the service.
+
+Each service will have a separate, versioned server-side fare policy keyed by service and currency, initially PKR. It includes an approved base fare, distance rate, time rate, minimum fare and rounding rule. The initial service-specific production amounts are pending owner approval; no invented values should enter a pilot. Suggestions are computed from the selected Google driving route, may be changed by the Rider, and never override the agreed Driver offer after selection. Once price-backed booking is activated, a service without an approved applicable policy is unavailable for that flow. A fundamentally different capability or custom booking interaction may still need an app update.
 
 ## Driver onboarding required by the MVP
 
@@ -110,7 +122,7 @@ The MVP does not include complete implementations for:
 - Other future capabilities
 - Full administrator operations
 - Enterprise dispatch algorithms
-- Advanced surge/pricing systems
+- Advanced surge/dynamic pricing systems beyond the simple versioned service-specific advisory fare policy in ADR-0013
 - Promotions/referrals/incentive systems
 - Complex fraud/risk platforms
 - Multi-region architecture

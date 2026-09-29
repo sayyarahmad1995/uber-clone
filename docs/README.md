@@ -21,7 +21,7 @@ Future implementation must be checked against these documents before a slice is 
 - Treat ride services as Driver/vehicle products, not account capabilities.
 - Let a Driver register multiple vehicles and apply each vehicle to one or more services.
 - Initial Driver onboarding applies one vehicle to one Driver-selected service; later service applications reuse the same vehicle.
-- Operate online with one verified vehicle and one approved service at a time for the MVP.
+- Operate online with one verified vehicle; marketplace eligibility includes every active approved service enrollment on that vehicle.
 - Keep approved Driver/vehicle information authoritative until a submitted revision is approved.
 - Use a separate, narrow operator boundary for Driver onboarding approval/rejection; administrator review is not a Rider/Driver capability.
 - Use one shared client application.
@@ -32,7 +32,8 @@ Future implementation must be checked against these documents before a slice is 
 - Use one Rider Ride Request flow: pickup, destination, and proposed fare.
 - Let eligible Drivers either accept the Rider proposed fare or submit a counteroffer.
 - Treat geographic logic as marketplace eligibility/distribution/ranking policy, not a Rider-selected booking mode.
-- Validate the MVP ride loop through minimal cash settlement and receipt display before introducing sophisticated payment infrastructure or unrelated product domains.
+- Maintain the implemented minimal cash settlement and receipt loop, and record its complete physical-device pilot acceptance before expanding pilot availability.
+- Next planned slice: dynamic Rider-visible ride services, Google Maps/Places/Routing and service-specific **advisory** fare estimates. The Rider still proposes the fare and selects the winning Driver offer; production pricing values require business approval.
 
 ## Documents
 
@@ -42,6 +43,10 @@ Future implementation must be checked against these documents before a slice is 
 - [ADR-0009: Driver Service and Vehicle Eligibility Model](ADR-0009-driver-service-vehicle-eligibility.md)
 - [ADR-0010: Minimal Driver Onboarding Reviewer](ADR-0010-minimal-driver-onboarding-reviewer.md)
 - [ADR-0011: Minimal Cash Settlement and Trip Receipt](ADR-0011-minimal-cash-settlement-and-receipt.md)
+- [ADR-0012: Dynamic Rider Ride Service Catalog](ADR-0012-dynamic-rider-service-catalog.md)
+- [ADR-0013: Google Maps Booking Preview and Advisory Fare](ADR-0013-google-maps-booking-preview-and-fare.md)
+- [Next milestone implementation plan](superpowers/plans/2026-09-29-google-maps-rider-booking.md)
+- [Google booking acceptance matrix](pilot-google-booking-acceptance.md)
 - [Pilot cash ride acceptance checklist](pilot-cash-ride-acceptance.md)
 - [Driver onboarding reviewer runbook](driver-onboarding-reviewer.md)
 - [Product and Capability Model](product-and-capability-model.md)
