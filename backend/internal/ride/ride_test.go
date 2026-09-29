@@ -56,3 +56,20 @@ func TestCreateRequiresValidFare(t *testing.T) {
 		if !errors.Is(err, ErrInvalidFare) { t.Fatalf("expected ErrInvalidFare for %#v, got %v", fare, err) }
 	}
 }
+
+func TestCreateAllowsCatalogOwnedFutureServiceCode(t *testing.T) {
+    repo := &fakeRepository{}
+    fare := Money{AmountMinor: 9000, Currency: "PKR"}
+    _, err := NewService(repo).Create(context.Background(), uuid.New(), CreateInput{
+        ServiceCode: "  TEST_THIRD  ",
+        Pickup: Location{Latitude: 24.86, Longitude: 67.01},
+        Destination: Location{Latitude: 24.91, Longitude: 67.08},
+        ProposedFare: &fare,
+    })
+    if err != nil {
+        t.Fatalf("future service rejected before database validation: %v", err)
+    }
+    if repo.input.ServiceCode != "test_third" {
+        t.Fatalf("service code normalization failed: %q", repo.input.ServiceCode)
+    }
+}
