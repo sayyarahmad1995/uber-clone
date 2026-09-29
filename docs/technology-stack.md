@@ -14,8 +14,9 @@
 | Secure storage | Flutter Secure Storage | Platform-specific implementations hidden behind clear boundaries |
 | Simple preferences | SharedPreferences | Keep lightweight unless offline requirements require a database |
 | Real-time/update transport | HTTP polling for ride-flow pilot | Introduce another transport only when a concrete live-update requirement justifies it |
-| Maps | flutter_map + OpenStreetMap tile adapter | Revisit the adapter only when product or platform requirements justify it |
-| Device location | geolocator behind DeviceLocation | Revisit the adapter only when platform or provider requirements justify it |
+| Maps | Implemented: flutter_map + OpenStreetMap tile adapter | Next slice: migrate **both** dashboards to Google Maps SDK for Android via google_maps_flutter behind the app-owned map boundary |
+| Device location | geolocator behind DeviceLocation | Preserve through the map migration; existing background Driver presence remains independent | 
+| Pickup/destination search | Not yet implemented | Google Places Autocomplete (New), Place Details (New) and optional reverse geocoding through authenticated Go APIs |
 
 ## Backend
 
@@ -25,6 +26,9 @@
 | Architecture | Modular monolith |
 | API | HTTP API; concrete API style finalized with first backend slice |
 | Database | PostgreSQL |
+| Ride services | Existing driver_service_catalog, currently Rider picker hardcoded | Next slice: application-owned Rider catalog API and client-driven rendering; reuse the existing table |
+| Routing | No road route API yet; marketplace uses Haversine | Next slice: Google Routes behind a provider-neutral Go port; return road route, duration and encoded polyline |
+| Fare estimate | Rider-proposed manual fare; no server calculator | Next slice: service/currency-keyed versioned fare policy and advisory estimator in Go, using the selected route |
 | Cache / fast ephemeral data | none currently required; Redis deferred until justified |
 | Authentication | application-owned HTTP/session contracts with Ory Kratos adapter |
 | Deployment | Containers |
