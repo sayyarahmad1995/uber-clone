@@ -98,3 +98,11 @@ while Rider decline affects only the selected offer and leaves the Ride Request 
 other offers intact. Rider selection remains the only assignment boundary and
 preserves Rider-selected assignment ownership. See
 [Driver readiness](flutter-driver-readiness.md).
+
+## Next planned Rider booking slice: dynamic catalog and Google Maps
+
+The current OpenStreetMap and hardcoded Economy/Comfort widget remain the implementation **until their respective PRs merge**. ADR-0012 adds authenticated catalog loading and an API-backed service picker. Re-fetch on Rider dashboard entry and app foreground/retry; an unknown catalog presentation token must have a generic icon fallback, and a disabled previously selected service invalidates its route/fare preview. The backend continues to validate service activation and Driver eligibility at write time. An additional compatible service becomes visible on an already-updated app after the next successful refresh; no push channel is required.
+
+ADR-0013 then migrates the existing application-owned `core/maps` adapter on **both** dashboards to Google Maps SDK for Android. Keep Google/plugin-specific coordinate, marker, polyline and camera types behind the shared adapter and preserve ADR-0008's panel behavior, committed extent and gesture controls. Keep `DeviceLocation`/geolocator for device location and the existing session-owned Driver background publisher. A manually adjusted map camera should not be overridden by incoming location events.
+
+Feature controllers call narrow application-owned Go APIs for place search/details, optional reverse geocoding, and road route previews. Route results are rendered on Google Maps; Flutter must not calculate an authoritative fare or present Haversine as road distance. Service-specific suggested fares arrive in the preview response with the policy version. A Rider may edit the suggestion before submitting the existing proposed-fare Ride Request; the chosen Driver offer remains the immutable Trip amount. External provider errors and invalidated stale previews must be recoverable.
