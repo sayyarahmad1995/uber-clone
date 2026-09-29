@@ -30,6 +30,8 @@ import '../features/driver_workspace/presentation/driver_readonly_surfaces.dart'
 import '../features/rider_request/application/rider_request_controller.dart';
 import '../features/rider_request/data/device_location.dart';
 import '../features/rider_request/data/ride_request_repository.dart';
+import '../features/rider_request/data/ride_service_repository.dart';
+import '../features/rider_request/domain/ride_service.dart';
 import 'config/app_config.dart';
 import 'dashboard/dashboard_panel_session.dart';
 import 'maps/map_tiles.dart';
@@ -76,6 +78,19 @@ final rideRequestRepositoryProvider = Provider<RideRequestRepository>(
     ref.watch(dioProvider),
     ref.watch(sessionStoreProvider),
   ),
+);
+final riderServiceRepositoryProvider = Provider<RideServiceRepository>(
+  (ref) => ApiRideServiceRepository(
+    ref.watch(dioProvider),
+    ref.watch(sessionStoreProvider),
+  ),
+);
+final riderServicesProvider = FutureProvider.autoDispose<List<RideService>>(
+  (ref) {
+    // A catalog from an old account must never survive an account switch.
+    ref.watch(sessionControllerProvider.select((s) => s.state.account?.id));
+    return ref.watch(riderServiceRepositoryProvider).list();
+  },
 );
 final rideFlowRepositoryProvider = Provider<RideFlowRepository>(
   (ref) => ApiRideFlowRepository(
