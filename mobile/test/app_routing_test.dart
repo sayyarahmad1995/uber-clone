@@ -800,7 +800,9 @@ Widget testApp(
     driverPresenceServiceProvider.overrideWithValue(
       presence ?? FakeDriverPresenceService(),
     ),
-    riderServiceRepositoryProvider.overrideWithValue(FakeRideServiceRepository()),
+    riderServiceRepositoryProvider.overrideWithValue(
+      FakeRideServiceRepository(),
+    ),
     rideRequestRepositoryProvider.overrideWithValue(
       rideRequests ?? FakeRideRequestRepository(requests: [requestedRide]),
     ),
