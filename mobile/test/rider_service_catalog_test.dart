@@ -22,25 +22,28 @@ void main() {
     presentationToken: 'future-icon',
   );
 
-  test('Rider catalog contract preserves future service codes and tokens', () async {
-    final adapter = _RideServicesAdapter();
-    final repository = ApiRideServiceRepository(
-      Dio(BaseOptions(baseUrl: 'http://application.test'))
-        ..httpClientAdapter = adapter,
-      _SessionStore(),
-    );
+  test(
+    'Rider catalog contract preserves future service codes and tokens',
+    () async {
+      final adapter = _RideServicesAdapter();
+      final repository = ApiRideServiceRepository(
+        Dio(BaseOptions(baseUrl: 'http://application.test'))
+          ..httpClientAdapter = adapter,
+        _SessionStore(),
+      );
 
-    final services = await repository.list();
-    expect(adapter.authorization, 'Bearer catalog-token');
-    expect(adapter.path, '/v1/ride-services');
-    expect(services.map((value) => value.code), [
-      'economy',
-      'third_car',
-      'comfort',
-    ]);
-    expect(services[1].presentationToken, 'future-icon');
-    expect(services[1].displayOrder, 15);
-  });
+      final services = await repository.list();
+      expect(adapter.authorization, 'Bearer catalog-token');
+      expect(adapter.path, '/v1/ride-services');
+      expect(services.map((value) => value.code), [
+        'economy',
+        'third_car',
+        'comfort',
+      ]);
+      expect(services[1].presentationToken, 'future-icon');
+      expect(services[1].displayOrder, 15);
+    },
+  );
 
   testWidgets('Rider can select a service that was not compiled into Flutter', (
     tester,
@@ -66,9 +69,7 @@ void main() {
             ],
           ),
         ],
-        child: const MaterialApp(
-          home: Scaffold(body: RiderServicePicker()),
-        ),
+        child: const MaterialApp(home: Scaffold(body: RiderServicePicker())),
       ),
     );
     await tester.pumpAndSettle();
@@ -97,9 +98,7 @@ void main() {
           riderRequestControllerProvider.overrideWith((ref) => controller),
           riderServiceRepositoryProvider.overrideWith((ref) => catalog),
         ],
-        child: const MaterialApp(
-          home: Scaffold(body: RiderServicePicker()),
-        ),
+        child: const MaterialApp(home: Scaffold(body: RiderServicePicker())),
       ),
     );
     await tester.pumpAndSettle();
