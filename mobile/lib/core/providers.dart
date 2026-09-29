@@ -85,13 +85,13 @@ final riderServiceRepositoryProvider = Provider<RideServiceRepository>(
     ref.watch(sessionStoreProvider),
   ),
 );
-final riderServicesProvider = FutureProvider.autoDispose<List<RideService>>(
-  (ref) {
-    // A catalog from an old account must never survive an account switch.
-    ref.watch(sessionControllerProvider.select((s) => s.state.account?.id));
-    return ref.watch(riderServiceRepositoryProvider).list();
-  },
-);
+final riderServicesProvider = FutureProvider.autoDispose<List<RideService>>((
+  ref,
+) {
+  // A catalog from an old account must never survive an account switch.
+  ref.watch(sessionControllerProvider.select((s) => s.state.account?.id));
+  return ref.watch(riderServiceRepositoryProvider).list();
+});
 final rideFlowRepositoryProvider = Provider<RideFlowRepository>(
   (ref) => ApiRideFlowRepository(
     ref.watch(dioProvider),
