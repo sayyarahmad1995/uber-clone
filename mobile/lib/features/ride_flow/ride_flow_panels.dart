@@ -603,6 +603,12 @@ class RiderServicePicker extends ConsumerWidget {
       ),
       data: (services) {
         if (services.isEmpty) {
+          if (controller.serviceCode.isNotEmpty) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!context.mounted) return;
+              ref.read(riderRequestControllerProvider).selectService('');
+            });
+          }
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
