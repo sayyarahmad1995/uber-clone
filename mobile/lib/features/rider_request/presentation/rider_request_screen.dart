@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../ride_flow/ride_flow_panels.dart';
 
-import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:latlong2/latlong.dart';
 
 import '../../../core/dashboard/ride_dashboard_scaffold.dart';
 import '../../../core/maps/ride_map.dart';
@@ -23,7 +21,7 @@ class RiderRequestScreen extends ConsumerStatefulWidget {
 class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     with WidgetsBindingObserver {
   final _fare = TextEditingController();
-  final _mapController = MapController();
+  final _mapController = RideMapController();
   bool _selectingPickup = true;
 
   @override
@@ -106,7 +104,6 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     final controller = ref.watch(riderRequestControllerProvider);
     final state = controller.state;
     final active = state.active;
-    final tiles = ref.watch(mapTilesProvider);
     final driverLocation = active == null
         ? null
         : freshDriverLocation(
@@ -127,13 +124,14 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
       maxPanelSize: 0.60,
       map: RideMap(
         mapController: _mapController,
-        tiles: tiles,
         markers: [
           ...markers,
           if (driverLocation != null)
             RideMapMarker(
-              point: LatLng(driverLocation.latitude, driverLocation.longitude),
-              icon: Icons.local_taxi,
+              point: RideMapPoint(
+                driverLocation.latitude,
+                driverLocation.longitude,
+              ),
               color: AppColors.success,
               label: 'Driver',
             ),
@@ -192,7 +190,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     );
   }
 
-  void _handleMapTap(LatLng point) {
+  void _handleMapTap(RideMapPoint point) {
     final controller = ref.read(riderRequestControllerProvider);
     final selected = GeoPoint(
       latitude: point.latitude,
@@ -210,20 +208,19 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     if (pickup != null)
       RideMapMarker(
         point: _latLng(pickup),
-        icon: Icons.my_location,
         color: AppColors.success,
         label: 'Pickup',
       ),
     if (destination != null)
       RideMapMarker(
         point: _latLng(destination),
-        icon: Icons.flag,
         color: AppColors.danger,
         label: 'Destination',
       ),
   ];
 
-  LatLng _latLng(GeoPoint point) => LatLng(point.latitude, point.longitude);
+  RideMapPoint _latLng(GeoPoint point) =>
+      RideMapPoint(point.latitude, point.longitude);
 }
 
 class _MapFocusButton extends StatelessWidget {
