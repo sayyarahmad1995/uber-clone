@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:latlong2/latlong.dart';
 
 import '../../../core/dashboard/ride_dashboard_scaffold.dart';
 import '../../../core/maps/ride_map.dart';
@@ -28,7 +26,7 @@ class DriverWorkspaceScreen extends ConsumerStatefulWidget {
 
 class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
     with WidgetsBindingObserver {
-  final _mapController = MapController();
+  final _mapController = RideMapController();
   bool _reapplying = false;
 
   @override
@@ -82,7 +80,10 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
       }
       return;
     }
-    _mapController.move(LatLng(location.latitude, location.longitude), 15);
+    await _mapController.move(
+      RideMapPoint(location.latitude, location.longitude),
+      15,
+    );
   }
 
   @override
@@ -132,29 +133,28 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
           : 'driver-onboarding-${application!.status}',
       map: RideMap(
         mapController: _mapController,
-        tiles: ref.watch(mapTilesProvider),
         markers: [
           if (location != null)
             RideMapMarker(
-              point: LatLng(location.latitude, location.longitude),
-              icon: Icons.local_taxi,
+              point: RideMapPoint(location.latitude, location.longitude),
               color: AppColors.success,
               label: 'Your published location',
             ),
           if (trip?.pickup != null)
             RideMapMarker(
-              point: LatLng(trip!.pickup!.latitude, trip.pickup!.longitude),
-              icon: Icons.my_location,
+              point: RideMapPoint(
+                trip!.pickup!.latitude,
+                trip.pickup!.longitude,
+              ),
               color: AppColors.danger,
               label: 'pickup',
             ),
           if (trip?.destination != null)
             RideMapMarker(
-              point: LatLng(
+              point: RideMapPoint(
                 trip!.destination!.latitude,
                 trip.destination!.longitude,
               ),
-              icon: Icons.flag,
               color: AppColors.danger,
               label: 'destination',
             ),
