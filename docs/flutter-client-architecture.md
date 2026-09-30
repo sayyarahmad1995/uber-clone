@@ -101,8 +101,19 @@ preserves Rider-selected assignment ownership. See
 
 ## Next planned Rider booking slice: dynamic catalog and Google Maps
 
-The current OpenStreetMap and hardcoded Economy/Comfort widget remain the implementation **until their respective PRs merge**. ADR-0012 adds authenticated catalog loading and an API-backed service picker. Re-fetch on Rider dashboard entry and app foreground/retry; an unknown catalog presentation token must have a generic icon fallback, and a disabled previously selected service invalidates its route/fare preview. The backend continues to validate service activation and Driver eligibility at write time. An additional compatible service becomes visible on an already-updated app after the next successful refresh; no push channel is required.
+ADR-0012's authenticated catalog loading and API-backed service picker are implemented in the preceding dynamic-service slice. Re-fetch on Rider dashboard entry and app foreground/retry; an unknown catalog presentation token must have a generic icon fallback, and a disabled previously selected service invalidates its route/fare preview. The backend continues to validate service activation and Driver eligibility at write time. An additional compatible service becomes visible on an already-updated app after the next successful refresh; no push channel is required.
 
-ADR-0013 then migrates the existing application-owned `core/maps` adapter on **both** dashboards to Google Maps SDK for Android. Keep Google/plugin-specific coordinate, marker, polyline and camera types behind the shared adapter and preserve ADR-0008's panel behavior, committed extent and gesture controls. Keep `DeviceLocation`/geolocator for device location and the existing session-owned Driver background publisher. A manually adjusted map camera should not be overridden by incoming location events.
+ADR-0013's shared rendering foundation migrates **both** dashboards to Google Maps SDK for Android using pinned `google_maps_flutter` 2.18.2. `RideMapPoint`, `RideMapMarker`, and `RideMapController` remain app-owned; Google coordinate/marker/controller types stay inside `core/maps`. `DeviceLocation`/geolocator and the session-owned Driver background publisher remain unchanged. Explicit focus actions may recenter the camera, while automatic Driver-location updates stop recentering after the user manually pans the map.
 
 Feature controllers call narrow application-owned Go APIs for place search/details, optional reverse geocoding, and road route previews. Route results are rendered on Google Maps; Flutter must not calculate an authoritative fare or present Haversine as road distance. Service-specific suggested fares arrive in the preview response with the policy version. A Rider may edit the suggestion before submitting the existing proposed-fare Ride Request; the chosen Driver offer remains the immutable Trip amount. External provider errors and invalidated stale previews must be recoverable.
+
+
+### Android Google Maps key configuration
+
+The Android build uses the Maps Platform Secrets Gradle Plugin. Keep the real SDK key outside Git in `mobile/android/secrets.properties`:
+
+```properties
+MAPS_API_KEY=YOUR_ANDROID_RESTRICTED_KEY
+```
+
+`mobile/android/local.defaults.properties` contains only the non-secret `DEFAULT_API_KEY` CI fallback so analysis/tests/build configuration can run without a live credential. The production/device key must be restricted to the Android application ID `com.sayyarahmad.uberclone.uber_clone` plus the relevant signing certificate fingerprints, and restricted to Maps SDK for Android. Backend Google web-service credentials remain separate and server-side.
