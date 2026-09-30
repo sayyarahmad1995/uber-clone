@@ -34,7 +34,6 @@ import '../features/rider_request/data/ride_service_repository.dart';
 import '../features/rider_request/domain/ride_service.dart';
 import 'config/app_config.dart';
 import 'dashboard/dashboard_panel_session.dart';
-import 'maps/map_tiles.dart';
 import 'models/account.dart';
 import 'session/session_store.dart';
 
@@ -62,9 +61,6 @@ final authRepositoryProvider = Provider<AuthRepository>(
     ref.watch(dioProvider),
     ref.watch(sessionStoreProvider),
   ),
-);
-final mapTilesProvider = Provider<MapTiles>(
-  (ref) => const OpenStreetMapTiles(),
 );
 final dashboardPanelSessionProvider =
     ChangeNotifierProvider<DashboardPanelSession>(
