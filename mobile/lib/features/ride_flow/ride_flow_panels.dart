@@ -568,22 +568,112 @@ DriverLocationSnapshot? freshDriverLocation(DriverLocationSnapshot? value) {
 class RiderServicePicker extends ConsumerWidget {
   const RiderServicePicker({super.key});
 
+  IconData _serviceIcon(String token) {
+    switch (token) {
+      case 'car':
+        return Icons.directions_car_outlined;
+      case 'car-front':
+        return Icons.directions_car_filled;
+      default:
+        // Unknown compatible service codes must work in existing app builds.
+        return Icons.local_taxi;
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final controller = ref.watch(riderRequestControllerProvider);
-    return DropdownButtonFormField<String>(
-      initialValue: controller.serviceCode,
-      decoration: const InputDecoration(labelText: 'Ride service'),
-      items: const [
-        DropdownMenuItem(value: 'economy', child: Text('Economy')),
-        DropdownMenuItem(value: 'comfort', child: Text('Comfort')),
-      ],
-      onChanged: controller.state.submitting
-          ? null
-          : (value) {
-              if (value != null) controller.selectService(value);
-            },
-    );
+    return ref
+        .watch(riderServicesProvider)
+        .when(
+          loading: () => const ListTile(
+            title: Text('Loading ride services...'),
+            trailing: SizedBox.square(
+              dimension: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+          error: (error, stack) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Unable to load ride services.'),
+              TextButton(
+                onPressed: () => ref.invalidate(riderServicesProvider),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+          data: (services) {
+            if (services.isEmpty) {
+              if (controller.serviceCode.isNotEmpty) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!context.mounted) return;
+                  ref.read(riderRequestControllerProvider).selectService('');
+                });
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('No ride services currently available.'),
+                  TextButton(
+                    onPressed: () => ref.invalidate(riderServicesProvider),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              );
+            }
+            final selected =
+                services.any(
+                  (service) => service.code == controller.serviceCode,
+                )
+                ? controller.serviceCode
+                : null;
+            if (selected == null && controller.serviceCode.isNotEmpty) {
+              final obsolete = controller.serviceCode;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!context.mounted) return;
+                final latest = ref.read(riderRequestControllerProvider);
+                if (latest.serviceCode == obsolete) latest.selectService('');
+              });
+            }
+            final description = services
+                .where((service) => service.code == selected)
+                .map((service) => service.description)
+                .firstOrNull;
+            return DropdownButtonFormField<String>(
+              key: ValueKey('rider-service-${selected ?? 'choose'}'),
+              initialValue: selected,
+              decoration: InputDecoration(
+                labelText: 'Ride service',
+                hintText: 'Choose an available service',
+                helperText: description?.isEmpty == false ? description : null,
+              ),
+              items: services
+                  .map(
+                    (service) => DropdownMenuItem(
+                      value: service.code,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _serviceIcon(service.presentationToken),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(service.displayName),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(growable: false),
+              onChanged: controller.state.submitting
+                  ? null
+                  : (value) {
+                      if (value != null) controller.selectService(value);
+                    },
+            );
+          },
+        );
   }
 }
 

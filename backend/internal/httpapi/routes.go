@@ -60,6 +60,7 @@ func (api *API) registerDriverRoutes(mux *http.ServeMux) {
 }
 
 func (api *API) registerRideRoutes(mux *http.ServeMux) {
+	mux.Handle("GET /v1/ride-services", api.authenticated(api.listRideServices))
 	mux.Handle("POST /v1/ride-requests", api.authenticated(api.createRideRequest))
 	mux.Handle("GET /v1/ride-requests", api.authenticated(api.listRideRequests))
 	mux.Handle("GET /v1/ride-requests/{ride_request_id}", api.authenticated(api.getRideRequestStatus))

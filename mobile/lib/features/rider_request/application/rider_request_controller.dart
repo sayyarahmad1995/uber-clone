@@ -70,6 +70,7 @@ class RiderRequestController extends ChangeNotifier {
   bool _disposed = false;
 
   void selectService(String code) {
+    if (serviceCode == code) return;
     serviceCode = code;
     if (!_disposed) {
       notifyListeners();
@@ -106,6 +107,10 @@ class RiderRequestController extends ChangeNotifier {
     required String currency,
   }) async {
     if (_state.submitting || _state.active != null) return false;
+    if (serviceCode.isEmpty) {
+      _set(_state.copyWith(error: 'Choose an available ride service.'));
+      return false;
+    }
     final pickup = _state.pickup;
     final destination = _state.destination;
     if (pickup == null || destination == null) {

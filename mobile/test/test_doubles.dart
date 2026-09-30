@@ -18,6 +18,8 @@ import 'package:uber_clone/features/driver_workspace/domain/driver_onboarding.da
 import 'package:uber_clone/features/driver_workspace/domain/driver_profile.dart';
 import 'package:uber_clone/features/rider_request/data/device_location.dart';
 import 'package:uber_clone/features/rider_request/data/ride_request_repository.dart';
+import 'package:uber_clone/features/rider_request/data/ride_service_repository.dart';
+import 'package:uber_clone/features/rider_request/domain/ride_service.dart';
 import 'package:uber_clone/features/rider_request/domain/ride_request.dart'
     hide TripSnapshot;
 
@@ -75,6 +77,32 @@ final requestedRide = RideRequest(
   status: 'requested',
   createdAt: DateTime.utc(2026, 9, 4),
 );
+
+class FakeRideServiceRepository implements RideServiceRepository {
+  FakeRideServiceRepository({
+    this.services = const [
+      RideService(
+        code: 'economy',
+        displayName: 'Economy',
+        description: 'Standard ride',
+        displayOrder: 10,
+        presentationToken: 'car',
+      ),
+      RideService(
+        code: 'comfort',
+        displayName: 'Comfort',
+        description: 'Comfort ride',
+        displayOrder: 20,
+        presentationToken: 'car-front',
+      ),
+    ],
+  });
+
+  List<RideService> services;
+
+  @override
+  Future<List<RideService>> list() async => List.of(services);
+}
 
 class FakeRideRequestRepository implements RideRequestRepository {
   FakeRideRequestRepository({List<RideRequest>? requests})
