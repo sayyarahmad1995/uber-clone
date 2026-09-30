@@ -148,9 +148,13 @@ class _RideMapState extends State<RideMap> {
     final controller = _googleController;
     if (controller == null || !point.isValid) return;
     _programmaticCameraMove = true;
-    await controller.moveCamera(
-      google.CameraUpdate.newLatLngZoom(_googlePoint(point), zoom),
-    );
+    try {
+      await controller.moveCamera(
+        google.CameraUpdate.newLatLngZoom(_googlePoint(point), zoom),
+      );
+    } finally {
+      _programmaticCameraMove = false;
+    }
   }
 
   void _onCameraMoveStarted() {
@@ -185,7 +189,7 @@ class _RideMapState extends State<RideMap> {
   }
 
   void _scheduleAutoCenter() {
-    if (_userMovedCamera) return;
+    if (_googleController == null || _userMovedCamera) return;
     final marker = _autoCenterMarker();
     if (marker == null || !marker.point.isValid) return;
 
