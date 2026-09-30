@@ -26,9 +26,9 @@
 | Architecture | Modular monolith |
 | API | HTTP API; concrete API style finalized with first backend slice |
 | Database | PostgreSQL |
-| Ride services | Existing driver_service_catalog + authenticated Rider catalog API; Flutter renders server-driven compatible services | Add operator tooling only when justified |
-| Routing | No road route API yet; marketplace uses Haversine | Next slice: Google Routes behind a provider-neutral Go port; return road route, duration and encoded polyline |
-| Fare estimate | Rider-proposed manual fare; no server calculator | Next slice: service/currency-keyed versioned fare policy and advisory estimator in Go, using the selected route |
+| Ride services | Existing driver_service_catalog + authenticated Rider catalog API; Flutter renders server-driven compatible services. Add operator tooling only when justified. |
+| Routing | No road route API yet; marketplace uses Haversine. Next slice: Google Routes behind a provider-neutral Go port returning road route, duration and encoded polyline. |
+| Fare estimate | Rider-proposed manual fare; no server calculator. Next slice: service/currency-keyed versioned fare policy and advisory estimator in Go using the selected route. |
 | Cache / fast ephemeral data | none currently required; Redis deferred until justified |
 | Authentication | application-owned HTTP/session contracts with Ory Kratos adapter |
 | Deployment | Containers |
