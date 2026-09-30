@@ -78,6 +78,19 @@ jobs:
           echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
       - run: flutter pub get
         working-directory: mobile
+      - name: Emit PR 2 formatter and lock diagnostics
+        run: |
+          dart format \
+            mobile/lib/core/maps/ride_map.dart \
+            mobile/lib/features/rider_request/presentation/rider_request_screen.dart \
+            mobile/lib/features/driver_workspace/presentation/driver_workspace_screen.dart \
+            mobile/test/ride_map_contract_test.dart
+          git diff -- mobile/pubspec.lock \
+            mobile/lib/core/maps/ride_map.dart \
+            mobile/lib/features/rider_request/presentation/rider_request_screen.dart \
+            mobile/lib/features/driver_workspace/presentation/driver_workspace_screen.dart \
+            mobile/test/ride_map_contract_test.dart
+          exit 1
       - name: Check changed Dart file formatting
         env:
           EVENT_BEFORE: ${{ github.event.before }}
