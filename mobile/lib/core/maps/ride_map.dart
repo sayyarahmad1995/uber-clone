@@ -61,11 +61,7 @@ class RideMapController {
 }
 
 class RideMapMarker {
-  const RideMapMarker({
-    required this.point,
-    required this.color,
-    this.label,
-  });
+  const RideMapMarker({required this.point, required this.color, this.label});
 
   final RideMapPoint point;
   final Color color;
