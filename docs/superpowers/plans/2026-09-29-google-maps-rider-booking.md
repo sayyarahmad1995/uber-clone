@@ -96,13 +96,15 @@ Before writing implementation code, create **ADR-0012: Dynamic Rider Ride Servic
 
 ### PR 2 — Shared Google Maps rendering foundation
 
-- [ ] Verify compatible, pinned google_maps_flutter/Android Maps SDK versions and Android build requirements before updating dependencies.
-- [ ] Implement the Google map adapter in mobile/lib/core/maps; adapt RideMap's public inputs, markers, map-tap callback and camera commands without passing provider classes into Rider/Driver features.
-- [ ] Migrate BOTH current map surfaces, current-location focus, marker presentation and cached-center handling; remove obsolete MapTiles/OpenStreetMap references once all callers are migrated.
-- [ ] Preserve dashboard panel gesture/extent regression behavior and marker access restrictions; no new ride business behavior.
-- [ ] Provide environment-specific Android API key injection without committing any key. The SDK key must be Android application-restricted (package plus signing fingerprint) and Maps-SDK-restricted; keep the backend key server-side.
-- [ ] Explicit user-initiated focus/fit should control the camera. Do not automatically recenter on each Driver location update after the user pans the map.
+- [x] Verify compatible, pinned google_maps_flutter/Android Maps SDK versions and Android build requirements before updating dependencies.
+- [x] Implement the Google map adapter in mobile/lib/core/maps; adapt RideMap's public inputs, markers, map-tap callback and camera commands without passing provider classes into Rider/Driver features.
+- [x] Migrate BOTH current map surfaces, current-location focus, marker presentation and cached-center handling; remove obsolete MapTiles/OpenStreetMap references once all callers are migrated.
+- [x] Preserve dashboard panel gesture/extent regression behavior and marker access restrictions in code/automated regressions; physical Android interaction acceptance remains outstanding.
+- [x] Provide environment-specific Android API key injection without committing any key. The SDK key must be Android application-restricted (package plus signing fingerprint) and Maps-SDK-restricted; keep the backend key server-side.
+- [x] Explicit user-initiated focus/fit should control the camera. Do not automatically recenter on each Driver location update after the user pans the map.
 - **Tests:** shared-map widget/adapter tests; Rider and Driver dashboard gesture/persistence regression; Flutter analyze/test; Android debug/release build smoke; physical-device map/permission/rotation/background checks.
+
+**PR 2 automated evidence:** Readiness passed with the pinned dependency and provider-boundary regression test. A temporary CI smoke run built both Android debug and release APKs successfully with the non-secret fallback key, then the workflow was restored. Physical-device Google map/permission/rotation/background and ADR-0008 gesture checks remain required before PR 2 is marked done.
 - **Done when:** Existing pickup/destination and Driver markers render correctly on Google maps and the prior booking behavior still works.
 
 ### PR 3 — Pickup/destination search and adjustment
