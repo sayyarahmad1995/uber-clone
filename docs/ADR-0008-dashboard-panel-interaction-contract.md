@@ -30,11 +30,13 @@ shared entry point for Rider and Driver task panels.
   with the pointer, providing direct visual feedback. Crossing the shared intent
   threshold selects expansion; on pointer release, the panel snaps to the maximum
   extent. A shorter pull snaps back to the collapsed extent.
-- At the maximum extent, content scrolls normally. A downward gesture that merely
-  returns content to its top does not minimize the panel. A new downward pull that
-  begins at the top moves the panel continuously with the pointer. Crossing the
-  shared intent threshold selects minimization; on pointer release, the panel
-  snaps to the collapsed extent. A shorter pull snaps back to the maximum extent.
+- At the maximum extent, content scrolls normally. A downward gesture first
+  returns scrolled content toward its top. Once the content reaches its top, any
+  continued downward pull may hand off to the panel and move it continuously with
+  the pointer; a fresh downward pull that begins at the top behaves the same way.
+  Crossing the shared intent threshold after handoff selects minimization; on
+  pointer release, the panel snaps to the collapsed extent. A shorter pull snaps
+  back to the maximum extent.
 - Body pulls provide continuous visual movement, but the final state transition
   executes only on pointer release. A cancelled gesture returns to its starting
   extent.

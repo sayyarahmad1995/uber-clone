@@ -403,7 +403,12 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
       return;
     }
     if (!_contentDragStartedAtTop) {
-      return;
+      if (!_canAdoptCollapseDrag(verticalDelta)) {
+        return;
+      }
+      _contentDragStartedAtTop = true;
+      _dragStartSize = _panelSize;
+      _collapsePullDistance = 0;
     }
     _collapsePullDistance = (_collapsePullDistance + verticalDelta).clamp(
       0.0,
@@ -416,6 +421,15 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
       ),
     );
   }
+
+  bool _canAdoptCollapseDrag(double verticalDelta) =>
+      verticalDelta > 0 &&
+      _committedExpanded &&
+      _expansionSettled &&
+      !_isDraggingPanel &&
+      _contentScrollController.hasClients &&
+      _contentScrollController.position.pixels <=
+          _contentScrollController.position.minScrollExtent + 0.5;
 
   void _releaseContentDrag() {
     final shouldExpand =

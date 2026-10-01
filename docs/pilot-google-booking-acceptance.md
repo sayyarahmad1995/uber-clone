@@ -27,8 +27,10 @@ Record test date, current branch/SHA, Android app build and device/version, envi
 
 **Physical-device evidence — 2026-10-01:** Rider and Driver Google Maps rendering, map taps, pickup/destination/Driver markers, explicit current-location focus, manual pan without unwanted re-centering, ADR-0008 panel interactions, rotation/background recovery and the existing Rider→Driver marketplace flow passed on Android. An online-Driver close/reopen auto-center regression was found during the first pass, fixed on `97bfd4b75b20072e19d339a4fc8b716d6ea3ac84`, and the retest passed. Places/search items below remain for PR 3.
 
+**PR 3 physical regression — 2026-10-01:** Places search succeeded after the backend Google key was supplied to the development API container. During the active Rider request flow, a dashboard scroll-handoff defect was found: after content had scrolled away from the top, a continuing downward pull could reach the top without transferring ownership to panel collapse, making the panel feel locked. The shared ADR-0008 handoff is being corrected and requires device retest before PR 3 is accepted.
+
 - [x] Rider and Driver dashboards render Google Maps, markers, current-location focus and cached location using the shared app-owned map adapter.
-- [x] Shared panel gesture sizes/ownership/scrolling and expanded/collapsed persistence still pass ADR-0008 regression on both capabilities.
+- [ ] Shared panel gesture sizes/ownership/scrolling and expanded/collapsed persistence pass ADR-0008 regression on both capabilities after the PR 3 scroll-handoff fix.
 - [ ] Rider searches for pickup and destination, selects Places results and sees readable labels and accurate pins. Dragging/adjusting a pin triggers coordinate and label reconciliation.
 - [ ] Validate no prediction, denied location permission, poor GPS, lost internet and a stale autocomplete response. No wrong-place selection or hidden provider error.
 - [ ] Google content displays over the Google map with appropriate provider attribution. No API key is shipped in committed source.
