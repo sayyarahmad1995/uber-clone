@@ -105,7 +105,7 @@ Before writing implementation code, create **ADR-0012: Dynamic Rider Ride Servic
 - **Tests:** shared-map widget/adapter tests; Rider and Driver dashboard gesture/persistence regression; Flutter analyze/test; Android debug/release build smoke; physical-device map/permission/rotation/background checks.
 
 **PR 2 automated evidence:** Readiness passed with the pinned dependency and provider-boundary regression test. A temporary CI smoke run built both Android debug and release APKs successfully with the non-secret fallback key, then the workflow was restored. Physical-device Google map/permission/rotation/background and ADR-0008 gesture checks remain required before PR 2 is marked done.
-- **Done when:** Existing pickup/destination and Driver markers render correctly on Google maps and the prior booking behavior still works.
+- **Done when:** Existing pickup/destination and Driver markers render correctly on Google maps and the prior booking behavior still works. **Done on physical Android 2026-10-01 after retesting the online-Driver restart auto-center fix.**
 
 ### PR 3 — Pickup/destination search and adjustment
 
