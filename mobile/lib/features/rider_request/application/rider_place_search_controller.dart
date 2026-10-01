@@ -316,15 +316,11 @@ class RiderPlaceSearchController extends ChangeNotifier {
     final hex = bytes
         .map((value) => value.toRadixString(16).padLeft(2, '0'))
         .join();
-    return hex.substring(0, 8) +
-        '-' +
-        hex.substring(8, 12) +
-        '-' +
-        hex.substring(12, 16) +
-        '-' +
-        hex.substring(16, 20) +
-        '-' +
-        hex.substring(20);
+    return '${hex.substring(0, 8)}-'
+        '${hex.substring(8, 12)}-'
+        '${hex.substring(12, 16)}-'
+        '${hex.substring(16, 20)}-'
+        '${hex.substring(20)}';
   }
 
   @override
