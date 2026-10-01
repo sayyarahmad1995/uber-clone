@@ -32,7 +32,10 @@ void main() {
     expect(source, contains("Key('confirmPinButton')"));
     expect(source, contains('_confirmPinSelection'));
     expect(source, contains('FloatingActionButton.extended'));
-    expect(source, contains('showCenterPin: active == null && _pinSelectionMode'));
+    expect(
+      source,
+      contains('showCenterPin: active == null && _pinSelectionMode'),
+    );
   });
 
   test('Google Maps provider types stay behind the shared map boundary', () {

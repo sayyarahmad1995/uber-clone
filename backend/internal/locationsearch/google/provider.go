@@ -202,7 +202,7 @@ func (p *Provider) nearbyNamedPlace(ctx context.Context, point locationsearch.Po
 		"locationRestriction": map[string]any{
 			"circle": map[string]any{
 				"center": map[string]any{
-					"latitude": point.Latitude,
+					"latitude":  point.Latitude,
 					"longitude": point.Longitude,
 				},
 				"radius": 50.0,
@@ -235,13 +235,13 @@ func (p *Provider) nearbyNamedPlace(ctx context.Context, point locationsearch.Po
 
 	var payload struct {
 		Places []struct {
-			ID string `json:"id"`
+			ID          string `json:"id"`
 			DisplayName struct {
 				Text string `json:"text"`
 			} `json:"displayName"`
 			FormattedAddress string `json:"formattedAddress"`
-			Location struct {
-				Latitude float64 `json:"latitude"`
+			Location         struct {
+				Latitude  float64 `json:"latitude"`
 				Longitude float64 `json:"longitude"`
 			} `json:"location"`
 		} `json:"places"`
@@ -261,9 +261,9 @@ func (p *Provider) nearbyNamedPlace(ctx context.Context, point locationsearch.Po
 			label += ", " + address
 		}
 		return locationsearch.Place{
-			PlaceID: strings.TrimSpace(candidate.ID),
-			Label: label,
-			Location: location,
+			PlaceID:     strings.TrimSpace(candidate.ID),
+			Label:       label,
+			Location:    location,
 			SnapToPlace: true,
 		}, true, nil
 	}

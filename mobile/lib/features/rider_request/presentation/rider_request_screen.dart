@@ -249,7 +249,11 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
   Future<void> _confirmPinSelection() async {
     if (!_pinSelectionMode) return;
     final field = _selectedField;
-    if (ref.read(riderPlaceSearchControllerProvider).state.field(field).resolving) {
+    if (ref
+        .read(riderPlaceSearchControllerProvider)
+        .state
+        .field(field)
+        .resolving) {
       return;
     }
     final point = _mapController.center;

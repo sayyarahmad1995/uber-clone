@@ -43,18 +43,17 @@ jobs:
             fi
           }
 
-          files=(
-            backend/internal/locationsearch/locationsearch.go
-            backend/internal/locationsearch/google/provider.go
-            backend/internal/locationsearch/google/provider_test.go
-            backend/internal/httpapi/places.go
-            backend/internal/httpapi/places_test.go
-          )
-          gofmt -w "${files[@]}"
-          echo "__GOFMT_DIFF_BEGIN__"
-          git diff -- "${files[@]}"
-          echo "__GOFMT_DIFF_END__"
-          exit 1
+          mapfile -t files < <(changed_files)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No Go files changed."
+            exit 0
+          fi
+
+          unformatted="$(gofmt -l "${files[@]}")"
+          if [ -n "$unformatted" ]; then
+            echo "$unformatted"
+            exit 1
+          fi
       - name: Guard HTTP database boundary
         run: |
           if grep -R -n -E 'api\.db|DB[[:space:]]*\*sql\.DB' backend/internal/httpapi; then
@@ -94,18 +93,13 @@ jobs:
             fi
           }
 
-          files=(
-            mobile/lib/features/rider_request/domain/place_search.dart
-            mobile/lib/features/rider_request/application/rider_place_search_controller.dart
-            mobile/lib/features/rider_request/presentation/rider_request_screen.dart
-            mobile/test/rider_place_search_test.dart
-            mobile/test/ride_map_contract_test.dart
-          )
-          dart format "${files[@]}"
-          echo "__DART_FORMAT_DIFF_BEGIN__"
-          git diff -- "${files[@]}"
-          echo "__DART_FORMAT_DIFF_END__"
-          exit 1
+          mapfile -t files < <(changed_files)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No Dart files changed."
+            exit 0
+          fi
+
+          dart format --output=none --set-exit-if-changed "${files[@]}"
       - run: dart run build_runner build --delete-conflicting-outputs
         working-directory: mobile
       - run: git diff --exit-code --ignore-space-at-eol
