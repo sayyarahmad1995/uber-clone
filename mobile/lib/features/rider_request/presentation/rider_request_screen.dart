@@ -147,7 +147,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
               label: 'Driver',
             ),
         ],
-        onTap: active == null && !_pinSelectionMode ? _handleMapTap : null,
+        onTap: active == null ? _handleMapTap : null,
         showCenterPin: active == null && _pinSelectionMode,
         centerPinColor: _selectingPickup ? AppColors.success : AppColors.danger,
       ),
@@ -231,12 +231,16 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     });
   }
 
-  void _startPinSelection() {
+  void _startPinSelection(RiderPlaceField field) {
     FocusScope.of(context).unfocus();
     DashboardPanelSessionScope.maybeOf(context)?.setExpanded(false);
+    final pickup = field == RiderPlaceField.pickup;
     final rider = ref.read(riderRequestControllerProvider).state;
-    final existing = _selectingPickup ? rider.pickup : rider.destination;
-    setState(() => _pinSelectionMode = true);
+    final existing = pickup ? rider.pickup : rider.destination;
+    setState(() {
+      _selectingPickup = pickup;
+      _pinSelectionMode = true;
+    });
     if (existing != null) {
       unawaited(_mapController.move(_latLng(existing), 16));
     }
@@ -244,6 +248,10 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
 
   Future<void> _confirmPinSelection() async {
     if (!_pinSelectionMode) return;
+    final field = _selectedField;
+    if (ref.read(riderPlaceSearchControllerProvider).state.field(field).resolving) {
+      return;
+    }
     final point = _mapController.center;
     if (point == null || !point.isValid) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -253,20 +261,26 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
       );
       return;
     }
-    final field = _selectedField;
+    final resolved = await _reconcilePoint(field, point);
+    if (!mounted || resolved == null) return;
+    if (resolved.snapToPlace) {
+      await _mapController.move(_latLng(resolved.point), 16);
+    }
+    if (!mounted) return;
     setState(() {
       _pinSelectionMode = false;
       if (field == RiderPlaceField.pickup) {
         _selectingPickup = false;
       }
     });
-    await _reconcilePoint(field, point);
   }
 
   void _handleMapTap(RideMapPoint point) {
-    final field = _selectingPickup
-        ? RiderPlaceField.pickup
-        : RiderPlaceField.destination;
+    if (_pinSelectionMode) {
+      unawaited(_mapController.move(point, 16));
+      return;
+    }
+    final field = _selectedField;
     unawaited(_reconcilePoint(field, point));
     if (_selectingPickup) {
       setState(() => _selectingPickup = false);
@@ -316,7 +330,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     );
   }
 
-  Future<void> _reconcilePoint(
+  Future<PlaceSelection?> _reconcilePoint(
     RiderPlaceField field,
     RideMapPoint mapPoint, {
     bool moveCamera = false,
@@ -328,11 +342,15 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     final resolved = await ref
         .read(riderPlaceSearchControllerProvider)
         .reconcilePin(field, point);
-    if (!mounted) return;
+    if (!mounted) return null;
     _searchController(field).text = resolved?.label ?? _formatPoint(point);
     if (moveCamera) {
-      await _mapController.move(mapPoint, 15);
+      await _mapController.move(
+        resolved == null ? mapPoint : _latLng(resolved.point),
+        15,
+      );
     }
+    return resolved;
   }
 
   TextEditingController _searchController(RiderPlaceField field) =>
@@ -405,8 +423,9 @@ class _RiderMapControls extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (pinSelectionMode) ...[
-          FilledButton.icon(
+          FloatingActionButton.extended(
             key: const Key('confirmPinButton'),
+            heroTag: 'rider-confirm-pin',
             onPressed: resolving ? null : () => onConfirmPin(),
             icon: resolving
                 ? const SizedBox.square(
@@ -415,7 +434,9 @@ class _RiderMapControls extends StatelessWidget {
                   )
                 : const Icon(Icons.check),
             label: Text(
-              'Set ${selectingPickup ? 'pickup' : 'destination'} here',
+              resolving
+                  ? 'Resolving location...'
+                  : 'Confirm ${selectingPickup ? 'pickup' : 'destination'}',
             ),
           ),
           const SizedBox(height: AppSpacing.xs),
@@ -484,7 +505,7 @@ class _RequestRidePanel extends StatelessWidget {
   final bool selectingPickup;
   final bool pinSelectionMode;
   final ValueChanged<bool> onSelectionChanged;
-  final VoidCallback onSetOnMap;
+  final ValueChanged<RiderPlaceField> onSetOnMap;
   final void Function(RiderPlaceField field, String input) onSearch;
   final Future<void> Function(RiderPlaceField field, PlaceSuggestion suggestion)
   onSuggestionSelected;
@@ -529,26 +550,15 @@ class _RequestRidePanel extends StatelessWidget {
             onSelectionChanged: (value) => onSelectionChanged(value.single),
           ),
         ),
-        const SizedBox(height: AppSpacing.xs),
-        DashboardPanelControl(
-          child: OutlinedButton.icon(
-            key: const Key('setOnMapButton'),
-            onPressed: onSetOnMap,
-            icon: const Icon(Icons.pin_drop_outlined),
-            label: Text(
-              pinSelectionMode
-                  ? 'Map pin active'
-                  : 'Set ${selectingPickup ? 'pickup' : 'destination'} on map',
-            ),
-          ),
-        ),
         const SizedBox(height: AppSpacing.sm),
         _PlaceSearchField(
           field: RiderPlaceField.pickup,
           controller: pickupSearch,
           state: placeState.pickup,
           selected: selectingPickup,
+          pinSelectionActive: pinSelectionMode && selectingPickup,
           onFocus: () => onSelectionChanged(true),
+          onSetOnMap: () => onSetOnMap(RiderPlaceField.pickup),
           onChanged: (value) => onSearch(RiderPlaceField.pickup, value),
           onSuggestionSelected: (suggestion) =>
               onSuggestionSelected(RiderPlaceField.pickup, suggestion),
@@ -559,7 +569,9 @@ class _RequestRidePanel extends StatelessWidget {
           controller: destinationSearch,
           state: placeState.destination,
           selected: !selectingPickup,
+          pinSelectionActive: pinSelectionMode && !selectingPickup,
           onFocus: () => onSelectionChanged(false),
+          onSetOnMap: () => onSetOnMap(RiderPlaceField.destination),
           onChanged: (value) => onSearch(RiderPlaceField.destination, value),
           onSuggestionSelected: (suggestion) =>
               onSuggestionSelected(RiderPlaceField.destination, suggestion),
@@ -627,7 +639,9 @@ class _PlaceSearchField extends StatelessWidget {
     required this.controller,
     required this.state,
     required this.selected,
+    required this.pinSelectionActive,
     required this.onFocus,
+    required this.onSetOnMap,
     required this.onChanged,
     required this.onSuggestionSelected,
   });
@@ -636,7 +650,9 @@ class _PlaceSearchField extends StatelessWidget {
   final TextEditingController controller;
   final PlaceFieldSearchState state;
   final bool selected;
+  final bool pinSelectionActive;
   final VoidCallback onFocus;
+  final VoidCallback onSetOnMap;
   final ValueChanged<String> onChanged;
   final ValueChanged<PlaceSuggestion> onSuggestionSelected;
 
@@ -660,17 +676,37 @@ class _PlaceSearchField extends StatelessWidget {
                   ? 'Search pickup address or place'
                   : 'Search destination address or place',
               prefixIcon: Icon(pickup ? Icons.my_location : Icons.flag),
-              suffixIcon: state.searching || state.resolving
-                  ? const Padding(
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (state.searching || state.resolving)
+                    const Padding(
                       padding: EdgeInsets.all(AppSpacing.sm),
                       child: SizedBox.square(
                         dimension: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       ),
                     )
-                  : selected
-                  ? const Icon(Icons.edit_location_alt_outlined)
-                  : null,
+                  else if (selected)
+                    const Icon(Icons.edit_location_alt_outlined),
+                  IconButton(
+                    key: Key(
+                      pickup
+                          ? 'pickupSetOnMapButton'
+                          : 'destinationSetOnMapButton',
+                    ),
+                    tooltip: pickup
+                        ? 'Set pickup on map'
+                        : 'Set destination on map',
+                    onPressed: onSetOnMap,
+                    icon: Icon(
+                      pinSelectionActive
+                          ? Icons.location_pin
+                          : Icons.pin_drop_outlined,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           if (state.suggestions.isNotEmpty)
