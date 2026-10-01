@@ -52,19 +52,13 @@ class ApiPlaceSearchRepository implements PlaceSearchRepository {
           'input': input,
           'session_token': sessionToken,
           if (bias != null)
-            'bias': {
-              'latitude': bias.latitude,
-              'longitude': bias.longitude,
-            },
+            'bias': {'latitude': bias.latitude, 'longitude': bias.longitude},
         },
         cancelToken: cancelToken,
       );
       final raw = response['suggestions'] as List? ?? const [];
       return raw
-          .map(
-            (item) =>
-                PlaceSuggestion.fromJson(item as Map<String, dynamic>),
-          )
+          .map((item) => PlaceSuggestion.fromJson(item as Map<String, dynamic>))
           .toList(growable: false);
     } finally {
       if (identical(_autocompleteTokens[sessionToken], cancelToken)) {
@@ -91,10 +85,7 @@ class ApiPlaceSearchRepository implements PlaceSearchRepository {
       final data = await _request<Map<String, dynamic>>(
         '/v1/places/reverse-geocode',
         method: 'POST',
-        data: {
-          'latitude': point.latitude,
-          'longitude': point.longitude,
-        },
+        data: {'latitude': point.latitude, 'longitude': point.longitude},
       );
       return PlaceSelection.fromJson(data);
     } on ApiException catch (error) {
