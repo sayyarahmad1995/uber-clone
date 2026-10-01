@@ -61,11 +61,17 @@ class RideMapController {
 }
 
 class RideMapMarker {
-  const RideMapMarker({required this.point, required this.color, this.label});
+  const RideMapMarker({
+    required this.point,
+    required this.color,
+    this.label,
+    this.onDragEnd,
+  });
 
   final RideMapPoint point;
   final Color color;
   final String? label;
+  final ValueChanged<RideMapPoint>? onDragEnd;
 }
 
 /// Shared Google Maps rendering boundary for Rider and Driver dashboards.
@@ -231,6 +237,12 @@ class _RideMapState extends State<RideMap> {
         '${marker.point.latitude}-${marker.point.longitude}',
       ),
       position: _googlePoint(marker.point),
+      draggable: marker.onDragEnd != null,
+      onDragEnd: marker.onDragEnd == null
+          ? null
+          : (point) => marker.onDragEnd!(
+              RideMapPoint(point.latitude, point.longitude),
+            ),
       icon: google.BitmapDescriptor.defaultMarkerWithHue(
         HSVColor.fromColor(marker.color).hue,
       ),
