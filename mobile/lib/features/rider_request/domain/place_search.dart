@@ -8,10 +8,11 @@ class PlaceSuggestion {
   final String placeId;
   final String label;
 
-  factory PlaceSuggestion.fromJson(Map<String, dynamic> json) => PlaceSuggestion(
-    placeId: json['place_id'] as String,
-    label: json['label'] as String,
-  );
+  factory PlaceSuggestion.fromJson(Map<String, dynamic> json) =>
+      PlaceSuggestion(
+        placeId: json['place_id'] as String,
+        label: json['label'] as String,
+      );
 }
 
 class PlaceSelection {
