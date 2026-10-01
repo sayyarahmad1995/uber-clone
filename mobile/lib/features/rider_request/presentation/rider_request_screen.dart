@@ -6,6 +6,7 @@ import '../../ride_flow/ride_flow_panels.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/dashboard/dashboard_panel_session.dart';
 import '../../../core/dashboard/ride_dashboard_scaffold.dart';
 import '../../../core/maps/ride_map.dart';
 import '../../../core/providers.dart';
