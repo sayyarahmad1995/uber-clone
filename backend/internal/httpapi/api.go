@@ -11,6 +11,7 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/driveronboarding"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/drivertrip"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/identity"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/locationsearch"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/offer"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/ride"
@@ -37,8 +38,10 @@ type Dependencies struct {
 	Offers                 offer.Service
 	MarketplaceAssignments marketplace.AssignmentService
 	MarketplacePolicy      marketplace.PolicyService
-	Trips                  trip.Service
-	Identity               identity.Provider
+	Trips                           trip.Service
+	LocationSearch                  locationsearch.Searcher
+	LocationSearchRequestsPerMinute int
+	Identity                        identity.Provider
 	Auth                   auth.Handler
 	AdminReviewUsername    string
 	AdminReviewPassword    string
@@ -61,8 +64,10 @@ type API struct {
 	offers                 offer.Service
 	marketplaceAssignments marketplace.AssignmentService
 	marketplacePolicy      marketplace.PolicyService
-	trips                  trip.Service
-	identity               identity.Provider
+	trips                 trip.Service
+	locationSearch        locationsearch.Searcher
+	locationSearchLimiter *userWindowLimiter
+	identity              identity.Provider
 	auth                   auth.Handler
 	adminReviewUsername    string
 	adminReviewPassword    string
@@ -86,8 +91,10 @@ func New(deps Dependencies) *API {
 		offers:                 deps.Offers,
 		marketplaceAssignments: deps.MarketplaceAssignments,
 		marketplacePolicy:      deps.MarketplacePolicy,
-		trips:                  deps.Trips,
-		identity:               deps.Identity,
+		trips:                 deps.Trips,
+		locationSearch:        deps.LocationSearch,
+		locationSearchLimiter: newUserWindowLimiter(deps.LocationSearchRequestsPerMinute),
+		identity:              deps.Identity,
 		auth:                   deps.Auth,
 		adminReviewUsername:    deps.AdminReviewUsername,
 		adminReviewPassword:    deps.AdminReviewPassword,

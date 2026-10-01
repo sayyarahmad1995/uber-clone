@@ -17,6 +17,8 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/httpapi"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/identity"
 	identitykratos "github.com/sayyarahmad1995/uber-clone/backend/internal/identity/kratos"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/locationsearch"
+	locationsearchgoogle "github.com/sayyarahmad1995/uber-clone/backend/internal/locationsearch/google"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/offer"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/database"
@@ -54,6 +56,9 @@ func newApplication(cfg config) (application, func(), error) {
 	)
 	marketplacePolicyService := marketplace.NewPolicyService(db)
 	driverOnboardingRepository := driveronboarding.NewPostgresRepository(db)
+	locationSearchService := locationsearch.NewService(
+		locationsearchgoogle.New(cfg.GoogleMapsServerAPIKey),
+	)
 	api := httpapi.New(httpapi.Dependencies{
 		Health:                 db,
 		Users:                  user.NewService(user.NewPostgresRepository(db)),
@@ -69,9 +74,11 @@ func newApplication(cfg config) (application, func(), error) {
 		Cancellations:          cancellation.NewService(cancellation.NewPostgresRepository(db)),
 		Offers:                 offer.NewService(offer.NewPostgresRepository(db)),
 		MarketplaceAssignments: marketplaceAssignmentService,
-		MarketplacePolicy:      marketplacePolicyService,
-		Trips:                  tripService,
-		Identity:               identityProvider,
+		MarketplacePolicy:               marketplacePolicyService,
+		Trips:                           tripService,
+		LocationSearch:                  locationSearchService,
+		LocationSearchRequestsPerMinute: cfg.LocationSearchRequestsPerMinute,
+		Identity:                        identityProvider,
 		Auth:                   auth.NewHandler(auth.NewService(authProvider)),
 		AdminReviewUsername:    cfg.AdminReviewUsername,
 		AdminReviewPassword:    cfg.AdminReviewPassword,

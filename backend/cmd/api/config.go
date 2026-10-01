@@ -4,6 +4,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -16,7 +17,9 @@ type config struct {
 	KratosAdminURL      string
 	AdminReviewUsername string
 	AdminReviewPassword string
-	AdminReviewOrigin   string
+	AdminReviewOrigin               string
+	GoogleMapsServerAPIKey           string
+	LocationSearchRequestsPerMinute int
 }
 
 func loadConfig() config {
@@ -29,7 +32,9 @@ func loadConfig() config {
 		KratosAdminURL:      getenv("KRATOS_ADMIN_URL", "http://kratos:4434"),
 		AdminReviewUsername: os.Getenv("ADMIN_REVIEW_USERNAME"),
 		AdminReviewPassword: os.Getenv("ADMIN_REVIEW_PASSWORD"),
-		AdminReviewOrigin:   normalizeOrigin(os.Getenv("ADMIN_REVIEW_ORIGIN")),
+		AdminReviewOrigin:               normalizeOrigin(os.Getenv("ADMIN_REVIEW_ORIGIN")),
+		GoogleMapsServerAPIKey:           strings.TrimSpace(os.Getenv("GOOGLE_MAPS_SERVER_API_KEY")),
+		LocationSearchRequestsPerMinute: getenvInt("LOCATION_SEARCH_REQUESTS_PER_MINUTE", 60),
 	}
 }
 
@@ -63,4 +68,17 @@ func normalizeOrigin(raw string) string {
 		}
 	}
 	return scheme + "://" + host
+}
+
+
+func getenvInt(key string, fallback int) int {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
 }
