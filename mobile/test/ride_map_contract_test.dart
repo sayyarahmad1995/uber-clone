@@ -27,9 +27,11 @@ void main() {
       'lib/features/rider_request/presentation/rider_request_screen.dart',
     ).readAsStringSync();
 
-    expect(source, contains("Key('setOnMapButton')"));
+    expect(source, contains("'pickupSetOnMapButton'"));
+    expect(source, contains("'destinationSetOnMapButton'"));
     expect(source, contains("Key('confirmPinButton')"));
     expect(source, contains('_confirmPinSelection'));
+    expect(source, contains('FloatingActionButton.extended'));
     expect(source, contains('showCenterPin: active == null && _pinSelectionMode'));
   });
 

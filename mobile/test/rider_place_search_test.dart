@@ -126,13 +126,49 @@ void main() {
     );
   });
 
-  test('reverse geocode keeps the exact Rider pin coordinates', () async {
+  test(
+    'reverse geocode keeps exact pin when no named place is available',
+    () async {
+      final rider = RiderRequestController(
+        FakeRideRequestRepository(),
+        const FakeDeviceLocation(),
+      );
+      addTearDown(rider.dispose);
+      final places = _FakePlaceSearchRepository();
+      final controller = RiderPlaceSearchController(
+        places,
+        rider,
+        const FakeDeviceLocation(),
+      );
+      addTearDown(controller.dispose);
+
+      const pin = GeoPoint(latitude: 24.86123, longitude: 67.01987);
+      final resolved = await controller.reconcilePin(
+        RiderPlaceField.pickup,
+        pin,
+      );
+
+      expect(resolved!.label, 'Pinned Road, Karachi');
+      expect(resolved.snapToPlace, isFalse);
+      expect(resolved.point, pin);
+      expect(rider.state.pickup, pin);
+      expect(controller.state.pickup.label, 'Pinned Road, Karachi');
+    },
+  );
+
+  test('reverse geocode snaps Rider pin to a nearby named place', () async {
     final rider = RiderRequestController(
       FakeRideRequestRepository(),
       const FakeDeviceLocation(),
     );
     addTearDown(rider.dispose);
-    final places = _FakePlaceSearchRepository();
+    final places = _FakePlaceSearchRepository()
+      ..reverseSelection = const PlaceSelection(
+        placeId: 'named-1',
+        label: 'Named Place, Islamabad',
+        point: GeoPoint(latitude: 33.7295, longitude: 73.0372),
+        snapToPlace: true,
+      );
     final controller = RiderPlaceSearchController(
       places,
       rider,
@@ -140,13 +176,16 @@ void main() {
     );
     addTearDown(controller.dispose);
 
-    const pin = GeoPoint(latitude: 24.86123, longitude: 67.01987);
-    final resolved = await controller.reconcilePin(RiderPlaceField.pickup, pin);
+    const pin = GeoPoint(latitude: 33.7294, longitude: 73.0371);
+    final resolved = await controller.reconcilePin(
+      RiderPlaceField.destination,
+      pin,
+    );
 
-    expect(resolved!.label, 'Pinned Road, Karachi');
-    expect(resolved.point, pin);
-    expect(rider.state.pickup, pin);
-    expect(controller.state.pickup.label, 'Pinned Road, Karachi');
+    expect(resolved!.snapToPlace, isTrue);
+    expect(resolved.point, places.reverseSelection.point);
+    expect(rider.state.destination, places.reverseSelection.point);
+    expect(controller.state.destination.label, 'Named Place, Islamabad');
   });
 }
 
@@ -161,6 +200,11 @@ class _FakePlaceSearchRepository implements PlaceSearchRepository {
   final autocompleteCalls = <_AutocompleteCall>[];
   final detailsTokens = <String>[];
   Completer<List<PlaceSuggestion>>? firstAutocomplete;
+  PlaceSelection reverseSelection = const PlaceSelection(
+    placeId: 'pin-1',
+    label: 'Pinned Road, Karachi',
+    point: GeoPoint(latitude: 24.86, longitude: 67.02),
+  );
 
   @override
   Future<List<PlaceSuggestion>> autocomplete({
@@ -195,11 +239,7 @@ class _FakePlaceSearchRepository implements PlaceSearchRepository {
 
   @override
   Future<PlaceSelection?> reverseGeocode(GeoPoint point) async =>
-      const PlaceSelection(
-        placeId: 'pin-1',
-        label: 'Pinned Road, Karachi',
-        point: GeoPoint(latitude: 24.86, longitude: 67.02),
-      );
+      reverseSelection;
 
   @override
   void cancelSession(String sessionToken) {}
@@ -255,6 +295,7 @@ class _PlacesAdapter implements HttpClientAdapter {
         'label': 'Pinned Road, Karachi',
         'latitude': 24.87,
         'longitude': 67.02,
+        'snap_to_place': false,
       });
     }
     return ResponseBody.fromString(
