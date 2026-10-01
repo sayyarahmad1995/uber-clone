@@ -114,10 +114,7 @@ class RiderPlaceSearchController extends ChangeNotifier {
       return;
     }
 
-    final sessionToken = _sessionTokens.putIfAbsent(
-      field,
-      _newSessionToken,
-    );
+    final sessionToken = _sessionTokens.putIfAbsent(field, _newSessionToken);
     _debounces[field] = Timer(
       const Duration(milliseconds: 300),
       () => unawaited(
@@ -161,10 +158,7 @@ class RiderPlaceSearchController extends ChangeNotifier {
       );
       if (!_isCurrent(field, revision)) return null;
       _applyPoint(field, selected.point);
-      _setField(
-        field,
-        PlaceFieldSearchState(label: selected.label),
-      );
+      _setField(field, PlaceFieldSearchState(label: selected.label));
       return selected;
     } catch (error) {
       if (!_isCurrent(field, revision)) return null;
@@ -190,10 +184,7 @@ class RiderPlaceSearchController extends ChangeNotifier {
     _debounces.remove(field)?.cancel();
     final revision = _nextRevision(field);
     _applyPoint(field, point);
-    _setField(
-      field,
-      const PlaceFieldSearchState(resolving: true),
-    );
+    _setField(field, const PlaceFieldSearchState(resolving: true));
 
     try {
       final resolved = await _repository.reverseGeocode(point);
@@ -212,17 +203,11 @@ class RiderPlaceSearchController extends ChangeNotifier {
         label: resolved.label,
         point: point,
       );
-      _setField(
-        field,
-        PlaceFieldSearchState(label: precise.label),
-      );
+      _setField(field, PlaceFieldSearchState(label: precise.label));
       return precise;
     } catch (error) {
       if (!_isCurrent(field, revision)) return null;
-      _setField(
-        field,
-        PlaceFieldSearchState(error: _message(error)),
-      );
+      _setField(field, PlaceFieldSearchState(error: _message(error)));
       return null;
     }
   }
