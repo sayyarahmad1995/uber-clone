@@ -110,7 +110,7 @@ class RiderPlaceSearchController extends ChangeNotifier {
     );
 
     if (input.length < 3) {
-      if (input.isEmpty) _endSession(field);
+      _endSession(field);
       return;
     }
 
