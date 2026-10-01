@@ -267,8 +267,7 @@ class _RideMapState extends State<RideMap> {
                   Icons.location_pin,
                   key: const Key('rideMapCenterPin'),
                   size: 48,
-                  color:
-                      widget.centerPinColor ??
+                  color: widget.centerPinColor ??
                       Theme.of(context).colorScheme.primary,
                 ),
               ),

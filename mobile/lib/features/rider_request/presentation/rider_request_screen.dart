@@ -154,8 +154,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
         onFocus: _focusCurrentLocation,
         pinSelectionMode: active == null && _pinSelectionMode,
         selectingPickup: _selectingPickup,
-        resolving:
-            active == null && placeState.field(_selectedField).resolving,
+        resolving: active == null && placeState.field(_selectedField).resolving,
         onConfirmPin: _confirmPinSelection,
       ),
       floatingStatus: DashboardStatusCard(
