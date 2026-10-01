@@ -22,6 +22,9 @@ Record test date, current branch/SHA, Android app build and device/version, envi
 
 ## 2. Shared map and places
 
+**PR 3 automated evidence:** Backend-owned Places/Geocoding adapters use narrow field masks and a five-second provider timeout; app endpoints require Rider capability and apply a configurable per-user request guard. Flutter uses independent UUID-style pickup/destination sessions, 300 ms debounce, cancellation plus stale-response guards, and provider-neutral draggable pins. Physical search/select/drag and adverse-network/location checks remain open.
+
+
 **Physical-device evidence — 2026-10-01:** Rider and Driver Google Maps rendering, map taps, pickup/destination/Driver markers, explicit current-location focus, manual pan without unwanted re-centering, ADR-0008 panel interactions, rotation/background recovery and the existing Rider→Driver marketplace flow passed on Android. An online-Driver close/reopen auto-center regression was found during the first pass, fixed on `97bfd4b75b20072e19d339a4fc8b716d6ea3ac84`, and the retest passed. Places/search items below remain for PR 3.
 
 - [x] Rider and Driver dashboards render Google Maps, markers, current-location focus and cached location using the shared app-owned map adapter.
