@@ -46,46 +46,49 @@ void main() {
     expect(reverse!.label, 'Pinned Road, Karachi');
   });
 
-  test('pickup and destination use independent autocomplete sessions', () async {
-    final rider = RiderRequestController(
-      FakeRideRequestRepository(),
-      const FakeDeviceLocation(),
-    );
-    addTearDown(rider.dispose);
-    final places = _FakePlaceSearchRepository();
-    final controller = RiderPlaceSearchController(
-      places,
-      rider,
-      const FakeDeviceLocation(),
-    );
-    addTearDown(controller.dispose);
+  test(
+    'pickup and destination use independent autocomplete sessions',
+    () async {
+      final rider = RiderRequestController(
+        FakeRideRequestRepository(),
+        const FakeDeviceLocation(),
+      );
+      addTearDown(rider.dispose);
+      final places = _FakePlaceSearchRepository();
+      final controller = RiderPlaceSearchController(
+        places,
+        rider,
+        const FakeDeviceLocation(),
+      );
+      addTearDown(controller.dispose);
 
-    controller.search(RiderPlaceField.pickup, 'Clifton');
-    controller.search(RiderPlaceField.destination, 'Airport');
-    await Future<void>.delayed(const Duration(milliseconds: 350));
+      controller.search(RiderPlaceField.pickup, 'Clifton');
+      controller.search(RiderPlaceField.destination, 'Airport');
+      await Future<void>.delayed(const Duration(milliseconds: 350));
 
-    expect(places.autocompleteCalls, hasLength(2));
-    final pickupToken = places.autocompleteCalls
-        .firstWhere((call) => call.input == 'Clifton')
-        .sessionToken;
-    final destinationToken = places.autocompleteCalls
-        .firstWhere((call) => call.input == 'Airport')
-        .sessionToken;
-    expect(pickupToken, isNot(destinationToken));
+      expect(places.autocompleteCalls, hasLength(2));
+      final pickupToken = places.autocompleteCalls
+          .firstWhere((call) => call.input == 'Clifton')
+          .sessionToken;
+      final destinationToken = places.autocompleteCalls
+          .firstWhere((call) => call.input == 'Airport')
+          .sessionToken;
+      expect(pickupToken, isNot(destinationToken));
 
-    await controller.select(
-      RiderPlaceField.pickup,
-      const PlaceSuggestion(placeId: 'pickup-1', label: 'Clifton'),
-    );
-    expect(places.detailsTokens.single, pickupToken);
+      await controller.select(
+        RiderPlaceField.pickup,
+        const PlaceSuggestion(placeId: 'pickup-1', label: 'Clifton'),
+      );
+      expect(places.detailsTokens.single, pickupToken);
 
-    controller.search(RiderPlaceField.pickup, 'Sea View');
-    await Future<void>.delayed(const Duration(milliseconds: 350));
-    final secondPickupToken = places.autocompleteCalls
-        .firstWhere((call) => call.input == 'Sea View')
-        .sessionToken;
-    expect(secondPickupToken, isNot(pickupToken));
-  });
+      controller.search(RiderPlaceField.pickup, 'Sea View');
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      final secondPickupToken = places.autocompleteCalls
+          .firstWhere((call) => call.input == 'Sea View')
+          .sessionToken;
+      expect(secondPickupToken, isNot(pickupToken));
+    },
+  );
 
   test('late autocomplete result cannot replace a newer query', () async {
     final rider = RiderRequestController(
@@ -138,10 +141,7 @@ void main() {
     addTearDown(controller.dispose);
 
     const pin = GeoPoint(latitude: 24.86123, longitude: 67.01987);
-    final resolved = await controller.reconcilePin(
-      RiderPlaceField.pickup,
-      pin,
-    );
+    final resolved = await controller.reconcilePin(RiderPlaceField.pickup, pin);
 
     expect(resolved!.label, 'Pinned Road, Karachi');
     expect(resolved.point, pin);
@@ -241,8 +241,7 @@ class _PlacesAdapter implements HttpClientAdapter {
       });
     }
     if (options.path == '/v1/places/p1') {
-      detailsSessionToken =
-          options.queryParameters['session_token'] as String?;
+      detailsSessionToken = options.queryParameters['session_token'] as String?;
       return _json({
         'place_id': 'p1',
         'label': 'Clifton, Karachi',
