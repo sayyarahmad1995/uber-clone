@@ -23,29 +23,29 @@ import (
 )
 
 type Dependencies struct {
-	Health                 interface{ PingContext(context.Context) error }
-	Users                  user.Service
-	Drivers                driver.Service
-	DriverOnboarding       driveronboarding.Service
-	DriverOnboardingReview driveronboarding.ReviewService
-	DriverLocations        driverlocation.Service
-	DriverTrips            drivertrip.Service
-	RiderLocations         riderlocation.Service
-	Rides                  ride.Service
-	RideServices           rideservice.Service
-	RideStatuses           ridestatus.Service
-	Cancellations          cancellation.Service
-	Offers                 offer.Service
-	MarketplaceAssignments marketplace.AssignmentService
-	MarketplacePolicy      marketplace.PolicyService
+	Health                          interface{ PingContext(context.Context) error }
+	Users                           user.Service
+	Drivers                         driver.Service
+	DriverOnboarding                driveronboarding.Service
+	DriverOnboardingReview          driveronboarding.ReviewService
+	DriverLocations                 driverlocation.Service
+	DriverTrips                     drivertrip.Service
+	RiderLocations                  riderlocation.Service
+	Rides                           ride.Service
+	RideServices                    rideservice.Service
+	RideStatuses                    ridestatus.Service
+	Cancellations                   cancellation.Service
+	Offers                          offer.Service
+	MarketplaceAssignments          marketplace.AssignmentService
+	MarketplacePolicy               marketplace.PolicyService
 	Trips                           trip.Service
 	LocationSearch                  locationsearch.Searcher
 	LocationSearchRequestsPerMinute int
 	Identity                        identity.Provider
-	Auth                   auth.Handler
-	AdminReviewUsername    string
-	AdminReviewPassword    string
-	AdminReviewOrigin      string
+	Auth                            auth.Handler
+	AdminReviewUsername             string
+	AdminReviewPassword             string
+	AdminReviewOrigin               string
 }
 
 type API struct {
@@ -64,10 +64,10 @@ type API struct {
 	offers                 offer.Service
 	marketplaceAssignments marketplace.AssignmentService
 	marketplacePolicy      marketplace.PolicyService
-	trips                 trip.Service
-	locationSearch        locationsearch.Searcher
-	locationSearchLimiter *userWindowLimiter
-	identity              identity.Provider
+	trips                  trip.Service
+	locationSearch         locationsearch.Searcher
+	locationSearchLimiter  *userWindowLimiter
+	identity               identity.Provider
 	auth                   auth.Handler
 	adminReviewUsername    string
 	adminReviewPassword    string
@@ -91,10 +91,10 @@ func New(deps Dependencies) *API {
 		offers:                 deps.Offers,
 		marketplaceAssignments: deps.MarketplaceAssignments,
 		marketplacePolicy:      deps.MarketplacePolicy,
-		trips:                 deps.Trips,
-		locationSearch:        deps.LocationSearch,
-		locationSearchLimiter: newUserWindowLimiter(deps.LocationSearchRequestsPerMinute),
-		identity:              deps.Identity,
+		trips:                  deps.Trips,
+		locationSearch:         deps.LocationSearch,
+		locationSearchLimiter:  newUserWindowLimiter(deps.LocationSearchRequestsPerMinute),
+		identity:               deps.Identity,
 		auth:                   deps.Auth,
 		adminReviewUsername:    deps.AdminReviewUsername,
 		adminReviewPassword:    deps.AdminReviewPassword,
