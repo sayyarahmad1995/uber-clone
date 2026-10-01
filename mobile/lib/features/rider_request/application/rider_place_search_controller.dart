@@ -183,7 +183,6 @@ class RiderPlaceSearchController extends ChangeNotifier {
     _endSession(field);
     _debounces.remove(field)?.cancel();
     final revision = _nextRevision(field);
-    _applyPoint(field, point);
     _setField(field, const PlaceFieldSearchState(resolving: true));
 
     try {
@@ -198,13 +197,15 @@ class RiderPlaceSearchController extends ChangeNotifier {
         );
         return null;
       }
-      final precise = PlaceSelection(
+      final selection = PlaceSelection(
         placeId: resolved.placeId,
         label: resolved.label,
-        point: point,
+        point: resolved.snapToPlace ? resolved.point : point,
+        snapToPlace: resolved.snapToPlace,
       );
-      _setField(field, PlaceFieldSearchState(label: precise.label));
-      return precise;
+      _applyPoint(field, selection.point);
+      _setField(field, PlaceFieldSearchState(label: selection.label));
+      return selection;
     } catch (error) {
       if (!_isCurrent(field, revision)) return null;
       _setField(field, PlaceFieldSearchState(error: _message(error)));
