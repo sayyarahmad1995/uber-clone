@@ -1,0 +1,103 @@
+package google
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/locationsearch"
+)
+
+func TestAutocompleteUsesSessionTokenBiasAndNarrowFieldMask(t *testing.T) {
+	var body map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/places:autocomplete" || r.Method != http.MethodPost {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		if r.Header.Get("X-Goog-Api-Key") != "server-key" {
+			t.Fatal("server API key header missing")
+		}
+		if got := r.Header.Get("X-Goog-FieldMask"); strings.Contains(got, "*") || !strings.Contains(got, "placeId") || !strings.Contains(got, "text.text") {
+			t.Fatalf("unexpected field mask: %q", got)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"suggestions":[{"placePrediction":{"placeId":"p1","text":{"text":"Clifton, Karachi"}}}]}`))
+	}))
+	defer server.Close()
+
+	provider := newProvider("server-key", server.Client(), server.URL, server.URL)
+	bias := locationsearch.Point{Latitude: 24.86, Longitude: 67.01}
+	items, err := provider.Autocomplete(context.Background(), locationsearch.AutocompleteInput{
+		Query: "Clifton", SessionToken: "session-1", Bias: &bias,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || items[0].PlaceID != "p1" {
+		t.Fatalf("unexpected suggestions: %#v", items)
+	}
+	if body["sessionToken"] != "session-1" {
+		t.Fatalf("session token missing: %#v", body)
+	}
+	if body["locationBias"] == nil {
+		t.Fatalf("location bias missing: %#v", body)
+	}
+}
+
+func TestDetailsConcludesSessionWithoutProFields(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/places/p1" {
+			t.Fatalf("unexpected details path: %s", r.URL.Path)
+		}
+		if r.URL.Query().Get("sessionToken") != "session-1" {
+			t.Fatalf("missing details session token: %s", r.URL.RawQuery)
+		}
+		if got := r.Header.Get("X-Goog-FieldMask"); got != "id,formattedAddress,location" {
+			t.Fatalf("unexpected details mask: %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"p1","formattedAddress":"Clifton, Karachi","location":{"latitude":24.82,"longitude":67.03}}`))
+	}))
+	defer server.Close()
+
+	provider := newProvider("server-key", server.Client(), server.URL, server.URL)
+	place, err := provider.Details(context.Background(), "p1", "session-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if place.Label != "Clifton, Karachi" || place.Location.Latitude != 24.82 {
+		t.Fatalf("unexpected place: %#v", place)
+	}
+}
+
+func TestReverseGeocodeUsesGeocodingV4AndFirstReadableResult(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v4/geocode/location" {
+			t.Fatalf("unexpected reverse path: %s", r.URL.Path)
+		}
+		if r.URL.Query().Get("location.latitude") != "24.86" || r.URL.Query().Get("location.longitude") != "67.01" {
+			t.Fatalf("unexpected coordinates: %s", r.URL.RawQuery)
+		}
+		if got := r.Header.Get("X-Goog-FieldMask"); !strings.Contains(got, "formattedAddress") {
+			t.Fatalf("missing reverse field mask: %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"results":[{"placeId":"pin-1","formattedAddress":"Test Road, Karachi","location":{"latitude":24.86,"longitude":67.01}}]}`))
+	}))
+	defer server.Close()
+
+	provider := newProvider("server-key", server.Client(), server.URL, server.URL)
+	place, err := provider.ReverseGeocode(context.Background(), locationsearch.Point{Latitude: 24.86, Longitude: 67.01})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if place.Label != "Test Road, Karachi" || place.PlaceID != "pin-1" {
+		t.Fatalf("unexpected reverse result: %#v", place)
+	}
+}
