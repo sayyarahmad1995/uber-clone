@@ -34,6 +34,29 @@ void main() {
     expect(controller.operation!.vehicleId, 'test-vehicle');
   });
 
+
+  test('online restart hydrates map location with one foreground publish', () async {
+    final repo = FakeDriverRepository(
+      profile: driverProfile.copyWith(isOnline: true),
+    );
+    final presence = FakeDriverPresenceService()..runningFor = 'user-1';
+    final controller = await create(
+      repo,
+      const FakeDeviceLocation(),
+      presence,
+    );
+
+    for (var attempt = 0; attempt < 10 && controller.location == null; attempt++) {
+      await Future<void>.delayed(Duration.zero);
+    }
+
+    expect(controller.profile!.isOnline, isTrue);
+    expect(controller.onlinePresenceReady, isTrue);
+    expect(controller.location, isNotNull);
+    expect(repo.calls.where((call) => call == 'location'), hasLength(1));
+    expect(presence.events, isEmpty);
+  });
+
   test(
     'background leaves online state intact and resume reloads server truth',
     () async {

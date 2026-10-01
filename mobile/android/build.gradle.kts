@@ -1,3 +1,9 @@
+subprojects {
+    tasks.withType<JavaCompile>().configureEach {
+        options.compilerArgs.add("-Xlint:-options")
+    }
+}
+
 allprojects {
     repositories {
         google()
