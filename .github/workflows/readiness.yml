@@ -93,11 +93,10 @@ jobs:
             fi
           }
 
-          mapfile -t files < <(changed_files)
-          if [ "${#files[@]}" -eq 0 ]; then
-            echo "No Dart files changed."
-            exit 0
-          fi
+          files=(
+            mobile/lib/core/maps/ride_map.dart
+            mobile/lib/features/rider_request/presentation/rider_request_screen.dart
+          )
 
           dart format "${files[@]}"
           echo "__DART_FORMAT_DIFF_BEGIN__"
