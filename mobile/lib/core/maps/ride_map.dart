@@ -244,8 +244,9 @@ class _RideMapState extends State<RideMap> {
           onMapCreated: _onMapCreated,
           onTap: widget.onTap == null
               ? null
-              : (point) =>
-                    widget.onTap!(RideMapPoint(point.latitude, point.longitude)),
+              : (point) => widget.onTap!(
+                  RideMapPoint(point.latitude, point.longitude),
+                ),
           onCameraMoveStarted: _onCameraMoveStarted,
           onCameraMove: _onCameraMove,
           onCameraIdle: _onCameraIdle,
@@ -267,7 +268,8 @@ class _RideMapState extends State<RideMap> {
                   Icons.location_pin,
                   key: const Key('rideMapCenterPin'),
                   size: 48,
-                  color: widget.centerPinColor ??
+                  color:
+                      widget.centerPinColor ??
                       Theme.of(context).colorScheme.primary,
                 ),
               ),

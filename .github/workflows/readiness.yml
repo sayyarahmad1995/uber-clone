@@ -93,16 +93,13 @@ jobs:
             fi
           }
 
-          files=(
-            mobile/lib/core/maps/ride_map.dart
-            mobile/lib/features/rider_request/presentation/rider_request_screen.dart
-          )
+          mapfile -t files < <(changed_files)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No Dart files changed."
+            exit 0
+          fi
 
-          dart format "${files[@]}"
-          echo "__DART_FORMAT_DIFF_BEGIN__"
-          git diff -- "${files[@]}"
-          echo "__DART_FORMAT_DIFF_END__"
-          exit 1
+          dart format --output=none --set-exit-if-changed "${files[@]}"
       - run: dart run build_runner build --delete-conflicting-outputs
         working-directory: mobile
       - run: git diff --exit-code --ignore-space-at-eol

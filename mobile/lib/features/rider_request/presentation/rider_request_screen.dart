@@ -219,9 +219,8 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     );
   }
 
-  RiderPlaceField get _selectedField => _selectingPickup
-      ? RiderPlaceField.pickup
-      : RiderPlaceField.destination;
+  RiderPlaceField get _selectedField =>
+      _selectingPickup ? RiderPlaceField.pickup : RiderPlaceField.destination;
 
   void _selectField(bool pickup) {
     if (_selectingPickup == pickup && !_pinSelectionMode) return;
@@ -247,7 +246,9 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     final point = _mapController.center;
     if (point == null || !point.isValid) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Move the map before confirming the pin.')),
+        const SnackBar(
+          content: Text('Move the map before confirming the pin.'),
+        ),
       );
       return;
     }
