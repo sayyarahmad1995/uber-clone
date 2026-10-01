@@ -58,12 +58,14 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
   final Set<int> _controlPointers = {};
   bool _contentDragStartedAtTop = false;
   bool _contentDragStartedCollapsed = false;
+  bool _contentCollapseClaimed = false;
   double _collapsePullDistance = 0;
   double _expandPullDistance = 0;
   Widget? _cachedPanelContent;
   bool? _cachedPanelScrollEnabled;
 
   static const _collapsePullThreshold = 56.0;
+  static const _collapseOwnershipSlop = kTouchSlop;
 
   @override
   void initState() {
@@ -378,6 +380,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
         _contentScrollController.hasClients &&
         _contentScrollController.position.pixels <=
             _contentScrollController.position.minScrollExtent + 0.5;
+    _contentCollapseClaimed = false;
     _collapsePullDistance = 0;
     _expandPullDistance = 0;
     if (_contentDragStartedCollapsed || _contentDragStartedAtTop) {
@@ -410,10 +413,24 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
       _dragStartSize = _panelSize;
       _collapsePullDistance = 0;
     }
-    _collapsePullDistance = (_collapsePullDistance + verticalDelta).clamp(
-      0.0,
-      dashboardHeight * (widget.maxPanelSize - widget.minPanelSize),
-    );
+    final maxPull =
+        dashboardHeight * (widget.maxPanelSize - widget.minPanelSize);
+    if (!_contentCollapseClaimed) {
+      _collapsePullDistance = (_collapsePullDistance + verticalDelta).clamp(
+        0.0,
+        maxPull + _collapseOwnershipSlop,
+      );
+      if (_collapsePullDistance <= _collapseOwnershipSlop) {
+        return;
+      }
+      _contentCollapseClaimed = true;
+      _collapsePullDistance -= _collapseOwnershipSlop;
+    } else {
+      _collapsePullDistance = (_collapsePullDistance + verticalDelta).clamp(
+        0.0,
+        maxPull,
+      );
+    }
     _setPreviewPanelSize(
       (widget.maxPanelSize - _collapsePullDistance / dashboardHeight).clamp(
         widget.minPanelSize,
@@ -436,10 +453,10 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
         _contentDragStartedCollapsed &&
         _expandPullDistance >= _collapsePullThreshold;
     final shouldCollapse =
-        _contentDragStartedAtTop &&
+        _contentCollapseClaimed &&
         _collapsePullDistance >= _collapsePullThreshold;
     final hadBodyPanelDrag =
-        _contentDragStartedCollapsed || _contentDragStartedAtTop;
+        _contentDragStartedCollapsed || _contentCollapseClaimed;
     final returnSize = _dragStartSize;
     _resetContentDrag();
     if (!hadBodyPanelDrag) {
@@ -471,7 +488,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
 
   void _cancelContentDrag() {
     final hadBodyPanelDrag =
-        _contentDragStartedCollapsed || _contentDragStartedAtTop;
+        _contentDragStartedCollapsed || _contentCollapseClaimed;
     final returnSize = _dragStartSize;
     _resetContentDrag();
     if (hadBodyPanelDrag) {
@@ -486,6 +503,7 @@ class _RideDashboardScaffoldState extends State<RideDashboardScaffold> {
   void _resetContentDrag() {
     _contentDragStartedAtTop = false;
     _contentDragStartedCollapsed = false;
+    _contentCollapseClaimed = false;
     _collapsePullDistance = 0;
     _expandPullDistance = 0;
   }

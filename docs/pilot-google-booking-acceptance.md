@@ -29,6 +29,8 @@ Record test date, current branch/SHA, Android app build and device/version, envi
 
 **PR 3 physical regression — 2026-10-01:** Places search succeeded after the backend Google key was supplied to the development API container. During the active Rider request flow, a dashboard scroll-handoff defect was found: after content had scrolled away from the top, a continuing downward pull could reach the top without transferring ownership to panel collapse, making the panel feel locked. The shared ADR-0008 handoff is being corrected and requires device retest before PR 3 is accepted.
 
+**PR 3 follow-up regression — 2026-10-01:** Device retest still found intermittent scroll stalls. The shared raw-pointer handoff could claim panel dragging on a few pixels of downward touch jitter at the top, immediately disabling ListView scrolling even when the intended gesture then moved upward. Collapse ownership now requires Flutter touch slop before scroll physics are locked; physical retest remains required.
+
 - [x] Rider and Driver dashboards render Google Maps, markers, current-location focus and cached location using the shared app-owned map adapter.
 - [ ] Shared panel gesture sizes/ownership/scrolling and expanded/collapsed persistence pass ADR-0008 regression on both capabilities after the PR 3 scroll-handoff fix.
 - [ ] Rider searches for pickup and destination, selects Places results and sees readable labels and accurate pins. Dragging/adjusting a pin triggers coordinate and label reconciliation.

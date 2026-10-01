@@ -34,7 +34,9 @@ shared entry point for Rider and Driver task panels.
   returns scrolled content toward its top. Once the content reaches its top, any
   continued downward pull may hand off to the panel and move it continuously with
   the pointer; a fresh downward pull that begins at the top behaves the same way.
-  Crossing the shared intent threshold after handoff selects minimization; on
+  The panel does not claim that handoff until downward movement exceeds the shared
+  touch-slop threshold, so incidental finger jitter cannot disable an intended
+  upward content scroll. Crossing the shared intent threshold after handoff selects minimization; on
   pointer release, the panel snaps to the collapsed extent. A shorter pull snaps
   back to the maximum extent.
 - Body pulls provide continuous visual movement, but the final state transition
