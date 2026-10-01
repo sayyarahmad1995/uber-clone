@@ -27,8 +27,10 @@ import '../features/driver_workspace/data/driver_repository.dart';
 import '../features/driver_workspace/domain/driver_onboarding.dart';
 import '../features/driver_workspace/domain/driver_profile.dart';
 import '../features/driver_workspace/presentation/driver_readonly_surfaces.dart';
+import '../features/rider_request/application/rider_place_search_controller.dart';
 import '../features/rider_request/application/rider_request_controller.dart';
 import '../features/rider_request/data/device_location.dart';
+import '../features/rider_request/data/place_search_repository.dart';
 import '../features/rider_request/data/ride_request_repository.dart';
 import '../features/rider_request/data/ride_service_repository.dart';
 import '../features/rider_request/domain/ride_service.dart';
@@ -125,6 +127,21 @@ final riderRequestControllerProvider =
       ref.watch(sessionControllerProvider.select((s) => s.state.account?.id));
       return RiderRequestController(
         ref.watch(rideRequestRepositoryProvider),
+        ref.watch(deviceLocationProvider),
+      );
+    });
+final placeSearchRepositoryProvider = Provider<PlaceSearchRepository>(
+  (ref) => ApiPlaceSearchRepository(
+    ref.watch(dioProvider),
+    ref.watch(sessionStoreProvider),
+  ),
+);
+final riderPlaceSearchControllerProvider =
+    ChangeNotifierProvider.autoDispose<RiderPlaceSearchController>((ref) {
+      ref.watch(sessionControllerProvider.select((s) => s.state.account?.id));
+      return RiderPlaceSearchController(
+        ref.watch(placeSearchRepositoryProvider),
+        ref.watch(riderRequestControllerProvider),
         ref.watch(deviceLocationProvider),
       );
     });
