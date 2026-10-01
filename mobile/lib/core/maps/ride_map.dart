@@ -35,6 +35,9 @@ class RideMapPoint {
 class RideMapController {
   Future<void> Function(RideMapPoint point, double zoom)? _move;
   (RideMapPoint point, double zoom)? _pending;
+  RideMapPoint? _center;
+
+  RideMapPoint? get center => _center;
 
   Future<void> move(RideMapPoint point, double zoom) async {
     if (!point.isValid) return;
@@ -53,6 +56,10 @@ class RideMapController {
     if (pending != null) {
       move(pending.$1, pending.$2);
     }
+  }
+
+  void _updateCenter(RideMapPoint point) {
+    if (point.isValid) _center = point;
   }
 
   void _detach() {
@@ -87,6 +94,8 @@ class RideMap extends StatefulWidget {
     this.initialCenter = defaultCenter,
     this.initialZoom = 12,
     this.onTap,
+    this.showCenterPin = false,
+    this.centerPinColor,
   });
 
   static const defaultCenter = RideMapPoint(24.8607, 67.0011);
@@ -96,6 +105,8 @@ class RideMap extends StatefulWidget {
   final RideMapPoint initialCenter;
   final double initialZoom;
   final ValueChanged<RideMapPoint>? onTap;
+  final bool showCenterPin;
+  final Color? centerPinColor;
 
   @override
   State<RideMap> createState() => _RideMapState();
@@ -109,10 +120,13 @@ class _RideMapState extends State<RideMap> {
   bool _restoredCachedCenter = false;
   bool _programmaticCameraMove = false;
   bool _userMovedCamera = false;
+  late RideMapPoint _cameraCenter;
 
   @override
   void initState() {
     super.initState();
+    _cameraCenter = widget.initialCenter;
+    widget.mapController?._updateCenter(_cameraCenter);
     _restoreCachedCenter();
     _scheduleAutoCenter();
   }
@@ -124,6 +138,7 @@ class _RideMapState extends State<RideMap> {
       oldWidget.mapController?._detach();
       if (_googleController != null) {
         widget.mapController?._attach(_explicitMove);
+        widget.mapController?._updateCenter(_cameraCenter);
       }
     }
     _scheduleAutoCenter();
@@ -149,6 +164,8 @@ class _RideMapState extends State<RideMap> {
   Future<void> _moveCamera(RideMapPoint point, double zoom) async {
     final controller = _googleController;
     if (controller == null || !point.isValid) return;
+    _cameraCenter = point;
+    widget.mapController?._updateCenter(point);
     _programmaticCameraMove = true;
     try {
       await controller.moveCamera(
@@ -163,6 +180,15 @@ class _RideMapState extends State<RideMap> {
     if (!_programmaticCameraMove) {
       _userMovedCamera = true;
     }
+  }
+
+  void _onCameraMove(google.CameraPosition position) {
+    final point = RideMapPoint(
+      position.target.latitude,
+      position.target.longitude,
+    );
+    _cameraCenter = point;
+    widget.mapController?._updateCenter(point);
   }
 
   void _onCameraIdle() {
@@ -207,26 +233,48 @@ class _RideMapState extends State<RideMap> {
 
   @override
   Widget build(BuildContext context) {
-    return google.GoogleMap(
-      initialCameraPosition: google.CameraPosition(
-        target: _googlePoint(widget.initialCenter),
-        zoom: widget.initialZoom,
-      ),
-      onMapCreated: _onMapCreated,
-      onTap: widget.onTap == null
-          ? null
-          : (point) =>
-                widget.onTap!(RideMapPoint(point.latitude, point.longitude)),
-      onCameraMoveStarted: _onCameraMoveStarted,
-      onCameraIdle: _onCameraIdle,
-      markers: {
-        for (final entry in widget.markers.indexed)
-          if (entry.$2.point.isValid) _googleMarker(entry.$1, entry.$2),
-      },
-      myLocationButtonEnabled: false,
-      zoomControlsEnabled: false,
-      mapToolbarEnabled: false,
-      compassEnabled: false,
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        google.GoogleMap(
+          initialCameraPosition: google.CameraPosition(
+            target: _googlePoint(widget.initialCenter),
+            zoom: widget.initialZoom,
+          ),
+          onMapCreated: _onMapCreated,
+          onTap: widget.onTap == null
+              ? null
+              : (point) =>
+                    widget.onTap!(RideMapPoint(point.latitude, point.longitude)),
+          onCameraMoveStarted: _onCameraMoveStarted,
+          onCameraMove: _onCameraMove,
+          onCameraIdle: _onCameraIdle,
+          markers: {
+            for (final entry in widget.markers.indexed)
+              if (entry.$2.point.isValid) _googleMarker(entry.$1, entry.$2),
+          },
+          myLocationButtonEnabled: false,
+          zoomControlsEnabled: false,
+          mapToolbarEnabled: false,
+          compassEnabled: false,
+        ),
+        if (widget.showCenterPin)
+          IgnorePointer(
+            child: Center(
+              child: Transform.translate(
+                offset: const Offset(0, -24),
+                child: Icon(
+                  Icons.location_pin,
+                  key: const Key('rideMapCenterPin'),
+                  size: 48,
+                  color:
+                      widget.centerPinColor ??
+                      Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 

@@ -31,9 +31,11 @@ Record test date, current branch/SHA, Android app build and device/version, envi
 
 **PR 3 follow-up regression — 2026-10-01:** Device retest still found intermittent scroll stalls. The shared raw-pointer handoff could claim panel dragging on a few pixels of downward touch jitter at the top, immediately disabling ListView scrolling even when the intended gesture then moved upward. Collapse ownership now requires Flutter touch slop before scroll physics are locked; physical retest remains required.
 
+**PR 3 pin-selection clarification — 2026-10-01:** Device review exposed that the implemented map path supported tap-to-drop and dragging existing markers but did not expose the expected visible center-pin selector. PR 3 now adds an explicit Set-on-map mode: the dashboard collapses, a fixed center pin is shown, panning updates the provider-neutral camera center, and confirmation preserves that exact coordinate before reverse geocoding. Physical retest remains required.
+
 - [x] Rider and Driver dashboards render Google Maps, markers, current-location focus and cached location using the shared app-owned map adapter.
 - [ ] Shared panel gesture sizes/ownership/scrolling and expanded/collapsed persistence pass ADR-0008 regression on both capabilities after the PR 3 scroll-handoff fix.
-- [ ] Rider searches for pickup and destination, selects Places results and sees readable labels and accurate pins. Dragging/adjusting a pin triggers coordinate and label reconciliation.
+- [ ] Rider searches for pickup and destination, selects Places results and sees readable labels and accurate pins. Set-on-map mode shows a visible center pin and confirms the exact camera-center coordinate; tapping or dragging/adjusting a pin also triggers coordinate and label reconciliation.
 - [ ] Validate no prediction, denied location permission, poor GPS, lost internet and a stale autocomplete response. No wrong-place selection or hidden provider error.
 - [ ] Google content displays over the Google map with appropriate provider attribution. No API key is shipped in committed source.
 
