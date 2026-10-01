@@ -192,8 +192,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
         state: state,
         placeState: placeState,
         selectingPickup: _selectingPickup,
-        onSelectionChanged: (value) =>
-            setState(() => _selectingPickup = value),
+        onSelectionChanged: (value) => setState(() => _selectingPickup = value),
         onSearch: _searchPlaces,
         onSuggestionSelected: _selectSuggestion,
         onUseCurrentPickup: _useCurrentPickup,
@@ -384,10 +383,8 @@ class _RequestRidePanel extends StatelessWidget {
   final bool selectingPickup;
   final ValueChanged<bool> onSelectionChanged;
   final void Function(RiderPlaceField field, String input) onSearch;
-  final Future<void> Function(
-    RiderPlaceField field,
-    PlaceSuggestion suggestion,
-  ) onSuggestionSelected;
+  final Future<void> Function(RiderPlaceField field, PlaceSuggestion suggestion)
+  onSuggestionSelected;
   final Future<void> Function() onUseCurrentPickup;
   final Future<void> Function() onSubmit;
 
@@ -593,11 +590,7 @@ class _PlaceSearchField extends StatelessWidget {
 }
 
 class _PointSummary extends StatelessWidget {
-  const _PointSummary({
-    required this.label,
-    required this.point,
-    this.address,
-  });
+  const _PointSummary({required this.label, required this.point, this.address});
 
   final String label;
   final GeoPoint? point;
