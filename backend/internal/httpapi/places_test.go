@@ -16,12 +16,16 @@ func TestPlaceResponseKeepsReadableLabelAndCoordinates(t *testing.T) {
 			Latitude:  24.86,
 			Longitude: 67.01,
 		},
+		SnapToPlace: true,
 	})
 	if response["place_id"] != "p1" || response["label"] != "Test Road" {
 		t.Fatalf("unexpected place response: %#v", response)
 	}
 	if response["latitude"] != 24.86 || response["longitude"] != 67.01 {
 		t.Fatalf("unexpected coordinates: %#v", response)
+	}
+	if response["snap_to_place"] != true {
+		t.Fatalf("expected snap flag: %#v", response)
 	}
 }
 
