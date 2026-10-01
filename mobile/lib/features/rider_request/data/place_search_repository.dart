@@ -79,7 +79,7 @@ class ApiPlaceSearchRepository implements PlaceSearchRepository {
     required String sessionToken,
   }) async {
     final data = await _request<Map<String, dynamic>>(
-      '/v1/places/' + Uri.encodeComponent(placeId),
+      '/v1/places/${Uri.encodeComponent(placeId)}',
       queryParameters: {'session_token': sessionToken},
     );
     return PlaceSelection.fromJson(data);
