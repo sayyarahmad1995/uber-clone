@@ -78,6 +78,25 @@ jobs:
           echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
       - run: flutter pub get
         working-directory: mobile
+      - name: Emit PR 3 Dart formatter diagnostics
+        run: |
+          dart format \
+            mobile/lib/core/maps/ride_map.dart \
+            mobile/lib/core/providers.dart \
+            mobile/lib/features/rider_request/domain/place_search.dart \
+            mobile/lib/features/rider_request/data/place_search_repository.dart \
+            mobile/lib/features/rider_request/application/rider_place_search_controller.dart \
+            mobile/lib/features/rider_request/presentation/rider_request_screen.dart \
+            mobile/test/rider_place_search_test.dart
+          git diff -- \
+            mobile/lib/core/maps/ride_map.dart \
+            mobile/lib/core/providers.dart \
+            mobile/lib/features/rider_request/domain/place_search.dart \
+            mobile/lib/features/rider_request/data/place_search_repository.dart \
+            mobile/lib/features/rider_request/application/rider_place_search_controller.dart \
+            mobile/lib/features/rider_request/presentation/rider_request_screen.dart \
+            mobile/test/rider_place_search_test.dart
+          exit 1
       - name: Check changed Dart file formatting
         env:
           EVENT_BEFORE: ${{ github.event.before }}
