@@ -42,9 +42,10 @@ type Suggestion struct {
 }
 
 type Place struct {
-	PlaceID  string
-	Label    string
-	Location Point
+	PlaceID     string
+	Label       string
+	Location    Point
+	SnapToPlace bool
 }
 
 type Provider interface {

@@ -159,9 +159,10 @@ func locationSearchStatus(err error) int {
 
 func placeResponse(place locationsearch.Place) map[string]any {
 	response := map[string]any{
-		"label":     strings.TrimSpace(place.Label),
-		"latitude":  place.Location.Latitude,
-		"longitude": place.Location.Longitude,
+		"label":         strings.TrimSpace(place.Label),
+		"latitude":      place.Location.Latitude,
+		"longitude":     place.Location.Longitude,
+		"snap_to_place": place.SnapToPlace,
 	}
 	if strings.TrimSpace(place.PlaceID) != "" {
 		response["place_id"] = strings.TrimSpace(place.PlaceID)

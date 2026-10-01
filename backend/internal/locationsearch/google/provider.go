@@ -169,8 +169,9 @@ func (p *Provider) Details(ctx context.Context, placeID, sessionToken string) (l
 		return locationsearch.Place{}, err
 	}
 	place := locationsearch.Place{
-		PlaceID: strings.TrimSpace(payload.ID),
-		Label:   strings.TrimSpace(payload.FormattedAddress),
+		PlaceID:     strings.TrimSpace(payload.ID),
+		Label:       strings.TrimSpace(payload.FormattedAddress),
+		SnapToPlace: true,
 		Location: locationsearch.Point{
 			Latitude:  payload.Location.Latitude,
 			Longitude: payload.Location.Longitude,
@@ -186,6 +187,90 @@ func (p *Provider) ReverseGeocode(ctx context.Context, point locationsearch.Poin
 	if p.apiKey == "" {
 		return locationsearch.Place{}, locationsearch.ErrUnavailable
 	}
+	if place, found, err := p.nearbyNamedPlace(ctx, point); err != nil {
+		return locationsearch.Place{}, err
+	} else if found {
+		return place, nil
+	}
+	return p.reverseGeocodeAddress(ctx, point)
+}
+
+func (p *Provider) nearbyNamedPlace(ctx context.Context, point locationsearch.Point) (locationsearch.Place, bool, error) {
+	body := map[string]any{
+		"maxResultCount": 1,
+		"rankPreference": "DISTANCE",
+		"locationRestriction": map[string]any{
+			"circle": map[string]any{
+				"center": map[string]any{
+					"latitude": point.Latitude,
+					"longitude": point.Longitude,
+				},
+				"radius": 50.0,
+			},
+		},
+	}
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		return locationsearch.Place{}, false, fmt.Errorf("%w: encode nearby search request", locationsearch.ErrProvider)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.placesBase+"/v1/places:searchNearby", bytes.NewReader(encoded))
+	if err != nil {
+		return locationsearch.Place{}, false, fmt.Errorf("%w: build nearby search request", locationsearch.ErrProvider)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Goog-Api-Key", p.apiKey)
+	req.Header.Set("X-Goog-FieldMask", "places.id,places.displayName,places.formattedAddress,places.location")
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return locationsearch.Place{}, false, err
+		}
+		return locationsearch.Place{}, false, fmt.Errorf("%w: nearby search request", locationsearch.ErrProvider)
+	}
+	defer resp.Body.Close()
+	if err := providerStatus(resp.StatusCode); err != nil {
+		return locationsearch.Place{}, false, err
+	}
+
+	var payload struct {
+		Places []struct {
+			ID string `json:"id"`
+			DisplayName struct {
+				Text string `json:"text"`
+			} `json:"displayName"`
+			FormattedAddress string `json:"formattedAddress"`
+			Location struct {
+				Latitude float64 `json:"latitude"`
+				Longitude float64 `json:"longitude"`
+			} `json:"location"`
+		} `json:"places"`
+	}
+	if err := decodeJSON(resp.Body, &payload); err != nil {
+		return locationsearch.Place{}, false, err
+	}
+	for _, candidate := range payload.Places {
+		name := strings.TrimSpace(candidate.DisplayName.Text)
+		location := locationsearch.Point{Latitude: candidate.Location.Latitude, Longitude: candidate.Location.Longitude}
+		if name == "" || !location.Valid() {
+			continue
+		}
+		address := strings.TrimSpace(candidate.FormattedAddress)
+		label := name
+		if address != "" && !strings.Contains(strings.ToLower(address), strings.ToLower(name)) {
+			label += ", " + address
+		}
+		return locationsearch.Place{
+			PlaceID: strings.TrimSpace(candidate.ID),
+			Label: label,
+			Location: location,
+			SnapToPlace: true,
+		}, true, nil
+	}
+	return locationsearch.Place{}, false, nil
+}
+
+func (p *Provider) reverseGeocodeAddress(ctx context.Context, point locationsearch.Point) (locationsearch.Place, error) {
 	endpoint, err := url.Parse(p.geocodeBase + "/v4/geocode/location")
 	if err != nil {
 		return locationsearch.Place{}, fmt.Errorf("%w: build reverse geocode URL", locationsearch.ErrProvider)
@@ -235,18 +320,13 @@ func (p *Provider) ReverseGeocode(ctx context.Context, point locationsearch.Poin
 	}
 	first := payload.Results[0]
 	place := locationsearch.Place{
-		PlaceID: strings.TrimSpace(first.PlaceID),
-		Label:   strings.TrimSpace(first.FormattedAddress),
-		Location: locationsearch.Point{
-			Latitude:  first.Location.Latitude,
-			Longitude: first.Location.Longitude,
-		},
+		PlaceID:     strings.TrimSpace(first.PlaceID),
+		Label:       strings.TrimSpace(first.FormattedAddress),
+		Location:    point,
+		SnapToPlace: false,
 	}
 	if place.Label == "" {
 		return locationsearch.Place{}, locationsearch.ErrNotFound
-	}
-	if !place.Location.Valid() {
-		place.Location = point
 	}
 	return place, nil
 }
