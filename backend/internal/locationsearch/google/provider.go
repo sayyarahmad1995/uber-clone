@@ -202,8 +202,8 @@ func (p *Provider) ReverseGeocode(ctx context.Context, point locationsearch.Poin
 
 func (p *Provider) nearbyNamedPlace(ctx context.Context, point locationsearch.Point, radiusMeters int64) (locationsearch.Place, bool, error) {
 	body := map[string]any{
-		"maxResultCount": 1,
-		"rankPreference": "DISTANCE",
+		"maxResultCount": 5,
+		"rankPreference": "POPULARITY",
 		"locationRestriction": map[string]any{
 			"circle": map[string]any{
 				"center": map[string]any{
@@ -224,7 +224,10 @@ func (p *Provider) nearbyNamedPlace(ctx context.Context, point locationsearch.Po
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Goog-Api-Key", p.apiKey)
-	req.Header.Set("X-Goog-FieldMask", "places.id,places.displayName,places.formattedAddress,places.location")
+	req.Header.Set(
+		"X-Goog-FieldMask",
+		"places.id,places.displayName,places.formattedAddress,places.location,places.primaryType,places.types,places.pureServiceAreaBusiness,places.businessStatus",
+	)
 
 	resp, err := p.client.Do(req)
 	if err != nil {
@@ -244,8 +247,12 @@ func (p *Provider) nearbyNamedPlace(ctx context.Context, point locationsearch.Po
 			DisplayName struct {
 				Text string `json:"text"`
 			} `json:"displayName"`
-			FormattedAddress string `json:"formattedAddress"`
-			Location         struct {
+			FormattedAddress        string   `json:"formattedAddress"`
+			PrimaryType             string   `json:"primaryType"`
+			Types                   []string `json:"types"`
+			PureServiceAreaBusiness bool     `json:"pureServiceAreaBusiness"`
+			BusinessStatus          string   `json:"businessStatus"`
+			Location                struct {
 				Latitude  float64 `json:"latitude"`
 				Longitude float64 `json:"longitude"`
 			} `json:"location"`
@@ -258,6 +265,14 @@ func (p *Provider) nearbyNamedPlace(ctx context.Context, point locationsearch.Po
 		name := strings.TrimSpace(candidate.DisplayName.Text)
 		location := locationsearch.Point{Latitude: candidate.Location.Latitude, Longitude: candidate.Location.Longitude}
 		if name == "" || !location.Valid() {
+			continue
+		}
+		if !suitableNamedPlaceCandidate(
+			candidate.PrimaryType,
+			candidate.Types,
+			candidate.PureServiceAreaBusiness,
+			candidate.BusinessStatus,
+		) {
 			continue
 		}
 		if distanceMeters(point, location) > float64(radiusMeters) {
@@ -337,6 +352,40 @@ func (p *Provider) reverseGeocodeAddress(ctx context.Context, point locationsear
 		return locationsearch.Place{}, locationsearch.ErrNotFound
 	}
 	return place, nil
+}
+
+func suitableNamedPlaceCandidate(
+	primaryType string,
+	types []string,
+	pureServiceAreaBusiness bool,
+	businessStatus string,
+) bool {
+	if pureServiceAreaBusiness || strings.EqualFold(strings.TrimSpace(businessStatus), "CLOSED_PERMANENTLY") {
+		return false
+	}
+	genericAddressTypes := map[string]struct{}{
+		"geocode":        {},
+		"intersection":   {},
+		"plus_code":      {},
+		"premise":        {},
+		"route":          {},
+		"street_address": {},
+		"subpremise":     {},
+	}
+	primaryType = strings.TrimSpace(primaryType)
+	if _, generic := genericAddressTypes[primaryType]; generic {
+		return false
+	}
+	if primaryType != "" {
+		return true
+	}
+	for _, placeType := range types {
+		switch strings.TrimSpace(placeType) {
+		case "landmark", "point_of_interest":
+			return true
+		}
+	}
+	return false
 }
 
 func distanceMeters(a, b locationsearch.Point) float64 {
