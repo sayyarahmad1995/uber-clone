@@ -276,9 +276,6 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     }
     final resolved = await _reconcilePoint(field, point);
     if (!mounted || resolved == null) return;
-    if (resolved.snapToPlace) {
-      await _mapController.move(_latLng(resolved.point), 16);
-    }
     if (!mounted) return;
     setState(() {
       _pinSelectionMode = false;
