@@ -100,7 +100,7 @@ func TestReverseGeocodePrefersNearestNamedPlaceAndCanonicalLocation(t *testing.T
 			t.Fatalf("expected 5 meter named-place radius: %#v", restriction)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"places":[{"id":"named-1","displayName":{"text":"Faisal Mosque"},"formattedAddress":"Shah Faisal Ave, Islamabad","location":{"latitude":33.7295,"longitude":73.0372}}]}`))
+		_, _ = w.Write([]byte(`{"places":[{"id":"named-1","displayName":{"text":"Faisal Mosque"},"formattedAddress":"Shah Faisal Ave, Islamabad","location":{"latitude":33.72942,"longitude":73.03712}}]}`))
 	}))
 	defer server.Close()
 
@@ -109,11 +109,44 @@ func TestReverseGeocodePrefersNearestNamedPlaceAndCanonicalLocation(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !place.SnapToPlace || place.PlaceID != "named-1" || place.Location.Latitude != 33.7295 {
+	if !place.SnapToPlace || place.PlaceID != "named-1" || place.Location.Latitude != 33.72942 {
 		t.Fatalf("expected named-place snap, got %#v", place)
 	}
 	if !strings.Contains(place.Label, "Faisal Mosque") {
 		t.Fatalf("expected named label, got %q", place.Label)
+	}
+}
+
+func TestReverseGeocodeRejectsNamedPlaceOutsideConfiguredRadius(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/places:searchNearby":
+			_, _ = w.Write([]byte(`{"places":[{"id":"outside-1","displayName":{"text":"Outside Place"},"formattedAddress":"Islamabad","location":{"latitude":33.7295,"longitude":73.0372}}]}`))
+		case "/v4/geocode/location":
+			_, _ = w.Write([]byte(`{"results":[{"placeId":"pin-1","formattedAddress":"Pinned Road, Islamabad","location":{"latitude":33.7294,"longitude":73.0371}}]}`))
+		default:
+			t.Fatalf("unexpected request path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	provider := newProvider("server-key", server.Client(), server.URL, server.URL)
+	pin := locationsearch.Point{Latitude: 33.7294, Longitude: 73.0371}
+	place, err := provider.ReverseGeocode(context.Background(), pin, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if requests != 2 {
+		t.Fatalf("expected named-place lookup plus address fallback, got %d requests", requests)
+	}
+	if place.SnapToPlace || place.Location != pin {
+		t.Fatalf("expected exact pin fallback outside configured radius, got %#v", place)
+	}
+	if place.Label != "Pinned Road, Islamabad" {
+		t.Fatalf("unexpected fallback label: %q", place.Label)
 	}
 }
 
