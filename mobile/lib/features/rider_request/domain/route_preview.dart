@@ -45,10 +45,7 @@ List<GeoPoint> decodeEncodedPolyline(String encoded) {
     longitude += lng.$1;
 
     points.add(
-      GeoPoint(
-        latitude: latitude / 1e5,
-        longitude: longitude / 1e5,
-      ),
+      GeoPoint(latitude: latitude / 1e5, longitude: longitude / 1e5),
     );
   }
 
