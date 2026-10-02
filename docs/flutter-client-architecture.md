@@ -47,11 +47,11 @@ WebSocket transports remain deferred outside the implemented client slices.
 
 ## Rider request extension
 
-The Rider request slice introduces application-owned `DeviceLocation` and
-`MapTiles` ports. Geolocator and an attributed OpenStreetMap tile surface are the
-initial client adapters. Ride-domain models contain only coordinates and money;
-provider SDK types and tile configuration remain outside them. See
-[Flutter Rider ride request](flutter-rider-request.md).
+The Rider request slice uses an application-owned `DeviceLocation` port and the
+provider-neutral `core/maps` boundary. Geolocator supplies device coordinates and
+Google Maps renders the current map surface without leaking Google SDK types into
+ride-domain or feature contracts. Ride-domain models continue to contain only
+coordinates and money. See [Flutter Rider ride request](flutter-rider-request.md).
 
 ## Shared dashboard foundation
 
@@ -105,7 +105,24 @@ ADR-0012's authenticated catalog loading and API-backed service picker are imple
 
 ADR-0013's shared rendering foundation migrates **both** dashboards to Google Maps SDK for Android using pinned `google_maps_flutter` 2.18.2. `RideMapPoint`, `RideMapMarker`, and `RideMapController` remain app-owned; Google coordinate/marker/controller types stay inside `core/maps`. `DeviceLocation`/geolocator and the session-owned Driver background publisher remain unchanged. Explicit focus actions may recenter the camera, while automatic Driver-location updates stop recentering after the user manually pans the map.
 
-Feature controllers call narrow application-owned Go APIs for place search/details, optional reverse geocoding, and road route previews. Route results are rendered on Google Maps; Flutter must not calculate an authoritative fare or present Haversine as road distance. Service-specific suggested fares arrive in the preview response with the policy version. A Rider may edit the suggestion before submitting the existing proposed-fare Ride Request; the chosen Driver offer remains the immutable Trip amount. External provider errors and invalidated stale previews must be recoverable.
+Pickup and destination discovery now use an app-owned `PlaceSearchRepository` and
+`RiderPlaceSearchController`. Flutter calls only authenticated HiGO endpoints;
+the Go backend owns Google Places Autocomplete (New), Place Details (New), and
+Geocoding v4 reverse-geocoding. Pickup and destination maintain independent
+autocomplete session tokens. Search begins after three characters with a 300 ms
+debounce, superseded HTTP calls are cancelled, and revision guards prevent stale
+responses from replacing newer results. Device location is used only as a search
+bias; denied or unavailable location does not prevent text search and does not
+create a permanent service-area boundary.
+
+Selecting a prediction concludes that field's Places session through Place Details
+and stores the returned precise coordinate in the existing Rider request state.
+Map taps and draggable pickup/destination markers reverse-geocode a readable label
+but retain the Rider's exact selected coordinate rather than replacing it with a
+nearby geocoder coordinate. Empty predictions and provider errors remain explicit
+recoverable UI states; Flutter never fabricates an address.
+
+Feature controllers call narrow application-owned Go APIs for place search/details, server-resolved map pins (nearby named-place snap with reverse-geocoded address fallback), and road route previews. Route results are rendered on Google Maps; Flutter must not calculate an authoritative fare or present Haversine as road distance. Service-specific suggested fares arrive in the preview response with the policy version. A Rider may edit the suggestion before submitting the existing proposed-fare Ride Request; the chosen Driver offer remains the immutable Trip amount. External provider errors and invalidated stale previews must be recoverable.
 
 
 ### Android Google Maps key configuration
