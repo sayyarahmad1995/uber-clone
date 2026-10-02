@@ -55,7 +55,9 @@ class RideMapController {
     Iterable<RideMapPoint> points, {
     double padding = 48,
   }) async {
-    final valid = points\n        .where((point) => point.isValid)\n        .toList(growable: false);
+    final valid = points
+        .where((point) => point.isValid)
+        .toList(growable: false);
     if (valid.isEmpty) return;
     final fit = _fit;
     if (fit == null) {
