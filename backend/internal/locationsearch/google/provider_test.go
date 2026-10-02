@@ -81,14 +81,16 @@ func TestReverseGeocodePrefersNearestNamedPlaceAndCanonicalLocation(t *testing.T
 		if r.URL.Path != "/v1/places:searchNearby" || r.Method != http.MethodPost {
 			t.Fatalf("unexpected nearby request: %s %s", r.Method, r.URL.Path)
 		}
-		if got := r.Header.Get("X-Goog-FieldMask"); got != "places.id,places.displayName,places.formattedAddress,places.location" {
+		if got := r.Header.Get("X-Goog-FieldMask"); !strings.Contains(got, "places.primaryType") ||
+			!strings.Contains(got, "places.pureServiceAreaBusiness") ||
+			!strings.Contains(got, "places.businessStatus") {
 			t.Fatalf("unexpected nearby mask: %q", got)
 		}
 		var body map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			t.Fatal(err)
 		}
-		if body["rankPreference"] != "DISTANCE" || body["maxResultCount"] != float64(1) {
+		if body["rankPreference"] != "POPULARITY" || body["maxResultCount"] != float64(5) {
 			t.Fatalf("unexpected nearby body: %#v", body)
 		}
 		restriction, ok := body["locationRestriction"].(map[string]any)
@@ -100,7 +102,7 @@ func TestReverseGeocodePrefersNearestNamedPlaceAndCanonicalLocation(t *testing.T
 			t.Fatalf("expected 5 meter named-place radius: %#v", restriction)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"places":[{"id":"named-1","displayName":{"text":"Faisal Mosque"},"formattedAddress":"Shah Faisal Ave, Islamabad","location":{"latitude":33.72942,"longitude":73.03712}}]}`))
+		_, _ = w.Write([]byte(`{"places":[{"id":"named-1","displayName":{"text":"Faisal Mosque"},"formattedAddress":"Shah Faisal Ave, Islamabad","primaryType":"mosque","types":["mosque","place_of_worship","point_of_interest","establishment"],"businessStatus":"OPERATIONAL","location":{"latitude":33.72942,"longitude":73.03712}}]}`))
 	}))
 	defer server.Close()
 
@@ -114,6 +116,36 @@ func TestReverseGeocodePrefersNearestNamedPlaceAndCanonicalLocation(t *testing.T
 	}
 	if !strings.Contains(place.Label, "Faisal Mosque") {
 		t.Fatalf("expected named label, got %q", place.Label)
+	}
+}
+
+func TestReverseGeocodeSkipsServiceAreaAndGenericAddressCandidates(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/places:searchNearby":
+			_, _ = w.Write([]byte(`{"places":[
+				{"id":"service-1","displayName":{"text":"Mobile Service"},"primaryType":"plumber","types":["plumber","point_of_interest","establishment"],"pureServiceAreaBusiness":true,"location":{"latitude":33.729401,"longitude":73.037101}},
+				{"id":"address-1","displayName":{"text":"House 12"},"primaryType":"premise","types":["premise"],"location":{"latitude":33.729402,"longitude":73.037102}},
+				{"id":"visible-1","displayName":{"text":"Local Cafe"},"formattedAddress":"Islamabad","primaryType":"cafe","types":["cafe","point_of_interest","establishment"],"businessStatus":"OPERATIONAL","location":{"latitude":33.729403,"longitude":73.037103}}
+			]}`))
+		default:
+			t.Fatalf("unexpected request path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	provider := newProvider("server-key", server.Client(), server.URL, server.URL)
+	place, err := provider.ReverseGeocode(
+		context.Background(),
+		locationsearch.Point{Latitude: 33.7294, Longitude: 73.0371},
+		5,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if place.PlaceID != "visible-1" || !place.SnapToPlace {
+		t.Fatalf("expected physical POI candidate, got %#v", place)
 	}
 }
 
