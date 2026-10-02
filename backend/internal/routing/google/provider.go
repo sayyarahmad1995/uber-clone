@@ -50,12 +50,12 @@ func (p *Provider) Preview(ctx context.Context, pickup, destination routing.Poin
 	}
 
 	body := map[string]any{
-		"origin": waypoint(pickup),
-		"destination": waypoint(destination),
-		"travelMode": "DRIVE",
+		"origin":                   waypoint(pickup),
+		"destination":              waypoint(destination),
+		"travelMode":               "DRIVE",
 		"computeAlternativeRoutes": false,
-		"polylineQuality": "OVERVIEW",
-		"polylineEncoding": "ENCODED_POLYLINE",
+		"polylineQuality":          "OVERVIEW",
+		"polylineEncoding":         "ENCODED_POLYLINE",
 	}
 	encoded, err := json.Marshal(body)
 	if err != nil {
