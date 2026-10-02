@@ -38,6 +38,21 @@ void main() {
     );
   });
 
+  test('RideMap exposes provider-neutral route rendering and camera fit', () {
+    final source = File('lib/core/maps/ride_map.dart').readAsStringSync();
+    final rider = File(
+      'lib/features/rider_request/presentation/rider_request_screen.dart',
+    ).readAsStringSync();
+
+    expect(source, contains('class RideMapPolyline'));
+    expect(source, contains('Future<void> fit('));
+    expect(source, contains('newLatLngBounds'));
+    expect(source, contains('polylines: {'));
+    expect(source, contains('padding: widget.padding'));
+    expect(rider, contains('routePreviewSummary'));
+    expect(rider, contains('Estimated driving route'));
+  });
+
   test('Google Maps provider types stay behind the shared map boundary', () {
     final rider = File(
       'lib/features/rider_request/presentation/rider_request_screen.dart',
