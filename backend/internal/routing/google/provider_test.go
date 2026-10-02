@@ -28,7 +28,7 @@ func TestPreviewUsesDrivingRequestAndNarrowFieldMask(t *testing.T) {
 			t.Fatal(err)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"routes":[{"distanceMeters":12345,"duration":"901.4s","polyline":{"encodedPolyline":"_p~iF~ps|U_ulLnnqC_mqNvxq`@"}}]}`))
+		_, _ = w.Write([]byte(`{"routes":[{"distanceMeters":12345,"duration":"901.4s","polyline":{"encodedPolyline":"_p~iF~ps|U_ulLnnqC_mqNvxq"}}]}`))
 	}))
 	defer server.Close()
 
