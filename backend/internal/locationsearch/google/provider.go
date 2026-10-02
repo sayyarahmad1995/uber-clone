@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -259,6 +260,9 @@ func (p *Provider) nearbyNamedPlace(ctx context.Context, point locationsearch.Po
 		if name == "" || !location.Valid() {
 			continue
 		}
+		if distanceMeters(point, location) > float64(radiusMeters) {
+			continue
+		}
 		address := strings.TrimSpace(candidate.FormattedAddress)
 		label := name
 		if address != "" && !strings.Contains(strings.ToLower(address), strings.ToLower(name)) {
@@ -333,6 +337,19 @@ func (p *Provider) reverseGeocodeAddress(ctx context.Context, point locationsear
 		return locationsearch.Place{}, locationsearch.ErrNotFound
 	}
 	return place, nil
+}
+
+func distanceMeters(a, b locationsearch.Point) float64 {
+	const earthRadiusMeters = 6371000.0
+	lat1 := a.Latitude * math.Pi / 180
+	lat2 := b.Latitude * math.Pi / 180
+	deltaLat := (b.Latitude - a.Latitude) * math.Pi / 180
+	deltaLng := (b.Longitude - a.Longitude) * math.Pi / 180
+
+	h := math.Sin(deltaLat/2)*math.Sin(deltaLat/2) +
+		math.Cos(lat1)*math.Cos(lat2)*
+			math.Sin(deltaLng/2)*math.Sin(deltaLng/2)
+	return 2 * earthRadiusMeters * math.Asin(math.Sqrt(h))
 }
 
 func providerStatus(status int) error {
