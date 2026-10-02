@@ -154,8 +154,7 @@ void main() {
       expect(controller.state.pickup.label, 'Pinned Road, Karachi');
     },
   );
-
-
+}
 
 class _AutocompleteCall {
   const _AutocompleteCall(this.input, this.sessionToken);
