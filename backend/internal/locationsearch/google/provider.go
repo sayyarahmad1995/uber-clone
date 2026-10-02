@@ -261,6 +261,8 @@ func (p *Provider) nearbyNamedPlace(ctx context.Context, point locationsearch.Po
 	if err := decodeJSON(resp.Body, &payload); err != nil {
 		return locationsearch.Place{}, false, err
 	}
+	nearestDistance := math.Inf(1)
+	var nearest locationsearch.Place
 	for _, candidate := range payload.Places {
 		name := strings.TrimSpace(candidate.DisplayName.Text)
 		location := locationsearch.Point{Latitude: candidate.Location.Latitude, Longitude: candidate.Location.Longitude}
@@ -275,7 +277,8 @@ func (p *Provider) nearbyNamedPlace(ctx context.Context, point locationsearch.Po
 		) {
 			continue
 		}
-		if distanceMeters(point, location) > float64(radiusMeters) {
+		distance := distanceMeters(point, location)
+		if distance > float64(radiusMeters) || distance >= nearestDistance {
 			continue
 		}
 		address := strings.TrimSpace(candidate.FormattedAddress)
@@ -283,12 +286,16 @@ func (p *Provider) nearbyNamedPlace(ctx context.Context, point locationsearch.Po
 		if address != "" && !strings.Contains(strings.ToLower(address), strings.ToLower(name)) {
 			label += ", " + address
 		}
-		return locationsearch.Place{
+		nearestDistance = distance
+		nearest = locationsearch.Place{
 			PlaceID:     strings.TrimSpace(candidate.ID),
 			Label:       label,
 			Location:    location,
 			SnapToPlace: true,
-		}, true, nil
+		}
+	}
+	if nearestDistance < math.Inf(1) {
+		return nearest, true, nil
 	}
 	return locationsearch.Place{}, false, nil
 }
