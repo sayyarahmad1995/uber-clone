@@ -124,8 +124,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     final routePreview = active == null ? routeState.preview : null;
     _scheduleRouteFit(routePreview, panelExpanded);
     final mapBottomPadding =
-        MediaQuery.sizeOf(context).height *
-            (panelExpanded ? 0.60 : 0.18) +
+        MediaQuery.sizeOf(context).height * (panelExpanded ? 0.60 : 0.18) +
         AppSpacing.lg;
     final driverLocation = active == null
         ? null
@@ -437,9 +436,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     _lastFittedRouteKey = key;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      unawaited(
-        _mapController.fit(preview.points.map(_latLng), padding: 48),
-      );
+      unawaited(_mapController.fit(preview.points.map(_latLng), padding: 48));
     });
   }
 
