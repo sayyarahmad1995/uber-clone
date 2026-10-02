@@ -1,6 +1,7 @@
 package locationsearch
 
 import (
+	"context"
 	"net/url"
 	"os"
 	"strings"
@@ -41,7 +42,7 @@ func TestLocationSearchPolicyPersistsAndDefaultsToFiveMeters(t *testing.T) {
 	})
 
 	service := NewPolicyService(db)
-	policy, err := service.Load(t.Context())
+	policy, err := service.Load(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +51,7 @@ func TestLocationSearchPolicyPersistsAndDefaultsToFiveMeters(t *testing.T) {
 	}
 
 	updated, err := service.Update(
-		t.Context(),
+		context.Background(),
 		Policy{NamedPlaceSnapRadiusMeters: 7},
 		"admin-test",
 	)
@@ -61,7 +62,7 @@ func TestLocationSearchPolicyPersistsAndDefaultsToFiveMeters(t *testing.T) {
 		t.Fatalf("unexpected updated policy: %#v", updated)
 	}
 
-	reloaded, err := service.Load(t.Context())
+	reloaded, err := service.Load(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
