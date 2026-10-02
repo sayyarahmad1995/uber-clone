@@ -64,6 +64,7 @@ func (api *API) registerRideRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /v1/places/autocomplete", api.authenticated(api.autocompletePlaces))
 	mux.Handle("GET /v1/places/{place_id}", api.authenticated(api.getPlaceDetails))
 	mux.Handle("POST /v1/places/reverse-geocode", api.authenticated(api.reverseGeocodePlace))
+	mux.Handle("POST /v1/ride-previews", api.authenticated(api.createRidePreview))
 	mux.Handle("POST /v1/ride-requests", api.authenticated(api.createRideRequest))
 	mux.Handle("GET /v1/ride-requests", api.authenticated(api.listRideRequests))
 	mux.Handle("GET /v1/ride-requests/{ride_request_id}", api.authenticated(api.getRideRequestStatus))
