@@ -55,7 +55,7 @@ class RideMapController {
     Iterable<RideMapPoint> points, {
     double padding = 48,
   }) async {
-    final valid = points.where((point) => point.isValid).toList(growable: false);
+    final valid = points\n        .where((point) => point.isValid)\n        .toList(growable: false);
     if (valid.isEmpty) return;
     final fit = _fit;
     if (fit == null) {
@@ -222,10 +222,7 @@ class _RideMapState extends State<RideMap> {
     }
   }
 
-  Future<void> _fitPoints(
-    List<RideMapPoint> points,
-    double padding,
-  ) async {
+  Future<void> _fitPoints(List<RideMapPoint> points, double padding) async {
     final controller = _googleController;
     final valid = points.where((point) => point.isValid).toList(growable: false);
     if (controller == null || valid.isEmpty) return;
@@ -346,7 +343,10 @@ class _RideMapState extends State<RideMap> {
           },
           polylines: {
             for (final entry in widget.polylines.indexed)
-              if (entry.$2.points.where((point) => point.isValid).length >= 2)
+              if (entry.$2.points
+                      .where((point) => point.isValid)
+                      .length >=
+                  2)
                 _googlePolyline(entry.$1, entry.$2),
           },
           myLocationButtonEnabled: false,
