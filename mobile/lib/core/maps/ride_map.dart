@@ -51,10 +51,7 @@ class RideMapController {
     await move(point, zoom);
   }
 
-  Future<void> fit(
-    Iterable<RideMapPoint> points, {
-    double padding = 48,
-  }) async {
+  Future<void> fit(Iterable<RideMapPoint> points, {double padding = 48}) async {
     final valid = points
         .where((point) => point.isValid)
         .toList(growable: false);
@@ -226,7 +223,9 @@ class _RideMapState extends State<RideMap> {
 
   Future<void> _fitPoints(List<RideMapPoint> points, double padding) async {
     final controller = _googleController;
-    final valid = points.where((point) => point.isValid).toList(growable: false);
+    final valid = points
+        .where((point) => point.isValid)
+        .toList(growable: false);
     if (controller == null || valid.isEmpty) return;
     if (valid.length == 1) {
       await _moveCamera(valid.single, 16);
@@ -345,10 +344,7 @@ class _RideMapState extends State<RideMap> {
           },
           polylines: {
             for (final entry in widget.polylines.indexed)
-              if (entry.$2.points
-                      .where((point) => point.isValid)
-                      .length >=
-                  2)
+              if (entry.$2.points.where((point) => point.isValid).length >= 2)
                 _googlePolyline(entry.$1, entry.$2),
           },
           myLocationButtonEnabled: false,
