@@ -81,8 +81,6 @@ func (api *API) registerAdminRoutes(mux *http.ServeMux) {
 	}
 	mux.Handle("GET /v1/admin/marketplace-timing-policy", api.adminAuthenticated(api.getAdminMarketplaceTimingPolicy))
 	mux.Handle("PUT /v1/admin/marketplace-timing-policy", api.adminMutation(api.updateAdminMarketplaceTimingPolicy))
-	mux.Handle("GET /v1/admin/location-search-policy", api.adminAuthenticated(api.getAdminLocationSearchPolicy))
-	mux.Handle("PUT /v1/admin/location-search-policy", api.adminMutation(api.updateAdminLocationSearchPolicy))
 	mux.Handle("GET /v1/admin/driver-onboarding-applications", api.adminAuthenticated(api.listAdminDriverOnboardingApplications))
 	mux.Handle("GET /v1/admin/driver-onboarding-applications/{application_id}", api.adminAuthenticated(api.getAdminDriverOnboardingApplication))
 	mux.Handle("POST /v1/admin/driver-onboarding-applications/{application_id}/approve", api.adminMutation(api.approveAdminDriverOnboardingApplication))
@@ -92,7 +90,6 @@ func (api *API) registerAdminRoutes(mux *http.ServeMux) {
 	}))
 	mux.Handle("GET /admin/operations", api.adminAuthenticated(api.adminOperationsIndex))
 	mux.Handle("POST /admin/operations/marketplace-timing-policy", api.adminMutation(api.adminUpdateMarketplaceTimingPolicy))
-	mux.Handle("POST /admin/operations/location-search-policy", api.adminMutation(api.adminUpdateLocationSearchPolicy))
 	mux.Handle("GET /admin/driver-onboarding", api.adminAuthenticated(api.adminDriverOnboardingIndex))
 	mux.Handle("GET /admin/driver-onboarding/{application_id}", api.adminAuthenticated(api.adminDriverOnboardingDetail))
 	mux.Handle("POST /admin/driver-onboarding/{application_id}/approve", api.adminMutation(api.adminApproveDriverOnboarding))
