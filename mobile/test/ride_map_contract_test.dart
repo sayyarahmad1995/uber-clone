@@ -38,6 +38,17 @@ void main() {
     );
   });
 
+  test('pin mode and dashboard extent do not reposition the Rider map', () {
+    final source = File(
+      'lib/features/rider_request/presentation/rider_request_screen.dart',
+    ).readAsStringSync();
+
+    expect(source, isNot(contains('DashboardPanelSessionScope')));
+    expect(source, isNot(contains('mapBottomPadding')));
+    expect(source, isNot(contains('panelExpanded')));
+    expect(source, contains('final key = preview.encodedPolyline;'));
+  });
+
   test('RideMap exposes provider-neutral route rendering and camera fit', () {
     final source = File('lib/core/maps/ride_map.dart').readAsStringSync();
     final rider = File(
