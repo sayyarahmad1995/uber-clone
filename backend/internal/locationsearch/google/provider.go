@@ -169,8 +169,8 @@ func (p *Provider) Details(ctx context.Context, placeID, sessionToken string) (l
 		return locationsearch.Place{}, err
 	}
 	place := locationsearch.Place{
-		PlaceID:     strings.TrimSpace(payload.ID),
-		Label:       strings.TrimSpace(payload.FormattedAddress),
+		PlaceID: strings.TrimSpace(payload.ID),
+		Label:   strings.TrimSpace(payload.FormattedAddress),
 		Location: locationsearch.Point{
 			Latitude:  payload.Location.Latitude,
 			Longitude: payload.Location.Longitude,
@@ -239,9 +239,9 @@ func (p *Provider) reverseGeocodeAddress(ctx context.Context, point locationsear
 	}
 	first := payload.Results[0]
 	place := locationsearch.Place{
-		PlaceID:     strings.TrimSpace(first.PlaceID),
-		Label:       strings.TrimSpace(first.FormattedAddress),
-		Location:    point,
+		PlaceID:  strings.TrimSpace(first.PlaceID),
+		Label:    strings.TrimSpace(first.FormattedAddress),
+		Location: point,
 	}
 	if place.Label == "" {
 		return locationsearch.Place{}, locationsearch.ErrNotFound
