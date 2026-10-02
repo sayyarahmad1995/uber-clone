@@ -183,11 +183,15 @@ func (p *Provider) Details(ctx context.Context, placeID, sessionToken string) (l
 	return place, nil
 }
 
-func (p *Provider) ReverseGeocode(ctx context.Context, point locationsearch.Point) (locationsearch.Place, error) {
+func (p *Provider) ReverseGeocode(ctx context.Context, point locationsearch.Point, namedPlaceSnapRadiusMeters int64) (locationsearch.Place, error) {
 	if p.apiKey == "" {
 		return locationsearch.Place{}, locationsearch.ErrUnavailable
 	}
-	if place, found, err := p.nearbyNamedPlace(ctx, point); err != nil {
+	if namedPlaceSnapRadiusMeters < locationsearch.MinNamedPlaceSnapRadiusMeters ||
+		namedPlaceSnapRadiusMeters > locationsearch.MaxNamedPlaceSnapRadiusMeters {
+		return locationsearch.Place{}, locationsearch.ErrInvalidInput
+	}
+	if place, found, err := p.nearbyNamedPlace(ctx, point, namedPlaceSnapRadiusMeters); err != nil {
 		return locationsearch.Place{}, err
 	} else if found {
 		return place, nil
@@ -195,7 +199,7 @@ func (p *Provider) ReverseGeocode(ctx context.Context, point locationsearch.Poin
 	return p.reverseGeocodeAddress(ctx, point)
 }
 
-func (p *Provider) nearbyNamedPlace(ctx context.Context, point locationsearch.Point) (locationsearch.Place, bool, error) {
+func (p *Provider) nearbyNamedPlace(ctx context.Context, point locationsearch.Point, radiusMeters int64) (locationsearch.Place, bool, error) {
 	body := map[string]any{
 		"maxResultCount": 1,
 		"rankPreference": "DISTANCE",
@@ -205,7 +209,7 @@ func (p *Provider) nearbyNamedPlace(ctx context.Context, point locationsearch.Po
 					"latitude":  point.Latitude,
 					"longitude": point.Longitude,
 				},
-				"radius": 5.0,
+				"radius": float64(radiusMeters),
 			},
 		},
 	}

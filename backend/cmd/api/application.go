@@ -56,8 +56,10 @@ func newApplication(cfg config) (application, func(), error) {
 	)
 	marketplacePolicyService := marketplace.NewPolicyService(db)
 	driverOnboardingRepository := driveronboarding.NewPostgresRepository(db)
+	locationSearchPolicyService := locationsearch.NewPolicyService(db)
 	locationSearchService := locationsearch.NewService(
 		locationsearchgoogle.New(cfg.GoogleMapsServerAPIKey),
+		locationSearchPolicyService,
 	)
 	api := httpapi.New(httpapi.Dependencies{
 		Health:                          db,
@@ -77,6 +79,7 @@ func newApplication(cfg config) (application, func(), error) {
 		MarketplacePolicy:               marketplacePolicyService,
 		Trips:                           tripService,
 		LocationSearch:                  locationSearchService,
+		LocationSearchPolicy:            locationSearchPolicyService,
 		LocationSearchRequestsPerMinute: cfg.LocationSearchRequestsPerMinute,
 		Identity:                        identityProvider,
 		Auth:                            auth.NewHandler(auth.NewService(authProvider)),
