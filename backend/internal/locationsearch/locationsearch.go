@@ -42,9 +42,9 @@ type Suggestion struct {
 }
 
 type Place struct {
-	PlaceID     string
-	Label       string
-	Location    Point
+	PlaceID  string
+	Label    string
+	Location Point
 }
 
 type Provider interface {
