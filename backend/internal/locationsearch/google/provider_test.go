@@ -119,6 +119,35 @@ func TestReverseGeocodePrefersNearestNamedPlaceAndCanonicalLocation(t *testing.T
 	}
 }
 
+func TestReverseGeocodeChoosesNearestWithinPopularityCandidatePool(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/places:searchNearby":
+			_, _ = w.Write([]byte(`{"places":[
+				{"id":"popular-far","displayName":{"text":"Popular Far"},"primaryType":"cafe","types":["cafe","point_of_interest","establishment"],"businessStatus":"OPERATIONAL","location":{"latitude":33.72943,"longitude":73.0371}},
+				{"id":"popular-near","displayName":{"text":"Popular Near"},"primaryType":"restaurant","types":["restaurant","point_of_interest","establishment"],"businessStatus":"OPERATIONAL","location":{"latitude":33.729405,"longitude":73.0371}}
+			]}`))
+		default:
+			t.Fatalf("unexpected request path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	provider := newProvider("server-key", server.Client(), server.URL, server.URL)
+	place, err := provider.ReverseGeocode(
+		context.Background(),
+		locationsearch.Point{Latitude: 33.7294, Longitude: 73.0371},
+		5,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if place.PlaceID != "popular-near" {
+		t.Fatalf("expected nearest candidate from popularity pool, got %#v", place)
+	}
+}
+
 func TestReverseGeocodeSkipsServiceAreaAndGenericAddressCandidates(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
