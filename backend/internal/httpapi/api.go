@@ -18,6 +18,7 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/riderlocation"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/rideservice"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/ridestatus"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/routing"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/trip"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/user"
 )
@@ -40,6 +41,7 @@ type Dependencies struct {
 	MarketplacePolicy               marketplace.PolicyService
 	Trips                           trip.Service
 	LocationSearch                  locationsearch.Searcher
+	Routing                         routing.Previewer
 	LocationSearchPolicy            locationsearch.PolicyService
 	LocationSearchRequestsPerMinute int
 	Identity                        identity.Provider
@@ -67,6 +69,7 @@ type API struct {
 	marketplacePolicy      marketplace.PolicyService
 	trips                  trip.Service
 	locationSearch         locationsearch.Searcher
+	routing                routing.Previewer
 	locationSearchPolicy   locationsearch.PolicyService
 	locationSearchLimiter  *userWindowLimiter
 	identity               identity.Provider
@@ -95,6 +98,7 @@ func New(deps Dependencies) *API {
 		marketplacePolicy:      deps.MarketplacePolicy,
 		trips:                  deps.Trips,
 		locationSearch:         deps.LocationSearch,
+		routing:                deps.Routing,
 		locationSearchPolicy:   deps.LocationSearchPolicy,
 		locationSearchLimiter:  newUserWindowLimiter(deps.LocationSearchRequestsPerMinute),
 		identity:               deps.Identity,
