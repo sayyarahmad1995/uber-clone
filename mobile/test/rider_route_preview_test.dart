@@ -161,7 +161,7 @@ class _RoutePreviewAdapter implements HttpClientAdapter {
         'route': {
           'distance_meters': 788906,
           'duration_seconds': 3600,
-          'encoded_polyline': '_p~iF~ps|U_ulLnnqC_mqNvxq`@',
+          'encoded_polyline': '_p~iF~ps|U_ulLnnqC_mqNvxq`@`@',
         },
       }),
       200,
