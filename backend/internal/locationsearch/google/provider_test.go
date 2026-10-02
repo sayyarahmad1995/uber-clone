@@ -105,7 +105,7 @@ func TestReverseGeocodePrefersNearestNamedPlaceAndCanonicalLocation(t *testing.T
 	defer server.Close()
 
 	provider := newProvider("server-key", server.Client(), server.URL, server.URL)
-	place, err := provider.ReverseGeocode(context.Background(), locationsearch.Point{Latitude: 33.7294, Longitude: 73.0371})
+	place, err := provider.ReverseGeocode(context.Background(), locationsearch.Point{Latitude: 33.7294, Longitude: 73.0371}, 5)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestReverseGeocodeFallsBackToFormattedAddressAndKeepsPin(t *testing.T) {
 
 	provider := newProvider("server-key", server.Client(), server.URL, server.URL)
 	pin := locationsearch.Point{Latitude: 24.86, Longitude: 67.01}
-	place, err := provider.ReverseGeocode(context.Background(), pin)
+	place, err := provider.ReverseGeocode(context.Background(), pin, 5)
 	if err != nil {
 		t.Fatal(err)
 	}
