@@ -205,7 +205,7 @@ func (p *Provider) nearbyNamedPlace(ctx context.Context, point locationsearch.Po
 					"latitude":  point.Latitude,
 					"longitude": point.Longitude,
 				},
-				"radius": 50.0,
+				"radius": 5.0,
 			},
 		},
 	}

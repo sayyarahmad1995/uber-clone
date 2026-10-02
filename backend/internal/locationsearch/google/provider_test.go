@@ -91,6 +91,14 @@ func TestReverseGeocodePrefersNearestNamedPlaceAndCanonicalLocation(t *testing.T
 		if body["rankPreference"] != "DISTANCE" || body["maxResultCount"] != float64(1) {
 			t.Fatalf("unexpected nearby body: %#v", body)
 		}
+		restriction, ok := body["locationRestriction"].(map[string]any)
+		if !ok {
+			t.Fatalf("missing location restriction: %#v", body)
+		}
+		circle, ok := restriction["circle"].(map[string]any)
+		if !ok || circle["radius"] != float64(5) {
+			t.Fatalf("expected 5 meter named-place radius: %#v", restriction)
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"places":[{"id":"named-1","displayName":{"text":"Faisal Mosque"},"formattedAddress":"Shah Faisal Ave, Islamabad","location":{"latitude":33.7295,"longitude":73.0372}}]}`))
 	}))
