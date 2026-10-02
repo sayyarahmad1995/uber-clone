@@ -6,7 +6,6 @@ import '../../ride_flow/ride_flow_panels.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/dashboard/dashboard_panel_session.dart';
 import '../../../core/dashboard/ride_dashboard_scaffold.dart';
 import '../../../core/maps/ride_map.dart';
 import '../../../core/providers.dart';
@@ -119,13 +118,8 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     final active = state.active;
     final placeState = ref.watch(riderPlaceSearchControllerProvider).state;
     final routeState = ref.watch(riderRoutePreviewControllerProvider).state;
-    final panelExpanded =
-        DashboardPanelSessionScope.maybeOf(context)?.expanded ?? false;
     final routePreview = active == null ? routeState.preview : null;
-    _scheduleRouteFit(routePreview, panelExpanded);
-    final mapBottomPadding =
-        MediaQuery.sizeOf(context).height * (panelExpanded ? 0.60 : 0.18) +
-        AppSpacing.lg;
+    _scheduleRouteFit(routePreview);
     final driverLocation = active == null
         ? null
         : freshDriverLocation(
@@ -165,7 +159,6 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
               color: Theme.of(context).colorScheme.primary,
             ),
         ],
-        padding: EdgeInsets.only(bottom: mapBottomPadding),
         onTap: active == null ? _handleMapTap : null,
         showCenterPin: active == null && _pinSelectionMode,
         centerPinColor: _selectingPickup ? AppColors.success : AppColors.danger,
@@ -256,17 +249,10 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
 
   void _startPinSelection(RiderPlaceField field) {
     FocusScope.of(context).unfocus();
-    DashboardPanelSessionScope.maybeOf(context)?.setExpanded(false);
-    final pickup = field == RiderPlaceField.pickup;
-    final rider = ref.read(riderRequestControllerProvider).state;
-    final existing = pickup ? rider.pickup : rider.destination;
     setState(() {
-      _selectingPickup = pickup;
+      _selectingPickup = field == RiderPlaceField.pickup;
       _pinSelectionMode = true;
     });
-    if (existing != null) {
-      unawaited(_mapController.move(_latLng(existing), 16));
-    }
   }
 
   Future<void> _confirmPinSelection() async {
@@ -424,12 +410,12 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
       ),
   ];
 
-  void _scheduleRouteFit(RoutePreview? preview, bool panelExpanded) {
+  void _scheduleRouteFit(RoutePreview? preview) {
     if (preview == null) {
       _lastFittedRouteKey = null;
       return;
     }
-    final key = '${preview.encodedPolyline}|$panelExpanded';
+    final key = preview.encodedPolyline;
     if (_lastFittedRouteKey == key) {
       return;
     }
