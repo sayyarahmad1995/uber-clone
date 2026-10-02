@@ -200,10 +200,9 @@ class RiderPlaceSearchController extends ChangeNotifier {
       final selection = PlaceSelection(
         placeId: resolved.placeId,
         label: resolved.label,
-        point: resolved.snapToPlace ? resolved.point : point,
-        snapToPlace: resolved.snapToPlace,
+        point: point,
       );
-      _applyPoint(field, selection.point);
+      _applyPoint(field, point);
       _setField(field, PlaceFieldSearchState(label: selection.label));
       return selection;
     } catch (error) {
