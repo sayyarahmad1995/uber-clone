@@ -44,9 +44,7 @@ List<GeoPoint> decodeEncodedPolyline(String encoded) {
     index = lng.$2;
     longitude += lng.$1;
 
-    points.add(
-      GeoPoint(latitude: latitude / 1e5, longitude: longitude / 1e5),
-    );
+    points.add(GeoPoint(latitude: latitude / 1e5, longitude: longitude / 1e5));
   }
 
   if (points.length < 2) {
