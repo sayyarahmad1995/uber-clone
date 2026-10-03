@@ -70,6 +70,8 @@ void main() {
     ).readAsStringSync();
 
     expect(source, contains('class RideMapPolyline'));
+    expect(source, contains('consumeTapEvents: polyline.onTap != null'));
+    expect(source, contains('onTap: polyline.onTap'));
     expect(source, contains('Future<void> fit('));
     expect(source, contains('newLatLngBounds'));
     expect(source, contains('polylines: {'));
