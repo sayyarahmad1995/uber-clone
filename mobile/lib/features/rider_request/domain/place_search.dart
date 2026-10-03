@@ -20,13 +20,11 @@ class PlaceSelection {
     this.placeId,
     required this.label,
     required this.point,
-    this.snapToPlace = false,
   });
 
   final String? placeId;
   final String label;
   final GeoPoint point;
-  final bool snapToPlace;
 
   factory PlaceSelection.fromJson(Map<String, dynamic> json) => PlaceSelection(
     placeId: json['place_id'] as String?,
@@ -35,6 +33,5 @@ class PlaceSelection {
       latitude: (json['latitude'] as num).toDouble(),
       longitude: (json['longitude'] as num).toDouble(),
     ),
-    snapToPlace: json['snap_to_place'] as bool? ?? false,
   );
 }

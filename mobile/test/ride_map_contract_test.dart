@@ -38,6 +38,52 @@ void main() {
     );
   });
 
+  test('pin mode and dashboard extent do not reposition the Rider map', () {
+    final source = File(
+      'lib/features/rider_request/presentation/rider_request_screen.dart',
+    ).readAsStringSync();
+
+    expect(source, isNot(contains('DashboardPanelSessionScope')));
+    expect(source, isNot(contains('mapBottomPadding')));
+    expect(source, isNot(contains('panelExpanded')));
+    expect(
+      source,
+      contains("preview.routes.map((route) => route.encodedPolyline).join('|')"),
+    );
+  });
+
+  test('RideMap translates Google POI taps behind provider boundary', () {
+    final source = File('lib/core/maps/ride_map.dart').readAsStringSync();
+    final rider = File(
+      'lib/features/rider_request/presentation/rider_request_screen.dart',
+    ).readAsStringSync();
+
+    expect(source, contains('class RideMapPlace'));
+    expect(source, contains('onPointOfInterestTap'));
+    expect(source, contains('PointOfInterestTapEvent'));
+    expect(source, contains('RideMapPlace(placeId: placeId)'));
+    expect(rider, contains('onPlaceTap: active == null ? _handlePlaceTap : null'));
+    expect(rider, contains('selectPlaceId(field, place.placeId)'));
+  });
+
+  test('RideMap exposes provider-neutral route rendering and camera fit', () {
+    final source = File('lib/core/maps/ride_map.dart').readAsStringSync();
+    final rider = File(
+      'lib/features/rider_request/presentation/rider_request_screen.dart',
+    ).readAsStringSync();
+
+    expect(source, contains('class RideMapPolyline'));
+    expect(source, contains('consumeTapEvents: polyline.onTap != null'));
+    expect(source, contains('onTap: polyline.onTap'));
+    expect(source, contains('Future<void> fit('));
+    expect(source, contains('newLatLngBounds'));
+    expect(source, contains('polylines: {'));
+    expect(source, contains('padding: widget.padding'));
+    expect(rider, contains('routePreviewSummary'));
+    expect(rider, contains('Recommended · current traffic'));
+    expect(rider, contains(r"Key('routeOption-${entry.$2.id}')"));
+  });
+
   test('Google Maps provider types stay behind the shared map boundary', () {
     final rider = File(
       'lib/features/rider_request/presentation/rider_request_screen.dart',

@@ -42,16 +42,15 @@ type Suggestion struct {
 }
 
 type Place struct {
-	PlaceID     string
-	Label       string
-	Location    Point
-	SnapToPlace bool
+	PlaceID  string
+	Label    string
+	Location Point
 }
 
 type Provider interface {
 	Autocomplete(context.Context, AutocompleteInput) ([]Suggestion, error)
 	Details(context.Context, string, string) (Place, error)
-	ReverseGeocode(context.Context, Point, int64) (Place, error)
+	ReverseGeocode(context.Context, Point) (Place, error)
 }
 
 type Searcher interface {
@@ -62,15 +61,10 @@ type Searcher interface {
 
 type Service struct {
 	provider Provider
-	policy   PolicyService
 }
 
-func NewService(provider Provider, policy ...PolicyService) Service {
-	service := Service{provider: provider}
-	if len(policy) > 0 {
-		service.policy = policy[0]
-	}
-	return service
+func NewService(provider Provider) Service {
+	return Service{provider: provider}
 }
 
 func (s Service) Autocomplete(ctx context.Context, input AutocompleteInput) ([]Suggestion, error) {
@@ -94,7 +88,7 @@ func (s Service) Details(ctx context.Context, placeID, sessionToken string) (Pla
 	if s.provider == nil {
 		return Place{}, ErrUnavailable
 	}
-	if placeID == "" || sessionToken == "" {
+	if placeID == "" {
 		return Place{}, ErrInvalidInput
 	}
 	return s.provider.Details(ctx, placeID, sessionToken)
@@ -107,13 +101,5 @@ func (s Service) ReverseGeocode(ctx context.Context, point Point) (Place, error)
 	if !point.Valid() {
 		return Place{}, ErrInvalidInput
 	}
-	radius := DefaultNamedPlaceSnapRadiusMeters
-	if s.policy != nil {
-		policy, err := s.policy.Load(ctx)
-		if err != nil {
-			return Place{}, errors.Join(ErrUnavailable, err)
-		}
-		radius = policy.NamedPlaceSnapRadiusMeters
-	}
-	return s.provider.ReverseGeocode(ctx, point, radius)
+	return s.provider.ReverseGeocode(ctx, point)
 }

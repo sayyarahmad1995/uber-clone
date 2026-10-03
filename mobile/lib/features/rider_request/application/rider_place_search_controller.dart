@@ -176,6 +176,47 @@ class RiderPlaceSearchController extends ChangeNotifier {
     }
   }
 
+  Future<PlaceSelection?> selectPlaceId(
+    RiderPlaceField field,
+    String placeId,
+  ) async {
+    _endSession(field);
+    _debounces.remove(field)?.cancel();
+    final revision = _nextRevision(field);
+    final previous = _state.field(field);
+    _setField(
+      field,
+      previous.copyWith(
+        suggestions: const [],
+        searching: false,
+        resolving: true,
+        searched: false,
+        clearError: true,
+      ),
+    );
+
+    try {
+      final selected = await _repository.placeById(placeId);
+      if (!_isCurrent(field, revision)) return null;
+      _applyPoint(field, selected.point);
+      _setField(field, PlaceFieldSearchState(label: selected.label));
+      return selected;
+    } catch (error) {
+      if (!_isCurrent(field, revision)) return null;
+      _setField(
+        field,
+        previous.copyWith(
+          suggestions: const [],
+          searching: false,
+          resolving: false,
+          searched: false,
+          error: _message(error),
+        ),
+      );
+      return null;
+    }
+  }
+
   Future<PlaceSelection?> reconcilePin(
     RiderPlaceField field,
     GeoPoint point,
@@ -200,10 +241,9 @@ class RiderPlaceSearchController extends ChangeNotifier {
       final selection = PlaceSelection(
         placeId: resolved.placeId,
         label: resolved.label,
-        point: resolved.snapToPlace ? resolved.point : point,
-        snapToPlace: resolved.snapToPlace,
+        point: point,
       );
-      _applyPoint(field, selection.point);
+      _applyPoint(field, point);
       _setField(field, PlaceFieldSearchState(label: selection.label));
       return selection;
     } catch (error) {
