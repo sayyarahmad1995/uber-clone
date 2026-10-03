@@ -41,7 +41,9 @@ func TestPreviewUsesDrivingRequestAndNarrowFieldMask(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if body["travelMode"] != "DRIVE" || body["computeAlternativeRoutes"] != false {
+	if body["travelMode"] != "DRIVE" ||
+		body["routingPreference"] != "TRAFFIC_AWARE" ||
+		body["computeAlternativeRoutes"] != false {
 		t.Fatalf("unexpected route options: %#v", body)
 	}
 	if body["polylineQuality"] != "OVERVIEW" || body["polylineEncoding"] != "ENCODED_POLYLINE" {
