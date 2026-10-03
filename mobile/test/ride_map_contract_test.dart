@@ -81,7 +81,7 @@ void main() {
     expect(source, contains('padding: widget.padding'));
     expect(rider, contains('routePreviewSummary'));
     expect(rider, contains('Recommended · current traffic'));
-    expect(rider, contains("Key('routeOption-\${entry.$2.id}')"));
+    expect(rider, contains(r"Key('routeOption-${entry.$2.id}')"));
   });
 
   test('Google Maps provider types stay behind the shared map boundary', () {
