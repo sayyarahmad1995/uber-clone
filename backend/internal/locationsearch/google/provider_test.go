@@ -55,11 +55,11 @@ func TestDetailsConcludesSessionWithoutProFields(t *testing.T) {
 		if r.URL.Query().Get("sessionToken") != "session-1" {
 			t.Fatalf("missing details session token: %s", r.URL.RawQuery)
 		}
-		if got := r.Header.Get("X-Goog-FieldMask"); got != "id,formattedAddress,location" {
+		if got := r.Header.Get("X-Goog-FieldMask"); got != "id,displayName.text,formattedAddress,location" {
 			t.Fatalf("unexpected details mask: %q", got)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"id":"p1","formattedAddress":"Clifton, Karachi","location":{"latitude":24.82,"longitude":67.03}}`))
+		_, _ = w.Write([]byte(`{"id":"p1","displayName":{"text":"Clifton"},"formattedAddress":"Clifton, Karachi","location":{"latitude":24.82,"longitude":67.03}}`))
 	}))
 	defer server.Close()
 
@@ -82,7 +82,7 @@ func TestDetailsWithoutAutocompleteSessionOmitsSessionToken(t *testing.T) {
 			t.Fatalf("direct POI details must not fabricate an autocomplete session: %s", r.URL.RawQuery)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"id":"poi-1","formattedAddress":"Faisal Mosque, Islamabad","location":{"latitude":33.7295,"longitude":73.0372}}`))
+		_, _ = w.Write([]byte(`{"id":"poi-1","displayName":{"text":"Faisal Mosque"},"formattedAddress":"Shah Faisal Ave, Islamabad","location":{"latitude":33.7295,"longitude":73.0372}}`))
 	}))
 	defer server.Close()
 
@@ -91,7 +91,7 @@ func TestDetailsWithoutAutocompleteSessionOmitsSessionToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if place.PlaceID != "poi-1" || place.Location.Latitude != 33.7295 {
+	if place.PlaceID != "poi-1" || place.Label != "Faisal Mosque" || place.Location.Latitude != 33.7295 {
 		t.Fatalf("unexpected POI place: %#v", place)
 	}
 }
