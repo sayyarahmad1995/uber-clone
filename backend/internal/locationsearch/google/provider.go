@@ -145,7 +145,10 @@ func (p *Provider) Details(ctx context.Context, placeID, sessionToken string) (l
 		return locationsearch.Place{}, fmt.Errorf("%w: build place details request", locationsearch.ErrProvider)
 	}
 	req.Header.Set("X-Goog-Api-Key", p.apiKey)
-	req.Header.Set("X-Goog-FieldMask", "id,formattedAddress,location")
+	req.Header.Set(
+		"X-Goog-FieldMask",
+		"id,displayName.text,formattedAddress,location",
+	)
 
 	resp, err := p.client.Do(req)
 	if err != nil {
@@ -160,7 +163,10 @@ func (p *Provider) Details(ctx context.Context, placeID, sessionToken string) (l
 	}
 
 	var payload struct {
-		ID               string `json:"id"`
+		ID          string `json:"id"`
+		DisplayName struct {
+			Text string `json:"text"`
+		} `json:"displayName"`
 		FormattedAddress string `json:"formattedAddress"`
 		Location         struct {
 			Latitude  float64 `json:"latitude"`
@@ -170,9 +176,15 @@ func (p *Provider) Details(ctx context.Context, placeID, sessionToken string) (l
 	if err := decodeJSON(resp.Body, &payload); err != nil {
 		return locationsearch.Place{}, err
 	}
+	label := strings.TrimSpace(payload.FormattedAddress)
+	if strings.TrimSpace(sessionToken) == "" {
+		if displayName := strings.TrimSpace(payload.DisplayName.Text); displayName != "" {
+			label = displayName
+		}
+	}
 	place := locationsearch.Place{
 		PlaceID: strings.TrimSpace(payload.ID),
-		Label:   strings.TrimSpace(payload.FormattedAddress),
+		Label:   label,
 		Location: locationsearch.Point{
 			Latitude:  payload.Location.Latitude,
 			Longitude: payload.Location.Longitude,
