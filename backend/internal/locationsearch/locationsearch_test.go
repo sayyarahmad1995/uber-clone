@@ -56,6 +56,18 @@ func TestServiceRejectsInvalidRequestsBeforeProvider(t *testing.T) {
 	}
 }
 
+func TestServiceAllowsDirectPlaceDetailsWithoutAutocompleteSession(t *testing.T) {
+	service := NewService(&fakeProvider{})
+
+	place, err := service.Details(context.Background(), "place-1", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if place.PlaceID != "place-1" {
+		t.Fatalf("unexpected place: %#v", place)
+	}
+}
+
 func TestServiceReverseGeocodePassesExactPointToProvider(t *testing.T) {
 	provider := &fakeProvider{}
 	service := NewService(provider)
