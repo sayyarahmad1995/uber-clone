@@ -41,8 +41,8 @@ Record test date, current branch/SHA, Android app build and device/version, envi
 
 ## 3. Routing and suggested fares
 
-- [ ] Two plausible local locations return one `TRAFFIC_AWARE` road-driving route; Flutter displays the encoded polyline and fits both endpoints with the bottom panel visible. During materially different traffic conditions, verify the returned duration reflects current traffic rather than the traffic-unaware default.
-- [ ] Display distance in road kilometres and estimated journey duration using the **same** backend route result. Verify no-route response shows an error rather than a Haversine fallback labeled as a road route.
+- [ ] Two plausible local locations request `TRAFFIC_AWARE` driving alternatives. When Google returns alternatives, Flutter shows all returned polylines, initially emphasizes the recommended route, and lists each option with current-traffic duration and road distance. Tapping an alternate line or option selects it without another route request or camera transition. When Google returns only one route, the UI remains valid. During materially different traffic conditions, verify duration reflects current traffic rather than the traffic-unaware default.
+- [ ] Display road kilometres and estimated journey duration from the **currently selected route option**. Switching options updates both values together. Verify no-route response shows an error rather than a Haversine fallback labeled as a road route.
 - [ ] Changing either endpoint or the selected service invalidates prior route/fare displays and ignores out-of-order responses.
 - [ ] Owner-approved Economy and Comfort parameters produce reproducible suggested PKR fares for controlled fixture distances/durations; backend owns math, version and final integer rounding.
 - [ ] A third test service has its **own** active pricing policy and its own reproducible suggestion; deleting/disabling its policy prevents new price-backed booking without changing previously agreed prices.
