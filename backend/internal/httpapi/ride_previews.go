@@ -41,7 +41,7 @@ func (api *API) createRidePreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	route, err := api.routing.Preview(
+	preview, err := api.routing.Preview(
 		r.Context(),
 		routing.Point{
 			Latitude:  *body.Pickup.Latitude,
@@ -56,7 +56,7 @@ func (api *API) createRidePreview(w http.ResponseWriter, r *http.Request) {
 		api.writeRoutingError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, ridePreviewResponse(route))
+	writeJSON(w, http.StatusOK, ridePreviewResponse(preview))
 }
 
 func (api *API) writeRoutingError(w http.ResponseWriter, r *http.Request, err error) {
@@ -89,12 +89,16 @@ func routingStatus(err error) int {
 	}
 }
 
-func ridePreviewResponse(route routing.Route) map[string]any {
-	return map[string]any{
-		"route": map[string]any{
+func ridePreviewResponse(preview routing.Preview) map[string]any {
+	routes := make([]map[string]any, 0, len(preview.Routes))
+	for _, route := range preview.Routes {
+		routes = append(routes, map[string]any{
+			"id":               route.ID,
+			"recommended":      route.Recommended,
 			"distance_meters":  route.DistanceMeters,
 			"duration_seconds": route.DurationSeconds,
 			"encoded_polyline": route.EncodedPolyline,
-		},
+		})
 	}
+	return map[string]any{"routes": routes}
 }
