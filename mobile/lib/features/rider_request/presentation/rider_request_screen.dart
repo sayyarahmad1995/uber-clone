@@ -474,9 +474,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
       _lastFittedRouteKey = null;
       return;
     }
-    final key = preview.routes
-        .map((route) => route.encodedPolyline)
-        .join('|');
+    final key = preview.routes.map((route) => route.encodedPolyline).join('|');
     if (_lastFittedRouteKey == key) {
       return;
     }
