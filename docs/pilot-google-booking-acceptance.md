@@ -35,7 +35,7 @@ Record test date, current branch/SHA, Android app build and device/version, envi
 
 - [x] Rider and Driver dashboards render Google Maps, markers, current-location focus and cached location using the shared app-owned map adapter.
 - [ ] Shared panel gesture sizes/ownership/scrolling and expanded/collapsed persistence pass ADR-0008 regression on both capabilities after the PR 3 scroll-handoff fix.
-- [ ] Rider searches for pickup and destination, selects Places results and sees readable labels and accurate pins. Each field has its own map-pin button. Set-on-map mode shows a visible center pin and explicit confirm action. Confirming, tapping, or dragging a pin must retain the exact Rider-selected coordinate; reverse geocoding may update only the readable address label.
+- [ ] Rider searches for pickup and destination, selects Places results and sees readable labels and accurate pins. Each field has its own map-pin button. Set-on-map mode shows a visible center pin and explicit confirm action. Confirming, tapping blank map space, or dragging a free pin retains the exact Rider-selected coordinate; reverse geocoding may update only the readable address label. Tapping a Google-rendered POI label directly selects that named POI and its canonical coordinate without an automatic camera transition.
 - [ ] Validate no prediction, denied location permission, poor GPS, lost internet and a stale autocomplete response. No wrong-place selection or hidden provider error.
 - [ ] Google content displays over the Google map with appropriate provider attribution. No API key is shipped in committed source.
 
