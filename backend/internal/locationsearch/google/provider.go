@@ -134,9 +134,11 @@ func (p *Provider) Details(ctx context.Context, placeID, sessionToken string) (l
 	if err != nil {
 		return locationsearch.Place{}, fmt.Errorf("%w: build place details URL", locationsearch.ErrProvider)
 	}
-	query := endpoint.Query()
-	query.Set("sessionToken", sessionToken)
-	endpoint.RawQuery = query.Encode()
+	if sessionToken = strings.TrimSpace(sessionToken); sessionToken != "" {
+		query := endpoint.Query()
+		query.Set("sessionToken", sessionToken)
+		endpoint.RawQuery = query.Encode()
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
