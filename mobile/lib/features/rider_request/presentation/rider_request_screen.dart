@@ -118,7 +118,6 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     final active = state.active;
     final placeState = ref.watch(riderPlaceSearchControllerProvider).state;
     final routeState = ref.watch(riderRoutePreviewControllerProvider).state;
-    final selectedRoute = active == null ? routeState.selectedRoute : null;
     final routePreview = active == null ? routeState.preview : null;
     _scheduleRouteFit(routePreview);
     final driverLocation = active == null
