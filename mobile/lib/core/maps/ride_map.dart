@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart' as google;
+import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platform_interface.dart' as google_platform;
 
 import 'last_map_location_store.dart';
 
@@ -110,6 +113,12 @@ class RideMapMarker {
   final ValueChanged<RideMapPoint>? onDragEnd;
 }
 
+class RideMapPlace {
+  const RideMapPlace({required this.placeId});
+
+  final String placeId;
+}
+
 class RideMapPolyline {
   const RideMapPolyline({
     required this.points,
@@ -137,6 +146,7 @@ class RideMap extends StatefulWidget {
     this.initialCenter = defaultCenter,
     this.initialZoom = 12,
     this.onTap,
+    this.onPlaceTap,
     this.showCenterPin = false,
     this.centerPinColor,
   });
@@ -150,6 +160,7 @@ class RideMap extends StatefulWidget {
   final RideMapPoint initialCenter;
   final double initialZoom;
   final ValueChanged<RideMapPoint>? onTap;
+  final ValueChanged<RideMapPlace>? onPlaceTap;
   final bool showCenterPin;
   final Color? centerPinColor;
 
@@ -161,6 +172,8 @@ class _RideMapState extends State<RideMap> {
   static const _autoCenterLabel = 'Your published location';
 
   google.GoogleMapController? _googleController;
+  StreamSubscription<google_platform.PointOfInterestTapEvent>?
+  _pointOfInterestTapSubscription;
   String? _lastAutoCenteredPoint;
   bool _restoredCachedCenter = false;
   bool _programmaticCameraMove = false;
@@ -186,19 +199,51 @@ class _RideMapState extends State<RideMap> {
         widget.mapController?._updateCenter(_cameraCenter);
       }
     }
+    if (oldWidget.onPlaceTap != widget.onPlaceTap) {
+      _bindPointOfInterestTap();
+    }
     _scheduleAutoCenter();
   }
 
   @override
   void dispose() {
     widget.mapController?._detach();
+    unawaited(_pointOfInterestTapSubscription?.cancel());
     super.dispose();
   }
 
   void _onMapCreated(google.GoogleMapController controller) {
     _googleController = controller;
     widget.mapController?._attach(_explicitMove, _fitPoints);
+    _bindPointOfInterestTap();
     _scheduleAutoCenter();
+  }
+
+  void _bindPointOfInterestTap() {
+    unawaited(_pointOfInterestTapSubscription?.cancel());
+    _pointOfInterestTapSubscription = null;
+
+    final controller = _googleController;
+    if (controller == null || widget.onPlaceTap == null) {
+      return;
+    }
+    try {
+      _pointOfInterestTapSubscription = google_platform
+          .GoogleMapsFlutterPlatform.instance
+          .onPointOfInterestTap(mapId: controller.mapId)
+          .listen(
+            (event) {
+              final placeId = event.value.value.trim();
+              if (placeId.isEmpty) return;
+              widget.onPlaceTap?.call(RideMapPlace(placeId: placeId));
+            },
+            onError: (_) {
+              // POI tap events are an optional platform capability.
+            },
+          );
+    } catch (_) {
+      // Keep normal map taps available on platforms without POI tap support.
+    }
   }
 
   Future<void> _explicitMove(RideMapPoint point, double zoom) async {
