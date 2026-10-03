@@ -41,7 +41,7 @@ Record test date, current branch/SHA, Android app build and device/version, envi
 
 ## 3. Routing and suggested fares
 
-- [ ] Two plausible local locations return one road-driving route; Flutter displays the encoded polyline and fits both endpoints with the bottom panel visible.
+- [ ] Two plausible local locations return one `TRAFFIC_AWARE` road-driving route; Flutter displays the encoded polyline and fits both endpoints with the bottom panel visible. During materially different traffic conditions, verify the returned duration reflects current traffic rather than the traffic-unaware default.
 - [ ] Display distance in road kilometres and estimated journey duration using the **same** backend route result. Verify no-route response shows an error rather than a Haversine fallback labeled as a road route.
 - [ ] Changing either endpoint or the selected service invalidates prior route/fare displays and ignores out-of-order responses.
 - [ ] Owner-approved Economy and Comfort parameters produce reproducible suggested PKR fares for controlled fixture distances/durations; backend owns math, version and final integer rounding.
