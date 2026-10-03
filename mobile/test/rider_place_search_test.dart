@@ -45,7 +45,7 @@ void main() {
     expect(adapter.autocompleteSessionToken, 'session-1');
     expect(adapter.detailsSessionToken, 'session-1');
     expect(details.label, 'Clifton, Karachi');
-    expect(direct.label, 'Faisal Mosque, Islamabad');
+    expect(direct.label, 'Faisal Mosque');
     expect(adapter.directDetailsSessionToken, isNull);
     expect(reverse!.label, 'Pinned Road, Karachi');
   });
@@ -149,7 +149,7 @@ void main() {
       'poi-1',
     );
 
-    expect(selected!.label, 'Faisal Mosque, Islamabad');
+    expect(selected!.label, 'Faisal Mosque');
     expect(selected.point, const GeoPoint(latitude: 33.7295, longitude: 73.0372));
     expect(rider.state.pickup, selected.point);
     expect(controller.state.pickup.label, selected.label);
@@ -237,7 +237,7 @@ class _FakePlaceSearchRepository implements PlaceSearchRepository {
   Future<PlaceSelection> placeById(String placeId) async {
     return const PlaceSelection(
       placeId: 'poi-1',
-      label: 'Faisal Mosque, Islamabad',
+      label: 'Faisal Mosque',
       point: GeoPoint(latitude: 33.7295, longitude: 73.0372),
     );
   }
@@ -300,7 +300,7 @@ class _PlacesAdapter implements HttpClientAdapter {
           options.queryParameters['session_token'] as String?;
       return _json({
         'place_id': 'poi-1',
-        'label': 'Faisal Mosque, Islamabad',
+        'label': 'Faisal Mosque',
         'latitude': 33.7295,
         'longitude': 73.0372,
       });
