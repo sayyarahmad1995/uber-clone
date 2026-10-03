@@ -99,11 +99,7 @@ jobs:
             exit 0
           fi
 
-          dart format "${files[@]}"
-          if ! git diff --quiet -- "${files[@]}"; then
-            git diff -- "${files[@]}"
-            exit 1
-          fi
+          dart format --output=none --set-exit-if-changed "${files[@]}"
       - run: dart run build_runner build --delete-conflicting-outputs
         working-directory: mobile
       - run: git diff --exit-code --ignore-space-at-eol
