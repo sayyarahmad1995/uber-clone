@@ -125,11 +125,13 @@ class RideMapPolyline {
     required this.points,
     required this.color,
     this.width = 5,
+    this.onTap,
   });
 
   final List<RideMapPoint> points;
   final Color color;
   final int width;
+  final VoidCallback? onTap;
 }
 
 /// Shared Google Maps rendering boundary for Rider and Driver dashboards.
@@ -450,6 +452,8 @@ class _RideMapState extends State<RideMap> {
           .toList(growable: false),
       color: polyline.color,
       width: polyline.width,
+      consumeTapEvents: polyline.onTap != null,
+      onTap: polyline.onTap,
     );
   }
 
