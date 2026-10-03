@@ -17,7 +17,7 @@ import (
 
 const (
 	defaultRoutesBase = "https://routes.googleapis.com"
-	fieldMask         = "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline"
+	fieldMask         = "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline,routes.routeLabels"
 	maxAttempts       = 2
 	retryDelay        = 100 * time.Millisecond
 )
@@ -44,9 +44,9 @@ func newProvider(apiKey string, client *http.Client, base string) *Provider {
 	}
 }
 
-func (p *Provider) Preview(ctx context.Context, pickup, destination routing.Point) (routing.Route, error) {
+func (p *Provider) Preview(ctx context.Context, pickup, destination routing.Point) (routing.Preview, error) {
 	if p.apiKey == "" {
-		return routing.Route{}, routing.ErrUnavailable
+		return routing.Preview{}, routing.ErrUnavailable
 	}
 
 	body := map[string]any{
@@ -54,13 +54,13 @@ func (p *Provider) Preview(ctx context.Context, pickup, destination routing.Poin
 		"destination":              waypoint(destination),
 		"travelMode":               "DRIVE",
 		"routingPreference":        "TRAFFIC_AWARE",
-		"computeAlternativeRoutes": false,
+		"computeAlternativeRoutes": true,
 		"polylineQuality":          "OVERVIEW",
 		"polylineEncoding":         "ENCODED_POLYLINE",
 	}
 	encoded, err := json.Marshal(body)
 	if err != nil {
-		return routing.Route{}, fmt.Errorf("%w: encode route request", routing.ErrProvider)
+		return routing.Preview{}, fmt.Errorf("%w: encode route request", routing.ErrProvider)
 	}
 
 	var resp *http.Response
@@ -72,7 +72,7 @@ func (p *Provider) Preview(ctx context.Context, pickup, destination routing.Poin
 			bytes.NewReader(encoded),
 		)
 		if buildErr != nil {
-			return routing.Route{}, fmt.Errorf("%w: build route request", routing.ErrProvider)
+			return routing.Preview{}, fmt.Errorf("%w: build route request", routing.ErrProvider)
 		}
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("X-Goog-Api-Key", p.apiKey)
@@ -89,61 +89,88 @@ func (p *Provider) Preview(ctx context.Context, pickup, destination routing.Poin
 		}
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
 			if ctx.Err() != nil {
-				return routing.Route{}, ctx.Err()
+				return routing.Preview{}, ctx.Err()
 			}
-			return routing.Route{}, err
+			return routing.Preview{}, err
 		}
 		if attempt+1 < maxAttempts {
 			timer := time.NewTimer(retryDelay)
 			select {
 			case <-ctx.Done():
 				timer.Stop()
-				return routing.Route{}, ctx.Err()
+				return routing.Preview{}, ctx.Err()
 			case <-timer.C:
 			}
 		}
 	}
 	if err != nil {
-		return routing.Route{}, fmt.Errorf("%w: compute route request", routing.ErrProvider)
+		return routing.Preview{}, fmt.Errorf("%w: compute route request", routing.ErrProvider)
 	}
 	if resp == nil {
-		return routing.Route{}, fmt.Errorf("%w: empty route response", routing.ErrProvider)
+		return routing.Preview{}, fmt.Errorf("%w: empty route response", routing.ErrProvider)
 	}
 	defer resp.Body.Close()
 	if err := providerStatus(resp.StatusCode); err != nil {
-		return routing.Route{}, err
+		return routing.Preview{}, err
 	}
 
 	var payload struct {
 		Routes []struct {
-			DistanceMeters int64  `json:"distanceMeters"`
-			Duration       string `json:"duration"`
+			DistanceMeters int64    `json:"distanceMeters"`
+			Duration       string   `json:"duration"`
+			RouteLabels    []string `json:"routeLabels"`
 			Polyline       struct {
 				EncodedPolyline string `json:"encodedPolyline"`
 			} `json:"polyline"`
 		} `json:"routes"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		return routing.Route{}, fmt.Errorf("%w: decode route response", routing.ErrProvider)
+		return routing.Preview{}, fmt.Errorf("%w: decode route response", routing.ErrProvider)
 	}
 	if len(payload.Routes) == 0 {
-		return routing.Route{}, routing.ErrNotFound
+		return routing.Preview{}, routing.ErrNotFound
 	}
 
-	first := payload.Routes[0]
-	duration, err := time.ParseDuration(strings.TrimSpace(first.Duration))
-	if err != nil || duration <= 0 {
-		return routing.Route{}, fmt.Errorf("%w: invalid route duration", routing.ErrProvider)
+	routes := make([]routing.Route, 0, len(payload.Routes))
+	recommendedIndex := -1
+	for _, candidate := range payload.Routes {
+		duration, parseErr := time.ParseDuration(strings.TrimSpace(candidate.Duration))
+		if parseErr != nil || duration <= 0 {
+			continue
+		}
+		route := routing.Route{
+			ID:              fmt.Sprintf("route-%d", len(routes)),
+			Recommended:     hasRouteLabel(candidate.RouteLabels, "DEFAULT_ROUTE"),
+			DistanceMeters:  candidate.DistanceMeters,
+			DurationSeconds: int64(math.Ceil(duration.Seconds())),
+			EncodedPolyline: strings.TrimSpace(candidate.Polyline.EncodedPolyline),
+		}
+		if !route.Valid() {
+			continue
+		}
+		if route.Recommended && recommendedIndex == -1 {
+			recommendedIndex = len(routes)
+		} else {
+			route.Recommended = false
+		}
+		routes = append(routes, route)
 	}
-	route := routing.Route{
-		DistanceMeters:  first.DistanceMeters,
-		DurationSeconds: int64(math.Ceil(duration.Seconds())),
-		EncodedPolyline: strings.TrimSpace(first.Polyline.EncodedPolyline),
+	if len(routes) == 0 {
+		return routing.Preview{}, fmt.Errorf("%w: no complete routes", routing.ErrProvider)
 	}
-	if !route.Valid() {
-		return routing.Route{}, fmt.Errorf("%w: incomplete route", routing.ErrProvider)
+	if recommendedIndex == -1 {
+		routes[0].Recommended = true
 	}
-	return route, nil
+	return routing.Preview{Routes: routes}, nil
+}
+
+func hasRouteLabel(labels []string, expected string) bool {
+	for _, label := range labels {
+		if strings.EqualFold(strings.TrimSpace(label), expected) {
+			return true
+		}
+	}
+	return false
 }
 
 func waypoint(point routing.Point) map[string]any {
