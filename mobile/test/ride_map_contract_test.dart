@@ -49,6 +49,20 @@ void main() {
     expect(source, contains('final key = preview.encodedPolyline;'));
   });
 
+  test('RideMap translates Google POI taps behind provider boundary', () {
+    final source = File('lib/core/maps/ride_map.dart').readAsStringSync();
+    final rider = File(
+      'lib/features/rider_request/presentation/rider_request_screen.dart',
+    ).readAsStringSync();
+
+    expect(source, contains('class RideMapPlace'));
+    expect(source, contains('onPointOfInterestTap'));
+    expect(source, contains('PointOfInterestTapEvent'));
+    expect(source, contains('RideMapPlace(placeId: placeId)'));
+    expect(rider, contains('onPlaceTap: active == null ? _handlePlaceTap : null'));
+    expect(rider, contains('selectPlaceId(field, place.placeId)'));
+  });
+
   test('RideMap exposes provider-neutral route rendering and camera fit', () {
     final source = File('lib/core/maps/ride_map.dart').readAsStringSync();
     final rider = File(
