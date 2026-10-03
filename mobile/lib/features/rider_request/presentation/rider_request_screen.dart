@@ -160,6 +160,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
             ),
         ],
         onTap: active == null ? _handleMapTap : null,
+        onPlaceTap: active == null ? _handlePlaceTap : null,
         showCenterPin: active == null && _pinSelectionMode,
         centerPinColor: _selectingPickup ? AppColors.success : AppColors.danger,
       ),
@@ -175,8 +176,8 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
         title: active == null ? 'Ride dashboard' : 'Active ride request',
         message: active == null
             ? _pinSelectionMode
-                  ? 'Move the map under the pin, then confirm the ${_selectingPickup ? 'pickup' : 'destination'}.'
-                  : 'Search for a place, tap the map, or use Set on map.'
+                  ? 'Move the map under the pin and confirm, or tap a labeled place to select it directly.'
+                  : 'Search, tap a labeled place, tap the map, or use Set on map.'
             : 'Status updates appear in the ride panel below.',
       ),
       panelBuilder: (context, scrollController, scrollEnabled) {
@@ -295,6 +296,31 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     if (_selectingPickup) {
       setState(() => _selectingPickup = false);
     }
+  }
+
+  Future<void> _handlePlaceTap(RideMapPlace place) async {
+    final field = _selectedField;
+    if (ref
+        .read(riderPlaceSearchControllerProvider)
+        .state
+        .field(field)
+        .resolving) {
+      return;
+    }
+
+    final selected = await ref
+        .read(riderPlaceSearchControllerProvider)
+        .selectPlaceId(field, place.placeId);
+    if (!mounted || selected == null) return;
+
+    _searchController(field).text = selected.label;
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _pinSelectionMode = false;
+      if (field == RiderPlaceField.pickup) {
+        _selectingPickup = false;
+      }
+    });
   }
 
   void _searchPlaces(RiderPlaceField field, String input) {
