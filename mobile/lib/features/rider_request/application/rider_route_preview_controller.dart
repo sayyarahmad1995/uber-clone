@@ -86,12 +86,7 @@ class RiderRoutePreviewController extends ChangeNotifier {
     if (_state.selectedRouteId == routeId) {
       return;
     }
-    _set(
-      RiderRoutePreviewState(
-        preview: preview,
-        selectedRouteId: routeId,
-      ),
-    );
+    _set(RiderRoutePreviewState(preview: preview, selectedRouteId: routeId));
   }
 
   Future<void> retry() async {
