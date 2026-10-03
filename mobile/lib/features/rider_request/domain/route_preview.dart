@@ -43,11 +43,7 @@ class RoutePreview {
     }
     return RoutePreview(
       routes: rawRoutes
-          .map(
-            (route) => RouteOption.fromJson(
-              route as Map<String, dynamic>,
-            ),
-          )
+          .map((route) => RouteOption.fromJson(route as Map<String, dynamic>))
           .toList(growable: false),
     );
   }
