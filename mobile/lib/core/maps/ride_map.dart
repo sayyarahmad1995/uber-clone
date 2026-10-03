@@ -173,7 +173,7 @@ class _RideMapState extends State<RideMap> {
 
   google.GoogleMapController? _googleController;
   StreamSubscription<google_platform.PointOfInterestTapEvent>?
-  _pointOfInterestTapSubscription;
+      _pointOfInterestTapSubscription;
   String? _lastAutoCenteredPoint;
   bool _restoredCachedCenter = false;
   bool _programmaticCameraMove = false;
