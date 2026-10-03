@@ -46,7 +46,10 @@ void main() {
     expect(source, isNot(contains('DashboardPanelSessionScope')));
     expect(source, isNot(contains('mapBottomPadding')));
     expect(source, isNot(contains('panelExpanded')));
-    expect(source, contains('final key = preview.encodedPolyline;'));
+    expect(
+      source,
+      contains("preview.routes.map((route) => route.encodedPolyline).join('|')"),
+    );
   });
 
   test('RideMap translates Google POI taps behind provider boundary', () {
@@ -77,7 +80,8 @@ void main() {
     expect(source, contains('polylines: {'));
     expect(source, contains('padding: widget.padding'));
     expect(rider, contains('routePreviewSummary'));
-    expect(rider, contains('Estimated driving route'));
+    expect(rider, contains('Recommended · current traffic'));
+    expect(rider, contains("Key('routeOption-\${entry.$2.id}')"));
   });
 
   test('Google Maps provider types stay behind the shared map boundary', () {
