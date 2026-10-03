@@ -31,23 +31,52 @@ func (p Point) Valid() bool {
 }
 
 type Route struct {
+	ID              string
+	Recommended     bool
 	DistanceMeters  int64
 	DurationSeconds int64
 	EncodedPolyline string
 }
 
 func (r Route) Valid() bool {
-	return r.DistanceMeters > 0 &&
+	return strings.TrimSpace(r.ID) != "" &&
+		r.DistanceMeters > 0 &&
 		r.DurationSeconds > 0 &&
 		strings.TrimSpace(r.EncodedPolyline) != ""
 }
 
+type Preview struct {
+	Routes []Route
+}
+
+func (p Preview) Valid() bool {
+	if len(p.Routes) == 0 {
+		return false
+	}
+	ids := make(map[string]struct{}, len(p.Routes))
+	recommended := 0
+	for _, route := range p.Routes {
+		if !route.Valid() {
+			return false
+		}
+		id := strings.TrimSpace(route.ID)
+		if _, exists := ids[id]; exists {
+			return false
+		}
+		ids[id] = struct{}{}
+		if route.Recommended {
+			recommended++
+		}
+	}
+	return recommended == 1
+}
+
 type Provider interface {
-	Preview(context.Context, Point, Point) (Route, error)
+	Preview(context.Context, Point, Point) (Preview, error)
 }
 
 type Previewer interface {
-	Preview(context.Context, Point, Point) (Route, error)
+	Preview(context.Context, Point, Point) (Preview, error)
 }
 
 type Service struct {
@@ -58,20 +87,23 @@ func NewService(provider Provider) Service {
 	return Service{provider: provider}
 }
 
-func (s Service) Preview(ctx context.Context, pickup, destination Point) (Route, error) {
+func (s Service) Preview(ctx context.Context, pickup, destination Point) (Preview, error) {
 	if s.provider == nil {
-		return Route{}, ErrUnavailable
+		return Preview{}, ErrUnavailable
 	}
 	if !pickup.Valid() || !destination.Valid() || pickup == destination {
-		return Route{}, ErrInvalidInput
+		return Preview{}, ErrInvalidInput
 	}
-	route, err := s.provider.Preview(ctx, pickup, destination)
+	preview, err := s.provider.Preview(ctx, pickup, destination)
 	if err != nil {
-		return Route{}, err
+		return Preview{}, err
 	}
-	if !route.Valid() {
-		return Route{}, ErrProvider
+	for i := range preview.Routes {
+		preview.Routes[i].ID = strings.TrimSpace(preview.Routes[i].ID)
+		preview.Routes[i].EncodedPolyline = strings.TrimSpace(preview.Routes[i].EncodedPolyline)
 	}
-	route.EncodedPolyline = strings.TrimSpace(route.EncodedPolyline)
-	return route, nil
+	if !preview.Valid() {
+		return Preview{}, ErrProvider
+	}
+	return preview, nil
 }
