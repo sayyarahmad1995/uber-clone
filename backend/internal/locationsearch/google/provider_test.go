@@ -73,6 +73,29 @@ func TestDetailsConcludesSessionWithoutProFields(t *testing.T) {
 	}
 }
 
+func TestDetailsWithoutAutocompleteSessionOmitsSessionToken(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/places/poi-1" {
+			t.Fatalf("unexpected details path: %s", r.URL.Path)
+		}
+		if r.URL.Query().Has("sessionToken") {
+			t.Fatalf("direct POI details must not fabricate an autocomplete session: %s", r.URL.RawQuery)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"poi-1","formattedAddress":"Faisal Mosque, Islamabad","location":{"latitude":33.7295,"longitude":73.0372}}`))
+	}))
+	defer server.Close()
+
+	provider := newProvider("server-key", server.Client(), server.URL, server.URL)
+	place, err := provider.Details(context.Background(), "poi-1", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if place.PlaceID != "poi-1" || place.Location.Latitude != 33.7295 {
+		t.Fatalf("unexpected POI place: %#v", place)
+	}
+}
+
 func TestReverseGeocodeReturnsReadableAddressAtExactPin(t *testing.T) {
 	requests := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
