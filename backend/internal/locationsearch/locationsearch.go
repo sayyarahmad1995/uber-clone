@@ -88,7 +88,7 @@ func (s Service) Details(ctx context.Context, placeID, sessionToken string) (Pla
 	if s.provider == nil {
 		return Place{}, ErrUnavailable
 	}
-	if placeID == "" || sessionToken == "" {
+	if placeID == "" {
 		return Place{}, ErrInvalidInput
 	}
 	return s.provider.Details(ctx, placeID, sessionToken)
