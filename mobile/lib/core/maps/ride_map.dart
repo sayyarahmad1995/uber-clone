@@ -2,7 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart' as google;
-import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platform_interface.dart' as google_platform;
+import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platform_interface.dart'
+    as google_platform;
 
 import 'last_map_location_store.dart';
 
