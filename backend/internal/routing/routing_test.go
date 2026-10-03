@@ -7,20 +7,26 @@ import (
 )
 
 type fakeProvider struct {
-	route Route
-	err   error
+	preview Preview
+	err     error
 }
 
-func (f fakeProvider) Preview(context.Context, Point, Point) (Route, error) {
-	return f.route, f.err
+func (f fakeProvider) Preview(context.Context, Point, Point) (Preview, error) {
+	return f.preview, f.err
 }
 
-func TestServiceValidatesCoordinatesAndDistinctEndpoints(t *testing.T) {
-	service := NewService(fakeProvider{route: Route{
+func validPreview() Preview {
+	return Preview{Routes: []Route{{
+		ID:              "route-0",
+		Recommended:     true,
 		DistanceMeters:  100,
 		DurationSeconds: 20,
 		EncodedPolyline: "abc",
-	}})
+	}}}
+}
+
+func TestServiceValidatesCoordinatesAndDistinctEndpoints(t *testing.T) {
+	service := NewService(fakeProvider{preview: validPreview()})
 
 	cases := []struct {
 		name        string
@@ -41,15 +47,35 @@ func TestServiceValidatesCoordinatesAndDistinctEndpoints(t *testing.T) {
 	}
 }
 
-func TestServiceRejectsMalformedProviderRoute(t *testing.T) {
-	service := NewService(fakeProvider{route: Route{DistanceMeters: 100}})
-	_, err := service.Preview(
-		context.Background(),
-		Point{Latitude: 24.86, Longitude: 67.01},
-		Point{Latitude: 24.90, Longitude: 67.05},
-	)
-	if !errors.Is(err, ErrProvider) {
-		t.Fatalf("expected provider error, got %v", err)
+func TestServiceRejectsMalformedProviderPreview(t *testing.T) {
+	cases := []struct {
+		name    string
+		preview Preview
+	}{
+		{"empty routes", Preview{}},
+		{"malformed route", Preview{Routes: []Route{{ID: "route-0", Recommended: true, DistanceMeters: 100}}}},
+		{"no recommended route", Preview{Routes: []Route{{ID: "route-0", DistanceMeters: 100, DurationSeconds: 20, EncodedPolyline: "abc"}}}},
+		{"multiple recommended routes", Preview{Routes: []Route{
+			{ID: "route-0", Recommended: true, DistanceMeters: 100, DurationSeconds: 20, EncodedPolyline: "abc"},
+			{ID: "route-1", Recommended: true, DistanceMeters: 120, DurationSeconds: 22, EncodedPolyline: "def"},
+		}}},
+		{"duplicate route IDs", Preview{Routes: []Route{
+			{ID: "route-0", Recommended: true, DistanceMeters: 100, DurationSeconds: 20, EncodedPolyline: "abc"},
+			{ID: "route-0", DistanceMeters: 120, DurationSeconds: 22, EncodedPolyline: "def"},
+		}}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			service := NewService(fakeProvider{preview: tc.preview})
+			_, err := service.Preview(
+				context.Background(),
+				Point{Latitude: 24.86, Longitude: 67.01},
+				Point{Latitude: 24.90, Longitude: 67.05},
+			)
+			if !errors.Is(err, ErrProvider) {
+				t.Fatalf("expected provider error, got %v", err)
+			}
+		})
 	}
 }
 
