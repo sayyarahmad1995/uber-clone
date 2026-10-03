@@ -174,7 +174,7 @@ class _RideMapState extends State<RideMap> {
 
   google.GoogleMapController? _googleController;
   StreamSubscription<google_platform.PointOfInterestTapEvent>?
-      _pointOfInterestTapSubscription;
+  _pointOfInterestTapSubscription;
   String? _lastAutoCenteredPoint;
   bool _restoredCachedCenter = false;
   bool _programmaticCameraMove = false;
@@ -230,7 +230,8 @@ class _RideMapState extends State<RideMap> {
     }
     try {
       _pointOfInterestTapSubscription = google_platform
-          .GoogleMapsFlutterPlatform.instance
+          .GoogleMapsFlutterPlatform
+          .instance
           .onPointOfInterestTap(mapId: controller.mapId)
           .listen(
             (event) {
