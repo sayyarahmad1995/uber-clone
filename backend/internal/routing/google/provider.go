@@ -53,6 +53,7 @@ func (p *Provider) Preview(ctx context.Context, pickup, destination routing.Poin
 		"origin":                   waypoint(pickup),
 		"destination":              waypoint(destination),
 		"travelMode":               "DRIVE",
+		"routingPreference":        "TRAFFIC_AWARE",
 		"computeAlternativeRoutes": false,
 		"polylineQuality":          "OVERVIEW",
 		"polylineEncoding":         "ENCODED_POLYLINE",
