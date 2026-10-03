@@ -21,6 +21,8 @@ abstract interface class PlaceSearchRepository {
     required String sessionToken,
   });
 
+  Future<PlaceSelection> placeById(String placeId);
+
   Future<PlaceSelection?> reverseGeocode(GeoPoint point);
 
   void cancelSession(String sessionToken);
@@ -75,6 +77,14 @@ class ApiPlaceSearchRepository implements PlaceSearchRepository {
     final data = await _request<Map<String, dynamic>>(
       '/v1/places/${Uri.encodeComponent(placeId)}',
       queryParameters: {'session_token': sessionToken},
+    );
+    return PlaceSelection.fromJson(data);
+  }
+
+  @override
+  Future<PlaceSelection> placeById(String placeId) async {
+    final data = await _request<Map<String, dynamic>>(
+      '/v1/places/${Uri.encodeComponent(placeId)}',
     );
     return PlaceSelection.fromJson(data);
   }
