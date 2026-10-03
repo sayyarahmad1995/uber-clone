@@ -12,13 +12,21 @@ import 'rider_request_controller.dart';
 class RiderRoutePreviewState {
   const RiderRoutePreviewState({
     this.preview,
+    this.selectedRouteId,
     this.loading = false,
     this.error,
   });
 
   final RoutePreview? preview;
+  final String? selectedRouteId;
   final bool loading;
   final String? error;
+
+  RouteOption? get selectedRoute {
+    final value = preview;
+    if (value == null) return null;
+    return value.routeById(selectedRouteId) ?? value.recommended;
+  }
 }
 
 class RiderRoutePreviewController extends ChangeNotifier {
@@ -70,6 +78,22 @@ class RiderRoutePreviewController extends ChangeNotifier {
     );
   }
 
+  void selectRoute(String routeId) {
+    final preview = _state.preview;
+    if (preview == null || preview.routeById(routeId) == null) {
+      return;
+    }
+    if (_state.selectedRouteId == routeId) {
+      return;
+    }
+    _set(
+      RiderRoutePreviewState(
+        preview: preview,
+        selectedRouteId: routeId,
+      ),
+    );
+  }
+
   Future<void> retry() async {
     final pickup = _rider.state.pickup;
     final destination = _rider.state.destination;
@@ -104,7 +128,12 @@ class RiderRoutePreviewController extends ChangeNotifier {
       if (!_isCurrent(revision)) {
         return;
       }
-      _set(RiderRoutePreviewState(preview: preview));
+      _set(
+        RiderRoutePreviewState(
+          preview: preview,
+          selectedRouteId: preview.recommended.id,
+        ),
+      );
     } on RoutePreviewCancelled {
       // A newer pickup, destination, service, or explicit retry superseded it.
     } catch (error) {
