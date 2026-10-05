@@ -17,9 +17,10 @@ import (
 
 const (
 	defaultRoutesBase = "https://routes.googleapis.com"
-	fieldMask         = "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline,routes.routeLabels"
+	fieldMask         = "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline,routes.routeLabels,routes.routeToken"
 	maxAttempts       = 2
 	retryDelay        = 100 * time.Millisecond
+	providerTimeout   = 8 * time.Second
 )
 
 type Provider struct {
@@ -31,7 +32,7 @@ type Provider struct {
 func New(apiKey string) *Provider {
 	return newProvider(
 		strings.TrimSpace(apiKey),
-		&http.Client{Timeout: 5 * time.Second},
+		&http.Client{Timeout: providerTimeout},
 		defaultRoutesBase,
 	)
 }
@@ -53,8 +54,10 @@ func (p *Provider) Preview(ctx context.Context, pickup, destination routing.Poin
 		"origin":                   waypoint(pickup),
 		"destination":              waypoint(destination),
 		"travelMode":               "DRIVE",
-		"routingPreference":        "TRAFFIC_AWARE",
+		"routingPreference":        "TRAFFIC_AWARE_OPTIMAL",
+		"trafficModel":             "BEST_GUESS",
 		"computeAlternativeRoutes": true,
+		"requestedReferenceRoutes": []string{"SHORTER_DISTANCE"},
 		"polylineQuality":          "OVERVIEW",
 		"polylineEncoding":         "ENCODED_POLYLINE",
 	}
@@ -132,10 +135,15 @@ func (p *Provider) Preview(ctx context.Context, pickup, destination routing.Poin
 	}
 
 	routes := make([]routing.Route, 0, len(payload.Routes))
+	seenPolylines := make(map[string]struct{}, len(payload.Routes))
 	recommendedIndex := -1
 	for _, candidate := range payload.Routes {
 		duration, parseErr := time.ParseDuration(strings.TrimSpace(candidate.Duration))
 		if parseErr != nil || duration <= 0 {
+			continue
+		}
+		polyline := strings.TrimSpace(candidate.Polyline.EncodedPolyline)
+		if _, exists := seenPolylines[polyline]; exists {
 			continue
 		}
 		route := routing.Route{
@@ -143,11 +151,12 @@ func (p *Provider) Preview(ctx context.Context, pickup, destination routing.Poin
 			Recommended:     hasRouteLabel(candidate.RouteLabels, "DEFAULT_ROUTE"),
 			DistanceMeters:  candidate.DistanceMeters,
 			DurationSeconds: int64(math.Ceil(duration.Seconds())),
-			EncodedPolyline: strings.TrimSpace(candidate.Polyline.EncodedPolyline),
+			EncodedPolyline: polyline,
 		}
 		if !route.Valid() {
 			continue
 		}
+		seenPolylines[polyline] = struct{}{}
 		if route.Recommended && recommendedIndex == -1 {
 			recommendedIndex = len(routes)
 		} else {
