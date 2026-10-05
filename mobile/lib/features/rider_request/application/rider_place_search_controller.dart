@@ -303,11 +303,7 @@ class RiderPlaceSearchController extends ChangeNotifier {
     }();
   }
 
-  void _applyPoint(
-    RiderPlaceField field,
-    GeoPoint point, {
-    String? placeId,
-  }) {
+  void _applyPoint(RiderPlaceField field, GeoPoint point, {String? placeId}) {
     if (field == RiderPlaceField.pickup) {
       _rider.setPickup(point, placeId: placeId);
     } else {
