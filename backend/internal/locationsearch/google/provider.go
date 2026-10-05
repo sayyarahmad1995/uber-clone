@@ -17,8 +17,9 @@ import (
 )
 
 const (
-	defaultPlacesBase  = "https://places.googleapis.com"
-	defaultGeocodeBase = "https://geocode.googleapis.com"
+	defaultPlacesBase          = "https://places.googleapis.com"
+	defaultGeocodeBase         = "https://geocode.googleapis.com"
+	autocompleteRadiusMeters   = 50000.0
 )
 
 type Provider struct {
@@ -55,13 +56,13 @@ func (p *Provider) Autocomplete(ctx context.Context, input locationsearch.Autoco
 		"sessionToken": input.SessionToken,
 	}
 	if input.Bias != nil {
-		body["locationBias"] = map[string]any{
+		body["locationRestriction"] = map[string]any{
 			"circle": map[string]any{
 				"center": map[string]any{
 					"latitude":  input.Bias.Latitude,
 					"longitude": input.Bias.Longitude,
 				},
-				"radius": 50000.0,
+				"radius": autocompleteRadiusMeters,
 			},
 		}
 	}
