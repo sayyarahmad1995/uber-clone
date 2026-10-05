@@ -14,6 +14,7 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/locationsearch"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/offer"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/pricing"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/ride"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/riderlocation"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/rideservice"
@@ -43,6 +44,8 @@ type Dependencies struct {
 	LocationSearch                  locationsearch.Searcher
 	LocationSearchPolicy            locationsearch.SearchPolicyService
 	Routing                         routing.Previewer
+	Pricing                         pricing.Suggester
+	PricingPolicies                 pricing.PolicyManager
 	LocationSearchRequestsPerMinute int
 	Identity                        identity.Provider
 	Auth                            auth.Handler
