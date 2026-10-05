@@ -7,41 +7,24 @@ import (
 )
 
 type fakeProvider struct {
-	preview Preview
-	err     error
+	route Route
+	err   error
 }
 
-func (f fakeProvider) Preview(context.Context, Point, Point) (Preview, error) {
-	return f.preview, f.err
+func (f fakeProvider) Preview(context.Context, Point, Point) (Route, error) {
+	return f.route, f.err
 }
 
-func validPreview() Preview {
-	return Preview{Routes: []Route{{
-		ID:              "route-0",
-		Recommended:     true,
+func validRoute() Route {
+	return Route{
 		DistanceMeters:  100,
 		DurationSeconds: 20,
 		EncodedPolyline: "abc",
-	}}}
-}
-
-func previewRoute(
-	id string,
-	distanceMeters int64,
-	durationSeconds int64,
-	recommended bool,
-) Route {
-	return Route{
-		ID:              id,
-		Recommended:     recommended,
-		DistanceMeters:  distanceMeters,
-		DurationSeconds: durationSeconds,
-		EncodedPolyline: "poly-" + id,
 	}
 }
 
 func TestServiceValidatesCoordinatesAndDistinctEndpoints(t *testing.T) {
-	service := NewService(fakeProvider{preview: validPreview()})
+	service := NewService(fakeProvider{route: validRoute()})
 
 	cases := []struct {
 		name        string
@@ -62,25 +45,18 @@ func TestServiceValidatesCoordinatesAndDistinctEndpoints(t *testing.T) {
 	}
 }
 
-func TestServiceRejectsMalformedProviderPreview(t *testing.T) {
+func TestServiceRejectsMalformedProviderRoute(t *testing.T) {
 	cases := []struct {
-		name    string
-		preview Preview
+		name  string
+		route Route
 	}{
-		{"empty routes", Preview{}},
-		{"malformed route", Preview{Routes: []Route{{
-			ID:              "route-0",
-			DistanceMeters:  100,
-			DurationSeconds: 20,
-		}}}},
-		{"duplicate route IDs", Preview{Routes: []Route{
-			previewRoute("route-0", 100, 20, true),
-			previewRoute("route-0", 120, 22, false),
-		}}},
+		{"zero distance", Route{DurationSeconds: 20, EncodedPolyline: "abc"}},
+		{"zero duration", Route{DistanceMeters: 100, EncodedPolyline: "abc"}},
+		{"missing polyline", Route{DistanceMeters: 100, DurationSeconds: 20}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			service := NewService(fakeProvider{preview: tc.preview})
+			service := NewService(fakeProvider{route: tc.route})
 			_, err := service.Preview(
 				context.Background(),
 				Point{Latitude: 24.86, Longitude: 67.01},
@@ -90,87 +66,6 @@ func TestServiceRejectsMalformedProviderPreview(t *testing.T) {
 				t.Fatalf("expected provider error, got %v", err)
 			}
 		})
-	}
-}
-
-func TestServiceRecommendsShortestRouteWithinTrafficTolerance(t *testing.T) {
-	service := NewService(fakeProvider{preview: Preview{Routes: []Route{
-		previewRoute("fastest", 8000, 18*60, true),
-		previewRoute("balanced", 6900, 20*60, false),
-		previewRoute("too-slow", 5800, 22*60, false),
-	}}})
-
-	preview, err := service.Preview(
-		context.Background(),
-		Point{Latitude: 24.86, Longitude: 67.01},
-		Point{Latitude: 24.90, Longitude: 67.05},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !preview.Routes[1].Recommended {
-		t.Fatalf("expected balanced route to be recommended: %#v", preview.Routes)
-	}
-	if preview.Routes[0].Recommended || preview.Routes[2].Recommended {
-		t.Fatalf("expected exactly one HiGO recommendation: %#v", preview.Routes)
-	}
-}
-
-func TestServiceAppliesFiveMinuteAbsoluteTrafficCap(t *testing.T) {
-	service := NewService(fakeProvider{preview: Preview{Routes: []Route{
-		previewRoute("fastest", 30000, 60*60, true),
-		previewRoute("shorter-but-six-minutes-slower", 25000, 66*60, false),
-		previewRoute("eligible", 27000, 64*60, false),
-	}}})
-
-	preview, err := service.Preview(
-		context.Background(),
-		Point{Latitude: 24.86, Longitude: 67.01},
-		Point{Latitude: 24.90, Longitude: 67.05},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !preview.Routes[2].Recommended {
-		t.Fatalf("expected four-minute-slower shorter route: %#v", preview.Routes)
-	}
-}
-
-func TestServiceFallsBackToFastestWhenShorterRoutesExceedTolerance(t *testing.T) {
-	service := NewService(fakeProvider{preview: Preview{Routes: []Route{
-		previewRoute("fastest", 8000, 10*60, false),
-		previewRoute("shorter", 6000, 13*60, true),
-	}}})
-
-	preview, err := service.Preview(
-		context.Background(),
-		Point{Latitude: 24.86, Longitude: 67.01},
-		Point{Latitude: 24.90, Longitude: 67.05},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !preview.Routes[0].Recommended || preview.Routes[1].Recommended {
-		t.Fatalf("expected fastest route fallback: %#v", preview.Routes)
-	}
-}
-
-func TestServiceOverridesProviderRecommendationUsingHiGOPolicy(t *testing.T) {
-	service := NewService(fakeProvider{preview: Preview{Routes: []Route{
-		previewRoute("google-default", 9000, 20*60, true),
-		previewRoute("shorter", 8000, 21*60, false),
-	}}})
-
-	preview, err := service.Preview(
-		context.Background(),
-		Point{Latitude: 24.86, Longitude: 67.01},
-		Point{Latitude: 24.90, Longitude: 67.05},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if preview.Routes[0].Recommended || !preview.Routes[1].Recommended {
-		t.Fatalf("expected HiGO policy to select shorter qualifying route: %#v", preview.Routes)
 	}
 }
 
