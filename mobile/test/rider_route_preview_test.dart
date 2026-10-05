@@ -24,12 +24,15 @@ void main() {
     final preview = await repository.preview(
       pickup: const GeoPoint(latitude: 38.5, longitude: -120.2),
       destination: const GeoPoint(latitude: 43.252, longitude: -126.453),
+      destinationPlaceId: 'market-place-id',
       serviceCode: 'economy',
     );
 
     expect(adapter.path, '/v1/ride-previews');
     expect(adapter.authorization, 'Bearer route-token');
     expect(adapter.serviceCode, 'economy');
+    expect(adapter.pickupPlaceId, isNull);
+    expect(adapter.destinationPlaceId, 'market-place-id');
     expect(preview.distanceMeters, 788906);
     expect(preview.durationSeconds, 3600);
     expect(preview.points, hasLength(3));
@@ -63,8 +66,14 @@ void main() {
     final controller = RiderRoutePreviewController(repository, rider);
     addTearDown(controller.dispose);
 
-    rider.setPickup(const GeoPoint(latitude: 24.86, longitude: 67.01));
-    rider.setDestination(const GeoPoint(latitude: 24.90, longitude: 67.05));
+    rider.setPickup(
+      const GeoPoint(latitude: 24.86, longitude: 67.01),
+      placeId: 'pickup-place',
+    );
+    rider.setDestination(
+      const GeoPoint(latitude: 24.90, longitude: 67.05),
+      placeId: 'destination-place',
+    );
     await Future<void>.delayed(Duration.zero);
 
     rider.setDestination(const GeoPoint(latitude: 24.95, longitude: 67.10));
@@ -78,6 +87,31 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     expect(controller.state.preview?.distanceMeters, 2000);
+  });
+
+  test('Place ID change invalidates preview even when coordinates stay the same', () async {
+    final rider = RiderRequestController(
+      FakeRideRequestRepository(),
+      const FakeDeviceLocation(),
+    );
+    addTearDown(rider.dispose);
+
+    final repository = _FakeRoutePreviewRepository();
+    final controller = RiderRoutePreviewController(repository, rider);
+    addTearDown(controller.dispose);
+
+    const point = GeoPoint(latitude: 24.86, longitude: 67.01);
+    rider.setPickup(point, placeId: 'pickup-a');
+    rider.setDestination(
+      const GeoPoint(latitude: 24.90, longitude: 67.05),
+      placeId: 'destination-a',
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    rider.setPickup(point, placeId: 'pickup-b');
+    await Future<void>.delayed(Duration.zero);
+
+    expect(repository.pickupPlaceIds, ['pickup-a', 'pickup-b']);
   });
 
   test('service change invalidates and reloads the route preview', () async {
@@ -119,16 +153,22 @@ RoutePreview _route({
 class _FakeRoutePreviewRepository implements RoutePreviewRepository {
   Completer<RoutePreview>? firstPreview;
   final serviceCodes = <String>[];
+  final pickupPlaceIds = <String?>[];
+  final destinationPlaceIds = <String?>[];
   var calls = 0;
 
   @override
   Future<RoutePreview> preview({
     required GeoPoint pickup,
+    String? pickupPlaceId,
     required GeoPoint destination,
+    String? destinationPlaceId,
     required String serviceCode,
   }) {
     calls++;
     serviceCodes.add(serviceCode);
+    pickupPlaceIds.add(pickupPlaceId);
+    destinationPlaceIds.add(destinationPlaceId);
     if (calls == 1 && firstPreview != null) {
       return firstPreview!.future;
     }
@@ -154,6 +194,8 @@ class _RoutePreviewAdapter implements HttpClientAdapter {
   String? path;
   String? authorization;
   String? serviceCode;
+  String? pickupPlaceId;
+  String? destinationPlaceId;
 
   @override
   Future<ResponseBody> fetch(
@@ -165,6 +207,10 @@ class _RoutePreviewAdapter implements HttpClientAdapter {
     authorization = options.headers['Authorization'] as String?;
     final data = options.data as Map<String, dynamic>;
     serviceCode = data['service_code'] as String?;
+    pickupPlaceId =
+        (data['pickup'] as Map<String, dynamic>)['place_id'] as String?;
+    destinationPlaceId =
+        (data['destination'] as Map<String, dynamic>)['place_id'] as String?;
 
     return ResponseBody.fromString(
       jsonEncode({
