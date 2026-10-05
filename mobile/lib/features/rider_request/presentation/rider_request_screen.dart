@@ -33,6 +33,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
   bool _selectingPickup = true;
   bool _pinSelectionMode = false;
   String? _lastFittedRouteKey;
+  String? _lastSuggestedFareKey;
 
   @override
   void initState() {
@@ -74,6 +75,13 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
   }
 
   Future<void> _submit() async {
+    final pricedPreview = ref.read(riderRoutePreviewControllerProvider).state.preview;
+    if (pricedPreview == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Wait for the current fare estimate.')),
+      );
+      return;
+    }
     final services = ref.read(riderServicesProvider).asData?.value;
     final selected = ref.read(riderRequestControllerProvider).serviceCode;
     if (services == null ||
@@ -120,6 +128,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     final routeState = ref.watch(riderRoutePreviewControllerProvider).state;
     final routePreview = active == null ? routeState.preview : null;
     _scheduleRouteFit(routePreview);
+    _syncSuggestedFare(routePreview);
     final driverLocation = active == null
         ? null
         : freshDriverLocation(
@@ -453,6 +462,39 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     });
   }
 
+  void _syncSuggestedFare(RoutePreview? preview) {
+    if (preview == null) {
+      if (_lastSuggestedFareKey == null) {
+        return;
+      }
+      _lastSuggestedFareKey = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _fare.clear();
+        }
+      });
+      return;
+    }
+
+    final key =
+        '${preview.encodedPolyline}|${preview.pricingPolicyVersion}|'
+        '${preview.suggestedFare.amountMinor}';
+    if (_lastSuggestedFareKey == key) {
+      return;
+    }
+    _lastSuggestedFareKey = key;
+    final amount = _formatFareInput(preview.suggestedFare.amountMinor);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _lastSuggestedFareKey != key) {
+        return;
+      }
+      _fare.value = TextEditingValue(
+        text: amount,
+        selection: TextSelection.collapsed(offset: amount.length),
+      );
+    });
+  }
+
   RideMapPoint _latLng(GeoPoint point) =>
       RideMapPoint(point.latitude, point.longitude);
 }
@@ -671,9 +713,11 @@ class _RequestRidePanel extends StatelessWidget {
           child: TextField(
             key: const Key('fareField'),
             controller: fare,
+            enabled: routeState.preview != null && !state.submitting,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: const InputDecoration(
               labelText: 'Your proposed fare',
+              helperText: 'Suggested by HiGO; you can edit it before requesting.',
               prefixText: 'PKR ',
             ),
           ),
@@ -689,7 +733,10 @@ class _RequestRidePanel extends StatelessWidget {
         DashboardPanelControl(
           child: FilledButton.icon(
             key: const Key('requestRideButton'),
-            onPressed: state.submitting ? null : () => onSubmit(),
+            onPressed:
+                state.submitting || routeState.preview == null
+                ? null
+                : () => onSubmit(),
             icon: const Icon(Icons.local_taxi),
             label: Text(state.submitting ? 'Requesting...' : 'Request ride'),
           ),
@@ -883,7 +930,12 @@ class _RoutePreviewCard extends StatelessWidget {
             '${_formatRouteDuration(preview.durationSeconds)} · '
             '${_formatRouteDistance(preview.distanceMeters)}',
           ),
-          subtitle: const Text('Google recommended · current traffic'),
+          subtitle: Text(
+            'Google recommended · current traffic\n'
+            'Suggested ${_formatMoney(preview.suggestedFare)} · '
+            'pricing v${preview.pricingPolicyVersion}',
+          ),
+          isThreeLine: true,
         ),
       ),
     );
@@ -907,6 +959,15 @@ String _formatRouteDuration(int seconds) {
   final remainder = minutes % 60;
   return remainder == 0 ? '$hours hr' : '$hours hr $remainder min';
 }
+
+String _formatFareInput(int amountMinor) {
+  final whole = amountMinor ~/ 100;
+  final fraction = (amountMinor % 100).toString().padLeft(2, '0');
+  return '$whole.$fraction';
+}
+
+String _formatMoney(Money money) =>
+    '${money.currency} ${_formatFareInput(money.amountMinor)}';
 
 class _PointSummary extends StatelessWidget {
   const _PointSummary({required this.label, required this.point, this.address});
