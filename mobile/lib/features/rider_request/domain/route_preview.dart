@@ -5,8 +5,14 @@ class RoutePreview {
     required this.distanceMeters,
     required this.durationSeconds,
     required this.encodedPolyline,
+    required this.suggestedFare,
+    required this.pricingPolicyVersion,
   }) : points = decodeEncodedPolyline(encodedPolyline) {
-    if (distanceMeters <= 0 || durationSeconds <= 0) {
+    if (distanceMeters <= 0 ||
+        durationSeconds <= 0 ||
+        suggestedFare.amountMinor <= 0 ||
+        suggestedFare.currency.trim().isEmpty ||
+        pricingPolicyVersion <= 0) {
       throw const FormatException('Route preview is invalid.');
     }
   }
@@ -14,17 +20,22 @@ class RoutePreview {
   final int distanceMeters;
   final int durationSeconds;
   final String encodedPolyline;
+  final Money suggestedFare;
+  final int pricingPolicyVersion;
   final List<GeoPoint> points;
 
   factory RoutePreview.fromJson(Map<String, dynamic> json) {
     final route = json['route'] as Map<String, dynamic>?;
-    if (route == null) {
-      throw const FormatException('Route preview is missing.');
+    final fare = json['suggested_fare'] as Map<String, dynamic>?;
+    if (route == null || fare == null) {
+      throw const FormatException('Priced route preview is missing.');
     }
     return RoutePreview(
       distanceMeters: (route['distance_meters'] as num).toInt(),
       durationSeconds: (route['duration_seconds'] as num).toInt(),
       encodedPolyline: route['encoded_polyline'] as String,
+      suggestedFare: Money.fromJson(fare),
+      pricingPolicyVersion: (json['pricing_policy_version'] as num).toInt(),
     );
   }
 }
