@@ -95,3 +95,37 @@ func TestAdminOperationsNoLongerExposesLocationSnapControls(t *testing.T) {
 		t.Fatalf("removed snap controls still rendered: %s", body)
 	}
 }
+
+
+func TestAdminOperationsUpdatesPlaceSearchRadius(t *testing.T) {
+	searchPolicy := &fakePlaceSearchPolicyService{
+		policy: locationsearch.SearchPolicy{
+			AutocompleteRadiusMeters: 50000,
+			UpdatedAt:                time.Now().UTC(),
+			UpdatedBy:                "migration",
+		},
+	}
+	api := &API{
+		locationSearchPolicy: searchPolicy,
+	}
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/admin/operations/place-search-policy",
+		strings.NewReader("autocomplete_radius_kilometers=20"),
+	)
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.SetBasicAuth("reviewer", "secret")
+	response := httptest.NewRecorder()
+
+	api.adminUpdatePlaceSearchPolicy(response, request)
+
+	if response.Code != http.StatusSeeOther {
+		t.Fatalf("expected redirect, got %d: %s", response.Code, response.Body.String())
+	}
+	if searchPolicy.policy.AutocompleteRadiusMeters != 20000 {
+		t.Fatalf("unexpected saved radius: %#v", searchPolicy.policy)
+	}
+	if searchPolicy.policy.UpdatedBy != "reviewer" {
+		t.Fatalf("unexpected policy actor: %#v", searchPolicy.policy)
+	}
+}
