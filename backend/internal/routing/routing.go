@@ -79,6 +79,11 @@ type Previewer interface {
 	Preview(context.Context, Point, Point) (Preview, error)
 }
 
+const (
+	recommendedDurationPercent = int64(115)
+	recommendedDurationSlack   = 5 * 60
+)
+
 type Service struct {
 	provider Provider
 }
@@ -102,8 +107,67 @@ func (s Service) Preview(ctx context.Context, pickup, destination Point) (Previe
 		preview.Routes[i].ID = strings.TrimSpace(preview.Routes[i].ID)
 		preview.Routes[i].EncodedPolyline = strings.TrimSpace(preview.Routes[i].EncodedPolyline)
 	}
+	if err := validateCandidates(preview.Routes); err != nil {
+		return Preview{}, ErrProvider
+	}
+	recommendRoute(preview.Routes)
 	if !preview.Valid() {
 		return Preview{}, ErrProvider
 	}
 	return preview, nil
+}
+
+func validateCandidates(routes []Route) error {
+	if len(routes) == 0 {
+		return ErrProvider
+	}
+	ids := make(map[string]struct{}, len(routes))
+	for _, route := range routes {
+		if !route.Valid() {
+			return ErrProvider
+		}
+		if _, exists := ids[route.ID]; exists {
+			return ErrProvider
+		}
+		ids[route.ID] = struct{}{}
+	}
+	return nil
+}
+
+func recommendRoute(routes []Route) {
+	fastest := routes[0].DurationSeconds
+	for i := range routes {
+		routes[i].Recommended = false
+		if routes[i].DurationSeconds < fastest {
+			fastest = routes[i].DurationSeconds
+		}
+	}
+
+	percentLimit := (fastest*recommendedDurationPercent + 99) / 100
+	slackLimit := fastest + recommendedDurationSlack
+	maxDuration := percentLimit
+	if slackLimit < maxDuration {
+		maxDuration = slackLimit
+	}
+
+	selected := -1
+	for i := range routes {
+		if routes[i].DurationSeconds > maxDuration {
+			continue
+		}
+		if selected == -1 ||
+			routes[i].DistanceMeters < routes[selected].DistanceMeters ||
+			(routes[i].DistanceMeters == routes[selected].DistanceMeters &&
+				routes[i].DurationSeconds < routes[selected].DurationSeconds) {
+			selected = i
+		}
+	}
+	if selected == -1 {
+		for i := range routes {
+			if selected == -1 || routes[i].DurationSeconds < routes[selected].DurationSeconds {
+				selected = i
+			}
+		}
+	}
+	routes[selected].Recommended = true
 }
