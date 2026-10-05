@@ -19,10 +19,10 @@ type adminMarketplacePolicyRequest struct {
 }
 
 type adminOperationsView struct {
-	Policy                  marketplace.TimingPolicy
-	PlaceSearchPolicy       locationsearch.SearchPolicy
-	PlaceSearchRadiusKm     int64
-	Message                 string
+	Policy              marketplace.TimingPolicy
+	PlaceSearchPolicy   locationsearch.SearchPolicy
+	PlaceSearchRadiusKm int64
+	Message             string
 }
 
 var adminOperationsTemplate = template.Must(template.New("admin-operations").Parse(`<!doctype html>
