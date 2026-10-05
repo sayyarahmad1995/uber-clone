@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/pricing"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/routing"
 )
 
@@ -24,11 +25,20 @@ func TestRoutePointEndpointPreservesOptionalPlaceID(t *testing.T) {
 }
 
 func TestRidePreviewResponseUsesSingleRouteContract(t *testing.T) {
-	response := ridePreviewResponse(routing.Route{
-		DistanceMeters:  12400,
-		DurationSeconds: 901,
-		EncodedPolyline: "encoded-a",
-	})
+	response := ridePreviewResponse(
+		routing.Route{
+			DistanceMeters:  12400,
+			DurationSeconds: 901,
+			EncodedPolyline: "encoded-a",
+		},
+		pricing.Suggestion{
+			Fare: pricing.Fare{
+				AmountMinor: 34500,
+				Currency:    "PKR",
+			},
+			PolicyVersion: 4,
+		},
+	)
 	route, ok := response["route"].(map[string]any)
 	if !ok {
 		t.Fatalf("missing route: %#v", response)
@@ -37,6 +47,13 @@ func TestRidePreviewResponseUsesSingleRouteContract(t *testing.T) {
 		route["duration_seconds"] != int64(901) ||
 		route["encoded_polyline"] != "encoded-a" {
 		t.Fatalf("unexpected route response: %#v", route)
+	}
+	fare, ok := response["suggested_fare"].(map[string]any)
+	if !ok ||
+		fare["amount_minor"] != int64(34500) ||
+		fare["currency"] != "PKR" ||
+		response["pricing_policy_version"] != int64(4) {
+		t.Fatalf("unexpected pricing response: %#v", response)
 	}
 	if _, exists := response["routes"]; exists {
 		t.Fatalf("alternative routes contract must not be exposed: %#v", response)
