@@ -12,7 +12,9 @@ class RoutePreviewCancelled implements Exception {
 abstract interface class RoutePreviewRepository {
   Future<RoutePreview> preview({
     required GeoPoint pickup,
+    String? pickupPlaceId,
     required GeoPoint destination,
+    String? destinationPlaceId,
     required String serviceCode,
   });
 
@@ -29,7 +31,9 @@ class ApiRoutePreviewRepository implements RoutePreviewRepository {
   @override
   Future<RoutePreview> preview({
     required GeoPoint pickup,
+    String? pickupPlaceId,
     required GeoPoint destination,
+    String? destinationPlaceId,
     required String serviceCode,
   }) async {
     cancel();
@@ -52,10 +56,15 @@ class ApiRoutePreviewRepository implements RoutePreviewRepository {
           'pickup': {
             'latitude': pickup.latitude,
             'longitude': pickup.longitude,
+            if (pickupPlaceId != null && pickupPlaceId.trim().isNotEmpty)
+              'place_id': pickupPlaceId.trim(),
           },
           'destination': {
             'latitude': destination.latitude,
             'longitude': destination.longitude,
+            if (destinationPlaceId != null &&
+                destinationPlaceId.trim().isNotEmpty)
+              'place_id': destinationPlaceId.trim(),
           },
           'service_code': serviceCode,
         },
