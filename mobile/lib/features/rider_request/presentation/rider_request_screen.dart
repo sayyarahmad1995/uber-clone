@@ -720,7 +720,8 @@ class _RequestRidePanel extends StatelessWidget {
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: const InputDecoration(
               labelText: 'Your proposed fare',
-              helperText: 'Suggested by HiGO; you can edit it before requesting.',
+              helperText:
+                  'Suggested by HiGO; you can edit it before requesting.',
               prefixText: 'PKR ',
             ),
           ),
