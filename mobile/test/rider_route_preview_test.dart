@@ -13,7 +13,7 @@ import 'package:uber_clone/features/rider_request/domain/route_preview.dart';
 import 'test_doubles.dart';
 
 void main() {
-  test('route preview API returns normalized route options', () async {
+  test('route preview API returns one recommended route', () async {
     final adapter = _RoutePreviewAdapter();
     final repository = ApiRoutePreviewRepository(
       Dio(BaseOptions(baseUrl: 'http://application.test'))
@@ -30,14 +30,11 @@ void main() {
     expect(adapter.path, '/v1/ride-previews');
     expect(adapter.authorization, 'Bearer route-token');
     expect(adapter.serviceCode, 'economy');
-    expect(preview.routes, hasLength(2));
-    expect(preview.recommended.id, 'route-0');
-    expect(preview.recommended.distanceMeters, 788906);
-    expect(preview.recommended.durationSeconds, 3600);
-    expect(preview.recommended.points, hasLength(3));
-    expect(preview.recommended.points.first.latitude, closeTo(38.5, 0.00001));
-    expect(preview.recommended.points.first.longitude, closeTo(-120.2, 0.00001));
-    expect(preview.routes[1].recommended, isFalse);
+    expect(preview.distanceMeters, 788906);
+    expect(preview.durationSeconds, 3600);
+    expect(preview.points, hasLength(3));
+    expect(preview.points.first.latitude, closeTo(38.5, 0.00001));
+    expect(preview.points.first.longitude, closeTo(-120.2, 0.00001));
   });
 
   test('encoded route polyline rejects truncated provider data', () {
@@ -47,23 +44,9 @@ void main() {
     );
   });
 
-  test('route preview rejects missing or duplicate recommendation', () {
+  test('route preview rejects missing route object', () {
     expect(
-      () => RoutePreview(
-        routes: [
-          _route(id: 'route-0', recommended: false),
-          _route(id: 'route-1', recommended: false),
-        ],
-      ),
-      throwsA(isA<FormatException>()),
-    );
-    expect(
-      () => RoutePreview(
-        routes: [
-          _route(id: 'route-0', recommended: true),
-          _route(id: 'route-1', recommended: true),
-        ],
-      ),
+      () => RoutePreview.fromJson(const {}),
       throwsA(isA<FormatException>()),
     );
   });
@@ -87,44 +70,14 @@ void main() {
     rider.setDestination(const GeoPoint(latitude: 24.95, longitude: 67.10));
     await Future<void>.delayed(Duration.zero);
 
-    expect(controller.state.selectedRoute?.distanceMeters, 2000);
+    expect(controller.state.preview?.distanceMeters, 2000);
 
     repository.firstPreview!.complete(
-      RoutePreview(
-        routes: [
-          _route(
-            id: 'old-route',
-            recommended: true,
-            distanceMeters: 1000,
-            durationSeconds: 120,
-          ),
-        ],
-      ),
+      _route(distanceMeters: 1000, durationSeconds: 120),
     );
     await Future<void>.delayed(Duration.zero);
 
-    expect(controller.state.selectedRoute?.distanceMeters, 2000);
-  });
-
-  test('recommended route is selected by default and Rider can switch', () async {
-    final rider = RiderRequestController(
-      FakeRideRequestRepository(),
-      const FakeDeviceLocation(),
-    );
-    addTearDown(rider.dispose);
-
-    final repository = _FakeRoutePreviewRepository();
-    final controller = RiderRoutePreviewController(repository, rider);
-    addTearDown(controller.dispose);
-
-    rider.setPickup(const GeoPoint(latitude: 24.86, longitude: 67.01));
-    rider.setDestination(const GeoPoint(latitude: 24.90, longitude: 67.05));
-    await Future<void>.delayed(Duration.zero);
-
-    expect(controller.state.selectedRoute?.id, 'route-0');
-    controller.selectRoute('route-1');
-    expect(controller.state.selectedRoute?.id, 'route-1');
-    expect(controller.state.selectedRoute?.distanceMeters, 1800);
+    expect(controller.state.preview?.distanceMeters, 2000);
   });
 
   test('service change invalidates and reloads the route preview', () async {
@@ -147,20 +100,16 @@ void main() {
 
     expect(repository.serviceCodes, ['economy', 'comfort']);
     expect(controller.state.preview, isNotNull);
-    expect(controller.state.selectedRoute?.recommended, isTrue);
+    expect(controller.state.preview?.distanceMeters, 2000);
   });
 }
 
-RouteOption _route({
-  required String id,
-  required bool recommended,
+RoutePreview _route({
   int distanceMeters = 2000,
   int durationSeconds = 300,
   String encodedPolyline = '_p~iF~ps|U_ulLnnqC',
 }) {
-  return RouteOption(
-    id: id,
-    recommended: recommended,
+  return RoutePreview(
     distanceMeters: distanceMeters,
     durationSeconds: durationSeconds,
     encodedPolyline: encodedPolyline,
@@ -183,20 +132,7 @@ class _FakeRoutePreviewRepository implements RoutePreviewRepository {
     if (calls == 1 && firstPreview != null) {
       return firstPreview!.future;
     }
-    return Future.value(
-      RoutePreview(
-        routes: [
-          _route(id: 'route-0', recommended: true),
-          _route(
-            id: 'route-1',
-            recommended: false,
-            distanceMeters: 1800,
-            durationSeconds: 340,
-            encodedPolyline: '_p~iF~ps|U????',
-          ),
-        ],
-      ),
-    );
+    return Future.value(_route());
   }
 
   @override
@@ -232,22 +168,11 @@ class _RoutePreviewAdapter implements HttpClientAdapter {
 
     return ResponseBody.fromString(
       jsonEncode({
-        'routes': [
-          {
-            'id': 'route-0',
-            'recommended': true,
-            'distance_meters': 788906,
-            'duration_seconds': 3600,
-            'encoded_polyline': '_p~iF~ps|U????',
-          },
-          {
-            'id': 'route-1',
-            'recommended': false,
-            'distance_meters': 800000,
-            'duration_seconds': 3900,
-            'encoded_polyline': '_p~iF~ps|U_ulLnnqC',
-          },
-        ],
+        'route': {
+          'distance_meters': 788906,
+          'duration_seconds': 3600,
+          'encoded_polyline': '_p~iF~ps|U????',
+        },
       }),
       200,
       headers: {
