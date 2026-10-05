@@ -23,6 +23,7 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/offer"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/database"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/migrations"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/pricing"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/ride"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/riderlocation"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/rideservice"
@@ -64,6 +65,8 @@ func newApplication(cfg config) (application, func(), error) {
 		locationSearchPolicyService,
 	)
 	routingService := routing.NewService(routinggoogle.New(cfg.GoogleMapsServerAPIKey))
+	pricingRepository := pricing.NewPostgresRepository(db)
+	pricingService := pricing.NewService(pricingRepository)
 	api := httpapi.New(httpapi.Dependencies{
 		Health:                          db,
 		Users:                           user.NewService(user.NewPostgresRepository(db)),
@@ -84,6 +87,8 @@ func newApplication(cfg config) (application, func(), error) {
 		LocationSearch:                  locationSearchService,
 		LocationSearchPolicy:            locationSearchPolicyService,
 		Routing:                         routingService,
+		Pricing:                         pricingService,
+		PricingPolicies:                 pricingRepository,
 		LocationSearchRequestsPerMinute: cfg.LocationSearchRequestsPerMinute,
 		Identity:                        identityProvider,
 		Auth:                            auth.NewHandler(auth.NewService(authProvider)),
