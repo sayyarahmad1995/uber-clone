@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/pricing"
@@ -135,7 +136,7 @@ func (api *API) adminPublishPricingPolicy(w http.ResponseWriter, r *http.Request
 	}
 
 	message := "Published " + policy.ServiceCode + " pricing policy v" +
-		strings.TrimSpace(formatInt64(policy.Version))
+		strconv.FormatInt(policy.Version, 10)
 	http.Redirect(
 		w,
 		r,
