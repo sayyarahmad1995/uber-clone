@@ -19,6 +19,17 @@ type ridePreviewRequest struct {
 type routePoint struct {
 	Latitude  *float64 `json:"latitude"`
 	Longitude *float64 `json:"longitude"`
+	PlaceID   string   `json:"place_id,omitempty"`
+}
+
+func (p routePoint) endpoint() routing.Endpoint {
+	return routing.Endpoint{
+		Point: routing.Point{
+			Latitude:  *p.Latitude,
+			Longitude: *p.Longitude,
+		},
+		PlaceID: strings.TrimSpace(p.PlaceID),
+	}
 }
 
 func (api *API) createRidePreview(w http.ResponseWriter, r *http.Request) {
@@ -43,14 +54,8 @@ func (api *API) createRidePreview(w http.ResponseWriter, r *http.Request) {
 
 	route, err := api.routing.Preview(
 		r.Context(),
-		routing.Point{
-			Latitude:  *body.Pickup.Latitude,
-			Longitude: *body.Pickup.Longitude,
-		},
-		routing.Point{
-			Latitude:  *body.Destination.Latitude,
-			Longitude: *body.Destination.Longitude,
-		},
+		body.Pickup.endpoint(),
+		body.Destination.endpoint(),
 	)
 	if err != nil {
 		api.writeRoutingError(w, r, err)
