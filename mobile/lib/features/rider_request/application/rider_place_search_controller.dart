@@ -157,7 +157,7 @@ class RiderPlaceSearchController extends ChangeNotifier {
         sessionToken: sessionToken,
       );
       if (!_isCurrent(field, revision)) return null;
-      _applyPoint(field, selected.point);
+      _applyPoint(field, selected.point, placeId: selected.placeId);
       _setField(field, PlaceFieldSearchState(label: selected.label));
       return selected;
     } catch (error) {
@@ -198,7 +198,7 @@ class RiderPlaceSearchController extends ChangeNotifier {
     try {
       final selected = await _repository.placeById(placeId);
       if (!_isCurrent(field, revision)) return null;
-      _applyPoint(field, selected.point);
+      _applyPoint(field, selected.point, placeId: selected.placeId);
       _setField(field, PlaceFieldSearchState(label: selected.label));
       return selected;
     } catch (error) {
@@ -303,11 +303,15 @@ class RiderPlaceSearchController extends ChangeNotifier {
     }();
   }
 
-  void _applyPoint(RiderPlaceField field, GeoPoint point) {
+  void _applyPoint(
+    RiderPlaceField field,
+    GeoPoint point, {
+    String? placeId,
+  }) {
     if (field == RiderPlaceField.pickup) {
-      _rider.setPickup(point);
+      _rider.setPickup(point, placeId: placeId);
     } else {
-      _rider.setDestination(point);
+      _rider.setDestination(point, placeId: placeId);
     }
   }
 
