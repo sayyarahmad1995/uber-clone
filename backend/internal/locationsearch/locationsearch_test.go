@@ -4,7 +4,25 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 )
+
+type fakeSearchPolicyService struct {
+	policy SearchPolicy
+	err    error
+}
+
+func (f fakeSearchPolicyService) Load(context.Context) (SearchPolicy, error) {
+	return f.policy, f.err
+}
+
+func (f fakeSearchPolicyService) Update(
+	context.Context,
+	SearchPolicy,
+	string,
+) (SearchPolicy, error) {
+	return SearchPolicy{}, nil
+}
 
 type fakeProvider struct {
 	autocompleteInput AutocompleteInput
@@ -38,8 +56,35 @@ func TestServiceValidatesAutocompleteSessionAndBias(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(items) != 1 || provider.autocompleteInput.Query != "Clifton" || provider.autocompleteInput.SessionToken != "session" {
+	if len(items) != 1 ||
+		provider.autocompleteInput.Query != "Clifton" ||
+		provider.autocompleteInput.SessionToken != "session" ||
+		provider.autocompleteInput.RestrictionRadiusMeters != DefaultAutocompleteRadiusMeters {
 		t.Fatalf("unexpected autocomplete input: %#v", provider.autocompleteInput)
+	}
+}
+
+func TestServiceUsesConfiguredAutocompleteRadius(t *testing.T) {
+	provider := &fakeProvider{}
+	service := NewServiceWithPolicy(provider, fakeSearchPolicyService{
+		policy: SearchPolicy{
+			AutocompleteRadiusMeters: 25000,
+			UpdatedAt:                time.Now().UTC(),
+			UpdatedBy:                "admin",
+		},
+	})
+	bias := Point{Latitude: 33.6844, Longitude: 73.0479}
+
+	_, err := service.Autocomplete(context.Background(), AutocompleteInput{
+		Query:        "faisal",
+		SessionToken: "session",
+		Bias:         &bias,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if provider.autocompleteInput.RestrictionRadiusMeters != 25000 {
+		t.Fatalf("unexpected configured radius: %#v", provider.autocompleteInput)
 	}
 }
 
