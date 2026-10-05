@@ -10,6 +10,7 @@ import (
 
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/locationsearch"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/pricing"
 )
 
 type adminMarketplacePolicyRequest struct {
@@ -22,7 +23,18 @@ type adminOperationsView struct {
 	Policy              marketplace.TimingPolicy
 	PlaceSearchPolicy   locationsearch.SearchPolicy
 	PlaceSearchRadiusKm int64
+	PricingPolicies     []adminPricingPolicyView
 	Message             string
+}
+
+type adminPricingPolicyView struct {
+	ServiceCode      string
+	Version          int64
+	BaseFare         string
+	RatePerKM        string
+	RatePerMinute    string
+	MinimumFare      string
+	RoundingIncrement string
 }
 
 var adminOperationsTemplate = template.Must(template.New("admin-operations").Parse(`<!doctype html>
@@ -66,6 +78,36 @@ body{font-family:system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0
 <p><button type="submit">Save place search radius</button></p>
 </form>
 <p class="muted">Last updated {{.PlaceSearchPolicy.UpdatedAt}} by {{.PlaceSearchPolicy.UpdatedBy}}</p>
+</div>
+<div class="card">
+<h2>Suggested fare pricing</h2>
+<p class="muted">Publishing creates a new approved version for one Rider-visible service. Existing Ride Requests and Trips are never repriced.</p>
+{{if .PricingPolicies}}
+<ul>
+{{range .PricingPolicies}}
+<li><strong>{{.ServiceCode}}</strong> · v{{.Version}} · base PKR {{.BaseFare}} · PKR {{.RatePerKM}}/km · PKR {{.RatePerMinute}}/min · minimum PKR {{.MinimumFare}} · round PKR {{.RoundingIncrement}}</li>
+{{end}}
+</ul>
+{{else}}
+<p class="muted">No approved active pricing policies. Ride previews cannot suggest fares until a policy is published.</p>
+{{end}}
+<form method="post" action="/admin/operations/pricing-policy">
+<div class="grid">
+<div><label for="pricing_service_code">Service code</label><div class="hint">Must be active and Rider-visible</div></div>
+<input id="pricing_service_code" name="service_code" type="text" required>
+<div><label for="base_fare">Base fare</label><div class="hint">PKR</div></div>
+<input id="base_fare" name="base_fare" type="number" min="0" step="0.01" required>
+<div><label for="rate_per_km">Distance rate</label><div class="hint">PKR per km</div></div>
+<input id="rate_per_km" name="rate_per_km" type="number" min="0" step="0.01" required>
+<div><label for="rate_per_minute">Duration rate</label><div class="hint">PKR per route minute</div></div>
+<input id="rate_per_minute" name="rate_per_minute" type="number" min="0" step="0.01" required>
+<div><label for="minimum_fare">Minimum fare</label><div class="hint">PKR</div></div>
+<input id="minimum_fare" name="minimum_fare" type="number" min="0.01" step="0.01" required>
+<div><label for="rounding_increment">Final rounding increment</label><div class="hint">PKR; one final half-up rounding step</div></div>
+<input id="rounding_increment" name="rounding_increment" type="number" min="0.01" step="0.01" required>
+</div>
+<p><button type="submit">Publish pricing version</button></p>
+</form>
 </div>
 </body>
 </html>`))
@@ -114,11 +156,32 @@ func (api *API) adminOperationsIndex(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	pricingPolicies := make([]adminPricingPolicyView, 0)
+	if api.pricingPolicies != nil {
+		active, err := api.pricingPolicies.ListActive(r.Context())
+		if err != nil {
+			http.Error(w, "Unable to load pricing policies", http.StatusInternalServerError)
+			return
+		}
+		for _, policy := range active {
+			pricingPolicies = append(pricingPolicies, adminPricingPolicyView{
+				ServiceCode:       policy.ServiceCode,
+				Version:           policy.Version,
+				BaseFare:          pricing.FormatMajorAmount(policy.BaseFareMinor),
+				RatePerKM:         pricing.FormatMajorAmount(policy.RateMinorPerKM),
+				RatePerMinute:     pricing.FormatMajorAmount(policy.RateMinorPerMinute),
+				MinimumFare:       pricing.FormatMajorAmount(policy.MinimumFareMinor),
+				RoundingIncrement: pricing.FormatMajorAmount(policy.RoundingIncrement),
+			})
+		}
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = adminOperationsTemplate.Execute(w, adminOperationsView{
 		Policy:              policy,
 		PlaceSearchPolicy:   searchPolicy,
 		PlaceSearchRadiusKm: searchPolicy.AutocompleteRadiusMeters / 1000,
+		PricingPolicies:     pricingPolicies,
 		Message:             r.URL.Query().Get("message"),
 	})
 }
