@@ -59,6 +59,71 @@ func TestAutocompleteUsesSessionTokenLocalRestrictionAndNarrowFieldMask(t *testi
 	}
 }
 
+func TestAutocompleteRanksMatchedPredictionsByPopularity(t *testing.T) {
+	var detailRequests int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/places:autocomplete":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"suggestions":[
+				{"placePrediction":{"placeId":"p1","text":{"text":"Faisal Movers, Islamabad"}}},
+				{"placePrediction":{"placeId":"p2","text":{"text":"Faisal Mosque, Islamabad"}}},
+				{"placePrediction":{"placeId":"p3","text":{"text":"Faisal Market, Islamabad"}}}
+			]}`))
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v1/places/"):
+			detailRequests++
+			if got := r.Header.Get("X-Goog-FieldMask"); got != "userRatingCount" {
+				t.Fatalf("unexpected popularity field mask: %q", got)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			switch r.URL.Path {
+			case "/v1/places/p1":
+				_, _ = w.Write([]byte(`{"userRatingCount":500}`))
+			case "/v1/places/p2":
+				_, _ = w.Write([]byte(`{"userRatingCount":12000}`))
+			case "/v1/places/p3":
+				_, _ = w.Write([]byte(`{"userRatingCount":900}`))
+			default:
+				t.Fatalf("unexpected popularity path: %s", r.URL.Path)
+			}
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	provider := newProvider("server-key", server.Client(), server.URL, server.URL)
+	bias := locationsearch.Point{Latitude: 33.6844, Longitude: 73.0479}
+	items, err := provider.Autocomplete(context.Background(), locationsearch.AutocompleteInput{
+		Query:                   "faisal",
+		SessionToken:            "session-1",
+		Bias:                    &bias,
+		RestrictionRadiusMeters: 25000,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 3 ||
+		items[0].PlaceID != "p2" ||
+		items[1].PlaceID != "p3" ||
+		items[2].PlaceID != "p1" {
+		t.Fatalf("unexpected popularity order: %#v", items)
+	}
+
+	_, err = provider.Autocomplete(context.Background(), locationsearch.AutocompleteInput{
+		Query:                   "faisal",
+		SessionToken:            "session-2",
+		Bias:                    &bias,
+		RestrictionRadiusMeters: 25000,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detailRequests != 3 {
+		t.Fatalf("expected cached popularity lookups after first search, got %d requests", detailRequests)
+	}
+}
+
 func TestDetailsConcludesSessionWithoutProFields(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/places/p1" {
