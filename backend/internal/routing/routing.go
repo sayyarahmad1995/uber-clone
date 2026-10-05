@@ -30,6 +30,15 @@ func (p Point) Valid() bool {
 		p.Longitude <= 180
 }
 
+type Endpoint struct {
+	Point   Point
+	PlaceID string
+}
+
+func (e Endpoint) Valid() bool {
+	return e.Point.Valid()
+}
+
 type Route struct {
 	DistanceMeters  int64
 	DurationSeconds int64
@@ -43,11 +52,11 @@ func (r Route) Valid() bool {
 }
 
 type Provider interface {
-	Preview(context.Context, Point, Point) (Route, error)
+	Preview(context.Context, Endpoint, Endpoint) (Route, error)
 }
 
 type Previewer interface {
-	Preview(context.Context, Point, Point) (Route, error)
+	Preview(context.Context, Endpoint, Endpoint) (Route, error)
 }
 
 type Service struct {
@@ -58,11 +67,15 @@ func NewService(provider Provider) Service {
 	return Service{provider: provider}
 }
 
-func (s Service) Preview(ctx context.Context, pickup, destination Point) (Route, error) {
+func (s Service) Preview(ctx context.Context, pickup, destination Endpoint) (Route, error) {
 	if s.provider == nil {
 		return Route{}, ErrUnavailable
 	}
-	if !pickup.Valid() || !destination.Valid() || pickup == destination {
+	pickup.PlaceID = strings.TrimSpace(pickup.PlaceID)
+	destination.PlaceID = strings.TrimSpace(destination.PlaceID)
+	if !pickup.Valid() ||
+		!destination.Valid() ||
+		pickup.Point == destination.Point {
 		return Route{}, ErrInvalidInput
 	}
 	route, err := s.provider.Preview(ctx, pickup, destination)
