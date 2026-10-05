@@ -35,6 +35,7 @@ func TestAutocompleteUsesSessionTokenLocalRestrictionAndNarrowFieldMask(t *testi
 	bias := locationsearch.Point{Latitude: 24.86, Longitude: 67.01}
 	items, err := provider.Autocomplete(context.Background(), locationsearch.AutocompleteInput{
 		Query: "Clifton", SessionToken: "session-1", Bias: &bias,
+		RestrictionRadiusMeters: 25000,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -53,7 +54,7 @@ func TestAutocompleteUsesSessionTokenLocalRestrictionAndNarrowFieldMask(t *testi
 		t.Fatalf("local restriction missing: %#v", body)
 	}
 	circle, ok := restriction["circle"].(map[string]any)
-	if !ok || circle["radius"] != autocompleteRadiusMeters {
+	if !ok || circle["radius"] != float64(25000) {
 		t.Fatalf("unexpected local restriction: %#v", restriction)
 	}
 }
