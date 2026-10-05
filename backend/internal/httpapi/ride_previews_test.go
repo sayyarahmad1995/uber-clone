@@ -7,35 +7,23 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/routing"
 )
 
-func TestRidePreviewResponseUsesNormalizedRouteOptionsContract(t *testing.T) {
-	response := ridePreviewResponse(routing.Preview{Routes: []routing.Route{
-		{
-			ID:              "route-0",
-			Recommended:     true,
-			DistanceMeters:  12400,
-			DurationSeconds: 901,
-			EncodedPolyline: "encoded-a",
-		},
-		{
-			ID:              "route-1",
-			DistanceMeters:  11800,
-			DurationSeconds: 960,
-			EncodedPolyline: "encoded-b",
-		},
-	}})
-	routes, ok := response["routes"].([]map[string]any)
-	if !ok || len(routes) != 2 {
-		t.Fatalf("missing route options: %#v", response)
+func TestRidePreviewResponseUsesSingleRouteContract(t *testing.T) {
+	response := ridePreviewResponse(routing.Route{
+		DistanceMeters:  12400,
+		DurationSeconds: 901,
+		EncodedPolyline: "encoded-a",
+	})
+	route, ok := response["route"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing route: %#v", response)
 	}
-	if routes[0]["id"] != "route-0" ||
-		routes[0]["recommended"] != true ||
-		routes[0]["distance_meters"] != int64(12400) ||
-		routes[0]["duration_seconds"] != int64(901) ||
-		routes[0]["encoded_polyline"] != "encoded-a" {
-		t.Fatalf("unexpected recommended route response: %#v", routes[0])
+	if route["distance_meters"] != int64(12400) ||
+		route["duration_seconds"] != int64(901) ||
+		route["encoded_polyline"] != "encoded-a" {
+		t.Fatalf("unexpected route response: %#v", route)
 	}
-	if routes[1]["id"] != "route-1" || routes[1]["recommended"] != false {
-		t.Fatalf("unexpected alternate route response: %#v", routes[1])
+	if _, exists := response["routes"]; exists {
+		t.Fatalf("alternative routes contract must not be exposed: %#v", response)
 	}
 }
 
