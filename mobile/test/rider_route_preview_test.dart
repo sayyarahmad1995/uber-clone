@@ -35,6 +35,9 @@ void main() {
     expect(adapter.destinationPlaceId, 'market-place-id');
     expect(preview.distanceMeters, 788906);
     expect(preview.durationSeconds, 3600);
+    expect(preview.suggestedFare.amountMinor, 34500);
+    expect(preview.suggestedFare.currency, 'PKR');
+    expect(preview.pricingPolicyVersion, 4);
     expect(preview.points, hasLength(3));
     expect(preview.points.first.latitude, closeTo(38.5, 0.00001));
     expect(preview.points.first.longitude, closeTo(-120.2, 0.00001));
@@ -147,6 +150,8 @@ RoutePreview _route({
     distanceMeters: distanceMeters,
     durationSeconds: durationSeconds,
     encodedPolyline: encodedPolyline,
+    suggestedFare: const Money(amountMinor: 25000, currency: 'PKR'),
+    pricingPolicyVersion: 2,
   );
 }
 
@@ -219,6 +224,11 @@ class _RoutePreviewAdapter implements HttpClientAdapter {
           'duration_seconds': 3600,
           'encoded_polyline': '_p~iF~ps|U????',
         },
+        'suggested_fare': {
+          'amount_minor': 34500,
+          'currency': 'PKR',
+        },
+        'pricing_policy_version': 4,
       }),
       200,
       headers: {
