@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/database"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/migrations"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/pricing"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/ride"
 )
 
@@ -52,6 +53,7 @@ func TestRiderCatalogThirdServiceVisibilityAndRequestGuard(t *testing.T) {
 	}
 	t.Cleanup(func() {
 		_, _ = db.Exec(`DELETE FROM ride_requests WHERE service_code=$1`, code)
+		_, _ = db.Exec(`DELETE FROM ride_pricing_policies WHERE service_code=$1`, code)
 		_, _ = db.Exec(`DELETE FROM driver_service_catalog WHERE code=$1`, code)
 	})
 	userID := uuid.New()
@@ -65,6 +67,29 @@ func TestRiderCatalogThirdServiceVisibilityAndRequestGuard(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	for _, item := range list {
+		if item.Code == code {
+			t.Fatal("unpriced service was exposed as Rider-bookable")
+		}
+	}
+
+	pricingRepository := pricing.NewPostgresRepository(db)
+	if _, err := pricingRepository.Publish(context.Background(), pricing.Draft{
+		ServiceCode:        code,
+		Currency:           "PKR",
+		BaseFareMinor:      10000,
+		RateMinorPerKM:     5000,
+		RateMinorPerMinute: 1000,
+		MinimumFareMinor:   15000,
+		RoundingIncrement:  500,
+	}, "test"); err != nil {
+		t.Fatal(err)
+	}
+
+	list, err = catalog.List(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
 	found := false
 	for _, item := range list {
 		if item.Code == code {
@@ -72,7 +97,7 @@ func TestRiderCatalogThirdServiceVisibilityAndRequestGuard(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Fatal("third service not exposed or presentation metadata lost")
+		t.Fatal("priced third service not exposed or presentation metadata lost")
 	}
 
 	input := ride.CreateInput{
