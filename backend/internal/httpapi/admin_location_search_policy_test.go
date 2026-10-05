@@ -87,7 +87,7 @@ func TestAdminOperationsNoLongerExposesLocationSnapControls(t *testing.T) {
 	}
 	if !strings.Contains(body, "Rider place search") ||
 		!strings.Contains(body, "Nearby search radius") ||
-		!strings.Contains(body, "value="25"") {
+		!strings.Contains(body, "value=\"25\"") {
 		t.Fatalf("place search controls missing: %s", body)
 	}
 	if strings.Contains(body, "Named-place snap radius") ||
@@ -95,7 +95,6 @@ func TestAdminOperationsNoLongerExposesLocationSnapControls(t *testing.T) {
 		t.Fatalf("removed snap controls still rendered: %s", body)
 	}
 }
-
 
 func TestAdminOperationsUpdatesPlaceSearchRadius(t *testing.T) {
 	searchPolicy := &fakePlaceSearchPolicyService{
