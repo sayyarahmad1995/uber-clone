@@ -18,18 +18,18 @@ var (
 const defaultCurrency = "PKR"
 
 type Policy struct {
-	ServiceCode          string
-	Currency             string
-	Version              int64
-	BaseFareMinor        int64
-	RateMinorPerKM       int64
-	RateMinorPerMinute   int64
-	MinimumFareMinor     int64
-	RoundingIncrement    int64
-	EffectiveFrom        time.Time
-	EffectiveUntil       *time.Time
-	Approved             bool
-	Active               bool
+	ServiceCode        string     `json:"service_code"`
+	Currency           string     `json:"currency"`
+	Version            int64      `json:"version"`
+	BaseFareMinor      int64      `json:"base_fare_minor"`
+	RateMinorPerKM     int64      `json:"rate_minor_per_km"`
+	RateMinorPerMinute int64      `json:"rate_minor_per_minute"`
+	MinimumFareMinor   int64      `json:"minimum_fare_minor"`
+	RoundingIncrement  int64      `json:"rounding_increment_minor"`
+	EffectiveFrom      time.Time  `json:"effective_from"`
+	EffectiveUntil     *time.Time `json:"effective_until,omitempty"`
+	Approved           bool       `json:"approved"`
+	Active             bool       `json:"active"`
 }
 
 func (p Policy) Valid(at time.Time) bool {
