@@ -75,7 +75,10 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
   }
 
   Future<void> _submit() async {
-    final pricedPreview = ref.read(riderRoutePreviewControllerProvider).state.preview;
+    final pricedPreview = ref
+        .read(riderRoutePreviewControllerProvider)
+        .state
+        .preview;
     if (pricedPreview == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Wait for the current fare estimate.')),
@@ -733,8 +736,7 @@ class _RequestRidePanel extends StatelessWidget {
         DashboardPanelControl(
           child: FilledButton.icon(
             key: const Key('requestRideButton'),
-            onPressed:
-                state.submitting || routeState.preview == null
+            onPressed: state.submitting || routeState.preview == null
                 ? null
                 : () => onSubmit(),
             icon: const Icon(Icons.local_taxi),
