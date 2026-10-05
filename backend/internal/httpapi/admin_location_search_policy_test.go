@@ -8,8 +8,30 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/locationsearch"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 )
+
+type fakePlaceSearchPolicyService struct {
+	policy locationsearch.SearchPolicy
+}
+
+func (f *fakePlaceSearchPolicyService) Load(context.Context) (locationsearch.SearchPolicy, error) {
+	return f.policy, nil
+}
+
+func (f *fakePlaceSearchPolicyService) Update(
+	_ context.Context,
+	policy locationsearch.SearchPolicy,
+	actor string,
+) (locationsearch.SearchPolicy, error) {
+	if !locationsearch.ValidSearchPolicy(policy) {
+		return locationsearch.SearchPolicy{}, locationsearch.ErrInvalidSearchPolicy
+	}
+	policy.UpdatedBy = actor
+	f.policy = policy
+	return policy, nil
+}
 
 type fakeMarketplacePolicyService struct {
 	policy marketplace.TimingPolicy
@@ -40,6 +62,13 @@ func TestAdminOperationsNoLongerExposesLocationSnapControls(t *testing.T) {
 				UpdatedBy:                   "migration",
 			},
 		},
+		locationSearchPolicy: &fakePlaceSearchPolicyService{
+			policy: locationsearch.SearchPolicy{
+				AutocompleteRadiusMeters: 25000,
+				UpdatedAt:                time.Now().UTC(),
+				UpdatedBy:                "migration",
+			},
+		},
 		adminReviewUsername: "reviewer",
 		adminReviewPassword: "secret",
 	}
@@ -55,6 +84,11 @@ func TestAdminOperationsNoLongerExposesLocationSnapControls(t *testing.T) {
 	body := response.Body.String()
 	if !strings.Contains(body, "Marketplace timing") {
 		t.Fatalf("marketplace controls missing: %s", body)
+	}
+	if !strings.Contains(body, "Rider place search") ||
+		!strings.Contains(body, "Nearby search radius") ||
+		!strings.Contains(body, "value="25"") {
+		t.Fatalf("place search controls missing: %s", body)
 	}
 	if strings.Contains(body, "Named-place snap radius") ||
 		strings.Contains(body, "location-search-policy") {
