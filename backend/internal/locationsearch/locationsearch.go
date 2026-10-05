@@ -31,9 +31,10 @@ func (p Point) Valid() bool {
 }
 
 type AutocompleteInput struct {
-	Query        string
-	SessionToken string
-	Bias         *Point
+	Query                   string
+	SessionToken            string
+	Bias                    *Point
+	RestrictionRadiusMeters int64
 }
 
 type Suggestion struct {
@@ -61,10 +62,15 @@ type Searcher interface {
 
 type Service struct {
 	provider Provider
+	policy   SearchPolicyService
 }
 
 func NewService(provider Provider) Service {
 	return Service{provider: provider}
+}
+
+func NewServiceWithPolicy(provider Provider, policy SearchPolicyService) Service {
+	return Service{provider: provider, policy: policy}
 }
 
 func (s Service) Autocomplete(ctx context.Context, input AutocompleteInput) ([]Suggestion, error) {
@@ -78,6 +84,18 @@ func (s Service) Autocomplete(ctx context.Context, input AutocompleteInput) ([]S
 	}
 	if input.Bias != nil && !input.Bias.Valid() {
 		return nil, ErrInvalidInput
+	}
+
+	input.RestrictionRadiusMeters = DefaultAutocompleteRadiusMeters
+	if s.policy != nil {
+		policy, err := s.policy.Load(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if !ValidSearchPolicy(policy) {
+			return nil, ErrProvider
+		}
+		input.RestrictionRadiusMeters = policy.AutocompleteRadiusMeters
 	}
 	return s.provider.Autocomplete(ctx, input)
 }
