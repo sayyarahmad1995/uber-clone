@@ -43,9 +43,17 @@ class RiderRoutePreviewController extends ChangeNotifier {
     }
 
     final pickup = _rider.state.pickup;
+    final pickupPlaceId = _rider.state.pickupPlaceId;
     final destination = _rider.state.destination;
+    final destinationPlaceId = _rider.state.destinationPlaceId;
     final serviceCode = _rider.serviceCode.trim();
-    final key = _key(pickup, destination, serviceCode);
+    final key = _key(
+      pickup,
+      pickupPlaceId,
+      destination,
+      destinationPlaceId,
+      serviceCode,
+    );
     if (key == _selectionKey) {
       return;
     }
@@ -63,7 +71,9 @@ class RiderRoutePreviewController extends ChangeNotifier {
     unawaited(
       _load(
         pickup: pickup,
+        pickupPlaceId: pickupPlaceId,
         destination: destination,
+        destinationPlaceId: destinationPlaceId,
         serviceCode: serviceCode,
         revision: revision,
       ),
@@ -72,7 +82,9 @@ class RiderRoutePreviewController extends ChangeNotifier {
 
   Future<void> retry() async {
     final pickup = _rider.state.pickup;
+    final pickupPlaceId = _rider.state.pickupPlaceId;
     final destination = _rider.state.destination;
+    final destinationPlaceId = _rider.state.destinationPlaceId;
     final serviceCode = _rider.serviceCode.trim();
     if (pickup == null || destination == null || serviceCode.isEmpty) {
       return;
@@ -83,7 +95,9 @@ class RiderRoutePreviewController extends ChangeNotifier {
     _set(const RiderRoutePreviewState(loading: true));
     await _load(
       pickup: pickup,
+      pickupPlaceId: pickupPlaceId,
       destination: destination,
+      destinationPlaceId: destinationPlaceId,
       serviceCode: serviceCode,
       revision: revision,
     );
@@ -91,14 +105,18 @@ class RiderRoutePreviewController extends ChangeNotifier {
 
   Future<void> _load({
     required GeoPoint pickup,
+    String? pickupPlaceId,
     required GeoPoint destination,
+    String? destinationPlaceId,
     required String serviceCode,
     required int revision,
   }) async {
     try {
       final preview = await _repository.preview(
         pickup: pickup,
+        pickupPlaceId: pickupPlaceId,
         destination: destination,
+        destinationPlaceId: destinationPlaceId,
         serviceCode: serviceCode,
       );
       if (!_isCurrent(revision)) {
@@ -117,9 +135,16 @@ class RiderRoutePreviewController extends ChangeNotifier {
 
   bool _isCurrent(int revision) => !_disposed && revision == _revision;
 
-  String _key(GeoPoint? pickup, GeoPoint? destination, String serviceCode) =>
-      '${pickup?.latitude},${pickup?.longitude}|'
-      '${destination?.latitude},${destination?.longitude}|$serviceCode';
+  String _key(
+    GeoPoint? pickup,
+    String? pickupPlaceId,
+    GeoPoint? destination,
+    String? destinationPlaceId,
+    String serviceCode,
+  ) =>
+      '${pickup?.latitude},${pickup?.longitude},${pickupPlaceId ?? ''}|'
+      '${destination?.latitude},${destination?.longitude},'
+      '${destinationPlaceId ?? ''}|$serviceCode';
 
   String _message(Object error) {
     if (error is ApiException) {
