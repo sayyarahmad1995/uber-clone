@@ -45,7 +45,7 @@ func newProvider(apiKey string, client *http.Client, base string) *Provider {
 	}
 }
 
-func (p *Provider) Preview(ctx context.Context, pickup, destination routing.Point) (routing.Route, error) {
+func (p *Provider) Preview(ctx context.Context, pickup, destination routing.Endpoint) (routing.Route, error) {
 	if p.apiKey == "" {
 		return routing.Route{}, routing.ErrUnavailable
 	}
@@ -148,12 +148,15 @@ func (p *Provider) Preview(ctx context.Context, pickup, destination routing.Poin
 	return route, nil
 }
 
-func waypoint(point routing.Point) map[string]any {
+func waypoint(endpoint routing.Endpoint) map[string]any {
+	if placeID := strings.TrimSpace(endpoint.PlaceID); placeID != "" {
+		return map[string]any{"placeId": placeID}
+	}
 	return map[string]any{
 		"location": map[string]any{
 			"latLng": map[string]any{
-				"latitude":  point.Latitude,
-				"longitude": point.Longitude,
+				"latitude":  endpoint.Point.Latitude,
+				"longitude": endpoint.Point.Longitude,
 			},
 		},
 	}
