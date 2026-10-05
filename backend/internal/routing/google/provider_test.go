@@ -35,8 +35,13 @@ func TestPreviewRequestsGoogleRecommendedOptimalTrafficRoute(t *testing.T) {
 	provider := newProvider("server-key", server.Client(), server.URL)
 	route, err := provider.Preview(
 		context.Background(),
-		routing.Point{Latitude: 24.86, Longitude: 67.01},
-		routing.Point{Latitude: 24.90, Longitude: 67.05},
+		routing.Endpoint{
+			Point: routing.Point{Latitude: 24.86, Longitude: 67.01},
+		},
+		routing.Endpoint{
+			Point:   routing.Point{Latitude: 24.90, Longitude: 67.05},
+			PlaceID: "destination-place",
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -46,6 +51,17 @@ func TestPreviewRequestsGoogleRecommendedOptimalTrafficRoute(t *testing.T) {
 		body["trafficModel"] != "BEST_GUESS" ||
 		body["computeAlternativeRoutes"] != false {
 		t.Fatalf("unexpected route options: %#v", body)
+	}
+	origin := body["origin"].(map[string]any)
+	if _, ok := origin["location"]; !ok {
+		t.Fatalf("free-pin origin must use lat/lng: %#v", origin)
+	}
+	destination := body["destination"].(map[string]any)
+	if destination["placeId"] != "destination-place" {
+		t.Fatalf("named destination must use Place ID: %#v", destination)
+	}
+	if _, ok := destination["location"]; ok {
+		t.Fatalf("named destination must not be downgraded to lat/lng: %#v", destination)
 	}
 	if _, exists := body["requestedReferenceRoutes"]; exists {
 		t.Fatalf("shorter-distance route must not be requested: %#v", body)
@@ -78,8 +94,13 @@ func TestPreviewRetriesOneTransientProviderFailure(t *testing.T) {
 	provider := newProvider("server-key", server.Client(), server.URL)
 	_, err := provider.Preview(
 		context.Background(),
-		routing.Point{Latitude: 24.86, Longitude: 67.01},
-		routing.Point{Latitude: 24.90, Longitude: 67.05},
+		routing.Endpoint{
+			Point: routing.Point{Latitude: 24.86, Longitude: 67.01},
+		},
+		routing.Endpoint{
+			Point:   routing.Point{Latitude: 24.90, Longitude: 67.05},
+			PlaceID: "destination-place",
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -99,8 +120,13 @@ func TestPreviewReturnsNotFoundForEmptyRoutes(t *testing.T) {
 	provider := newProvider("server-key", server.Client(), server.URL)
 	_, err := provider.Preview(
 		context.Background(),
-		routing.Point{Latitude: 24.86, Longitude: 67.01},
-		routing.Point{Latitude: 24.90, Longitude: 67.05},
+		routing.Endpoint{
+			Point: routing.Point{Latitude: 24.86, Longitude: 67.01},
+		},
+		routing.Endpoint{
+			Point:   routing.Point{Latitude: 24.90, Longitude: 67.05},
+			PlaceID: "destination-place",
+		},
 	)
 	if err != routing.ErrNotFound {
 		t.Fatalf("expected not found, got %v", err)
@@ -117,8 +143,13 @@ func TestPreviewRejectsMalformedRecommendedRoute(t *testing.T) {
 	provider := newProvider("server-key", server.Client(), server.URL)
 	_, err := provider.Preview(
 		context.Background(),
-		routing.Point{Latitude: 24.86, Longitude: 67.01},
-		routing.Point{Latitude: 24.90, Longitude: 67.05},
+		routing.Endpoint{
+			Point: routing.Point{Latitude: 24.86, Longitude: 67.01},
+		},
+		routing.Endpoint{
+			Point:   routing.Point{Latitude: 24.90, Longitude: 67.05},
+			PlaceID: "destination-place",
+		},
 	)
 	if err == nil {
 		t.Fatal("expected malformed route error")
