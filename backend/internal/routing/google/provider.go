@@ -17,7 +17,7 @@ import (
 
 const (
 	defaultRoutesBase = "https://routes.googleapis.com"
-	fieldMask         = "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline,routes.routeLabels,routes.routeToken"
+	fieldMask         = "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline"
 	maxAttempts       = 2
 	retryDelay        = 100 * time.Millisecond
 	providerTimeout   = 8 * time.Second
@@ -45,9 +45,9 @@ func newProvider(apiKey string, client *http.Client, base string) *Provider {
 	}
 }
 
-func (p *Provider) Preview(ctx context.Context, pickup, destination routing.Point) (routing.Preview, error) {
+func (p *Provider) Preview(ctx context.Context, pickup, destination routing.Point) (routing.Route, error) {
 	if p.apiKey == "" {
-		return routing.Preview{}, routing.ErrUnavailable
+		return routing.Route{}, routing.ErrUnavailable
 	}
 
 	body := map[string]any{
@@ -56,14 +56,13 @@ func (p *Provider) Preview(ctx context.Context, pickup, destination routing.Poin
 		"travelMode":               "DRIVE",
 		"routingPreference":        "TRAFFIC_AWARE_OPTIMAL",
 		"trafficModel":             "BEST_GUESS",
-		"computeAlternativeRoutes": true,
-		"requestedReferenceRoutes": []string{"SHORTER_DISTANCE"},
+		"computeAlternativeRoutes": false,
 		"polylineQuality":          "OVERVIEW",
 		"polylineEncoding":         "ENCODED_POLYLINE",
 	}
 	encoded, err := json.Marshal(body)
 	if err != nil {
-		return routing.Preview{}, fmt.Errorf("%w: encode route request", routing.ErrProvider)
+		return routing.Route{}, fmt.Errorf("%w: encode route request", routing.ErrProvider)
 	}
 
 	var resp *http.Response
@@ -75,7 +74,7 @@ func (p *Provider) Preview(ctx context.Context, pickup, destination routing.Poin
 			bytes.NewReader(encoded),
 		)
 		if buildErr != nil {
-			return routing.Preview{}, fmt.Errorf("%w: build route request", routing.ErrProvider)
+			return routing.Route{}, fmt.Errorf("%w: build route request", routing.ErrProvider)
 		}
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("X-Goog-Api-Key", p.apiKey)
@@ -92,94 +91,61 @@ func (p *Provider) Preview(ctx context.Context, pickup, destination routing.Poin
 		}
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
 			if ctx.Err() != nil {
-				return routing.Preview{}, ctx.Err()
+				return routing.Route{}, ctx.Err()
 			}
-			return routing.Preview{}, err
+			return routing.Route{}, err
 		}
 		if attempt+1 < maxAttempts {
 			timer := time.NewTimer(retryDelay)
 			select {
 			case <-ctx.Done():
 				timer.Stop()
-				return routing.Preview{}, ctx.Err()
+				return routing.Route{}, ctx.Err()
 			case <-timer.C:
 			}
 		}
 	}
 	if err != nil {
-		return routing.Preview{}, fmt.Errorf("%w: compute route request", routing.ErrProvider)
+		return routing.Route{}, fmt.Errorf("%w: compute route request", routing.ErrProvider)
 	}
 	if resp == nil {
-		return routing.Preview{}, fmt.Errorf("%w: empty route response", routing.ErrProvider)
+		return routing.Route{}, fmt.Errorf("%w: empty route response", routing.ErrProvider)
 	}
 	defer resp.Body.Close()
 	if err := providerStatus(resp.StatusCode); err != nil {
-		return routing.Preview{}, err
+		return routing.Route{}, err
 	}
 
 	var payload struct {
 		Routes []struct {
-			DistanceMeters int64    `json:"distanceMeters"`
-			Duration       string   `json:"duration"`
-			RouteLabels    []string `json:"routeLabels"`
+			DistanceMeters int64  `json:"distanceMeters"`
+			Duration       string `json:"duration"`
 			Polyline       struct {
 				EncodedPolyline string `json:"encodedPolyline"`
 			} `json:"polyline"`
 		} `json:"routes"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		return routing.Preview{}, fmt.Errorf("%w: decode route response", routing.ErrProvider)
+		return routing.Route{}, fmt.Errorf("%w: decode route response", routing.ErrProvider)
 	}
 	if len(payload.Routes) == 0 {
-		return routing.Preview{}, routing.ErrNotFound
+		return routing.Route{}, routing.ErrNotFound
 	}
 
-	routes := make([]routing.Route, 0, len(payload.Routes))
-	seenPolylines := make(map[string]struct{}, len(payload.Routes))
-	recommendedIndex := -1
-	for _, candidate := range payload.Routes {
-		duration, parseErr := time.ParseDuration(strings.TrimSpace(candidate.Duration))
-		if parseErr != nil || duration <= 0 {
-			continue
-		}
-		polyline := strings.TrimSpace(candidate.Polyline.EncodedPolyline)
-		if _, exists := seenPolylines[polyline]; exists {
-			continue
-		}
-		route := routing.Route{
-			ID:              fmt.Sprintf("route-%d", len(routes)),
-			Recommended:     hasRouteLabel(candidate.RouteLabels, "DEFAULT_ROUTE"),
-			DistanceMeters:  candidate.DistanceMeters,
-			DurationSeconds: int64(math.Ceil(duration.Seconds())),
-			EncodedPolyline: polyline,
-		}
-		if !route.Valid() {
-			continue
-		}
-		seenPolylines[polyline] = struct{}{}
-		if route.Recommended && recommendedIndex == -1 {
-			recommendedIndex = len(routes)
-		} else {
-			route.Recommended = false
-		}
-		routes = append(routes, route)
+	candidate := payload.Routes[0]
+	duration, parseErr := time.ParseDuration(strings.TrimSpace(candidate.Duration))
+	if parseErr != nil || duration <= 0 {
+		return routing.Route{}, fmt.Errorf("%w: invalid route duration", routing.ErrProvider)
 	}
-	if len(routes) == 0 {
-		return routing.Preview{}, fmt.Errorf("%w: no complete routes", routing.ErrProvider)
+	route := routing.Route{
+		DistanceMeters:  candidate.DistanceMeters,
+		DurationSeconds: int64(math.Ceil(duration.Seconds())),
+		EncodedPolyline: strings.TrimSpace(candidate.Polyline.EncodedPolyline),
 	}
-	if recommendedIndex == -1 {
-		routes[0].Recommended = true
+	if !route.Valid() {
+		return routing.Route{}, fmt.Errorf("%w: incomplete route", routing.ErrProvider)
 	}
-	return routing.Preview{Routes: routes}, nil
-}
-
-func hasRouteLabel(labels []string, expected string) bool {
-	for _, label := range labels {
-		if strings.EqualFold(strings.TrimSpace(label), expected) {
-			return true
-		}
-	}
-	return false
+	return route, nil
 }
 
 func waypoint(point routing.Point) map[string]any {
