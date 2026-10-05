@@ -7,6 +7,22 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/routing"
 )
 
+func TestRoutePointEndpointPreservesOptionalPlaceID(t *testing.T) {
+	latitude := 33.7295
+	longitude := 73.0372
+	endpoint := (routePoint{
+		Latitude:  &latitude,
+		Longitude: &longitude,
+		PlaceID:   "  poi-place-id  ",
+	}).endpoint()
+
+	if endpoint.Point.Latitude != latitude ||
+		endpoint.Point.Longitude != longitude ||
+		endpoint.PlaceID != "poi-place-id" {
+		t.Fatalf("unexpected endpoint: %#v", endpoint)
+	}
+}
+
 func TestRidePreviewResponseUsesSingleRouteContract(t *testing.T) {
 	response := ridePreviewResponse(routing.Route{
 		DistanceMeters:  12400,
