@@ -34,7 +34,7 @@ The owner has already configured working Google Maps Platform APIs. The next MVP
 
 - Add a small Go pricing component consuming validated route distance/duration and the selected **active catalog service**. Each service/currency has its own independently versioned, approved policy. Initial currency is PKR; initial services are Economy and Comfort. A synthetic third service tests the architecture without adding a production tariff.
 - Required policy fields: `service_code`, `currency`, `version`, `base_fare_minor`, `rate_minor_per_km`, `rate_minor_per_minute`, `minimum_fare_minor`, `rounding_increment_minor`, `effective_from`, optional `effective_until`, and active/approval state. Ensure the selected policy is unambiguous for a service/currency and preview time. Changes create new versions; historical policies are not silently overwritten.
-- Proposed computation, using integer minor units and a defined **single final rounding step**:
+- Implemented computation, using integer minor units and a defined **single final half-up rounding step**:
 
   ```text
   raw = base_fare_minor
@@ -44,8 +44,8 @@ The owner has already configured working Google Maps Platform APIs. The next MVP
                              round(raw, rounding_increment_minor))
   ```
 
-  Define exact rational arithmetic/rounding and overflow behavior before implementation; avoid binary floating-point for money. Rate values and rounding increments are **business configuration**, not invented constants. The owner must approve actual Economy and Comfort tariffs before production fare suggestions are enabled.
-- Extend the single authenticated `POST /v1/ride-previews` call to return the one recommended route. During PR 4 it contains distance/duration/polyline. PR 5 adds `suggested_fare {amount_minor,currency}` and `pricing_policy_version`, calculated from that same route without another Google call. After pricing activation, no price-backed booking proceeds without a valid active policy.
+  The Go pricing engine evaluates the distance/time terms with exact rational integer arithmetic, applies a single final half-up rounding step to the configured increment, enforces the minimum afterward, and rejects overflow. Binary floating-point is not used for money. Rate values and rounding increments remain **business configuration**, not invented constants. No Economy/Comfort tariff rows are seeded; an administrator must explicitly publish an approved version before that service is Rider-bookable in the priced flow.
+- Extend the single authenticated `POST /v1/ride-previews` call to return the one recommended route. During PR 4 it contains distance/duration/polyline. PR 5 returns `suggested_fare {amount_minor,currency}` and `pricing_policy_version`, calculated from that same route without another Google call. After pricing activation, no price-backed booking proceeds without a valid active policy.
 - This is a **suggestion, not a fare quote or automatic charge**. The Rider may accept or edit the suggested amount as their **proposed fare**. Existing 90–130% Driver response bounds remain relative to the Rider's submitted proposal, not the system suggestion. Neither previewing nor Driver accepting the Rider's amount assigns a Trip.
 - Ride Request creation remains `POST /v1/ride-requests` with coordinates, selected service and Rider-proposed fare. Revalidate service activation at create time; never trust client-supplied prices. Rider offer selection is the only assignment boundary; the selected offer's **agreed fare snapshot** is final for the Trip and subsequent cash settlement. Do not retrospectively reprice existing Trips or use actual travelled distance to change the agreed fare in this milestone.
 
