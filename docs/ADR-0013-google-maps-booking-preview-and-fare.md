@@ -30,7 +30,7 @@ The owner has already configured working Google Maps Platform APIs. The next MVP
 - The current Driver-to-pickup **discovery distance** remains cheap Haversine straight-line distance for marketplace ordering and eligibility. Do not make a paid Google Routes request for every Driver/ride pair or relabel this distance as Driver arrival time.
 - Driver-to-pickup routing, traffic-aware ETA, live rerouting and turn-by-turn navigation remain subsequent product decisions, not part of this first preview milestone.
 
-### 3. One route preview request, selectable routes, advisory fare
+### 3. One recommended route preview, one advisory fare
 
 - Add a small Go pricing component consuming validated route distance/duration and the selected **active catalog service**. Each service/currency has its own independently versioned, approved policy. Initial currency is PKR; initial services are Economy and Comfort. A synthetic third service tests the architecture without adding a production tariff.
 - Required policy fields: `service_code`, `currency`, `version`, `base_fare_minor`, `rate_minor_per_km`, `rate_minor_per_minute`, `minimum_fare_minor`, `rounding_increment_minor`, `effective_from`, optional `effective_until`, and active/approval state. Ensure the selected policy is unambiguous for a service/currency and preview time. Changes create new versions; historical policies are not silently overwritten.
