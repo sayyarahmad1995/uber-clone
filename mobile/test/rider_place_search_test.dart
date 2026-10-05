@@ -84,6 +84,7 @@ void main() {
         const PlaceSuggestion(placeId: 'pickup-1', label: 'Clifton'),
       );
       expect(places.detailsTokens.single, pickupToken);
+      expect(rider.state.pickupPlaceId, 'pickup-1');
 
       controller.search(RiderPlaceField.pickup, 'Sea View');
       await Future<void>.delayed(const Duration(milliseconds: 350));
@@ -152,6 +153,7 @@ void main() {
     expect(selected!.label, 'Faisal Mosque');
     expect(selected.point, const GeoPoint(latitude: 33.7295, longitude: 73.0372));
     expect(rider.state.pickup, selected.point);
+    expect(rider.state.pickupPlaceId, 'poi-1');
     expect(controller.state.pickup.label, selected.label);
   });
 
@@ -180,6 +182,7 @@ void main() {
       expect(resolved!.label, 'Pinned Road, Karachi');
       expect(resolved.point, pin);
       expect(rider.state.pickup, pin);
+      expect(rider.state.pickupPlaceId, isNull);
       expect(controller.state.pickup.label, 'Pinned Road, Karachi');
     },
   );
