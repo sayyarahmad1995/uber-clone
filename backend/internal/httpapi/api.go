@@ -41,6 +41,7 @@ type Dependencies struct {
 	MarketplacePolicy               marketplace.PolicyService
 	Trips                           trip.Service
 	LocationSearch                  locationsearch.Searcher
+	LocationSearchPolicy            locationsearch.SearchPolicyService
 	Routing                         routing.Previewer
 	LocationSearchRequestsPerMinute int
 	Identity                        identity.Provider
@@ -68,6 +69,7 @@ type API struct {
 	marketplacePolicy      marketplace.PolicyService
 	trips                  trip.Service
 	locationSearch         locationsearch.Searcher
+	locationSearchPolicy   locationsearch.SearchPolicyService
 	routing                routing.Previewer
 	locationSearchLimiter  *userWindowLimiter
 	identity               identity.Provider
@@ -96,6 +98,7 @@ func New(deps Dependencies) *API {
 		marketplacePolicy:      deps.MarketplacePolicy,
 		trips:                  deps.Trips,
 		locationSearch:         deps.LocationSearch,
+		locationSearchPolicy:   deps.LocationSearchPolicy,
 		routing:                deps.Routing,
 		locationSearchLimiter:  newUserWindowLimiter(deps.LocationSearchRequestsPerMinute),
 		identity:               deps.Identity,
