@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strconv"
 
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/locationsearch"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 )
 
@@ -18,8 +19,10 @@ type adminMarketplacePolicyRequest struct {
 }
 
 type adminOperationsView struct {
-	Policy  marketplace.TimingPolicy
-	Message string
+	Policy                  marketplace.TimingPolicy
+	PlaceSearchPolicy       locationsearch.SearchPolicy
+	PlaceSearchRadiusKm     int64
+	Message                 string
 }
 
 var adminOperationsTemplate = template.Must(template.New("admin-operations").Parse(`<!doctype html>
@@ -51,6 +54,18 @@ body{font-family:system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0
 <p><button type="submit">Save marketplace timing</button></p>
 </form>
 <p class="muted">Last updated {{.Policy.UpdatedAt}} by {{.Policy.UpdatedBy}}</p>
+</div>
+<div class="card">
+<h2>Rider place search</h2>
+<p class="muted">Controls how far Google autocomplete searches around the Rider's current device location. This does not snap or move Rider-selected pins.</p>
+<form method="post" action="/admin/operations/place-search-policy">
+<div class="grid">
+<div><label for="autocomplete_radius_kilometers">Nearby search radius</label><div class="hint">5–50 km; default 50 km</div></div>
+<input id="autocomplete_radius_kilometers" name="autocomplete_radius_kilometers" type="number" min="5" max="50" step="1" required value="{{.PlaceSearchRadiusKm}}">
+</div>
+<p><button type="submit">Save place search radius</button></p>
+</form>
+<p class="muted">Last updated {{.PlaceSearchPolicy.UpdatedAt}} by {{.PlaceSearchPolicy.UpdatedBy}}</p>
 </div>
 </body>
 </html>`))
@@ -86,10 +101,25 @@ func (api *API) adminOperationsIndex(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unable to load marketplace timing policy", http.StatusInternalServerError)
 		return
 	}
+
+	searchPolicy := locationsearch.SearchPolicy{
+		AutocompleteRadiusMeters: locationsearch.DefaultAutocompleteRadiusMeters,
+		UpdatedBy:                "default",
+	}
+	if api.locationSearchPolicy != nil {
+		searchPolicy, err = api.locationSearchPolicy.Load(r.Context())
+		if err != nil {
+			http.Error(w, "Unable to load place search policy", http.StatusInternalServerError)
+			return
+		}
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = adminOperationsTemplate.Execute(w, adminOperationsView{
-		Policy:  policy,
-		Message: r.URL.Query().Get("message"),
+		Policy:              policy,
+		PlaceSearchPolicy:   searchPolicy,
+		PlaceSearchRadiusKm: searchPolicy.AutocompleteRadiusMeters / 1000,
+		Message:             r.URL.Query().Get("message"),
 	})
 }
 
