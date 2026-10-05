@@ -9,16 +9,19 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/locationsearch"
 )
 
 const (
-	defaultPlacesBase  = "https://places.googleapis.com"
-	defaultGeocodeBase = "https://geocode.googleapis.com"
+	defaultPlacesBase       = "https://places.googleapis.com"
+	defaultGeocodeBase      = "https://geocode.googleapis.com"
+	popularityCacheLifetime = 24 * time.Hour
 )
 
 type Provider struct {
@@ -26,6 +29,14 @@ type Provider struct {
 	client      *http.Client
 	placesBase  string
 	geocodeBase string
+
+	popularityMu    sync.Mutex
+	popularityCache map[string]cachedPopularity
+}
+
+type cachedPopularity struct {
+	userRatingCount int64
+	expiresAt       time.Time
 }
 
 func New(apiKey string) *Provider {
@@ -39,10 +50,11 @@ func New(apiKey string) *Provider {
 
 func newProvider(apiKey string, client *http.Client, placesBase, geocodeBase string) *Provider {
 	return &Provider{
-		apiKey:      strings.TrimSpace(apiKey),
-		client:      client,
-		placesBase:  strings.TrimRight(placesBase, "/"),
-		geocodeBase: strings.TrimRight(geocodeBase, "/"),
+		apiKey:          strings.TrimSpace(apiKey),
+		client:          client,
+		placesBase:      strings.TrimRight(placesBase, "/"),
+		geocodeBase:     strings.TrimRight(geocodeBase, "/"),
+		popularityCache: make(map[string]cachedPopularity),
 	}
 }
 
@@ -123,7 +135,89 @@ func (p *Provider) Autocomplete(ctx context.Context, input locationsearch.Autoco
 		}
 		items = append(items, locationsearch.Suggestion{PlaceID: placeID, Label: label})
 	}
-	return items, nil
+	return p.rankSuggestionsByPopularity(ctx, items), nil
+}
+
+func (p *Provider) rankSuggestionsByPopularity(
+	ctx context.Context,
+	items []locationsearch.Suggestion,
+) []locationsearch.Suggestion {
+	if len(items) < 2 {
+		return items
+	}
+
+	type rankedSuggestion struct {
+		suggestion locationsearch.Suggestion
+		popularity int64
+		index      int
+	}
+	ranked := make([]rankedSuggestion, len(items))
+	var wait sync.WaitGroup
+	for i, item := range items {
+		ranked[i] = rankedSuggestion{suggestion: item, index: i}
+		wait.Add(1)
+		go func(index int, placeID string) {
+			defer wait.Done()
+			ranked[index].popularity = p.userRatingCount(ctx, placeID)
+		}(i, item.PlaceID)
+	}
+	wait.Wait()
+
+	sort.SliceStable(ranked, func(i, j int) bool {
+		if ranked[i].popularity == ranked[j].popularity {
+			return ranked[i].index < ranked[j].index
+		}
+		return ranked[i].popularity > ranked[j].popularity
+	})
+	for i := range ranked {
+		items[i] = ranked[i].suggestion
+	}
+	return items
+}
+
+func (p *Provider) userRatingCount(ctx context.Context, placeID string) int64 {
+	now := time.Now()
+	p.popularityMu.Lock()
+	if cached, ok := p.popularityCache[placeID]; ok && now.Before(cached.expiresAt) {
+		p.popularityMu.Unlock()
+		return cached.userRatingCount
+	}
+	p.popularityMu.Unlock()
+
+	endpoint, err := url.Parse(p.placesBase + "/v1/places/" + url.PathEscape(placeID))
+	if err != nil {
+		return 0
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	if err != nil {
+		return 0
+	}
+	req.Header.Set("X-Goog-Api-Key", p.apiKey)
+	req.Header.Set("X-Goog-FieldMask", "userRatingCount")
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return 0
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return 0
+	}
+
+	var payload struct {
+		UserRatingCount int64 `json:"userRatingCount"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return 0
+	}
+
+	p.popularityMu.Lock()
+	p.popularityCache[placeID] = cachedPopularity{
+		userRatingCount: payload.UserRatingCount,
+		expiresAt:       now.Add(popularityCacheLifetime),
+	}
+	p.popularityMu.Unlock()
+	return payload.UserRatingCount
 }
 
 func (p *Provider) Details(ctx context.Context, placeID, sessionToken string) (locationsearch.Place, error) {
