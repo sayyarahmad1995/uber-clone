@@ -28,12 +28,12 @@ type adminOperationsView struct {
 }
 
 type adminPricingPolicyView struct {
-	ServiceCode      string
-	Version          int64
-	BaseFare         string
-	RatePerKM        string
-	RatePerMinute    string
-	MinimumFare      string
+	ServiceCode       string
+	Version           int64
+	BaseFare          string
+	RatePerKM         string
+	RatePerMinute     string
+	MinimumFare       string
 	RoundingIncrement string
 }
 
