@@ -152,8 +152,16 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
               label: 'Driver',
             ),
         ],
-        polylines: active == null
-            ? _routePolylines(routeState, Theme.of(context).colorScheme)
+        polylines: active == null && routePreview != null
+            ? [
+                RideMapPolyline(
+                  points: routePreview.points
+                      .map(_latLng)
+                      .toList(growable: false),
+                  color: Theme.of(context).colorScheme.primary,
+                  width: 6,
+                ),
+              ]
             : const [],
         onTap: active == null ? _handleMapTap : null,
         onPlaceTap: active == null ? _handlePlaceTap : null,
@@ -223,9 +231,6 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
         onSuggestionSelected: _selectSuggestion,
         onUseCurrentPickup: _useCurrentPickup,
         onRetryRoute: ref.read(riderRoutePreviewControllerProvider).retry,
-        onSelectRoute: ref
-            .read(riderRoutePreviewControllerProvider)
-            .selectRoute,
         onSubmit: _submit,
       );
     }
@@ -432,59 +437,19 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
       ),
   ];
 
-  List<RideMapPolyline> _routePolylines(
-    RiderRoutePreviewState state,
-    ColorScheme colors,
-  ) {
-    final preview = state.preview;
-    final selected = state.selectedRoute;
-    if (preview == null || selected == null) {
-      return const [];
-    }
-
-    final alternatives = preview.routes
-        .where((route) => route.id != selected.id)
-        .map(
-          (route) => RideMapPolyline(
-            points: route.points.map(_latLng).toList(growable: false),
-            color: colors.outline,
-            width: 4,
-            onTap: () => ref
-                .read(riderRoutePreviewControllerProvider)
-                .selectRoute(route.id),
-          ),
-        )
-        .toList(growable: true);
-
-    alternatives.add(
-      RideMapPolyline(
-        points: selected.points.map(_latLng).toList(growable: false),
-        color: colors.primary,
-        width: 6,
-        onTap: () => ref
-            .read(riderRoutePreviewControllerProvider)
-            .selectRoute(selected.id),
-      ),
-    );
-    return alternatives;
-  }
-
   void _scheduleRouteFit(RoutePreview? preview) {
     if (preview == null) {
       _lastFittedRouteKey = null;
       return;
     }
-    final key = preview.routes.map((route) => route.encodedPolyline).join('|');
+    final key = preview.encodedPolyline;
     if (_lastFittedRouteKey == key) {
       return;
     }
     _lastFittedRouteKey = key;
-    final recommended = preview.recommended;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      unawaited(
-        _mapController.fit(recommended.points.map(_latLng), padding: 48),
-      );
+      unawaited(_mapController.fit(preview.points.map(_latLng), padding: 48));
     });
   }
 
@@ -585,7 +550,6 @@ class _RequestRidePanel extends StatelessWidget {
     required this.onSuggestionSelected,
     required this.onUseCurrentPickup,
     required this.onRetryRoute,
-    required this.onSelectRoute,
     required this.onSubmit,
   });
 
@@ -606,7 +570,6 @@ class _RequestRidePanel extends StatelessWidget {
   onSuggestionSelected;
   final Future<void> Function() onUseCurrentPickup;
   final Future<void> Function() onRetryRoute;
-  final ValueChanged<String> onSelectRoute;
   final Future<void> Function() onSubmit;
 
   @override
@@ -702,7 +665,6 @@ class _RequestRidePanel extends StatelessWidget {
           state: routeState,
           hasEndpoints: state.pickup != null && state.destination != null,
           onRetry: onRetryRoute,
-          onSelectRoute: onSelectRoute,
         ),
         const SizedBox(height: AppSpacing.sm),
         DashboardPanelControl(
@@ -850,13 +812,11 @@ class _RoutePreviewCard extends StatelessWidget {
     required this.state,
     required this.hasEndpoints,
     required this.onRetry,
-    required this.onSelectRoute,
   });
 
   final RiderRoutePreviewState state;
   final bool hasEndpoints;
   final Future<void> Function() onRetry;
-  final ValueChanged<String> onSelectRoute;
 
   @override
   Widget build(BuildContext context) {
@@ -876,7 +836,7 @@ class _RoutePreviewCard extends StatelessWidget {
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
               SizedBox(width: AppSpacing.sm),
-              Expanded(child: Text('Calculating traffic-aware routes...')),
+              Expanded(child: Text('Calculating traffic-aware route...')),
             ],
           ),
         ),
@@ -909,8 +869,7 @@ class _RoutePreviewCard extends StatelessWidget {
     }
 
     final preview = state.preview;
-    final selected = state.selectedRoute;
-    if (preview == null || selected == null) {
+    if (preview == null) {
       return const SizedBox.shrink();
     }
 
@@ -918,33 +877,13 @@ class _RoutePreviewCard extends StatelessWidget {
       key: const Key('routePreviewSummary'),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-        child: Column(
-          children: [
-            for (final entry in preview.routes.indexed)
-              DashboardPanelControl(
-                child: ListTile(
-                  key: Key('routeOption-${entry.$2.id}'),
-                  leading: Icon(
-                    entry.$2.id == selected.id
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
-                  ),
-                  title: Text(
-                    '${_formatRouteDuration(entry.$2.durationSeconds)} · '
-                    '${_formatRouteDistance(entry.$2.distanceMeters)}',
-                  ),
-                  subtitle: Text(
-                    entry.$2.recommended
-                        ? 'Recommended · current traffic'
-                        : 'Alternative ${entry.$1} · current traffic',
-                  ),
-                  trailing: entry.$2.id == selected.id
-                      ? const Icon(Icons.check)
-                      : null,
-                  onTap: () => onSelectRoute(entry.$2.id),
-                ),
-              ),
-          ],
+        child: ListTile(
+          leading: const Icon(Icons.route),
+          title: Text(
+            '${_formatRouteDuration(preview.durationSeconds)} · '
+            '${_formatRouteDistance(preview.distanceMeters)}',
+          ),
+          subtitle: const Text('Google recommended · current traffic'),
         ),
       ),
     );
