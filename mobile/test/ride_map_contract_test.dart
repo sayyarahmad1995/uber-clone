@@ -46,10 +46,7 @@ void main() {
     expect(source, isNot(contains('DashboardPanelSessionScope')));
     expect(source, isNot(contains('mapBottomPadding')));
     expect(source, isNot(contains('panelExpanded')));
-    expect(
-      source,
-      contains("preview.routes.map((route) => route.encodedPolyline).join('|')"),
-    );
+    expect(source, contains('final key = preview.encodedPolyline;'));
   });
 
   test('RideMap translates Google POI taps behind provider boundary', () {
@@ -66,22 +63,23 @@ void main() {
     expect(rider, contains('selectPlaceId(field, place.placeId)'));
   });
 
-  test('RideMap exposes provider-neutral route rendering and camera fit', () {
+  test('RideMap renders one provider-neutral route and fits it once', () {
     final source = File('lib/core/maps/ride_map.dart').readAsStringSync();
     final rider = File(
       'lib/features/rider_request/presentation/rider_request_screen.dart',
     ).readAsStringSync();
 
     expect(source, contains('class RideMapPolyline'));
-    expect(source, contains('consumeTapEvents: polyline.onTap != null'));
-    expect(source, contains('onTap: polyline.onTap'));
+    expect(source, isNot(contains('consumeTapEvents: polyline.onTap != null')));
+    expect(source, isNot(contains('onTap: polyline.onTap')));
     expect(source, contains('Future<void> fit('));
     expect(source, contains('newLatLngBounds'));
     expect(source, contains('polylines: {'));
     expect(source, contains('padding: widget.padding'));
     expect(rider, contains('routePreviewSummary'));
-    expect(rider, contains('Recommended · current traffic'));
-    expect(rider, contains(r"Key('routeOption-${entry.$2.id}')"));
+    expect(rider, contains('Google recommended · current traffic'));
+    expect(rider, isNot(contains('routeOption-')));
+    expect(rider, isNot(contains('Alternative')));
   });
 
   test('Google Maps provider types stay behind the shared map boundary', () {
