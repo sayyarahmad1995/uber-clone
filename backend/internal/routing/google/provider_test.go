@@ -12,7 +12,7 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/routing"
 )
 
-func TestPreviewRequestsTrafficAwareAlternativeRoutesAndNormalizesOptions(t *testing.T) {
+func TestPreviewRequestsOptimalTrafficAlternativesAndShorterDistance(t *testing.T) {
 	var body map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost || r.URL.Path != "/directions/v2:computeRoutes" {
@@ -28,7 +28,7 @@ func TestPreviewRequestsTrafficAwareAlternativeRoutesAndNormalizesOptions(t *tes
 			t.Fatal(err)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"routes":[{"distanceMeters":12345,"duration":"901.4s","routeLabels":["DEFAULT_ROUTE"],"polyline":{"encodedPolyline":"_p~iF~ps|U_ulLnnqC_mqNvxq"}},{"distanceMeters":11900,"duration":"960s","routeLabels":["DEFAULT_ROUTE_ALTERNATE"],"polyline":{"encodedPolyline":"_p~iF~ps|U????"}}]}`))
+		_, _ = w.Write([]byte(`{"routes":[{"distanceMeters":12345,"duration":"901.4s","routeLabels":["DEFAULT_ROUTE"],"routeToken":"default-token","polyline":{"encodedPolyline":"_p~iF~ps|U_ulLnnqC_mqNvxq"}},{"distanceMeters":11900,"duration":"960s","routeLabels":["DEFAULT_ROUTE_ALTERNATE"],"routeToken":"alternate-token","polyline":{"encodedPolyline":"_p~iF~ps|U????"}},{"distanceMeters":10800,"duration":"1000s","routeLabels":["SHORTER_DISTANCE"],"routeToken":"short-token","polyline":{"encodedPolyline":"_p~iF~ps|Uzzzz"}}]}`))
 	}))
 	defer server.Close()
 
@@ -42,18 +42,24 @@ func TestPreviewRequestsTrafficAwareAlternativeRoutesAndNormalizesOptions(t *tes
 		t.Fatal(err)
 	}
 	if body["travelMode"] != "DRIVE" ||
-		body["routingPreference"] != "TRAFFIC_AWARE" ||
+		body["routingPreference"] != "TRAFFIC_AWARE_OPTIMAL" ||
+		body["trafficModel"] != "BEST_GUESS" ||
 		body["computeAlternativeRoutes"] != true {
 		t.Fatalf("unexpected route options: %#v", body)
+	}
+	referenceRoutes, ok := body["requestedReferenceRoutes"].([]any)
+	if !ok || len(referenceRoutes) != 1 || referenceRoutes[0] != "SHORTER_DISTANCE" {
+		t.Fatalf("unexpected reference routes: %#v", body["requestedReferenceRoutes"])
 	}
 	if body["polylineQuality"] != "OVERVIEW" || body["polylineEncoding"] != "ENCODED_POLYLINE" {
 		t.Fatalf("unexpected polyline options: %#v", body)
 	}
-	if !strings.Contains(fieldMask, "routes.routeLabels") {
-		t.Fatalf("route labels missing from field mask: %q", fieldMask)
+	if !strings.Contains(fieldMask, "routes.routeLabels") ||
+		!strings.Contains(fieldMask, "routes.routeToken") {
+		t.Fatalf("shorter-distance fields missing from field mask: %q", fieldMask)
 	}
-	if len(preview.Routes) != 2 {
-		t.Fatalf("expected two routes, got %#v", preview.Routes)
+	if len(preview.Routes) != 3 {
+		t.Fatalf("expected three routes, got %#v", preview.Routes)
 	}
 	if preview.Routes[0].ID != "route-0" ||
 		!preview.Routes[0].Recommended ||
@@ -66,6 +72,33 @@ func TestPreviewRequestsTrafficAwareAlternativeRoutesAndNormalizesOptions(t *tes
 		preview.Routes[1].DistanceMeters != 11900 ||
 		preview.Routes[1].DurationSeconds != 960 {
 		t.Fatalf("unexpected alternate route: %#v", preview.Routes[1])
+	}
+	if preview.Routes[2].ID != "route-2" ||
+		preview.Routes[2].Recommended ||
+		preview.Routes[2].DistanceMeters != 10800 ||
+		preview.Routes[2].DurationSeconds != 1000 {
+		t.Fatalf("unexpected shorter-distance route: %#v", preview.Routes[2])
+	}
+}
+
+func TestPreviewDeduplicatesIdenticalRouteGeometry(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"routes":[{"distanceMeters":1000,"duration":"120s","routeLabels":["DEFAULT_ROUTE"],"polyline":{"encodedPolyline":"same"}},{"distanceMeters":1000,"duration":"120s","routeLabels":["SHORTER_DISTANCE"],"polyline":{"encodedPolyline":"same"}}]}`))
+	}))
+	defer server.Close()
+
+	provider := newProvider("server-key", server.Client(), server.URL)
+	preview, err := provider.Preview(
+		context.Background(),
+		routing.Point{Latitude: 24.86, Longitude: 67.01},
+		routing.Point{Latitude: 24.90, Longitude: 67.05},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(preview.Routes) != 1 {
+		t.Fatalf("expected duplicate geometry to collapse, got %#v", preview.Routes)
 	}
 }
 
