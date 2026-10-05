@@ -74,6 +74,8 @@ type API struct {
 	locationSearch         locationsearch.Searcher
 	locationSearchPolicy   locationsearch.SearchPolicyService
 	routing                routing.Previewer
+	pricing                pricing.Suggester
+	pricingPolicies        pricing.PolicyManager
 	locationSearchLimiter  *userWindowLimiter
 	identity               identity.Provider
 	auth                   auth.Handler
@@ -103,6 +105,8 @@ func New(deps Dependencies) *API {
 		locationSearch:         deps.LocationSearch,
 		locationSearchPolicy:   deps.LocationSearchPolicy,
 		routing:                deps.Routing,
+		pricing:                deps.Pricing,
+		pricingPolicies:        deps.PricingPolicies,
 		locationSearchLimiter:  newUserWindowLimiter(deps.LocationSearchRequestsPerMinute),
 		identity:               deps.Identity,
 		auth:                   deps.Auth,
