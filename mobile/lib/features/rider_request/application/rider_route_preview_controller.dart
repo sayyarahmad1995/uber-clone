@@ -150,7 +150,7 @@ class RiderRoutePreviewController extends ChangeNotifier {
     if (error is ApiException) {
       return switch (error.statusCode) {
         404 => 'No driving route was found between these locations.',
-        503 => 'Route preview is temporarily unavailable.',
+        503 => error.message,
         _ => error.message,
       };
     }
