@@ -11,7 +11,7 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/locationsearch"
 )
 
-func TestAutocompleteUsesSessionTokenBiasAndNarrowFieldMask(t *testing.T) {
+func TestAutocompleteUsesSessionTokenLocalRestrictionAndNarrowFieldMask(t *testing.T) {
 	var body map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/places:autocomplete" || r.Method != http.MethodPost {
@@ -42,8 +42,19 @@ func TestAutocompleteUsesSessionTokenBiasAndNarrowFieldMask(t *testing.T) {
 	if len(items) != 1 || items[0].PlaceID != "p1" {
 		t.Fatalf("unexpected suggestions: %#v", items)
 	}
-	if body["sessionToken"] != "session-1" || body["locationBias"] == nil {
-		t.Fatalf("unexpected autocomplete body: %#v", body)
+	if body["sessionToken"] != "session-1" {
+		t.Fatalf("unexpected autocomplete session: %#v", body)
+	}
+	if _, exists := body["locationBias"]; exists {
+		t.Fatalf("soft location bias must not be used: %#v", body)
+	}
+	restriction, ok := body["locationRestriction"].(map[string]any)
+	if !ok {
+		t.Fatalf("local restriction missing: %#v", body)
+	}
+	circle, ok := restriction["circle"].(map[string]any)
+	if !ok || circle["radius"] != autocompleteRadiusMeters {
+		t.Fatalf("unexpected local restriction: %#v", restriction)
 	}
 }
 
