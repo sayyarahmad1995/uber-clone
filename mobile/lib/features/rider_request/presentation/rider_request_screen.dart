@@ -113,6 +113,8 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Keep the catalog available when the lazy service picker scrolls offscreen.
+    ref.watch(riderServicesProvider);
     final controller = ref.watch(riderRequestControllerProvider);
     final state = controller.state;
     final active = state.active;
