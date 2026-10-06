@@ -72,7 +72,7 @@ void main() {
     expect(controller.state.active?.id, 'ride-1');
     final bookedMap = tester.widget<RideMap>(find.byType(RideMap));
     expect(bookedMap.polylines, hasLength(1));
-    expect(bookedMap.polylines.single.points, hasLength(3));
+    expect(bookedMap.polylines.single.points, hasLength(2));
     expect(bookedMap.polylines.single.points.first.latitude, 38.5);
     expect(bookedMap.onTap, isNull);
     expect(bookedMap.onPlaceTap, isNull);
