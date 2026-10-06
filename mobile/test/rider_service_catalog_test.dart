@@ -17,7 +17,7 @@ void main() {
       );
 
       final services = await repository.list();
-      expect(adapter.authorization, '***');
+      expect(adapter.authorization, 'Bearer catalog-token');
       expect(adapter.path, '/v1/ride-services');
       expect(services.map((value) => value.code), [
         'economy',

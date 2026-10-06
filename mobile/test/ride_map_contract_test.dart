@@ -34,7 +34,7 @@ void main() {
     expect(source, contains('FloatingActionButton.extended'));
     expect(
       source,
-      contains('showCenterPin: active == null && _pinSelectionMode'),
+      contains('showCenterPin: booking && _pinSelectionMode'),
     );
   });
 
@@ -59,7 +59,7 @@ void main() {
     expect(source, contains('onPointOfInterestTap'));
     expect(source, contains('PointOfInterestTapEvent'));
     expect(source, contains('RideMapPlace(placeId: placeId)'));
-    expect(rider, contains('onPlaceTap: active == null ? _handlePlaceTap : null'));
+    expect(rider, contains('onPlaceTap: booking ? _handlePlaceTap : null'));
     expect(rider, contains('selectPlaceId(field, place.placeId)'));
   });
 

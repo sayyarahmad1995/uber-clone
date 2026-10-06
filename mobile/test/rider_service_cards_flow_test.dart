@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:uber_clone/core/maps/ride_map.dart';
 import 'package:uber_clone/core/providers.dart';
 import 'package:uber_clone/features/rider_request/data/ride_service_repository.dart';
 import 'package:uber_clone/features/rider_request/data/route_preview_repository.dart';
@@ -30,11 +31,18 @@ void main() {
     expect(find.byKey(const Key('pickupSearchField')), findsNothing);
     expect(find.byKey(const Key('fareField')), findsNothing);
     expect(find.byKey(const Key('requestRideButton')), findsNothing);
+    final chooserMap = tester.widget<RideMap>(find.byType(RideMap));
+    expect(chooserMap.onTap, isNull);
+    expect(chooserMap.onPlaceTap, isNull);
+    expect(chooserMap.showCenterPin, isFalse);
 
     await tester.tap(find.byKey(const Key('ride-service-card-economy')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('selectedRideService')), findsOneWidget);
     expect(find.byKey(const Key('changeRideServiceButton')), findsOneWidget);
+    final bookingMap = tester.widget<RideMap>(find.byType(RideMap));
+    expect(bookingMap.onTap, isNotNull);
+    expect(bookingMap.onPlaceTap, isNotNull);
     await tester.scrollUntilVisible(
       find.byKey(const Key('pickupSearchField')),
       100,
@@ -94,6 +102,8 @@ void main() {
     list.controller!.jumpTo(list.controller!.position.maxScrollExtent);
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('fareField')), '735');
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
     list.controller!.jumpTo(list.controller!.position.minScrollExtent);
     await tester.pumpAndSettle();
     await tester.ensureVisible(
