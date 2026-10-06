@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:uber_clone/core/maps/ride_map.dart';
 import 'package:uber_clone/core/providers.dart';
 import 'package:uber_clone/features/ride_flow/ride_flow_panels.dart';
 import 'package:uber_clone/features/rider_request/data/route_preview_repository.dart';
@@ -44,11 +45,11 @@ void main() {
       tester.element(find.byType(RiderRequestScreen)),
     );
     final controller = container.read(riderRequestControllerProvider);
-    controller.setPickup(const GeoPoint(latitude: 24.86, longitude: 67.01));
-    controller.setDestination(
-      const GeoPoint(latitude: 24.90, longitude: 67.05),
-    );
+    controller.setPickup(requestedRide.pickup);
+    controller.setDestination(requestedRide.destination);
     await tester.pumpAndSettle();
+
+    expect(tester.widget<RideMap>(find.byType(RideMap)).polylines, hasLength(1));
 
     final list = tester.widget<ListView>(find.byType(ListView).first);
     list.controller!.jumpTo(list.controller!.position.maxScrollExtent);
@@ -69,6 +70,24 @@ void main() {
       const Money(amountMinor: 70000, currency: 'PKR'),
     );
     expect(controller.state.active?.id, 'ride-1');
+    final bookedMap = tester.widget<RideMap>(find.byType(RideMap));
+    expect(bookedMap.polylines, hasLength(1));
+    expect(bookedMap.polylines.single.points, hasLength(3));
+    expect(bookedMap.polylines.single.points.first.latitude, 38.5);
+    expect(bookedMap.onTap, isNull);
+    expect(bookedMap.onPlaceTap, isNull);
+
+    // An unrelated restored request must not display the previous draft route.
+    repository.requests = [
+      requestedRide.copyWith(
+        id: 'other-ride',
+        destination: const GeoPoint(latitude: 25, longitude: 68),
+      ),
+    ];
+    await controller.load();
+    await tester.pumpAndSettle();
+    expect(controller.state.active?.id, 'other-ride');
+    expect(tester.widget<RideMap>(find.byType(RideMap)).polylines, isEmpty);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 }
