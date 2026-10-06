@@ -57,15 +57,17 @@ void main() {
     expect(controller.serviceCode, 'economy');
     await tester.enterText(find.byKey(const Key('fareField')), '700');
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('requestRideButton')));
+    await tester.ensureVisible(find.byKey(const Key('requestRideButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('requestRideButton')).hitTestable());
     await tester.pumpAndSettle();
 
+    expect(find.text('Choose an available ride service.'), findsNothing);
     expect(
       repository.submittedFare,
       const Money(amountMinor: 70000, currency: 'PKR'),
     );
     expect(controller.state.active?.id, 'ride-1');
-    expect(find.text('Choose an available ride service.'), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 }
