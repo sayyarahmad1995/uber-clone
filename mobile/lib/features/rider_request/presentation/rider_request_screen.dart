@@ -16,6 +16,8 @@ import '../application/rider_request_controller.dart';
 import '../domain/place_search.dart';
 import '../domain/ride_request.dart';
 import '../domain/route_preview.dart';
+import '../domain/ride_service.dart';
+import 'rider_service_cards.dart';
 
 class RiderRequestScreen extends ConsumerStatefulWidget {
   const RiderRequestScreen({super.key});
@@ -33,6 +35,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
   bool _selectingPickup = true;
   bool _pinSelectionMode = false;
   String? _lastFittedRouteKey;
+  RideService? _selectedService;
 
   @override
   void initState() {
@@ -76,7 +79,8 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
   Future<void> _submit() async {
     final services = ref.read(riderServicesProvider).asData?.value;
     final selected = ref.read(riderRequestControllerProvider).serviceCode;
-    if (services == null ||
+    if (_selectedService?.code != selected ||
+        services == null ||
         !services.any((service) => service.code == selected)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Choose an available ride service.')),
@@ -113,15 +117,47 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
 
   @override
   Widget build(BuildContext context) {
-    // Keep the catalog available when the lazy service picker scrolls offscreen.
-    ref.watch(riderServicesProvider);
+    // The screen owns catalog availability throughout selection and booking.
+    final catalog = ref.watch(riderServicesProvider);
+    ref.listen(riderServicesProvider, (previous, next) {
+      final services = next.asData?.value;
+      final selected = _selectedService;
+      if (services != null &&
+          selected != null &&
+          !services.any((service) => service.code == selected.code)) {
+        _changeService();
+      }
+    });
+    ref.listen(riderRequestControllerProvider, (previous, next) {
+      if (previous != null && !identical(previous, next)) {
+        _fare.clear();
+        _pickupSearch.clear();
+        _destinationSearch.clear();
+        setState(() {
+          _selectedService = null;
+          _pinSelectionMode = false;
+        });
+      } else if (next.state.active != null && _selectedService != null) {
+        setState(() {
+          _selectedService = null;
+          _pinSelectionMode = false;
+        });
+      }
+    });
     final controller = ref.watch(riderRequestControllerProvider);
+    final services = catalog.asData?.value;
+    final selectedService = services == null
+        ? _selectedService
+        : services
+              .where((service) => service.code == _selectedService?.code)
+              .firstOrNull;
     final state = controller.state;
     final active = state.active;
     final placeState = ref.watch(riderPlaceSearchControllerProvider).state;
     final routeState = ref.watch(riderRoutePreviewControllerProvider).state;
-    final routePreview = active == null ? routeState.preview : null;
-    _scheduleRouteFit(routePreview);
+    final booking = active == null && selectedService != null;
+    final routePreview = booking ? routeState.preview : null;
+    _scheduleRouteFit(active == null ? routeState.preview : null);
     final driverLocation = active == null
         ? null
         : freshDriverLocation(
@@ -135,7 +171,9 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
       panelIdentity: state.loading && state.requests.isEmpty
           ? 'rider-loading'
           : active == null
-          ? 'rider-request-form'
+          ? selectedService == null
+                ? 'rider-service-selection'
+                : 'rider-request-form'
           : 'rider-active-${active.id}',
       minPanelSize: 0.18,
       initialPanelSize: 0.18,
@@ -165,14 +203,14 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
                 ),
               ]
             : const [],
-        onTap: active == null ? _handleMapTap : null,
-        onPlaceTap: active == null ? _handlePlaceTap : null,
-        showCenterPin: active == null && _pinSelectionMode,
+        onTap: booking ? _handleMapTap : null,
+        onPlaceTap: booking ? _handlePlaceTap : null,
+        showCenterPin: booking && _pinSelectionMode,
         centerPinColor: _selectingPickup ? AppColors.success : AppColors.danger,
       ),
       mapControls: _RiderMapControls(
         onFocus: _focusCurrentLocation,
-        pinSelectionMode: active == null && _pinSelectionMode,
+        pinSelectionMode: booking && _pinSelectionMode,
         selectingPickup: _selectingPickup,
         resolving: active == null && placeState.field(_selectedField).resolving,
         onConfirmPin: _confirmPinSelection,
@@ -181,7 +219,9 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
         icon: active == null ? Icons.map_outlined : Icons.local_taxi,
         title: active == null ? 'Ride dashboard' : 'Active ride request',
         message: active == null
-            ? _pinSelectionMode
+            ? !booking
+                  ? 'Choose a service to plan your ride.'
+                  : _pinSelectionMode
                   ? 'Move the map under the pin and confirm, or tap a labeled place to select it directly.'
                   : 'Search, tap a labeled place, tap the map, or use Set on map.'
             : 'Status updates appear in the ride panel below.',
@@ -192,7 +232,8 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
           scrollEnabled: scrollEnabled,
           state: state,
           active: active,
-          controller: controller,
+          catalog: catalog,
+          selectedService: selectedService,
           placeState: placeState,
           routeState: routeState,
         );
@@ -205,7 +246,8 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     required bool scrollEnabled,
     required RiderRequestState state,
     required RideRequest? active,
-    required RiderRequestController controller,
+    required AsyncValue<List<RideService>> catalog,
+    required RideService? selectedService,
     required RiderPlaceSearchState placeState,
     required RiderRoutePreviewState routeState,
   }) {
@@ -216,10 +258,23 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
       );
     }
     if (active == null) {
+      if (selectedService == null) {
+        return RiderServiceCards(
+          scrollController: scrollController,
+          scrollEnabled: scrollEnabled,
+          catalog: catalog,
+          onSelected: _chooseService,
+          onRetry: () => ref.invalidate(riderServicesProvider),
+        );
+      }
       return _RequestRidePanel(
         scrollController: scrollController,
         scrollEnabled: scrollEnabled,
         fare: _fare,
+        service: selectedService,
+        catalog: catalog,
+        onChangeService: _changeService,
+        onRetryServices: () => ref.invalidate(riderServicesProvider),
         pickupSearch: _pickupSearch,
         destinationSearch: _destinationSearch,
         state: state,
@@ -241,6 +296,28 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
       scrollEnabled: scrollEnabled,
       request: active,
     );
+  }
+
+  void _chooseService(RideService service) {
+    final services = ref.read(riderServicesProvider).asData?.value;
+    if (services == null ||
+        !services.any((available) => available.code == service.code)) {
+      return;
+    }
+    ref.read(riderRequestControllerProvider).selectService(service.code);
+    setState(() {
+      _selectedService = service;
+      _pinSelectionMode = false;
+    });
+  }
+
+  void _changeService() {
+    FocusScope.of(context).unfocus();
+    ref.read(riderRequestControllerProvider).selectService('');
+    setState(() {
+      _selectedService = null;
+      _pinSelectionMode = false;
+    });
   }
 
   RiderPlaceField get _selectedField =>
@@ -539,6 +616,10 @@ class _RequestRidePanel extends StatelessWidget {
     required this.scrollController,
     required this.scrollEnabled,
     required this.fare,
+    required this.service,
+    required this.catalog,
+    required this.onChangeService,
+    required this.onRetryServices,
     required this.pickupSearch,
     required this.destinationSearch,
     required this.state,
@@ -558,6 +639,10 @@ class _RequestRidePanel extends StatelessWidget {
   final ScrollController scrollController;
   final bool scrollEnabled;
   final TextEditingController fare;
+  final RideService service;
+  final AsyncValue<List<RideService>> catalog;
+  final VoidCallback onChangeService;
+  final VoidCallback onRetryServices;
   final TextEditingController pickupSearch;
   final TextEditingController destinationSearch;
   final RiderRequestState state;
@@ -593,7 +678,38 @@ class _RequestRidePanel extends StatelessWidget {
           'Choose pickup and destination, then propose the fare you want to pay.',
         ),
         const SizedBox(height: AppSpacing.sm),
-        const RiderServicePicker(),
+        Card(
+          key: const Key('selectedRideService'),
+          child: ListTile(
+            leading: Icon(rideServiceIcon(service.presentationToken)),
+            title: Text(service.displayName),
+            subtitle: service.description.isEmpty
+                ? null
+                : Text(service.description),
+            trailing: DashboardPanelControl(
+              child: TextButton(
+                key: const Key('changeRideServiceButton'),
+                onPressed: state.submitting ? null : onChangeService,
+                child: const Text('Change'),
+              ),
+            ),
+          ),
+        ),
+        if (catalog.isLoading)
+          const LinearProgressIndicator()
+        else if (catalog.hasError)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Unable to verify ride services.'),
+              DashboardPanelControl(
+                child: TextButton(
+                  onPressed: onRetryServices,
+                  child: const Text('Retry'),
+                ),
+              ),
+            ],
+          ),
         DashboardPanelControl(
           child: SegmentedButton<bool>(
             segments: const [

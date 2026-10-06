@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uber_clone/core/providers.dart';
-import 'package:uber_clone/features/ride_flow/ride_flow_panels.dart';
 import 'package:uber_clone/features/rider_request/data/route_preview_repository.dart';
 import 'package:uber_clone/features/rider_request/domain/ride_request.dart';
 import 'package:uber_clone/features/rider_request/domain/route_preview.dart';
@@ -11,7 +10,7 @@ import 'package:uber_clone/features/rider_request/presentation/rider_request_scr
 import 'test_doubles.dart';
 
 void main() {
-  testWidgets('preselected service can submit after its picker scrolls away', (
+  testWidgets('selected service can submit after its summary scrolls away', (
     tester,
   ) async {
     final repository = FakeRideRequestRepository();
@@ -39,6 +38,8 @@ void main() {
       const Offset(0, -400),
     );
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('ride-service-card-economy')));
+    await tester.pumpAndSettle();
     expect(find.text('Economy'), findsOneWidget);
     final container = ProviderScope.containerOf(
       tester.element(find.byType(RiderRequestScreen)),
@@ -53,7 +54,7 @@ void main() {
     final list = tester.widget<ListView>(find.byType(ListView).first);
     list.controller!.jumpTo(list.controller!.position.maxScrollExtent);
     await tester.pumpAndSettle();
-    expect(find.byType(RiderServicePicker), findsNothing);
+    expect(find.byKey(const Key('selectedRideService')), findsNothing);
     expect(controller.serviceCode, 'economy');
     expect(container.read(riderServicesProvider).asData?.value, isNotNull);
     await tester.enterText(find.byKey(const Key('fareField')), '700');

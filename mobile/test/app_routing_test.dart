@@ -526,6 +526,19 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(location.requestCount, 1);
+    expect(find.text('Choose your ride'), findsOneWidget);
+    await tester.drag(
+      find.byKey(const Key('dashboardPanelDragHandle')),
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('ride-service-card-economy')));
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byKey(const Key('dashboardPanelDragHandle')),
+      const Offset(0, 300),
+    );
+    await tester.pumpAndSettle();
     final panel = find.byKey(const Key('dashboardPanel'));
     final dashboardHeight = tester
         .getSize(find.byType(RideDashboardScaffold))

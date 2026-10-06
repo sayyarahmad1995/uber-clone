@@ -50,11 +50,18 @@ void main() {
     final list = tester.widget<ListView>(find.byType(ListView).first);
     list.controller!.jumpTo(list.controller!.position.maxScrollExtent);
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byKey(const Key('ride-service-card-third_car')));
-    await tester.tap(find.byKey(const Key('ride-service-card-third_car')).hitTestable());
+    await tester.ensureVisible(
+      find.byKey(const Key('ride-service-card-third_car')),
+    );
+    await tester.tap(
+      find.byKey(const Key('ride-service-card-third_car')).hitTestable(),
+    );
     await tester.pumpAndSettle();
 
-    expect(container.read(riderRequestControllerProvider).serviceCode, 'third_car');
+    expect(
+      container.read(riderRequestControllerProvider).serviceCode,
+      'third_car',
+    );
     expect(find.text('Third category'), findsOneWidget);
     expect(find.byKey(const Key('pickupSearchField')), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -73,20 +80,34 @@ void main() {
     controller.setPickup(pickup, placeId: 'pickup-place');
     controller.setDestination(destination, placeId: 'destination-place');
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('changeRideServiceButton')));
+    final list = tester.widget<ListView>(find.byType(ListView).first);
+    list.controller!.jumpTo(list.controller!.position.maxScrollExtent);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('fareField')), '735');
+    await tester.ensureVisible(find.byKey(const Key('changeRideServiceButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('changeRideServiceButton')).hitTestable());
     await tester.pumpAndSettle();
     expect(find.text('Choose your ride'), findsOneWidget);
     expect(find.byKey(const Key('pickupSearchField')), findsNothing);
     expect(controller.state.pickup, pickup);
     expect(controller.state.destination, destination);
 
-    await tester.ensureVisible(find.byKey(const Key('ride-service-card-comfort')));
-    await tester.tap(find.byKey(const Key('ride-service-card-comfort')).hitTestable());
+    await tester.ensureVisible(
+      find.byKey(const Key('ride-service-card-comfort')),
+    );
+    await tester.tap(
+      find.byKey(const Key('ride-service-card-comfort')).hitTestable(),
+    );
     await tester.pumpAndSettle();
     expect(controller.serviceCode, 'comfort');
     expect(controller.state.pickupPlaceId, 'pickup-place');
     expect(controller.state.destinationPlaceId, 'destination-place');
     expect(routes.services, ['economy', 'comfort']);
+    final bookingList = tester.widget<ListView>(find.byType(ListView).first);
+    bookingList.controller!.jumpTo(bookingList.controller!.position.maxScrollExtent);
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byKey(const Key('fareField'))).controller!.text, '735');
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -100,7 +121,9 @@ void main() {
     final controller = container.read(riderRequestControllerProvider);
     const pickup = GeoPoint(latitude: 24.86, longitude: 67.01);
     controller.setPickup(pickup);
-    catalog.services = catalog.services.where((s) => s.code == 'comfort').toList();
+    catalog.services = catalog.services
+        .where((s) => s.code == 'comfort')
+        .toList();
     container.invalidate(riderServicesProvider);
     await tester.pumpAndSettle();
 
@@ -112,7 +135,9 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('empty catalog offers retry without a booking form', (tester) async {
+  testWidgets('empty catalog offers retry without a booking form', (
+    tester,
+  ) async {
     final catalog = _Catalog([]);
     final container = await _pumpDashboard(tester, catalog: catalog);
     expect(find.text('No ride services currently available.'), findsOneWidget);
@@ -125,7 +150,9 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('catalog failure can be retried before selecting a service', (tester) async {
+  testWidgets('catalog failure can be retried before selecting a service', (
+    tester,
+  ) async {
     final catalog = _Catalog(FakeRideServiceRepository().services)..fail = true;
     await _pumpDashboard(tester, catalog: catalog);
     expect(find.text('Unable to load ride services.'), findsOneWidget);
@@ -134,6 +161,21 @@ void main() {
     await tester.tap(find.text('Retry'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('ride-service-card-economy')), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('controller replacement resets service choice and booking inputs', (tester) async {
+    final container = await _pumpDashboard(tester);
+    await tester.tap(find.byKey(const Key('ride-service-card-economy')));
+    await tester.pumpAndSettle();
+    container.read(riderRequestControllerProvider).setPickup(
+      const GeoPoint(latitude: 24.86, longitude: 67.01),
+    );
+    container.invalidate(riderRequestControllerProvider);
+    await tester.pumpAndSettle();
+    expect(find.text('Choose your ride'), findsOneWidget);
+    expect(find.byKey(const Key('selectedRideService')), findsNothing);
+    expect(container.read(riderRequestControllerProvider).state.pickup, isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 }
@@ -148,7 +190,9 @@ Future<ProviderContainer> _pumpDashboard(
       overrides: [
         authRepositoryProvider.overrideWithValue(FakeAuthRepository()),
         capabilityStoreProvider.overrideWithValue(MemoryCapabilityStore()),
-        rideRequestRepositoryProvider.overrideWithValue(FakeRideRequestRepository()),
+        rideRequestRepositoryProvider.overrideWithValue(
+          FakeRideRequestRepository(),
+        ),
         riderServiceRepositoryProvider.overrideWithValue(
           catalog ?? _Catalog(FakeRideServiceRepository().services),
         ),
@@ -165,7 +209,9 @@ Future<ProviderContainer> _pumpDashboard(
     const Offset(0, -400),
   );
   await tester.pumpAndSettle();
-  return ProviderScope.containerOf(tester.element(find.byType(RiderRequestScreen)));
+  return ProviderScope.containerOf(
+    tester.element(find.byType(RiderRequestScreen)),
+  );
 }
 
 class _Catalog implements RideServiceRepository {
