@@ -34,8 +34,13 @@ void main() {
     await tester.tap(find.byKey(const Key('ride-service-card-economy')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('selectedRideService')), findsOneWidget);
-    expect(find.byKey(const Key('pickupSearchField')), findsOneWidget);
     expect(find.byKey(const Key('changeRideServiceButton')), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('pickupSearchField')),
+      100,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.byKey(const Key('pickupSearchField')), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -63,6 +68,11 @@ void main() {
       'third_car',
     );
     expect(find.text('Third category'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('pickupSearchField')),
+      100,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.byKey(const Key('pickupSearchField')), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -84,9 +94,15 @@ void main() {
     list.controller!.jumpTo(list.controller!.position.maxScrollExtent);
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('fareField')), '735');
-    await tester.ensureVisible(find.byKey(const Key('changeRideServiceButton')));
+    list.controller!.jumpTo(list.controller!.position.minScrollExtent);
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('changeRideServiceButton')).hitTestable());
+    await tester.ensureVisible(
+      find.byKey(const Key('changeRideServiceButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('changeRideServiceButton')).hitTestable(),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Choose your ride'), findsOneWidget);
     expect(find.byKey(const Key('pickupSearchField')), findsNothing);
@@ -105,9 +121,17 @@ void main() {
     expect(controller.state.destinationPlaceId, 'destination-place');
     expect(routes.services, ['economy', 'comfort']);
     final bookingList = tester.widget<ListView>(find.byType(ListView).first);
-    bookingList.controller!.jumpTo(bookingList.controller!.position.maxScrollExtent);
+    bookingList.controller!.jumpTo(
+      bookingList.controller!.position.maxScrollExtent,
+    );
     await tester.pumpAndSettle();
-    expect(tester.widget<TextField>(find.byKey(const Key('fareField'))).controller!.text, '735');
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('fareField')))
+          .controller!
+          .text,
+      '735',
+    );
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -164,20 +188,26 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('controller replacement resets service choice and booking inputs', (tester) async {
-    final container = await _pumpDashboard(tester);
-    await tester.tap(find.byKey(const Key('ride-service-card-economy')));
-    await tester.pumpAndSettle();
-    container.read(riderRequestControllerProvider).setPickup(
-      const GeoPoint(latitude: 24.86, longitude: 67.01),
-    );
-    container.invalidate(riderRequestControllerProvider);
-    await tester.pumpAndSettle();
-    expect(find.text('Choose your ride'), findsOneWidget);
-    expect(find.byKey(const Key('selectedRideService')), findsNothing);
-    expect(container.read(riderRequestControllerProvider).state.pickup, isNull);
-    await tester.pumpWidget(const SizedBox.shrink());
-  });
+  testWidgets(
+    'controller replacement resets service choice and booking inputs',
+    (tester) async {
+      final container = await _pumpDashboard(tester);
+      await tester.tap(find.byKey(const Key('ride-service-card-economy')));
+      await tester.pumpAndSettle();
+      container
+          .read(riderRequestControllerProvider)
+          .setPickup(const GeoPoint(latitude: 24.86, longitude: 67.01));
+      container.invalidate(riderRequestControllerProvider);
+      await tester.pumpAndSettle();
+      expect(find.text('Choose your ride'), findsOneWidget);
+      expect(find.byKey(const Key('selectedRideService')), findsNothing);
+      expect(
+        container.read(riderRequestControllerProvider).state.pickup,
+        isNull,
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 }
 
 Future<ProviderContainer> _pumpDashboard(

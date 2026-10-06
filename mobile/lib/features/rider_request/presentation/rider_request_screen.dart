@@ -136,6 +136,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
         setState(() {
           _selectedService = null;
           _pinSelectionMode = false;
+          _selectingPickup = true;
         });
       } else if (next.state.active != null && _selectedService != null) {
         setState(() {

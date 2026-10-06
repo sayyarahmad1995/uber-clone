@@ -56,6 +56,20 @@ Record test date, current branch/SHA, Android app build and device/version, envi
 - [ ] Restart, background/foreground, provider timeout and transient network loss never display a stale fare as current or strand an active Trip.
 - [ ] Disable a service after an assignment: no new requests may use it, but the existing Trip can finish and its immutable service/amount/history remain readable.
 
+## Service-first Rider dashboard
+
+Physical Android validation remains required for the service-card flow:
+
+- [ ] On a fresh Rider dashboard without an active request, only the service chooser is shown in the panel. Pickup, destination, fare and request controls appear only after explicit card selection.
+- [ ] Select Economy and Comfort separately; each booking form shows the selected service and a Change action. No dropdown or automatic service selection is used.
+- [ ] Publish, rename, reorder and disable a compatible test service in the backend catalog. Cards reflect the next catalog refresh without rebuilding the installed client; unknown presentation tokens use a generic icon.
+- [ ] Enter pickup, destination and a manual fare, then Change the service. Coordinates, explicit Place IDs and the manual fare survive; the previous route is invalidated and the newly chosen service receives a fresh preview.
+- [ ] Disable the chosen service while the booking form is scrolled to the fare. After refresh the form returns to service cards; the disabled service cannot submit a new request.
+- [ ] Empty catalogs, loading and network errors have clear retry states. A transient refresh error does not erase the booking draft.
+- [ ] Scroll the selected-service summary out of view, enter a fare and Request ride; the catalog remains available and a valid selected service submits successfully.
+- [ ] Map taps and POI selection do not edit booking locations before service selection. Choosing and changing services preserve the dashboard's panel extent, scroll handoff and camera rules.
+- [ ] Reopening with an active ride restores its operational panel directly. Logging out or changing accounts resets service selection and draft text.
+
 ## Validation gate
 
 Before each PR merges, use the existing Readiness workflow on its exact head: Go formatting/vet/PostgreSQL tests and Flutter format/build-runner/drift/analyze/full tests. Android map/plugin PRs also require physical build/device checks. Do not call the expanded booking flow pilot-ready until this matrix **and** the existing cash-loop gate are recorded as passed. Any failed critical case becomes the next fix.

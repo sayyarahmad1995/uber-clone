@@ -63,53 +63,61 @@ class RiderServiceCards extends StatelessWidget {
               return [
                 const Text('No ride services currently available.'),
                 DashboardPanelControl(
-                  child: TextButton(onPressed: onRetry, child: const Text('Retry')),
+                  child: TextButton(
+                    onPressed: onRetry,
+                    child: const Text('Retry'),
+                  ),
                 ),
               ];
             }
-            return services.map((service) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                child: DashboardPanelControl(
-                  child: Card.outlined(
-                    child: InkWell(
-                      key: ValueKey('ride-service-card-${service.code}'),
-                      borderRadius: BorderRadius.circular(AppRadii.lg),
-                      onTap: () => onSelected(service),
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.md),
-                        child: Row(
-                          children: [
-                            Icon(
-                              rideServiceIcon(service.presentationToken),
-                              size: 32,
-                            ),
-                            const SizedBox(width: AppSpacing.md),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    service.displayName,
-                                    style: Theme.of(context).textTheme.titleMedium,
+            return services
+                .map((service) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: DashboardPanelControl(
+                      child: Card.outlined(
+                        child: InkWell(
+                          key: ValueKey('ride-service-card-${service.code}'),
+                          borderRadius: BorderRadius.circular(AppRadii.lg),
+                          onTap: () => onSelected(service),
+                          child: Padding(
+                            padding: const EdgeInsets.all(AppSpacing.md),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  rideServiceIcon(service.presentationToken),
+                                  size: 32,
+                                ),
+                                const SizedBox(width: AppSpacing.md),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        service.displayName,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium,
+                                      ),
+                                      if (service.description.isNotEmpty) ...[
+                                        const SizedBox(height: AppSpacing.xxs),
+                                        Text(service.description),
+                                      ],
+                                    ],
                                   ),
-                                  if (service.description.isNotEmpty) ...[
-                                    const SizedBox(height: AppSpacing.xxs),
-                                    Text(service.description),
-                                  ],
-                                ],
-                              ),
+                                ),
+                                const SizedBox(width: AppSpacing.xs),
+                                const Icon(Icons.chevron_right),
+                              ],
                             ),
-                            const SizedBox(width: AppSpacing.xs),
-                            const Icon(Icons.chevron_right),
-                          ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ),
-              );
-            }).toList(growable: false);
+                  );
+                })
+                .toList(growable: false);
           },
         ),
       ],

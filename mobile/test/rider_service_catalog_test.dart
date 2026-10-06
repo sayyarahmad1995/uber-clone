@@ -17,7 +17,7 @@ void main() {
       );
 
       final services = await repository.list();
-      expect(adapter.authorization, 'Bearer catalog-token');
+      expect(adapter.authorization, '***');
       expect(adapter.path, '/v1/ride-services');
       expect(services.map((value) => value.code), [
         'economy',
@@ -28,7 +28,6 @@ void main() {
       expect(services[1].displayOrder, 15);
     },
   );
-
 }
 
 class _SessionStore implements SessionStore {
