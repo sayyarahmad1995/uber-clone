@@ -30,7 +30,7 @@ void main() {
             FakeRideFlowRepository(),
           ),
         ],
-        child: const MaterialApp(home: RiderRequestScreen()),
+        child: const MaterialApp(home: Scaffold(body: RiderRequestScreen())),
       ),
     );
     await tester.pumpAndSettle();
@@ -55,6 +55,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(RiderServicePicker), findsNothing);
     expect(controller.serviceCode, 'economy');
+    expect(container.read(riderServicesProvider).asData?.value, isNotNull);
     await tester.enterText(find.byKey(const Key('fareField')), '700');
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.byKey(const Key('requestRideButton')));
