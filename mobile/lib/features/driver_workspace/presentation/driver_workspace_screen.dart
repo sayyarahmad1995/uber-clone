@@ -315,7 +315,7 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
   void _scheduleRouteFit(DriverRouteState route, String? rideRequestId) {
     final preview = route.preview;
     if (preview == null) {
-      _lastFittedRouteKey = null;
+      if (route.status == null) _lastFittedRouteKey = null;
       return;
     }
     final key = '$rideRequestId|${route.status}|${preview.encodedPolyline}';

@@ -56,6 +56,20 @@ Record test date, current branch/SHA, Android app build and device/version, envi
 - [ ] Restart, background/foreground, provider timeout and transient network loss never display a stale fare as current or strand an active Trip.
 - [ ] Disable a service after an assignment: no new requests may use it, but the existing Trip can finish and its immutable service/amount/history remain readable.
 
+## Driver trip route stages
+
+Physical Android validation remains pending for the Driver route endpoint and map:
+
+- [ ] Deploy the backend from the Driver route branch before testing the updated app.
+- [ ] Select a Driver from the Rider app. The assigned Driver sees a Google road route from a fresh device location to the trip pickup.
+- [ ] Start trip. The pickup route is replaced by pickup-to-destination, using the server-owned current trip endpoints.
+- [ ] Complete or cancel the trip. The driving line disappears, including completed trips still awaiting cash settlement.
+- [ ] Restore the app with an assigned or in-progress trip. The correct stage route is requested again.
+- [ ] Test GPS permission failure, provider timeout/no route and Retry. No straight line is substituted for a failed driving route.
+- [ ] Delay the pickup response, then Start trip or cancel. A late response cannot restore the previous route.
+- [ ] Pan or zoom the map, allow unchanged trip polls and resume/refresh the same route. The camera is not repeatedly reset; a new trip or stage can fit its new route.
+- [ ] Check the Driver panel extent and scroll/drag handoff with the route and Retry control visible.
+
 ## Validation gate
 
 Before each PR merges, use the existing Readiness workflow on its exact head: Go formatting/vet/PostgreSQL tests and Flutter format/build-runner/drift/analyze/full tests. Android map/plugin PRs also require physical build/device checks. Do not call the expanded booking flow pilot-ready until this matrix **and** the existing cash-loop gate are recorded as passed. Any failed critical case becomes the next fix.

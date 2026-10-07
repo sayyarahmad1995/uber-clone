@@ -48,18 +48,5 @@ jobs:
               echo "FORMAT_END $path"
             fi
           done
-      - name: Trace route failures and run focused tests
+      - run: flutter test test/driver_route_map_test.dart
         working-directory: mobile
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path('lib/features/driver_workspace/application/driver_route_controller.dart')
-          source = path.read_text()
-          source = source.replace('} catch (error) {', '} catch (error, stack) {\n      debugPrint("DRIVER_ROUTE_ERROR: $error\\n$stack");')
-          path.write_text(source)
-          path = Path('lib/features/driver_workspace/data/driver_route_repository.dart')
-          source = path.read_text()
-          source = source.replace('if (CancelToken.isCancel(error)) {', 'print("DIO_ROUTE_FAILURE: " + error.type.toString() + " " + error.error.toString() + " " + error.message.toString());\n      if (CancelToken.isCancel(error)) {')
-          path.write_text(source)
-          PY
-          flutter test test/driver_route_map_test.dart

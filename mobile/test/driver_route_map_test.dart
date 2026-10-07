@@ -12,6 +12,8 @@ import 'package:uber_clone/features/driver_workspace/presentation/driver_workspa
 import 'package:uber_clone/features/ride_flow/domain/marketplace_request.dart';
 import 'package:uber_clone/features/ride_flow/domain/ride_execution.dart';
 import 'package:uber_clone/features/ride_flow/domain/trip.dart';
+import 'package:uber_clone/features/rider_request/data/device_location.dart';
+import 'package:uber_clone/features/rider_request/domain/ride_request.dart' show GeoPoint;
 
 import 'test_doubles.dart';
 
@@ -24,6 +26,10 @@ void main() {
       final container = await _pump(tester, flow, routes);
       expect(_map(tester).polylines, hasLength(1));
       expect(_map(tester).polylines.single.points.first.latitude, 38.5);
+      expect(routes.received.single.path, '/v1/driver/trip/route-preview');
+      expect(routes.received.single.method, 'POST');
+      expect(routes.received.single.headers['Authorization'],
+          ['Bearer', 'route-test'].join(' '));
       expect(routes.requests.single['status'], 'assigned');
       expect(routes.requests.single['origin'], {
         'latitude': 24.86,
@@ -40,6 +46,8 @@ void main() {
       expect(container.read(driverRouteControllerProvider).state.error, isNull);
       expect(container.read(driverRouteControllerProvider).state.loading, isFalse);
       expect(routes.requests.last['status'], 'in_progress');
+      expect(routes.received.last.headers['Authorization'],
+          ['Bearer', 'route-test'].join(' '));
       expect(routes.requests.last.containsKey('origin'), isFalse);
       expect(_map(tester).polylines, hasLength(1));
       expect(_map(tester).polylines.single.points.first.latitude, 0);
@@ -96,6 +104,36 @@ void main() {
     },
   );
 
+  testWidgets('late GPS cannot start a pickup route after Start trip', (
+    tester,
+  ) async {
+    final location = _DelayedLocation();
+    final routes = _Routes();
+    final container = await _pump(tester, _Flow(), routes, location: location);
+    expect(routes.requests, isEmpty);
+    await container.read(driverTripControllerProvider).startTrip('ride-1');
+    await tester.pumpAndSettle();
+    expect(_map(tester).polylines.single.points.first.latitude, 0);
+    location.reply.complete(const GeoPoint(latitude: 24.86, longitude: 67.01));
+    await tester.pumpAndSettle();
+    expect(routes.requests, hasLength(1));
+    expect(routes.requests.single['status'], 'in_progress');
+    expect(_map(tester).polylines.single.points.first.latitude, 0);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('GPS failure leaves no pickup line and offers Retry', (
+    tester,
+  ) async {
+    final routes = _Routes();
+    await _pump(tester, _Flow(), routes, location: _FailedLocation());
+    expect(routes.requests, isEmpty);
+    expect(_map(tester).polylines, isEmpty);
+    expect(find.text('Location permission is required.'), findsOneWidget);
+    expect(find.byKey(const Key('driverRouteRetryButton')), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets(
     'cancelled trip clears the route without refetching unchanged stages',
     (tester) async {
@@ -120,8 +158,9 @@ RideMap _map(WidgetTester tester) =>
 Future<ProviderContainer> _pump(
   WidgetTester tester,
   _Flow flow,
-  _Routes routes,
-) async {
+  _Routes routes, {
+  DeviceLocation? location,
+}) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -141,7 +180,9 @@ Future<ProviderContainer> _pump(
         driverPresenceServiceProvider.overrideWithValue(
           FakeDriverPresenceService(),
         ),
-        deviceLocationProvider.overrideWithValue(const FakeDeviceLocation()),
+        deviceLocationProvider.overrideWithValue(
+          location ?? const FakeDeviceLocation(),
+        ),
       ],
       child: const MaterialApp(
         home: Scaffold(body: DriverWorkspaceScreen(accountID: 'user-1')),
@@ -192,6 +233,7 @@ class _Sessions implements SessionStore {
 
 class _Routes implements HttpClientAdapter {
   final requests = <Map<String, dynamic>>[];
+  final received = <RequestOptions>[];
   Completer<ResponseBody>? firstReply;
   bool fail = false;
 
@@ -201,9 +243,7 @@ class _Routes implements HttpClientAdapter {
     Stream<List<int>>? requestStream,
     Future<void>? cancelFuture,
   ) async {
-    expect(options.path, '/v1/driver/trip/route-preview');
-    expect(options.method, 'POST');
-    expect(options.headers['Authorization'], ['Bearer', 'route-test'].join(' '));
+    received.add(options);
     final data = Map<String, dynamic>.from(options.data as Map);
     requests.add(data);
     if (firstReply != null && requests.length == 1) {
@@ -240,3 +280,15 @@ ResponseBody _response(String status) => ResponseBody.fromString(
     Headers.contentTypeHeader: [Headers.jsonContentType],
   },
 );
+
+class _DelayedLocation implements DeviceLocation {
+  final reply = Completer<GeoPoint>();
+  @override
+  Future<GeoPoint> current() => reply.future;
+}
+
+class _FailedLocation implements DeviceLocation {
+  @override
+  Future<GeoPoint> current() async =>
+      throw const LocationUnavailable('Location permission is required.');
+}
