@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+
 import '../../../core/network/api_exception.dart';
 
 import '../../ride_flow/domain/ride_execution.dart';
@@ -73,7 +74,9 @@ class RiderRequestState {
     submitting: submitting ?? this.submitting,
     locating: locating ?? this.locating,
     error: clearError ? null : error ?? this.error,
-    submissionErrorCode: clearError ? null : submissionErrorCode ?? this.submissionErrorCode,
+    submissionErrorCode: clearError
+        ? null
+        : submissionErrorCode ?? this.submissionErrorCode,
   );
 }
 
@@ -173,7 +176,13 @@ class RiderRequestController extends ChangeNotifier {
       );
       return true;
     } catch (error) {
-      _set(_state.copyWith(submitting: false, error: error is ApiException ? error.message : '$error', submissionErrorCode: error is ApiException ? error.code : null));
+      _set(
+        _state.copyWith(
+          submitting: false,
+          error: error is ApiException ? error.message : '$error',
+          submissionErrorCode: error is ApiException ? error.code : null,
+        ),
+      );
       return false;
     }
   }

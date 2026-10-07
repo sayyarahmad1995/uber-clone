@@ -67,7 +67,8 @@ class ApiRideRequestRepository implements RideRequestRepository {
         options: await _options(),
         data: {
           'service_code': serviceCode,
-          if (pricingPolicyVersion != null) 'pricing_policy_version': pricingPolicyVersion,
+          if (pricingPolicyVersion != null)
+            'pricing_policy_version': pricingPolicyVersion,
           'pickup': pickup.toJson(),
           'destination': destination.toJson(),
           'proposed_fare': proposedFare.toJson(),

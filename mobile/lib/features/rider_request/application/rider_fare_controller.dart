@@ -3,7 +3,6 @@ import '../domain/route_preview.dart';
 
 /// Proposal ownership belongs to one account and one booking selection.
 class RiderFareController extends ChangeNotifier {
-  RiderFareController() { debugPrint('FARE CREATE'); }
   String? selectionKey;
   String text = '';
   bool userEdited = false;
@@ -12,7 +11,6 @@ class RiderFareController extends ChangeNotifier {
 
   void invalidate(String key) {
     if (_disposed || selectionKey == key) return;
-    debugPrint('FARE INVALIDATE $selectionKey -> $key');
     selectionKey = key;
     text = '';
     userEdited = false;
@@ -22,7 +20,6 @@ class RiderFareController extends ChangeNotifier {
 
   void applyPreview(String key, RoutePreview preview) {
     if (_disposed || key != selectionKey) return;
-    debugPrint('FARE APPLY $key edited=$userEdited text=$text');
     version = preview.pricingPolicyVersion;
     final fare = preview.suggestedFare;
     if (!userEdited && fare != null) {
@@ -33,7 +30,6 @@ class RiderFareController extends ChangeNotifier {
 
   void edit(String value) {
     if (_disposed) return;
-    debugPrint('FARE EDIT $value');
     text = value;
     userEdited = true;
     notifyListeners();

@@ -9,9 +9,11 @@ class RoutePreview {
     this.pricingPolicyVersion,
   }) : points = decodeEncodedPolyline(encodedPolyline) {
     if ((suggestedFare == null) != (pricingPolicyVersion == null) ||
-        (suggestedFare != null && (suggestedFare!.currency != 'PKR' ||
-         suggestedFare!.amountMinor <= 0 || suggestedFare!.amountMinor > 1000000000000 ||
-         pricingPolicyVersion!.trim().isEmpty))) {
+        (suggestedFare != null &&
+            (suggestedFare!.currency != 'PKR' ||
+                suggestedFare!.amountMinor <= 0 ||
+                suggestedFare!.amountMinor > 1000000000000 ||
+                pricingPolicyVersion!.trim().isEmpty))) {
       throw const FormatException('Suggested fare is invalid.');
     }
     if (distanceMeters <= 0 || durationSeconds <= 0) {
@@ -41,10 +43,15 @@ class RoutePreview {
   }
   static Money? _fare(dynamic value) {
     if (value == null) return null;
-    if (value is! Map || value['amount_minor'] is! int || value['currency'] is! String) {
+    if (value is! Map ||
+        value['amount_minor'] is! int ||
+        value['currency'] is! String) {
       throw const FormatException('Suggested fare is invalid.');
     }
-    return Money(amountMinor: value['amount_minor'] as int, currency: value['currency'] as String);
+    return Money(
+      amountMinor: value['amount_minor'] as int,
+      currency: value['currency'] as String,
+    );
   }
 }
 

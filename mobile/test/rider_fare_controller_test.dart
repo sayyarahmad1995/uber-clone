@@ -1,3 +1,7 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uber_clone/core/providers.dart';
+import 'package:uber_clone/features/rider_request/data/route_preview_repository.dart';
+import 'test_doubles.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uber_clone/features/rider_request/application/rider_fare_controller.dart';
 import 'package:uber_clone/features/rider_request/domain/ride_request.dart';
@@ -82,4 +86,58 @@ void main() {
       true,
     );
   });
+  test('account logout resets proposal ownership and ignores disposed results', () async {
+    final container = ProviderContainer(overrides: [
+      authRepositoryProvider.overrideWithValue(FakeAuthRepository(account: riderAccount)),
+      capabilityStoreProvider.overrideWithValue(MemoryCapabilityStore()),
+      driverPresenceServiceProvider.overrideWithValue(FakeDriverPresenceService()),
+      driverRepositoryProvider.overrideWithValue(FakeDriverRepository()),
+      rideFlowRepositoryProvider.overrideWithValue(FakeRideFlowRepository()),
+      rideRequestRepositoryProvider.overrideWithValue(FakeRideRequestRepository()),
+      deviceLocationProvider.overrideWithValue(const FakeDeviceLocation()),
+      riderServiceRepositoryProvider.overrideWithValue(FakeRideServiceRepository()),
+      routePreviewRepositoryProvider.overrideWithValue(_FareRoutes()),
+    ]);
+    final subscription = container.listen(riderFareControllerProvider, (_, __) {});
+    await Future<void>.delayed(Duration.zero);
+    final previous = container.read(riderFareControllerProvider);
+    previous.edit('1100');
+    await container.read(sessionControllerProvider).logout();
+    await Future<void>.delayed(Duration.zero);
+    final current = container.read(riderFareControllerProvider);
+    expect(identical(previous, current), false);
+    expect(current.text, isEmpty);
+    previous.applyPreview(previous.selectionKey ?? '', preview(99900, 'old'));
+    expect(current.version, isNull);
+    subscription.close(); container.dispose();
+  });
+  test('catalog removal invalidates fare even while the picker is absent', () async {
+    final catalog = FakeRideServiceRepository();
+    final container = ProviderContainer(overrides: [
+      authRepositoryProvider.overrideWithValue(FakeAuthRepository()),
+      capabilityStoreProvider.overrideWithValue(MemoryCapabilityStore()),
+      rideRequestRepositoryProvider.overrideWithValue(FakeRideRequestRepository()),
+      deviceLocationProvider.overrideWithValue(const FakeDeviceLocation()),
+      riderServiceRepositoryProvider.overrideWithValue(catalog),
+      routePreviewRepositoryProvider.overrideWithValue(_FareRoutes()),
+    ]);
+    final subscription = container.listen(riderFareControllerProvider, (_, __) {});
+    await container.read(riderServicesProvider.future);
+    final fare = container.read(riderFareControllerProvider);
+    fare.edit('1100');
+    catalog.services = [];
+    container.invalidate(riderServicesProvider);
+    await container.read(riderServicesProvider.future);
+    expect(container.read(riderRequestControllerProvider).serviceCode, isEmpty);
+    expect(container.read(riderFareControllerProvider).text, isEmpty);
+    expect(container.read(riderFareControllerProvider).version, isNull);
+    subscription.close(); container.dispose();
+  });
+
+}
+
+class _FareRoutes implements RoutePreviewRepository {
+  @override Future<RoutePreview> preview({required GeoPoint pickup, String? pickupPlaceId, required GeoPoint destination, String? destinationPlaceId, required String serviceCode}) async =>
+    RoutePreview(distanceMeters: 2000, durationSeconds: 300, encodedPolyline: '??_ibE_ibE', suggestedFare: const Money(amountMinor:12500,currency:'PKR'), pricingPolicyVersion:'v1');
+  @override void cancel() {}
 }

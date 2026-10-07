@@ -87,12 +87,16 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     final route = ref.read(riderRoutePreviewControllerProvider);
     final fare = ref.read(riderFareControllerProvider);
     if (service.pricingRequired &&
-        (route.state.loading || route.state.error != null ||
-         route.state.preview?.suggestedFare == null || fare.version == null ||
-         fare.selectionKey != route.selectionKey ||
-         fare.version != route.state.preview?.pricingPolicyVersion)) {
+        (route.state.loading ||
+            route.state.error != null ||
+            route.state.preview?.suggestedFare == null ||
+            fare.version == null ||
+            fare.selectionKey != route.selectionKey ||
+            fare.version != route.state.preview?.pricingPolicyVersion)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Refresh the suggested fare before requesting.')),
+        const SnackBar(
+          content: Text('Refresh the suggested fare before requesting.'),
+        ),
       );
       return;
     }
@@ -105,11 +109,13 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     }
     final controller = ref.read(riderRequestControllerProvider);
     final submitted = await controller.submit(
-      amountMinor: amount, currency: 'PKR',
+      amountMinor: amount,
+      currency: 'PKR',
       pricingPolicyVersion: route.state.preview?.pricingPolicyVersion,
     );
     if (!mounted) return;
-    if (!submitted && controller.state.submissionErrorCode == 'pricing_policy_changed') {
+    if (!submitted &&
+        controller.state.submissionErrorCode == 'pricing_policy_changed') {
       ref.invalidate(riderServicesProvider);
       await route.retry();
     }
@@ -229,7 +235,10 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
 
   void _syncFare(String text) {
     if (_fare.text == text) return;
-    _fare.value = TextEditingValue(text: text, selection: TextSelection.collapsed(offset: text.length));
+    _fare.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
   }
 
   Widget _buildPanel({
@@ -704,7 +713,9 @@ class _RequestRidePanel extends StatelessWidget {
           onRetry: onRetryRoute,
         ),
         if (routeState.preview?.suggestedFare != null)
-          Text('Suggested fare: PKR ${(routeState.preview!.suggestedFare!.amountMinor / 100).toStringAsFixed(2)}'),
+          Text(
+            'Suggested fare: PKR ${(routeState.preview!.suggestedFare!.amountMinor / 100).toStringAsFixed(2)}',
+          ),
         const SizedBox(height: AppSpacing.sm),
         DashboardPanelControl(
           child: TextField(

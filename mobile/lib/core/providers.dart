@@ -167,30 +167,28 @@ final riderRoutePreviewControllerProvider =
 final riderFareControllerProvider =
     ChangeNotifierProvider.autoDispose<RiderFareController>((ref) {
   ref.watch(sessionControllerProvider.select((s) => s.state.account?.id));
-  final rider = ref.watch(riderRequestControllerProvider.notifier);
-  final route = ref.watch(riderRoutePreviewControllerProvider.notifier);
   final fare = RiderFareController();
   void sync() {
+    final rider = ref.read(riderRequestControllerProvider);
+    final route = ref.read(riderRoutePreviewControllerProvider);
     if (rider.state.active != null) return;
     final key = route.selectionKey ?? '';
     fare.invalidate(key);
     final preview = route.state.preview;
     if (preview != null) fare.applyPreview(key, preview);
   }
-  sync();
-  rider.addListener(sync);
-  route.addListener(sync);
+  // Listen without rebuilding the proposal owner on route/request notifications.
+  ref.listen(riderRequestControllerProvider, (_, __) => sync());
+  ref.listen(riderRoutePreviewControllerProvider, (_, __) => sync());
   ref.listen(riderServicesProvider, (_, next) {
+    final rider = ref.read(riderRequestControllerProvider);
     final services = next.asData?.value;
     if (services != null && rider.state.active == null &&
         !services.any((s) => s.code == rider.serviceCode)) {
       rider.selectService('');
     }
   });
-  ref.onDispose(() {
-    rider.removeListener(sync);
-    route.removeListener(sync);
-  });
+  sync();
   return fare;
 });
 final driverRouteRepositoryProvider =
