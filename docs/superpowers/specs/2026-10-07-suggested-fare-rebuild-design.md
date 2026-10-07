@@ -1,7 +1,7 @@
 # Suggested fare rebuild and immutable Ride Request pricing snapshots
 
 Date: 2026-10-07
-Status: Written specification awaiting owner review; application implementation has not started.
+Status: Approved by the owner on 2026-10-07; implementation plan awaiting review. Application implementation has not started.
 Baseline: fix/driver-trip-route-polylines at b88e412c74c7132cb4490750afc9a79bdddf9f71.
 This is a fresh implementation. Do not restore, cherry-pick or copy the implementation from closed PR #124.
 
