@@ -73,7 +73,10 @@ class ApiRideRequestRepository implements RideRequestRepository {
           'service_code': serviceCode,
           'pricing_policy_version': ?pricingPolicyVersion,
           'pickup': {...pickup.toJson(), 'place_id': ?pickupPlaceId},
-          'destination': {...destination.toJson(), 'place_id': ?destinationPlaceId},
+          'destination': {
+            ...destination.toJson(),
+            'place_id': ?destinationPlaceId,
+          },
           'proposed_fare': proposedFare.toJson(),
         },
       );

@@ -264,7 +264,17 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
         scrollController: scrollController,
         scrollEnabled: scrollEnabled,
         fare: _fare,
-        pricingRequired: ref.read(riderServicesProvider).asData?.value.any((service) => service.code == controller.serviceCode && service.pricingRequired) ?? false,
+        pricingRequired:
+            ref
+                .read(riderServicesProvider)
+                .asData
+                ?.value
+                .any(
+                  (service) =>
+                      service.code == controller.serviceCode &&
+                      service.pricingRequired,
+                ) ??
+            false,
         onFareChanged: ref.read(riderFareControllerProvider).edit,
         pickupSearch: _pickupSearch,
         destinationSearch: _destinationSearch,
@@ -727,7 +737,9 @@ class _RequestRidePanel extends StatelessWidget {
             onChanged: pricingRequired ? null : onFareChanged,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: InputDecoration(
-              labelText: pricingRequired ? 'Suggested fare' : 'Your proposed fare',
+              labelText: pricingRequired
+                  ? 'Suggested fare'
+                  : 'Your proposed fare',
               prefixText: 'PKR ',
             ),
           ),

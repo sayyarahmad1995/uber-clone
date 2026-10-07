@@ -95,10 +95,11 @@ void main() {
     expect(tester.widget<RideMap>(find.byType(RideMap)).polylines, isEmpty);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+  for (final conflictCode in ['pricing_policy_changed', 'suggested_fare_changed']) {
   testWidgets(
-    'priced booking is read-only and requires explicit resubmit after rate conflict',
+    'priced booking is read-only and explicitly resubmits after $conflictCode',
     (tester) async {
-      final requests = _ConflictRequests();
+      final requests = _ConflictRequests(conflictCode);
       final routes = _PricedRoutes();
       await tester.pumpWidget(
         ProviderScope(
@@ -205,6 +206,8 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+
+  }
 
   testWidgets(
     'changing service clears the old proposal and fits the new suggestion',
@@ -324,6 +327,8 @@ class _PricedRoutes implements RoutePreviewRepository {
 }
 
 class _ConflictRequests extends FakeRideRequestRepository {
+  _ConflictRequests(this.conflictCode);
+  final String conflictCode;
   int attempts = 0;
   String? version;
   @override
@@ -339,8 +344,8 @@ class _ConflictRequests extends FakeRideRequestRepository {
     attempts++;
     version = pricingPolicyVersion;
     if (attempts == 1) {
-      throw const ApiException(
-        'pricing_policy_changed',
+      throw ApiException(
+        conflictCode,
         'Rates changed. Refresh the suggestion and submit again.',
         statusCode: 409,
       );

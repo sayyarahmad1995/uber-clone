@@ -216,12 +216,11 @@ func TestReadOnlySuggestedFareHTTP(t *testing.T) {
 	}
 }
 
-
 type readOnlyRouteSpy struct {
-	calls int
-	pickup routing.Endpoint
+	calls       int
+	pickup      routing.Endpoint
 	destination routing.Endpoint
-	err error
+	err         error
 }
 
 func (s *readOnlyRouteSpy) Preview(_ context.Context, pickup, destination routing.Endpoint) (routing.Route, error) {

@@ -9,13 +9,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/pricing"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/ride"
-	"github.com/sayyarahmad1995/uber-clone/backend/internal/routing"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/ridestatus"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/routing"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/trip"
 )
 
 type rideLocationRequest struct {
-	PlaceID string `json:"place_id,omitempty"`
+	PlaceID   string   `json:"place_id,omitempty"`
 	Latitude  *float64 `json:"latitude"`
 	Longitude *float64 `json:"longitude"`
 }

@@ -34,7 +34,10 @@ void main() {
         'longitude': 67.0011,
         'place_id': 'pickup-poi',
       });
-      expect((adapter.body?['destination'] as Map)['place_id'], 'destination-poi');
+      expect(
+        (adapter.body?['destination'] as Map)['place_id'],
+        'destination-poi',
+      );
       expect(adapter.body?['proposed_fare'], {
         'amount_minor': 70000,
         'currency': 'PKR',
