@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../../core/network/api_exception.dart';
 
 import '../../ride_flow/domain/ride_execution.dart';
 import '../data/device_location.dart';
@@ -17,6 +18,7 @@ class RiderRequestState {
     this.submitting = false,
     this.locating = false,
     this.error,
+    this.submissionErrorCode,
   });
   final List<RideRequest> requests;
   final GeoPoint? pickup;
@@ -27,6 +29,7 @@ class RiderRequestState {
   final bool submitting;
   final bool locating;
   final String? error;
+  final String? submissionErrorCode;
 
   RideRequest? get active {
     for (final request in requests) {
@@ -52,6 +55,7 @@ class RiderRequestState {
     bool? submitting,
     bool? locating,
     String? error,
+    String? submissionErrorCode,
     bool clearPickupPlaceId = false,
     bool clearDestinationPlaceId = false,
     bool clearError = false,
@@ -69,6 +73,7 @@ class RiderRequestState {
     submitting: submitting ?? this.submitting,
     locating: locating ?? this.locating,
     error: clearError ? null : error ?? this.error,
+    submissionErrorCode: clearError ? null : submissionErrorCode ?? this.submissionErrorCode,
   );
 }
 
@@ -138,6 +143,7 @@ class RiderRequestController extends ChangeNotifier {
   Future<bool> submit({
     required int amountMinor,
     required String currency,
+    String? pricingPolicyVersion,
   }) async {
     if (_state.submitting || _state.active != null) return false;
     if (serviceCode.isEmpty) {
@@ -157,6 +163,7 @@ class RiderRequestController extends ChangeNotifier {
         destination: destination,
         proposedFare: Money(amountMinor: amountMinor, currency: currency),
         serviceCode: serviceCode,
+        pricingPolicyVersion: pricingPolicyVersion,
       );
       _set(
         _state.copyWith(
@@ -166,7 +173,7 @@ class RiderRequestController extends ChangeNotifier {
       );
       return true;
     } catch (error) {
-      _set(_state.copyWith(submitting: false, error: '$error'));
+      _set(_state.copyWith(submitting: false, error: error is ApiException ? error.message : '$error', submissionErrorCode: error is ApiException ? error.code : null));
       return false;
     }
   }

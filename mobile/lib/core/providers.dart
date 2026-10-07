@@ -32,6 +32,7 @@ import '../features/driver_workspace/presentation/driver_readonly_surfaces.dart'
 import '../features/rider_request/application/rider_place_search_controller.dart';
 import '../features/rider_request/application/rider_route_preview_controller.dart';
 import '../features/rider_request/application/rider_request_controller.dart';
+import '../features/rider_request/application/rider_fare_controller.dart';
 import '../features/rider_request/data/device_location.dart';
 import '../features/rider_request/data/place_search_repository.dart';
 import '../features/rider_request/data/ride_request_repository.dart';
@@ -145,7 +146,7 @@ final riderPlaceSearchControllerProvider =
       ref.watch(sessionControllerProvider.select((s) => s.state.account?.id));
       return RiderPlaceSearchController(
         ref.watch(placeSearchRepositoryProvider),
-        ref.watch(riderRequestControllerProvider),
+        ref.watch(riderRequestControllerProvider.notifier),
         ref.watch(deviceLocationProvider),
       );
     });
@@ -163,6 +164,35 @@ final riderRoutePreviewControllerProvider =
         ref.watch(riderRequestControllerProvider),
       );
     });
+final riderFareControllerProvider =
+    ChangeNotifierProvider.autoDispose<RiderFareController>((ref) {
+  ref.watch(sessionControllerProvider.select((s) => s.state.account?.id));
+  final rider = ref.watch(riderRequestControllerProvider.notifier);
+  final route = ref.watch(riderRoutePreviewControllerProvider.notifier);
+  final fare = RiderFareController();
+  void sync() {
+    if (rider.state.active != null) return;
+    final key = route.selectionKey ?? '';
+    fare.invalidate(key);
+    final preview = route.state.preview;
+    if (preview != null) fare.applyPreview(key, preview);
+  }
+  sync();
+  rider.addListener(sync);
+  route.addListener(sync);
+  ref.listen(riderServicesProvider, (_, next) {
+    final services = next.asData?.value;
+    if (services != null && rider.state.active == null &&
+        !services.any((s) => s.code == rider.serviceCode)) {
+      rider.selectService('');
+    }
+  });
+  ref.onDispose(() {
+    rider.removeListener(sync);
+    route.removeListener(sync);
+  });
+  return fare;
+});
 final driverRouteRepositoryProvider =
     Provider.autoDispose<DriverRouteRepository>((ref) {
       final repository = ApiDriverRouteRepository(
