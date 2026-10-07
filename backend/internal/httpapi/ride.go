@@ -233,7 +233,6 @@ func (api *API) validateSuggestedFare(w http.ResponseWriter, r *http.Request, bo
 	return true
 }
 
-
 // A Google Place ID takes precedence over coordinates during routing. Resolve
 // the selected ID so the priced endpoint cannot differ from the saved request.
 func (api *API) validatePricedPlace(w http.ResponseWriter, r *http.Request, placeID string, location ride.Location) bool {

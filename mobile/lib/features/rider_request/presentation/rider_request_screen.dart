@@ -86,7 +86,8 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     final service = services.firstWhere((service) => service.code == selected);
     final route = ref.read(riderRoutePreviewControllerProvider);
     final fare = ref.read(riderFareControllerProvider);
-    if ((service.pricingRequired || route.state.preview?.suggestedFare != null) &&
+    if ((service.pricingRequired ||
+            route.state.preview?.suggestedFare != null) &&
         (route.state.loading ||
             route.state.error != null ||
             route.state.preview?.suggestedFare == null ||
@@ -100,7 +101,8 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
       );
       return;
     }
-    final amount = (service.pricingRequired || route.state.preview?.suggestedFare != null)
+    final amount =
+        (service.pricingRequired || route.state.preview?.suggestedFare != null)
         ? route.state.preview?.suggestedFare?.amountMinor
         : parseFareMinor(_fare.text);
     if (amount == null) {
@@ -733,11 +735,16 @@ class _RequestRidePanel extends StatelessWidget {
           child: TextField(
             key: const Key('fareField'),
             controller: fare,
-            readOnly: pricingRequired || routeState.preview?.suggestedFare != null,
-            onChanged: (pricingRequired || routeState.preview?.suggestedFare != null) ? null : onFareChanged,
+            readOnly:
+                pricingRequired || routeState.preview?.suggestedFare != null,
+            onChanged:
+                (pricingRequired || routeState.preview?.suggestedFare != null)
+                ? null
+                : onFareChanged,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: InputDecoration(
-              labelText: (pricingRequired || routeState.preview?.suggestedFare != null)
+              labelText:
+                  (pricingRequired || routeState.preview?.suggestedFare != null)
                   ? 'Suggested fare'
                   : 'Your proposed fare',
               prefixText: 'PKR ',
