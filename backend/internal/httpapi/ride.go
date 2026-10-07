@@ -6,8 +6,8 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/pricing"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/ride"
- "github.com/sayyarahmad1995/uber-clone/backend/internal/pricing"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/ridestatus"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/trip"
 )
@@ -23,19 +23,20 @@ type rideFareRequest struct {
 }
 
 type createRideRequestBody struct {
- PricingPolicyVersion string `json:"pricing_policy_version"`
-	ServiceCode  string               `json:"service_code"`
-	Pickup       *rideLocationRequest `json:"pickup"`
-	Destination  *rideLocationRequest `json:"destination"`
-	ProposedFare *rideFareRequest     `json:"proposed_fare"`
+	PricingPolicyVersion string               `json:"pricing_policy_version"`
+	ServiceCode          string               `json:"service_code"`
+	Pickup               *rideLocationRequest `json:"pickup"`
+	Destination          *rideLocationRequest `json:"destination"`
+	ProposedFare         *rideFareRequest     `json:"proposed_fare"`
 }
 
 func (body createRideRequestBody) input() (ride.CreateInput, bool) {
 	if body.Pickup == nil || body.Destination == nil || body.Pickup.Latitude == nil || body.Pickup.Longitude == nil || body.Destination.Latitude == nil || body.Destination.Longitude == nil || body.ProposedFare == nil || body.ProposedFare.AmountMinor == nil || body.ProposedFare.Currency == nil {
 		return ride.CreateInput{
- PricingPolicyVersion:body.PricingPolicyVersion,}, false
+			PricingPolicyVersion: body.PricingPolicyVersion}, false
 	}
 	return ride.CreateInput{
+		PricingPolicyVersion: body.PricingPolicyVersion,
 		ServiceCode: body.ServiceCode,
 		Pickup:      ride.Location{Latitude: *body.Pickup.Latitude, Longitude: *body.Pickup.Longitude},
 		Destination: ride.Location{Latitude: *body.Destination.Latitude, Longitude: *body.Destination.Longitude},
@@ -63,9 +64,10 @@ func (api *API) createRideRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	request, err := api.rides.Create(r.Context(), u.ID, input)
 	switch {
- case errors.Is(err,pricing.ErrInvalidPolicy),errors.Is(err,pricing.ErrInvalidService),errors.Is(err,pricing.ErrPolicyChanged),errors.Is(err,pricing.ErrUnavailable):
-  writePricingError(w,err);return
- case errors.Is(err, ride.ErrInvalidService):
+	case errors.Is(err, pricing.ErrInvalidPolicy), errors.Is(err, pricing.ErrInvalidService), errors.Is(err, pricing.ErrPolicyChanged), errors.Is(err, pricing.ErrUnavailable):
+		writePricingError(w, err)
+		return
+	case errors.Is(err, ride.ErrInvalidService):
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "selected service is unavailable"})
 		return
 	case errors.Is(err, ride.ErrInvalidLocation):

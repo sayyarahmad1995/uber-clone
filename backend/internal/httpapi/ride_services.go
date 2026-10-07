@@ -24,8 +24,8 @@ func rideServicesResponse(services []rideservice.Option) map[string]any {
 	items := make([]map[string]any, 0, len(services))
 	for _, service := range services {
 		items = append(items, map[string]any{
-			"pricing_required":service.PricingRequired,
- "code":               service.Code,
+			"pricing_required":   service.PricingRequired,
+			"code":               service.Code,
 			"display_name":       service.DisplayName,
 			"description":        service.Description,
 			"display_order":      service.DisplayOrder,

@@ -9,7 +9,7 @@ import (
 )
 
 type config struct {
- SuggestedFaresEnabled bool
+	SuggestedFaresEnabled           bool
 	Port                            string
 	DatabaseURL                     string
 	AuthProvider                    string
@@ -25,7 +25,7 @@ type config struct {
 
 func loadConfig() config {
 	return config{
- SuggestedFaresEnabled: strings.TrimSpace(os.Getenv("SUGGESTED_FARES_ENABLED"))=="true",
+		SuggestedFaresEnabled:           strings.TrimSpace(os.Getenv("SUGGESTED_FARES_ENABLED")) == "true",
 		Port:                            getenv("APP_PORT", "8080"),
 		DatabaseURL:                     os.Getenv("DATABASE_URL"),
 		AuthProvider:                    getenv("AUTH_PROVIDER", "kratos"),

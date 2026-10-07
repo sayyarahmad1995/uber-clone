@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/pricing"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/routing"
- "github.com/sayyarahmad1995/uber-clone/backend/internal/pricing"
 )
 
 type ridePreviewRequest struct {
@@ -53,14 +53,20 @@ func (api *API) createRidePreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
- var policy pricing.Policy
- if api.suggestedFaresEnabled {
-  if api.pricing==nil {writePricingError(w,pricing.ErrUnavailable);return}
-  var err error
-  policy,err=api.pricing.Current(r.Context(),strings.ToLower(strings.TrimSpace(body.ServiceCode)),"PKR")
-  if err!=nil{writePricingError(w,err);return}
- }
- route, err := api.routing.Preview(
+	var policy pricing.Policy
+	if api.suggestedFaresEnabled {
+		if api.pricing == nil {
+			writePricingError(w, pricing.ErrUnavailable)
+			return
+		}
+		var err error
+		policy, err = api.pricing.Current(r.Context(), strings.ToLower(strings.TrimSpace(body.ServiceCode)), "PKR")
+		if err != nil {
+			writePricingError(w, err)
+			return
+		}
+	}
+	route, err := api.routing.Preview(
 		r.Context(),
 		body.Pickup.endpoint(),
 		body.Destination.endpoint(),
@@ -69,14 +75,17 @@ func (api *API) createRidePreview(w http.ResponseWriter, r *http.Request) {
 		api.writeRoutingError(w, r, err)
 		return
 	}
-	response:=ridePreviewResponse(route)
- if api.suggestedFaresEnabled {
-  amount,err:=pricing.Calculate(policy,route.DistanceMeters,route.DurationSeconds)
-  if err!=nil{writePricingError(w,err);return}
-  response["suggested_fare"]=map[string]any{"amount_minor":amount,"currency":policy.Currency}
-  response["pricing_policy_version"]=policy.ID.String()
- }
- writeJSON(w,http.StatusOK,response)
+	response := ridePreviewResponse(route)
+	if api.suggestedFaresEnabled {
+		amount, err := pricing.Calculate(policy, route.DistanceMeters, route.DurationSeconds)
+		if err != nil {
+			writePricingError(w, err)
+			return
+		}
+		response["suggested_fare"] = map[string]any{"amount_minor": amount, "currency": policy.Currency}
+		response["pricing_policy_version"] = policy.ID.String()
+	}
+	writeJSON(w, http.StatusOK, response)
 }
 
 func (api *API) writeRoutingError(w http.ResponseWriter, r *http.Request, err error) {
