@@ -159,6 +159,7 @@ final routePreviewRepositoryProvider = Provider<RoutePreviewRepository>(
 final riderRoutePreviewControllerProvider =
     ChangeNotifierProvider.autoDispose<RiderRoutePreviewController>((ref) {
       ref.watch(sessionControllerProvider.select((s) => s.state.account?.id));
+      ref.listen(riderRequestControllerProvider, (_, __) {});
       return RiderRoutePreviewController(
         ref.watch(routePreviewRepositoryProvider),
         ref.watch(riderRequestControllerProvider),

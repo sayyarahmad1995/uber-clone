@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+
 import '../domain/route_preview.dart';
 
 /// Proposal ownership belongs to one account and one booking selection.
@@ -23,7 +24,8 @@ class RiderFareController extends ChangeNotifier {
     version = preview.pricingPolicyVersion;
     final fare = preview.suggestedFare;
     if (!userEdited && fare != null) {
-      text = '${fare.amountMinor ~/ 100}.${(fare.amountMinor % 100).toString().padLeft(2, '0')}';
+      text =
+          '${fare.amountMinor ~/ 100}.${(fare.amountMinor % 100).toString().padLeft(2, '0')}';
     }
     notifyListeners();
   }
