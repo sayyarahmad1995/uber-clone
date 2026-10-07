@@ -5,6 +5,7 @@ import "context"
 // Option is the public presentation of one currently bookable ride service.
 // Driver onboarding eligibility and tariff policy are intentionally separate.
 type Option struct {
+ PricingRequired bool
 	Code              string
 	DisplayName       string
 	Description       string
