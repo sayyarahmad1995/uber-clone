@@ -98,7 +98,9 @@ class DriverRouteController extends ChangeNotifier {
 
   String _message(Object error) {
     if (error is LocationUnavailable) return error.message;
-    if (error is TimeoutException) return 'Unable to get your current location.';
+    if (error is TimeoutException) {
+      return 'Unable to get your current location.';
+    }
     if (error is ApiException) {
       return switch (error.statusCode) {
         404 => 'No driving route or active trip was found.',

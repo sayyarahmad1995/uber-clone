@@ -109,10 +109,7 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
     final route = profile == null
         ? const DriverRouteState()
         : ref.watch(driverRouteControllerProvider).state;
-    _scheduleRouteFit(
-      route,
-      trip?.rideRequestId,
-    );
+    _scheduleRouteFit(route, trip?.rideRequestId);
     final onboarding = driver.loaded && profile == null
         ? ref.watch(driverOnboardingControllerProvider)
         : null;
@@ -176,10 +173,10 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
             : [
                 RideMapPolyline(
                   points: route.preview!.points
-                      .map((point) => RideMapPoint(
-                            point.latitude,
-                            point.longitude,
-                          ))
+                      .map(
+                        (point) =>
+                            RideMapPoint(point.latitude, point.longitude),
+                      )
                       .toList(growable: false),
                   color: Theme.of(context).colorScheme.primary,
                   width: 6,

@@ -30,8 +30,15 @@ void main() {
         'longitude': 67.01,
       });
 
-      await container.read(driverTripControllerProvider).startTrip('ride-1');
+      final tripController = container.read(driverTripControllerProvider);
+      await tripController.startTrip('ride-1');
+      expect(tripController.error, isNull);
+      expect(tripController.trip?.status, 'in_progress');
       await tester.pumpAndSettle();
+      expect(container.read(driverRouteControllerProvider).state.status,
+          'in_progress');
+      expect(container.read(driverRouteControllerProvider).state.error, isNull);
+      expect(container.read(driverRouteControllerProvider).state.loading, isFalse);
       expect(routes.requests.last['status'], 'in_progress');
       expect(routes.requests.last.containsKey('origin'), isFalse);
       expect(_map(tester).polylines, hasLength(1));
@@ -196,7 +203,7 @@ class _Routes implements HttpClientAdapter {
   ) async {
     expect(options.path, '/v1/driver/trip/route-preview');
     expect(options.method, 'POST');
-    expect(options.headers['Authorization'], isNotEmpty);
+    expect(options.headers['Authorization'], ['Bearer', 'route-test'].join(' '));
     final data = Map<String, dynamic>.from(options.data as Map);
     requests.add(data);
     if (firstReply != null && requests.length == 1) {

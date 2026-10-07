@@ -163,16 +163,15 @@ final riderRoutePreviewControllerProvider =
         ref.watch(riderRequestControllerProvider),
       );
     });
-final driverRouteRepositoryProvider = Provider.autoDispose<DriverRouteRepository>(
-  (ref) {
-    final repository = ApiDriverRouteRepository(
-      ref.watch(dioProvider),
-      ref.watch(sessionStoreProvider),
-    );
-    ref.onDispose(repository.cancel);
-    return repository;
-  },
-);
+final driverRouteRepositoryProvider =
+    Provider.autoDispose<DriverRouteRepository>((ref) {
+      final repository = ApiDriverRouteRepository(
+        ref.watch(dioProvider),
+        ref.watch(sessionStoreProvider),
+      );
+      ref.onDispose(repository.cancel);
+      return repository;
+    });
 final driverRouteControllerProvider =
     ChangeNotifierProvider.autoDispose<DriverRouteController>((ref) {
       ref.watch(sessionControllerProvider.select((s) => s.state.account?.id));
