@@ -154,6 +154,7 @@ void main() {
             .text,
         '125.00',
       );
+      expect(routes.calls, 1);
       await tester.enterText(find.byKey(const Key('fareField')), '1100');
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.byKey(const Key('requestRideButton')));
@@ -162,6 +163,7 @@ void main() {
         find.byKey(const Key('requestRideButton')).hitTestable(),
       );
       await tester.pumpAndSettle();
+      expect(routes.calls, 2);
       expect(requests.attempts, 1);
       expect(controller.state.active, isNull);
       expect(
