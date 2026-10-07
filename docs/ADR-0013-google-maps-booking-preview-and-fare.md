@@ -33,7 +33,7 @@ The owner has already configured working Google Maps Platform APIs. The next MVP
 ### 3. One recommended route preview, one advisory fare
 
 - Add a small Go pricing component consuming validated route distance/duration and the selected **active catalog service**. Each service/currency has its own independently versioned, approved policy. Initial currency is PKR; initial services are Economy and Comfort. A synthetic third service tests the architecture without adding a production tariff.
-- Required policy fields: `service_code`, `currency`, `version`, `base_fare_minor`, `rate_minor_per_km`, `rate_minor_per_minute`, `minimum_fare_minor`, `rounding_increment_minor`, `effective_from`, optional `effective_until`, and active/approval state. Ensure the selected policy is unambiguous for a service/currency and preview time. Changes create new versions; historical policies are not silently overwritten.
+- Required policy fields: `service_code`, `currency`, `version`, `base_fare_minor`, `rate_minor_per_km`, `rate_minor_per_minute`, `minimum_fare_minor`, `rounding_increment_minor`, `effective_from`, database publication time and reviewer. Publication takes effect immediately through one current pointer; disabling clears that pointer with an expected policy identity. Future scheduling is outside this milestone. Changes create new versions; historical policies are not silently overwritten.
 - Proposed computation, using integer minor units and a defined **single final rounding step**:
 
   ```text
@@ -44,10 +44,10 @@ The owner has already configured working Google Maps Platform APIs. The next MVP
                              round(raw, rounding_increment_minor))
   ```
 
-  Define exact rational arithmetic/rounding and overflow behavior before implementation; avoid binary floating-point for money. Rate values and rounding increments are **business configuration**, not invented constants. The owner must approve actual Economy and Comfort tariffs before production fare suggestions are enabled.
+  Use exact rational/integer intermediates, round half up once to the increment, then enforce the minimum. Reject invalid input or results above 1,000,000,000,000 minor units; use no binary floating point for money. Rate values and rounding increments are **business configuration**, not invented constants. The owner must approve actual Economy and Comfort tariffs before production fare suggestions are enabled.
 - Extend the single authenticated `POST /v1/ride-previews` call to return the one recommended route. During PR 4 it contains distance/duration/polyline. PR 5 adds `suggested_fare {amount_minor,currency}` and `pricing_policy_version`, calculated from that same route without another Google call. After pricing activation, no price-backed booking proceeds without a valid active policy.
 - This is a **suggestion, not a fare quote or automatic charge**. The Rider may accept or edit the suggested amount as their **proposed fare**. Existing 90–130% Driver response bounds remain relative to the Rider's submitted proposal, not the system suggestion. Neither previewing nor Driver accepting the Rider's amount assigns a Trip.
-- Ride Request creation remains `POST /v1/ride-requests` with coordinates, selected service and Rider-proposed fare. Revalidate service activation at create time; never trust client-supplied prices. Rider offer selection is the only assignment boundary; the selected offer's **agreed fare snapshot** is final for the Trip and subsequent cash settlement. Do not retrospectively reprice existing Trips or use actual travelled distance to change the agreed fare in this milestone.
+- Ride Request creation remains `POST /v1/ride-requests` with coordinates, selected service and Rider-proposed fare. Revalidate service activation and the preview policy UUID at create time. The editable proposal is Rider input. Copy the authoritative policy identity, numeric version, five money parameters, calculation rule and snapshot time in the same transaction as the request. Store no client-supplied suggestion, Google route metrics or geometry. Shared catalog/pointer locks serialize creation against publication: publication first returns 409 with no request; creation first permanently keeps its snapshot. Later tariff changes cannot change open request proposals, offer bounds or Trip fares. Rider offer selection is the only assignment boundary; the selected offer's **agreed fare snapshot** is final for the Trip and subsequent cash settlement. Do not retrospectively reprice existing Trips or use actual travelled distance to change the agreed fare in this milestone.
 
 ### 4. Client states and failure behavior
 
@@ -80,3 +80,11 @@ No pricing surge, automatic final price, toll/tax estimation, waiting fees, canc
 - Uses ADR-0012's dynamic catalog and service-keyed versioned tariff policies.
 - Preserves ADR-0008's shared Rider/Driver map/panel interaction contract.
 - Does not retroactively expand ADR-0011's earlier *cash-settlement* scope; the agreed offer price and settlement rules remain authoritative.
+
+## Suggested fare rebuild (2026-10-07)
+
+`SUGGESTED_FARES_ENABLED` defaults to false and enables only for trimmed `true`. Disabled retains manual proposals and route-only previews. Enabled filters the catalog to active visible services with a current PKR policy and emits `pricing_required=true`. Rider previews add `suggested_fare` and `pricing_policy_version` (policy UUID); priced creation requires that UUID. Driver route responses remain route-only.
+
+The original service dropdown remains. Suggestions prefill untouched proposals. Retry and a tariff conflict preserve edits; changes to coordinates, Place IDs, service or account reset ownership. A 409 refreshes the preview and requires a second explicit tap. Active-request views use the saved proposal and retain the booked route line.
+
+Operations approves tariffs at `/admin/operations/pricing`; JSON admin endpoints share Basic Auth and origin protections. History and request snapshots reject update/delete. Publication alone does not enable the rollout. No production tariff values are seeded.
