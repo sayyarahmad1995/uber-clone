@@ -32,14 +32,13 @@ type createRideRequestBody struct {
 
 func (body createRideRequestBody) input() (ride.CreateInput, bool) {
 	if body.Pickup == nil || body.Destination == nil || body.Pickup.Latitude == nil || body.Pickup.Longitude == nil || body.Destination.Latitude == nil || body.Destination.Longitude == nil || body.ProposedFare == nil || body.ProposedFare.AmountMinor == nil || body.ProposedFare.Currency == nil {
-		return ride.CreateInput{
-			PricingPolicyVersion: body.PricingPolicyVersion}, false
+		return ride.CreateInput{}, false
 	}
 	return ride.CreateInput{
 		PricingPolicyVersion: body.PricingPolicyVersion,
-		ServiceCode: body.ServiceCode,
-		Pickup:      ride.Location{Latitude: *body.Pickup.Latitude, Longitude: *body.Pickup.Longitude},
-		Destination: ride.Location{Latitude: *body.Destination.Latitude, Longitude: *body.Destination.Longitude},
+		ServiceCode:          body.ServiceCode,
+		Pickup:               ride.Location{Latitude: *body.Pickup.Latitude, Longitude: *body.Pickup.Longitude},
+		Destination:          ride.Location{Latitude: *body.Destination.Latitude, Longitude: *body.Destination.Longitude},
 		ProposedFare: &ride.Money{
 			AmountMinor: *body.ProposedFare.AmountMinor,
 			Currency:    *body.ProposedFare.Currency,
