@@ -21,9 +21,11 @@ void main() {
         pickup: const GeoPoint(latitude: 24.8607, longitude: 67.0011),
         destination: const GeoPoint(latitude: 24.9056, longitude: 67.0822),
         proposedFare: const Money(amountMinor: 70000, currency: 'PKR'),
+        pricingPolicyVersion: 'policy-version-1',
       );
 
       expect(result.id, 'ride-1');
+      expect(adapter.body?['pricing_policy_version'], 'policy-version-1');
       expect(adapter.authorization, 'Bearer session-token');
       expect(adapter.body?['pickup'], {
         'latitude': 24.8607,

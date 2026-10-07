@@ -37,3 +37,25 @@ jobs:
           done
       - run: go test -p 1 ./internal/pricing ./internal/ride ./internal/httpapi ./internal/rideservice ./internal/marketplace ./cmd/api -count=1
         working-directory: backend
+  mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: |
+          git clone --depth 1 --branch 3.47.2 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+      - run: flutter pub get
+        working-directory: mobile
+      - name: Format diagnostics
+        run: |
+          git diff --name-only 88c3be9fd658b5bc05e569872cfc9bba4267cd89 HEAD -- '*.dart' | while read -r path; do
+            dart format "$path"
+            echo "FORMAT_BEGIN $path"
+            cat "$path"
+            echo "FORMAT_END $path"
+          done
+      - run: flutter test test/rider_fare_controller_test.dart test/rider_request_submission_test.dart test/rider_route_preview_test.dart test/ride_request_repository_test.dart test/rider_service_catalog_test.dart
+        working-directory: mobile
