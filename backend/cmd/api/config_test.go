@@ -23,3 +23,7 @@ func TestNormalizeOrigin(t *testing.T) {
 		})
 	}
 }
+
+func TestSuggestedFareConfigDefaultOff(t *testing.T){
+ for _,tc:=range []struct{value string;want bool}{{"",false},{"false",false},{"yes",false},{"true",true},{" true ",true}}{t.Setenv("SUGGESTED_FARES_ENABLED",tc.value);if got:=loadConfig().SuggestedFaresEnabled;got!=tc.want{t.Fatalf("%q enabled %v",tc.value,got)}}
+}
