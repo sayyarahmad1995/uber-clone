@@ -159,7 +159,7 @@ final routePreviewRepositoryProvider = Provider<RoutePreviewRepository>(
 final riderRoutePreviewControllerProvider =
     ChangeNotifierProvider.autoDispose<RiderRoutePreviewController>((ref) {
       ref.watch(sessionControllerProvider.select((s) => s.state.account?.id));
-      ref.listen(riderRequestControllerProvider, (_, __) {});
+      ref.listen(riderRequestControllerProvider, (_, _) {});
       return RiderRoutePreviewController(
         ref.watch(routePreviewRepositoryProvider),
         ref.read(riderRequestControllerProvider),
@@ -180,8 +180,8 @@ final riderFareControllerProvider =
       }
 
       // Listen without rebuilding the proposal owner on route/request notifications.
-      ref.listen(riderRequestControllerProvider, (_, __) => sync());
-      ref.listen(riderRoutePreviewControllerProvider, (_, __) => sync());
+      ref.listen(riderRequestControllerProvider, (_, _) => sync());
+      ref.listen(riderRoutePreviewControllerProvider, (_, _) => sync());
       ref.listen(riderServicesProvider, (_, next) {
         final rider = ref.read(riderRequestControllerProvider);
         final services = next.asData?.value;

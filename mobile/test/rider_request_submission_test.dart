@@ -336,12 +336,13 @@ class _ConflictRequests extends FakeRideRequestRepository {
   }) async {
     attempts++;
     version = pricingPolicyVersion;
-    if (attempts == 1)
+    if (attempts == 1) {
       throw const ApiException(
         'pricing_policy_changed',
         'Rates changed. Refresh the suggestion and submit again.',
         statusCode: 409,
       );
+    }
     return super.create(
       pickup: pickup,
       destination: destination,

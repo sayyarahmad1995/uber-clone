@@ -116,7 +116,7 @@ void main() {
       );
       final subscription = container.listen(
         riderFareControllerProvider,
-        (_, __) {},
+        (_, _) {},
       );
       await Future<void>.delayed(Duration.zero);
       final previous = container.read(riderFareControllerProvider);
@@ -150,7 +150,7 @@ void main() {
       );
       final subscription = container.listen(
         riderFareControllerProvider,
-        (_, __) {},
+        (_, _) {},
       );
       await container.read(riderServicesProvider.future);
       final fare = container.read(riderFareControllerProvider);
