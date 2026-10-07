@@ -100,7 +100,9 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
       );
       return;
     }
-    final amount = parseFareMinor(_fare.text);
+    final amount = service.pricingRequired
+        ? route.state.preview?.suggestedFare?.amountMinor
+        : parseFareMinor(_fare.text);
     if (amount == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Enter a valid proposed fare.')),
@@ -115,7 +117,8 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     );
     if (!mounted) return;
     if (!submitted &&
-        controller.state.submissionErrorCode == 'pricing_policy_changed') {
+        (controller.state.submissionErrorCode == 'pricing_policy_changed' ||
+            controller.state.submissionErrorCode == 'suggested_fare_changed')) {
       ref.invalidate(riderServicesProvider);
       await route.retry();
     }
@@ -261,6 +264,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
         scrollController: scrollController,
         scrollEnabled: scrollEnabled,
         fare: _fare,
+        pricingRequired: ref.read(riderServicesProvider).asData?.value.any((service) => service.code == controller.serviceCode && service.pricingRequired) ?? false,
         onFareChanged: ref.read(riderFareControllerProvider).edit,
         pickupSearch: _pickupSearch,
         destinationSearch: _destinationSearch,
@@ -581,6 +585,7 @@ class _RequestRidePanel extends StatelessWidget {
     required this.scrollController,
     required this.scrollEnabled,
     required this.fare,
+    required this.pricingRequired,
     required this.onFareChanged,
     required this.pickupSearch,
     required this.destinationSearch,
@@ -601,6 +606,7 @@ class _RequestRidePanel extends StatelessWidget {
   final ScrollController scrollController;
   final bool scrollEnabled;
   final TextEditingController fare;
+  final bool pricingRequired;
   final ValueChanged<String> onFareChanged;
   final TextEditingController pickupSearch;
   final TextEditingController destinationSearch;
@@ -634,7 +640,7 @@ class _RequestRidePanel extends StatelessWidget {
         const RiderRideHistory(),
         const SizedBox(height: AppSpacing.xs),
         const Text(
-          'Choose pickup and destination, then propose the fare you want to pay.',
+          'Choose pickup and destination. Select a Driver offer to agree the final fare.',
         ),
         const SizedBox(height: AppSpacing.sm),
         const RiderServicePicker(),
@@ -712,19 +718,16 @@ class _RequestRidePanel extends StatelessWidget {
           hasEndpoints: state.pickup != null && state.destination != null,
           onRetry: onRetryRoute,
         ),
-        if (routeState.preview?.suggestedFare != null)
-          Text(
-            'Suggested fare: PKR ${(routeState.preview!.suggestedFare!.amountMinor / 100).toStringAsFixed(2)}',
-          ),
         const SizedBox(height: AppSpacing.sm),
         DashboardPanelControl(
           child: TextField(
             key: const Key('fareField'),
             controller: fare,
-            onChanged: onFareChanged,
+            readOnly: pricingRequired,
+            onChanged: pricingRequired ? null : onFareChanged,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
-              labelText: 'Your proposed fare',
+            decoration: InputDecoration(
+              labelText: pricingRequired ? 'Suggested fare' : 'Your proposed fare',
               prefixText: 'PKR ',
             ),
           ),

@@ -333,6 +333,8 @@ class _ConflictRequests extends FakeRideRequestRepository {
     required Money proposedFare,
     String serviceCode = 'economy',
     String? pricingPolicyVersion,
+    String? pickupPlaceId,
+    String? destinationPlaceId,
   }) async {
     attempts++;
     version = pricingPolicyVersion;

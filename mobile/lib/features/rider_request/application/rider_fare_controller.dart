@@ -23,7 +23,8 @@ class RiderFareController extends ChangeNotifier {
     if (_disposed || key != selectionKey) return;
     version = preview.pricingPolicyVersion;
     final fare = preview.suggestedFare;
-    if (!userEdited && fare != null) {
+    if (fare != null) {
+      userEdited = false;
       text =
           '${fare.amountMinor ~/ 100}.${(fare.amountMinor % 100).toString().padLeft(2, '0')}';
     }

@@ -167,8 +167,9 @@ func TestPricedRideRequestHTTP(t *testing.T) {
 		t.Fatal(e)
 	}
 	body["pricing_policy_version"] = b.ID.String()
+	body["proposed_fare"] = map[string]any{"amount_minor": 12500, "currency": "PKR"}
 	res = pricedHTTP(api, "/v1/ride-requests", body, true)
-	if res.Code != 201 || !strings.Contains(res.Body.String(), "110000") {
+	if res.Code != 201 || !strings.Contains(res.Body.String(), "12500") {
 		t.Fatalf("create %d %s", res.Code, res.Body.String())
 	}
 	var n int
@@ -183,9 +184,12 @@ func TestReadOnlySuggestedFareHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	spy := &routePreviewSpy{}
-	api := pricedAPI(db, id, policies, true, spy)
+	spy := &readOnlyRouteSpy{}
+	api := pricedAPI(db, id, policies, true, &routePreviewSpy{})
+	api.routing = routing.NewService(spy)
 	body := previewBody(code)
+	body["pickup"].(map[string]any)["place_id"] = "pickup-poi"
+	body["destination"].(map[string]any)["place_id"] = "destination-poi"
 	body["pricing_policy_version"] = policy.ID.String()
 	body["proposed_fare"] = map[string]any{"amount_minor": 110000, "currency": "PKR"}
 	res := pricedHTTP(api, "/v1/ride-requests", body, true)
@@ -196,9 +200,32 @@ func TestReadOnlySuggestedFareHTTP(t *testing.T) {
 	if err := db.QueryRow("SELECT count(*) FROM ride_requests WHERE rider_user_id=$1", id).Scan(&count); err != nil || count != 0 {
 		t.Fatalf("rejected fare wrote request: %d %v", count, err)
 	}
+	if spy.pickup.PlaceID != "pickup-poi" || spy.destination.PlaceID != "destination-poi" {
+		t.Fatalf("lost routing Place IDs: %+v %+v", spy.pickup, spy.destination)
+	}
 	body["proposed_fare"] = map[string]any{"amount_minor": 12500, "currency": "PKR"}
+	spy.err = routing.ErrUnavailable
 	res = pricedHTTP(api, "/v1/ride-requests", body, true)
-	if res.Code != 201 || !strings.Contains(res.Body.String(), "12500") || spy.calls != 2 {
+	if res.Code != 503 {
+		t.Fatalf("provider failure created request: %d %s", res.Code, res.Body.String())
+	}
+	spy.err = nil
+	res = pricedHTTP(api, "/v1/ride-requests", body, true)
+	if res.Code != 201 || !strings.Contains(res.Body.String(), "12500") || spy.calls != 3 {
 		t.Fatalf("suggestion booking: %d %s calls=%d", res.Code, res.Body.String(), spy.calls)
 	}
+}
+
+
+type readOnlyRouteSpy struct {
+	calls int
+	pickup routing.Endpoint
+	destination routing.Endpoint
+	err error
+}
+
+func (s *readOnlyRouteSpy) Preview(_ context.Context, pickup, destination routing.Endpoint) (routing.Route, error) {
+	s.calls++
+	s.pickup, s.destination = pickup, destination
+	return routing.Route{DistanceMeters: 2000, DurationSeconds: 300, EncodedPolyline: "??_ibE_ibE"}, s.err
 }

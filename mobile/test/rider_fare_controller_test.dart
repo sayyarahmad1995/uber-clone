@@ -19,7 +19,7 @@ void main() {
     pricingPolicyVersion: version,
   );
   test(
-    'suggestion prefills an untouched proposal and preserves edits on refresh',
+    'suggestion replaces any former proposal on refresh',
     () {
       final c = RiderFareController();
       c.invalidate('A');
@@ -29,9 +29,9 @@ void main() {
       expect(c.userEdited, false);
       c.edit('1100');
       c.applyPreview('A', preview(22500, 'v2'));
-      expect(c.text, '1100');
+      expect(c.text, '225.00');
       expect(c.version, 'v2');
-      expect(c.userEdited, true);
+      expect(c.userEdited, false);
       c.dispose();
     },
   );
