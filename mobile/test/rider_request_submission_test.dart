@@ -95,118 +95,127 @@ void main() {
     expect(tester.widget<RideMap>(find.byType(RideMap)).polylines, isEmpty);
     await tester.pumpWidget(const SizedBox.shrink());
   });
-  for (final conflictCode in ['pricing_policy_changed', 'suggested_fare_changed']) {
-  testWidgets(
-    'priced booking is read-only and explicitly resubmits after $conflictCode',
-    (tester) async {
-      final requests = _ConflictRequests(conflictCode);
-      final routes = _PricedRoutes();
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            authRepositoryProvider.overrideWithValue(FakeAuthRepository()),
-            capabilityStoreProvider.overrideWithValue(MemoryCapabilityStore()),
-            rideRequestRepositoryProvider.overrideWithValue(requests),
-            riderServiceRepositoryProvider.overrideWithValue(
-              FakeRideServiceRepository(
-                services: const [
-                  RideService(
-                    code: 'economy',
-                    displayName: 'Economy',
-                    description: 'Standard',
-                    displayOrder: 1,
-                    presentationToken: 'car',
-                    pricingRequired: true,
-                  ),
-                ],
+  for (final conflictCode in [
+    'pricing_policy_changed',
+    'suggested_fare_changed',
+  ]) {
+    testWidgets(
+      'priced booking is read-only and explicitly resubmits after $conflictCode',
+      (tester) async {
+        final requests = _ConflictRequests(conflictCode);
+        final routes = _PricedRoutes();
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              authRepositoryProvider.overrideWithValue(FakeAuthRepository()),
+              capabilityStoreProvider.overrideWithValue(
+                MemoryCapabilityStore(),
               ),
+              rideRequestRepositoryProvider.overrideWithValue(requests),
+              riderServiceRepositoryProvider.overrideWithValue(
+                FakeRideServiceRepository(
+                  services: const [
+                    RideService(
+                      code: 'economy',
+                      displayName: 'Economy',
+                      description: 'Standard',
+                      displayOrder: 1,
+                      presentationToken: 'car',
+                      pricingRequired: true,
+                    ),
+                  ],
+                ),
+              ),
+              deviceLocationProvider.overrideWithValue(
+                const FakeDeviceLocation(),
+              ),
+              routePreviewRepositoryProvider.overrideWithValue(routes),
+              rideFlowRepositoryProvider.overrideWithValue(
+                FakeRideFlowRepository(),
+              ),
+            ],
+            child: const MaterialApp(
+              home: Scaffold(body: RiderRequestScreen()),
             ),
-            deviceLocationProvider.overrideWithValue(
-              const FakeDeviceLocation(),
-            ),
-            routePreviewRepositoryProvider.overrideWithValue(routes),
-            rideFlowRepositoryProvider.overrideWithValue(
-              FakeRideFlowRepository(),
-            ),
-          ],
-          child: const MaterialApp(home: Scaffold(body: RiderRequestScreen())),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.drag(
-        find.byKey(const Key('dashboardPanelDragHandle')),
-        const Offset(0, -400),
-      );
-      await tester.pumpAndSettle();
-      final container = ProviderScope.containerOf(
-        tester.element(find.byType(RiderRequestScreen)),
-      );
-      final controller = container.read(riderRequestControllerProvider);
-      controller.setPickup(requestedRide.pickup);
-      controller.setDestination(requestedRide.destination);
-      await tester.pumpAndSettle();
-      final list = tester.widget<ListView>(find.byType(ListView).first);
-      list.controller!.jumpTo(list.controller!.position.maxScrollExtent);
-      await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<TextField>(find.byKey(const Key('fareField')))
-            .controller!
-            .text,
-        '125.00',
-      );
-      expect(routes.calls, 1);
-      expect(tester.widget<TextField>(find.byKey(const Key('fareField'))).readOnly, isTrue);
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(find.byKey(const Key('requestRideButton')));
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const Key('requestRideButton')).hitTestable(),
-      );
-      await tester.pumpAndSettle();
-      expect(routes.calls, 2);
-      expect(requests.attempts, 1);
-      expect(controller.state.active, isNull);
-      expect(
-        tester
-            .widget<TextField>(find.byKey(const Key('fareField')))
-            .controller!
-            .text,
-        '225.00',
-      );
-      expect(
-        container
-            .read(riderRoutePreviewControllerProvider)
-            .state
-            .preview!
-            .pricingPolicyVersion,
-        'v2',
-      );
-      expect(
-        tester.widget<RideMap>(find.byType(RideMap)).polylines,
-        hasLength(1),
-      );
-      await tester.ensureVisible(find.byKey(const Key('requestRideButton')));
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const Key('requestRideButton')).hitTestable(),
-      );
-      await tester.pumpAndSettle();
-      expect(requests.attempts, 2);
-      expect(requests.version, 'v2');
-      expect(
-        requests.submittedFare,
-        const Money(amountMinor: 22500, currency: 'PKR'),
-      );
-      expect(controller.state.active?.id, 'ride-1');
-      expect(
-        tester.widget<RideMap>(find.byType(RideMap)).polylines,
-        hasLength(1),
-      );
-      await tester.pumpWidget(const SizedBox.shrink());
-    },
-  );
-
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.drag(
+          find.byKey(const Key('dashboardPanelDragHandle')),
+          const Offset(0, -400),
+        );
+        await tester.pumpAndSettle();
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(RiderRequestScreen)),
+        );
+        final controller = container.read(riderRequestControllerProvider);
+        controller.setPickup(requestedRide.pickup);
+        controller.setDestination(requestedRide.destination);
+        await tester.pumpAndSettle();
+        final list = tester.widget<ListView>(find.byType(ListView).first);
+        list.controller!.jumpTo(list.controller!.position.maxScrollExtent);
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<TextField>(find.byKey(const Key('fareField')))
+              .controller!
+              .text,
+          '125.00',
+        );
+        expect(routes.calls, 1);
+        expect(
+          tester.widget<TextField>(find.byKey(const Key('fareField'))).readOnly,
+          isTrue,
+        );
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.byKey(const Key('requestRideButton')));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const Key('requestRideButton')).hitTestable(),
+        );
+        await tester.pumpAndSettle();
+        expect(routes.calls, 2);
+        expect(requests.attempts, 1);
+        expect(controller.state.active, isNull);
+        expect(
+          tester
+              .widget<TextField>(find.byKey(const Key('fareField')))
+              .controller!
+              .text,
+          '225.00',
+        );
+        expect(
+          container
+              .read(riderRoutePreviewControllerProvider)
+              .state
+              .preview!
+              .pricingPolicyVersion,
+          'v2',
+        );
+        expect(
+          tester.widget<RideMap>(find.byType(RideMap)).polylines,
+          hasLength(1),
+        );
+        await tester.ensureVisible(find.byKey(const Key('requestRideButton')));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const Key('requestRideButton')).hitTestable(),
+        );
+        await tester.pumpAndSettle();
+        expect(requests.attempts, 2);
+        expect(requests.version, 'v2');
+        expect(
+          requests.submittedFare,
+          const Money(amountMinor: 22500, currency: 'PKR'),
+        );
+        expect(controller.state.active?.id, 'ride-1');
+        expect(
+          tester.widget<RideMap>(find.byType(RideMap)).polylines,
+          hasLength(1),
+        );
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
   }
 
   testWidgets(
