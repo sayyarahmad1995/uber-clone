@@ -176,3 +176,29 @@ func TestPricedRideRequestHTTP(t *testing.T) {
 		t.Fatalf("requests %d %v", n, e)
 	}
 }
+
+func TestReadOnlySuggestedFareHTTP(t *testing.T) {
+	db, code, id, policies := pricedDB(t)
+	policy, err := policies.Publish(context.Background(), pricedDraft(code), "owner")
+	if err != nil {
+		t.Fatal(err)
+	}
+	spy := &routePreviewSpy{}
+	api := pricedAPI(db, id, policies, true, spy)
+	body := previewBody(code)
+	body["pricing_policy_version"] = policy.ID.String()
+	body["proposed_fare"] = map[string]any{"amount_minor": 110000, "currency": "PKR"}
+	res := pricedHTTP(api, "/v1/ride-requests", body, true)
+	if res.Code != 409 || !strings.Contains(res.Body.String(), "suggested_fare_changed") {
+		t.Fatalf("edited fare accepted: %d %s", res.Code, res.Body.String())
+	}
+	var count int
+	if err := db.QueryRow("SELECT count(*) FROM ride_requests WHERE rider_user_id=$1", id).Scan(&count); err != nil || count != 0 {
+		t.Fatalf("rejected fare wrote request: %d %v", count, err)
+	}
+	body["proposed_fare"] = map[string]any{"amount_minor": 12500, "currency": "PKR"}
+	res = pricedHTTP(api, "/v1/ride-requests", body, true)
+	if res.Code != 201 || !strings.Contains(res.Body.String(), "12500") || spy.calls != 2 {
+		t.Fatalf("suggestion booking: %d %s calls=%d", res.Code, res.Body.String(), spy.calls)
+	}
+}

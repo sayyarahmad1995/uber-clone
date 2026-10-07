@@ -96,7 +96,7 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
   testWidgets(
-    'priced booking preserves edits and requires explicit resubmit after rate conflict',
+    'priced booking is read-only and requires explicit resubmit after rate conflict',
     (tester) async {
       final requests = _ConflictRequests();
       final routes = _PricedRoutes();
@@ -155,7 +155,7 @@ void main() {
         '125.00',
       );
       expect(routes.calls, 1);
-      await tester.enterText(find.byKey(const Key('fareField')), '1100');
+      expect(tester.widget<TextField>(find.byKey(const Key('fareField'))).readOnly, isTrue);
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.byKey(const Key('requestRideButton')));
       await tester.pumpAndSettle();
@@ -171,7 +171,7 @@ void main() {
             .widget<TextField>(find.byKey(const Key('fareField')))
             .controller!
             .text,
-        '1100',
+        '225.00',
       );
       expect(
         container
@@ -195,7 +195,7 @@ void main() {
       expect(requests.version, 'v2');
       expect(
         requests.submittedFare,
-        const Money(amountMinor: 110000, currency: 'PKR'),
+        const Money(amountMinor: 22500, currency: 'PKR'),
       );
       expect(controller.state.active?.id, 'ride-1');
       expect(
