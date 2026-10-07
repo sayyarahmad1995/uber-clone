@@ -37,6 +37,7 @@ body{font-family:system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0
 </head>
 <body>
 <h1>HiGO operations</h1>
+<p><a href="/admin/operations/pricing">Pricing policies →</a></p>
 <p><a href="/admin/driver-onboarding">Driver onboarding review →</a></p>
 {{if .Message}}<p class="message">{{.Message}}</p>{{end}}
 <div class="card">
