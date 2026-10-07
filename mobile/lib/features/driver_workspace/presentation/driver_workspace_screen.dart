@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +11,7 @@ import '../../../core/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../ride_flow/ride_flow_panels.dart';
 import '../application/driver_onboarding_controller.dart';
+import '../application/driver_route_controller.dart';
 import '../domain/driver_onboarding.dart';
 import '../domain/driver_profile.dart';
 import 'operating_selection.dart';
@@ -28,6 +31,7 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
     with WidgetsBindingObserver {
   final _mapController = RideMapController();
   bool _reapplying = false;
+  String? _lastFittedRouteKey;
 
   @override
   void initState() {
@@ -44,6 +48,7 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
       driver.setForeground(true);
       if (driver.profile != null) {
         flow.setForeground(true);
+        ref.read(driverRouteControllerProvider).retry();
       }
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden ||
@@ -101,6 +106,13 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
         }
       });
     }
+    final route = profile == null
+        ? const DriverRouteState()
+        : ref.watch(driverRouteControllerProvider).state;
+    _scheduleRouteFit(
+      route,
+      trip?.rideRequestId,
+    );
     final onboarding = driver.loaded && profile == null
         ? ref.watch(driverOnboardingControllerProvider)
         : null;
@@ -159,20 +171,62 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
               label: 'destination',
             ),
         ],
+        polylines: route.preview == null
+            ? const []
+            : [
+                RideMapPolyline(
+                  points: route.preview!.points
+                      .map((point) => RideMapPoint(
+                            point.latitude,
+                            point.longitude,
+                          ))
+                      .toList(growable: false),
+                  color: Theme.of(context).colorScheme.primary,
+                  width: 6,
+                ),
+              ],
       ),
       mapControls: profile == null
           ? null
-          : _DriverMapFocusButton(onPressed: _focusCurrentLocation),
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _DriverMapFocusButton(onPressed: _focusCurrentLocation),
+                if (route.error != null) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  FloatingActionButton.small(
+                    key: const Key('driverRouteRetryButton'),
+                    heroTag: 'driver-route-retry',
+                    tooltip: 'Retry driving route',
+                    onPressed: () async {
+                      await ref.read(driverTripControllerProvider).refresh();
+                      if (!mounted) return;
+                      await ref.read(driverRouteControllerProvider).retry();
+                    },
+                    child: const Icon(Icons.refresh),
+                  ),
+                ],
+              ],
+            ),
       floatingStatus: DashboardStatusCard(
         icon: Icons.local_taxi,
         title: 'Driver dashboard',
-        message: _statusMessage(
-          loading: loading,
-          onboardingFailed: onboardingFailed,
-          profile: profile,
-          application: application,
-          onlinePresenceReady: driver.onlinePresenceReady,
-        ),
+        message: route.loading
+            ? route.status == 'assigned'
+                  ? 'Loading route to pickup.'
+                  : 'Loading route to destination.'
+            : route.error ??
+                  (route.preview != null
+                      ? route.status == 'assigned'
+                            ? 'Driving route to pickup.'
+                            : 'Driving route to destination.'
+                      : _statusMessage(
+                          loading: loading,
+                          onboardingFailed: onboardingFailed,
+                          profile: profile,
+                          application: application,
+                          onlinePresenceReady: driver.onlinePresenceReady,
+                        )),
       ),
       panelBuilder: (_, scrollController, scrollEnabled) {
         final physics = scrollEnabled
@@ -259,6 +313,27 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
         );
       },
     );
+  }
+
+  void _scheduleRouteFit(DriverRouteState route, String? rideRequestId) {
+    final preview = route.preview;
+    if (preview == null) {
+      _lastFittedRouteKey = null;
+      return;
+    }
+    final key = '$rideRequestId|${route.status}|${preview.encodedPolyline}';
+    if (_lastFittedRouteKey == key) return;
+    _lastFittedRouteKey = key;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _lastFittedRouteKey != key) return;
+      unawaited(
+        _mapController.fit(
+          preview.points.map(
+            (point) => RideMapPoint(point.latitude, point.longitude),
+          ),
+        ),
+      );
+    });
   }
 
   String _statusMessage({

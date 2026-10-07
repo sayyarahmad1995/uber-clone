@@ -16,33 +16,34 @@ import 'package:uber_clone/features/ride_flow/domain/trip.dart';
 import 'test_doubles.dart';
 
 void main() {
-  testWidgets('Driver route switches from pickup to destination on Start trip', (
-    tester,
-  ) async {
-    final flow = _Flow();
-    final routes = _Routes();
-    final container = await _pump(tester, flow, routes);
-    expect(_map(tester).polylines, hasLength(1));
-    expect(_map(tester).polylines.single.points.first.latitude, 38.5);
-    expect(routes.requests.single['status'], 'assigned');
-    expect(routes.requests.single['origin'], {
-      'latitude': 24.86,
-      'longitude': 67.01,
-    });
+  testWidgets(
+    'Driver route switches from pickup to destination on Start trip',
+    (tester) async {
+      final flow = _Flow();
+      final routes = _Routes();
+      final container = await _pump(tester, flow, routes);
+      expect(_map(tester).polylines, hasLength(1));
+      expect(_map(tester).polylines.single.points.first.latitude, 38.5);
+      expect(routes.requests.single['status'], 'assigned');
+      expect(routes.requests.single['origin'], {
+        'latitude': 24.86,
+        'longitude': 67.01,
+      });
 
-    await container.read(driverTripControllerProvider).startTrip('ride-1');
-    await tester.pumpAndSettle();
-    expect(routes.requests.last['status'], 'in_progress');
-    expect(routes.requests.last.containsKey('origin'), isFalse);
-    expect(_map(tester).polylines, hasLength(1));
-    expect(_map(tester).polylines.single.points.first.latitude, 0);
+      await container.read(driverTripControllerProvider).startTrip('ride-1');
+      await tester.pumpAndSettle();
+      expect(routes.requests.last['status'], 'in_progress');
+      expect(routes.requests.last.containsKey('origin'), isFalse);
+      expect(_map(tester).polylines, hasLength(1));
+      expect(_map(tester).polylines.single.points.first.latitude, 0);
 
-    await container.read(driverTripControllerProvider).completeTrip('ride-1');
-    await tester.pumpAndSettle();
-    expect(_map(tester).polylines, isEmpty);
-    expect(routes.requests, hasLength(2));
-    await tester.pumpWidget(const SizedBox.shrink());
-  });
+      await container.read(driverTripControllerProvider).completeTrip('ride-1');
+      await tester.pumpAndSettle();
+      expect(_map(tester).polylines, isEmpty);
+      expect(routes.requests, hasLength(2));
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 
   testWidgets('restored in-progress trip loads its route without pickup GPS', (
     tester,
@@ -72,36 +73,38 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('route failure exposes retry and never draws a fabricated route', (
-    tester,
-  ) async {
-    final routes = _Routes()..fail = true;
-    await _pump(tester, _Flow(), routes);
-    expect(_map(tester).polylines, isEmpty);
-    expect(find.byKey(const Key('driverRouteRetryButton')), findsOneWidget);
-    routes.fail = false;
-    await tester.tap(find.byKey(const Key('driverRouteRetryButton')));
-    await tester.pumpAndSettle();
-    expect(_map(tester).polylines, hasLength(1));
-    expect(find.byKey(const Key('driverRouteRetryButton')), findsNothing);
-    await tester.pumpWidget(const SizedBox.shrink());
-  });
+  testWidgets(
+    'route failure exposes retry and never draws a fabricated route',
+    (tester) async {
+      final routes = _Routes()..fail = true;
+      await _pump(tester, _Flow(), routes);
+      expect(_map(tester).polylines, isEmpty);
+      expect(find.byKey(const Key('driverRouteRetryButton')), findsOneWidget);
+      routes.fail = false;
+      await tester.tap(find.byKey(const Key('driverRouteRetryButton')));
+      await tester.pumpAndSettle();
+      expect(_map(tester).polylines, hasLength(1));
+      expect(find.byKey(const Key('driverRouteRetryButton')), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 
-  testWidgets('cancelled trip clears the route and polling does not reprice it', (
-    tester,
-  ) async {
-    final flow = _Flow();
-    final routes = _Routes();
-    final container = await _pump(tester, flow, routes);
-    await container.read(driverTripControllerProvider).refresh();
-    await tester.pumpAndSettle();
-    expect(routes.requests, hasLength(1));
-    await container.read(driverTripControllerProvider).cancelTrip('ride-1');
-    await tester.pumpAndSettle();
-    expect(_map(tester).polylines, isEmpty);
-    expect(routes.requests, hasLength(1));
-    await tester.pumpWidget(const SizedBox.shrink());
-  });
+  testWidgets(
+    'cancelled trip clears the route without refetching unchanged stages',
+    (tester) async {
+      final flow = _Flow();
+      final routes = _Routes();
+      final container = await _pump(tester, flow, routes);
+      await container.read(driverTripControllerProvider).refresh();
+      await tester.pumpAndSettle();
+      expect(routes.requests, hasLength(1));
+      await container.read(driverTripControllerProvider).cancelTrip('ride-1');
+      await tester.pumpAndSettle();
+      expect(_map(tester).polylines, isEmpty);
+      expect(routes.requests, hasLength(1));
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 }
 
 RideMap _map(WidgetTester tester) =>
@@ -159,10 +162,12 @@ class _Flow extends FakeRideFlowRepository {
   Future<void> startTrip(String rideRequestId) async {
     currentTrip = _trip('in_progress');
   }
+
   @override
   Future<void> completeTrip(String rideRequestId) async {
     currentTrip = _trip('completed');
   }
+
   @override
   Future<void> cancelDriverTrip(String rideRequestId) async {
     currentTrip = _trip('cancelled');
@@ -201,11 +206,14 @@ class _Routes implements HttpClientAdapter {
       return ResponseBody.fromString(
         '{"error":"route unavailable"}',
         503,
-        headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
+        headers: {
+          Headers.contentTypeHeader: [Headers.jsonContentType],
+        },
       );
     }
     return _response(data['status'] as String);
   }
+
   @override
   void close({bool force = false}) {}
 }
@@ -221,5 +229,7 @@ ResponseBody _response(String status) => ResponseBody.fromString(
     },
   }),
   200,
-  headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
+  headers: {
+    Headers.contentTypeHeader: [Headers.jsonContentType],
+  },
 );

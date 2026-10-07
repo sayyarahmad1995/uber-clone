@@ -24,19 +24,19 @@ func TestDriverRouteUsesAuthenticatedTripEndpoints(t *testing.T) {
 			driverID := uuid.New()
 			view := drivertrip.View{
 				RideRequestID: uuid.New(),
-				Pickup: ride.Location{Latitude: 24.86, Longitude: 67.01},
-				Destination: ride.Location{Latitude: 24.91, Longitude: 67.08},
-				Status: status,
+				Pickup:        ride.Location{Latitude: 24.86, Longitude: 67.01},
+				Destination:   ride.Location{Latitude: 24.91, Longitude: 67.08},
+				Status:        status,
 			}
 			trips := &routeTripRepository{driverID: driverID, view: view}
 			provider := &routePreviewSpy{}
 			api := routeTestAPI(driverID, true, trips, provider)
 			body := map[string]any{
 				"ride_request_id": view.RideRequestID.String(),
-				"status": string(status),
-				"origin": map[string]any{"latitude": 24.80, "longitude": 67.00},
+				"status":          string(status),
+				"origin":          map[string]any{"latitude": 24.80, "longitude": 67.00},
 				// Client-supplied trip endpoints must not be trusted.
-				"pickup": map[string]any{"latitude": 1, "longitude": 2},
+				"pickup":      map[string]any{"latitude": 1, "longitude": 2},
 				"destination": map[string]any{"latitude": 3, "longitude": 4},
 			}
 			response := routeRequest(api, body, true)
@@ -68,16 +68,16 @@ func TestDriverRouteUsesAuthenticatedTripEndpoints(t *testing.T) {
 
 func TestDriverRouteRejectsUnauthorizedStaleAndInvalidRequests(t *testing.T) {
 	cases := []struct {
-		name string
-		authorized bool
-		driver bool
-		status trip.Status
-		missingTrip bool
-		wrongID bool
-		wrongStatus bool
-		origin map[string]any
+		name          string
+		authorized    bool
+		driver        bool
+		status        trip.Status
+		missingTrip   bool
+		wrongID       bool
+		wrongStatus   bool
+		origin        map[string]any
 		providerError error
-		want int
+		want          int
 	}{
 		{name: "unsigned", driver: true, status: trip.StatusAssigned, want: 401},
 		{name: "rider only", authorized: true, status: trip.StatusAssigned, want: 403},
@@ -95,7 +95,7 @@ func TestDriverRouteRejectsUnauthorizedStaleAndInvalidRequests(t *testing.T) {
 			driverID := uuid.New()
 			view := drivertrip.View{
 				RideRequestID: uuid.New(), Status: tc.status,
-				Pickup: ride.Location{Latitude: 24.86, Longitude: 67.01},
+				Pickup:      ride.Location{Latitude: 24.86, Longitude: 67.01},
 				Destination: ride.Location{Latitude: 24.91, Longitude: 67.08},
 			}
 			trips := &routeTripRepository{driverID: driverID, view: view}
@@ -144,10 +144,10 @@ func routeTestAPI(id uuid.UUID, driver bool, trips *routeTripRepository, provide
 		capabilities = append(capabilities, user.CapabilityDriver)
 	}
 	return New(Dependencies{
-		Identity: routeIdentity{},
-		Users: user.NewService(routeUserRepository{value: user.User{ID: id, Capabilities: capabilities}}),
+		Identity:    routeIdentity{},
+		Users:       user.NewService(routeUserRepository{value: user.User{ID: id, Capabilities: capabilities}}),
 		DriverTrips: drivertrip.NewService(trips),
-		Routing: routing.NewService(provider),
+		Routing:     routing.NewService(provider),
 	})
 }
 
@@ -168,8 +168,8 @@ func (r routeUserRepository) AddCapability(context.Context, uuid.UUID, user.Capa
 
 type routeTripRepository struct {
 	driverID uuid.UUID
-	view drivertrip.View
-	err error
+	view     drivertrip.View
+	err      error
 }
 
 func (r *routeTripRepository) GetCurrent(_ context.Context, id uuid.UUID) (drivertrip.View, error) {
@@ -184,9 +184,9 @@ func (*routeTripRepository) ListHistory(context.Context, uuid.UUID, int) ([]driv
 
 type routePreviewSpy struct {
 	calls int
-	from routing.Endpoint
-	to routing.Endpoint
-	err error
+	from  routing.Endpoint
+	to    routing.Endpoint
+	err   error
 }
 
 func (s *routePreviewSpy) Preview(_ context.Context, from, to routing.Endpoint) (routing.Route, error) {

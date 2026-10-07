@@ -19,6 +19,8 @@ import '../features/authentication/presentation/verification_screen.dart';
 import '../features/capabilities/presentation/capability_home_screen.dart';
 import '../features/capabilities/presentation/splash_screen.dart';
 import '../features/driver_workspace/application/driver_controller.dart';
+import '../features/driver_workspace/application/driver_route_controller.dart';
+import '../features/driver_workspace/data/driver_route_repository.dart';
 import '../features/driver_workspace/application/driver_presence_service.dart';
 import '../features/driver_workspace/data/android_driver_presence_service.dart';
 import '../features/driver_workspace/application/driver_onboarding_controller.dart';
@@ -159,6 +161,25 @@ final riderRoutePreviewControllerProvider =
       return RiderRoutePreviewController(
         ref.watch(routePreviewRepositoryProvider),
         ref.watch(riderRequestControllerProvider),
+      );
+    });
+final driverRouteRepositoryProvider = Provider.autoDispose<DriverRouteRepository>(
+  (ref) {
+    final repository = ApiDriverRouteRepository(
+      ref.watch(dioProvider),
+      ref.watch(sessionStoreProvider),
+    );
+    ref.onDispose(repository.cancel);
+    return repository;
+  },
+);
+final driverRouteControllerProvider =
+    ChangeNotifierProvider.autoDispose<DriverRouteController>((ref) {
+      ref.watch(sessionControllerProvider.select((s) => s.state.account?.id));
+      return DriverRouteController(
+        ref.watch(driverRouteRepositoryProvider),
+        ref.watch(driverTripControllerProvider.notifier),
+        ref.watch(deviceLocationProvider),
       );
     });
 final driverRepositoryProvider = Provider<DriverRepository>(
