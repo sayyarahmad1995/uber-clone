@@ -13,7 +13,8 @@ import 'package:uber_clone/features/ride_flow/domain/marketplace_request.dart';
 import 'package:uber_clone/features/ride_flow/domain/ride_execution.dart';
 import 'package:uber_clone/features/ride_flow/domain/trip.dart';
 import 'package:uber_clone/features/rider_request/data/device_location.dart';
-import 'package:uber_clone/features/rider_request/domain/ride_request.dart' show GeoPoint;
+import 'package:uber_clone/features/rider_request/domain/ride_request.dart'
+    show GeoPoint;
 
 import 'test_doubles.dart';
 
@@ -28,8 +29,10 @@ void main() {
       expect(_map(tester).polylines.single.points.first.latitude, 38.5);
       expect(routes.received.single.path, '/v1/driver/trip/route-preview');
       expect(routes.received.single.method, 'POST');
-      expect(routes.received.single.headers['Authorization'],
-          ['Bearer', 'route-test'].join(' '));
+      expect(
+        routes.received.single.headers['Authorization'],
+        ['Bearer', 'route-test'].join(' '),
+      );
       expect(routes.requests.single['status'], 'assigned');
       expect(routes.requests.single['origin'], {
         'latitude': 24.86,
@@ -41,13 +44,20 @@ void main() {
       expect(tripController.error, isNull);
       expect(tripController.trip?.status, 'in_progress');
       await tester.pumpAndSettle();
-      expect(container.read(driverRouteControllerProvider).state.status,
-          'in_progress');
+      expect(
+        container.read(driverRouteControllerProvider).state.status,
+        'in_progress',
+      );
       expect(container.read(driverRouteControllerProvider).state.error, isNull);
-      expect(container.read(driverRouteControllerProvider).state.loading, isFalse);
+      expect(
+        container.read(driverRouteControllerProvider).state.loading,
+        isFalse,
+      );
       expect(routes.requests.last['status'], 'in_progress');
-      expect(routes.received.last.headers['Authorization'],
-          ['Bearer', 'route-test'].join(' '));
+      expect(
+        routes.received.last.headers['Authorization'],
+        ['Bearer', 'route-test'].join(' '),
+      );
       expect(routes.requests.last.containsKey('origin'), isFalse);
       expect(_map(tester).polylines, hasLength(1));
       expect(_map(tester).polylines.single.points.first.latitude, 0);
@@ -243,8 +253,8 @@ class _Routes implements HttpClientAdapter {
     Stream<List<int>>? requestStream,
     Future<void>? cancelFuture,
   ) async {
-    received.add(options);
     final data = Map<String, dynamic>.from(options.data as Map);
+    received.add(options);
     requests.add(data);
     if (firstReply != null && requests.length == 1) {
       return firstReply!.future;
