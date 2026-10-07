@@ -37,6 +37,7 @@ func pricingDB(t *testing.T) (*sql.DB, string) {
 	if _, err := db.Exec("INSERT INTO driver_service_catalog(code,display_name,is_active,rider_visible,sort_order) VALUES($1,'Pricing fixture',true,true,999)", code); err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { _, _ = db.Exec("UPDATE driver_service_catalog SET rider_visible=false WHERE code=$1", code) })
 	return db, code
 }
 func draftFor(code string) Draft {

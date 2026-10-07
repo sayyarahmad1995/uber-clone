@@ -41,6 +41,7 @@ func requestPricingDB(t *testing.T) (*sql.DB, string, uuid.UUID, *pricing.Postgr
 	if _, e := db.Exec("INSERT INTO driver_service_catalog(code,display_name,is_active,rider_visible) VALUES($1,'Request pricing test',true,true)", code); e != nil {
 		t.Fatal(e)
 	}
+	t.Cleanup(func() { _, _ = db.Exec("UPDATE driver_service_catalog SET rider_visible=false WHERE code=$1", code) })
 	policies := pricing.NewPostgresRepository(db)
 	p, e := policies.Publish(context.Background(), requestDraft(code), "owner-A")
 	if e != nil {
