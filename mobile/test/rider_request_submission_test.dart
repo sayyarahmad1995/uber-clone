@@ -260,7 +260,7 @@ void main() {
       final list = tester.widget<ListView>(find.byType(ListView).first);
       list.controller!.jumpTo(list.controller!.position.maxScrollExtent);
       await tester.pumpAndSettle();
-      await tester.enterText(find.byKey(const Key('fareField')), '1100');
+      expect(tester.widget<TextField>(find.byKey(const Key('fareField'))).readOnly, isTrue);
       await tester.pumpAndSettle();
       controller.selectService('comfort');
       await tester.pumpAndSettle();
@@ -271,7 +271,7 @@ void main() {
             .text,
         '225.00',
       );
-      await tester.enterText(find.byKey(const Key('fareField')), '900');
+      expect(tester.widget<TextField>(find.byKey(const Key('fareField'))).readOnly, isTrue);
       await tester.pumpAndSettle();
       controller.setPickup(
         requestedRide.pickup,
