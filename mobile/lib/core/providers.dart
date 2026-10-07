@@ -162,7 +162,7 @@ final riderRoutePreviewControllerProvider =
       ref.listen(riderRequestControllerProvider, (_, __) {});
       return RiderRoutePreviewController(
         ref.watch(routePreviewRepositoryProvider),
-        ref.watch(riderRequestControllerProvider),
+        ref.read(riderRequestControllerProvider),
       );
     });
 final riderFareControllerProvider =
