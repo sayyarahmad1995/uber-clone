@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"github.com/google/uuid"
-	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/database"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/locationsearch"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/database"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/migrations"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/pricing"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/ride"
@@ -231,7 +231,6 @@ func (s *readOnlyRouteSpy) Preview(_ context.Context, pickup, destination routin
 	return routing.Route{DistanceMeters: 2000, DurationSeconds: 300, EncodedPolyline: "??_ibE_ibE"}, s.err
 }
 
-
 func TestSuggestedFareRejectsMismatchedPlaceCoordinates(t *testing.T) {
 	db, code, id, policies := pricedDB(t)
 	policy, err := policies.Publish(context.Background(), pricedDraft(code), "owner")
@@ -256,7 +255,7 @@ func TestSuggestedFareRejectsMismatchedPlaceCoordinates(t *testing.T) {
 	}
 }
 
-type pricingPlaces struct { locationsearch.Searcher }
+type pricingPlaces struct{ locationsearch.Searcher }
 
 func (s *pricingPlaces) Details(_ context.Context, id, _ string) (locationsearch.Place, error) {
 	point := locationsearch.Point{Latitude: 24.86, Longitude: 67.01}

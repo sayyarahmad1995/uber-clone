@@ -88,3 +88,5 @@ CI is automated evidence only. Record device, app/backend commit, approved tarif
 - [ ] Exercise panel drag/scroll handoff, dropdown selection, map pan/zoom, rotation and background/resume with fare and Retry controls visible.
 
 - [ ] Change route conditions between preview and submission. A changed fare returns `suggested_fare_changed`, creates no request, refreshes the display and requires another tap. Verify selected Place IDs are retained during revalidation.
+
+- [ ] Named-place booking resolves the same canonical coordinates at submission. Mismatched or changed Place ID/coordinate pairs cannot create a request, and a failed Place Details lookup offers a clear error without writes. Free-pin coordinates remain exact.

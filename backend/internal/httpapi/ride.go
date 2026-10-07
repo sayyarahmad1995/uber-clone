@@ -64,7 +64,7 @@ func (api *API) createRideRequest(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "pickup, destination, and proposed_fare are required"})
 		return
 	}
-	if api.suggestedFaresEnabled && !api.validateSuggestedFare(w, r, body, input) {
+	if api.suggestedFaresEnabled && !api.validateSuggestedFare(w, r, body, input, u.ID.String()) {
 		return
 	}
 	request, err := api.rides.Create(r.Context(), u.ID, input)
@@ -183,7 +183,7 @@ func rideRequestStatusResponse(request ride.Request, assignedTrip *trip.Trip) ma
 
 // Revalidate the displayed amount without trusting client route metrics or rates.
 // The repository still atomically checks the policy version after routing returns.
-func (api *API) validateSuggestedFare(w http.ResponseWriter, r *http.Request, body createRideRequestBody, input ride.CreateInput) bool {
+func (api *API) validateSuggestedFare(w http.ResponseWriter, r *http.Request, body createRideRequestBody, input ride.CreateInput, userID string) bool {
 	expected, err := uuid.Parse(input.PricingPolicyVersion)
 	if err != nil || input.ProposedFare.Currency != "PKR" || input.ProposedFare.AmountMinor <= 0 || input.ProposedFare.AmountMinor > ride.MaxFareMinor {
 		writePricingError(w, pricing.ErrInvalidPolicy)
@@ -201,6 +201,14 @@ func (api *API) validateSuggestedFare(w http.ResponseWriter, r *http.Request, bo
 	if expected != policy.ID {
 		writePricingError(w, pricing.ErrPolicyChanged)
 		return false
+	}
+	if strings.TrimSpace(body.Pickup.PlaceID) != "" || strings.TrimSpace(body.Destination.PlaceID) != "" {
+		if !api.allowLocationSearch(userID, w) {
+			return false
+		}
+		if !api.validatePricedPlace(w, r, body.Pickup.PlaceID, input.Pickup) || !api.validatePricedPlace(w, r, body.Destination.PlaceID, input.Destination) {
+			return false
+		}
 	}
 	if api.routing == nil {
 		api.writeRoutingError(w, r, routing.ErrUnavailable)
@@ -220,6 +228,26 @@ func (api *API) validateSuggestedFare(w http.ResponseWriter, r *http.Request, bo
 	}
 	if amount != input.ProposedFare.AmountMinor {
 		writeJSON(w, http.StatusConflict, map[string]string{"error": "suggested_fare_changed", "message": "Suggested fare changed. Review the refreshed fare and submit again."})
+		return false
+	}
+	return true
+}
+
+
+// A Google Place ID takes precedence over coordinates during routing. Resolve
+// the selected ID so the priced endpoint cannot differ from the saved request.
+func (api *API) validatePricedPlace(w http.ResponseWriter, r *http.Request, placeID string, location ride.Location) bool {
+	placeID = strings.TrimSpace(placeID)
+	if placeID == "" {
+		return true
+	}
+	place, err := api.locationSearch.Details(r.Context(), placeID, "")
+	if err != nil {
+		api.writeLocationSearchError(w, r, err)
+		return false
+	}
+	if !place.Location.Valid() || place.Location.Latitude != location.Latitude || place.Location.Longitude != location.Longitude {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "location_selection_changed", "message": "Selected place changed. Select pickup and destination again."})
 		return false
 	}
 	return true
