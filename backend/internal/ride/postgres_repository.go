@@ -6,13 +6,16 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
+ "github.com/sayyarahmad1995/uber-clone/backend/internal/pricing"
 )
 
-type PostgresRepository struct{ db *sql.DB }
+type PostgresRepository struct { db *sql.DB; pricingRequired bool; pricingConfigured bool }
 
 func NewPostgresRepository(db *sql.DB) PostgresRepository { return PostgresRepository{db: db} }
+func NewPostgresRepositoryWithPricing(db *sql.DB, policies *pricing.PostgresRepository, required bool) PostgresRepository { return PostgresRepository{db:db,pricingRequired:required,pricingConfigured:policies!=nil} }
 
 func (r PostgresRepository) Create(ctx context.Context, riderUserID uuid.UUID, input CreateInput) (Request, error) {
+ if r.pricingRequired {return r.createPriced(ctx,riderUserID,input)}
 	var proposedAmount any
 	var proposedCurrency any
 	if input.ProposedFare != nil {
