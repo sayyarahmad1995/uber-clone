@@ -120,7 +120,11 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     final active = state.active;
     final placeState = ref.watch(riderPlaceSearchControllerProvider).state;
     final routeState = ref.watch(riderRoutePreviewControllerProvider).state;
-    final routePreview = active == null ? routeState.preview : null;
+    final routeMatchesRide =
+        active == null ||
+        (active.pickup == state.pickup &&
+            active.destination == state.destination);
+    final routePreview = routeMatchesRide ? routeState.preview : null;
     _scheduleRouteFit(routePreview);
     final driverLocation = active == null
         ? null
@@ -154,7 +158,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
               label: 'Driver',
             ),
         ],
-        polylines: active == null && routePreview != null
+        polylines: routePreview != null
             ? [
                 RideMapPolyline(
                   points: routePreview.points
