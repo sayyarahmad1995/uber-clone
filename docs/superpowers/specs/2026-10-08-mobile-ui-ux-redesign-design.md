@@ -1,7 +1,7 @@
 # HiGO mobile UI/UX redesign specification
 
 Date: 2026-10-08
-Status: proposed written specification; awaiting owner review.
+Status: approved by owner on 2026-10-08 after review of the five visual specification boards.
 Baseline: main at 3a9fdfa2ca9305d20102ed1b5a61e84129452bfc.
 Delivery: horizontal foundations across Rider and Driver, then shared screen groups.
 
@@ -22,7 +22,8 @@ The selected approach is a journey redesign using reusable components.
 A cosmetic-only refresh would retain the content hierarchy problems; an
 app/backend rewrite adds unnecessary regression risk.
 
-Approval of this written spec precedes the detailed implementation plan.
+The owner approved this written spec and its visual specification on 2026-10-08.
+The implementation plan is docs/superpowers/plans/2026-10-08-mobile-ui-ux-redesign.md.
 The current audit is docs/ux/2026-10-08-mobile-ux-audit.md.
 
 ### Included
@@ -390,5 +391,7 @@ The owner should review four concrete decisions:
    infrastructure in this rollout.
 4. Horizontal delivery order and preservation of current backend/ride semantics.
 
-The accepted visual direction is recorded. Written-spec approval, implementation
-plan approval and product-code execution have not yet occurred.
+The visual direction, horizontal delivery and written/visual specification are
+approved. Implementation-plan review and execution-method selection are pending;
+product-code execution has not started.
+
