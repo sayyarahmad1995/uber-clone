@@ -22,10 +22,7 @@ void main() {
         });
     expect(await navigation.open(const RideMapPoint(-24.87, 67.02)), isTrue);
     expect(received?.method, 'openGoogleMaps');
-    expect(received?.arguments, {
-      'latitude': -24.87,
-      'longitude': 67.02,
-    });
+    expect(received?.arguments, {'latitude': -24.87, 'longitude': 67.02});
   });
 
   test('invalid coordinates cannot reach the platform launcher', () async {

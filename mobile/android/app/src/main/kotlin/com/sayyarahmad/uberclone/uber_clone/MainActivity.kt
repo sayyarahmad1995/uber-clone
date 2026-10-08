@@ -16,8 +16,8 @@ class MainActivity : FlutterActivity() {
                     result.notImplemented()
                     return@setMethodCallHandler
                 }
-                val latitude = call.argument<Number>("latitude")?.toDouble()
-                val longitude = call.argument<Number>("longitude")?.toDouble()
+                val latitude = (call.argument<Any>("latitude") as? Number)?.toDouble()
+                val longitude = (call.argument<Any>("longitude") as? Number)?.toDouble()
                 if (latitude == null || longitude == null ||
                     !latitude.isFinite() || !longitude.isFinite() ||
                     latitude !in -90.0..90.0 || longitude !in -180.0..180.0

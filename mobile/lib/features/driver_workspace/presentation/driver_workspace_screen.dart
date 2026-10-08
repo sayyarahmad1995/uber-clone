@@ -193,22 +193,6 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 _DriverMapFocusButton(onPressed: _focusCurrentLocation),
-                if (navigationTarget != null) ...[
-                  const SizedBox(height: AppSpacing.sm),
-                  FloatingActionButton.extended(
-                    key: const Key('driverNavigationButton'),
-                    heroTag: 'driver-navigation',
-                    onPressed: _navigationInFlight == navigationKey
-                        ? null
-                        : _navigate,
-                    icon: const Icon(Icons.navigation),
-                    label: Text(
-                      trip!.status == 'assigned'
-                          ? 'Navigate to pickup'
-                          : 'Navigate to destination',
-                    ),
-                  ),
-                ],
                 if (route.error != null) ...[
                   const SizedBox(height: AppSpacing.sm),
                   FloatingActionButton.small(
@@ -275,6 +259,22 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
             onAvailabilityChanged: driver.setOnline,
             selectionValid: driver.operation?.valid == true,
             activeTrip: trip != null,
+            navigationControl: navigationTarget == null
+                ? null
+                : DashboardPanelControl(
+                    child: FilledButton.icon(
+                      key: const Key('driverNavigationButton'),
+                      onPressed: _navigationInFlight == navigationKey
+                          ? null
+                          : _navigate,
+                      icon: const Icon(Icons.navigation),
+                      label: Text(
+                        trip!.status == 'assigned'
+                            ? 'Navigate to pickup'
+                            : 'Navigate to destination',
+                      ),
+                    ),
+                  ),
             onPublishLocation: _focusCurrentLocation,
             onRefresh: driver.load,
           );
@@ -330,7 +330,6 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
     );
   }
 
-
   RideMapPoint? _navigationTarget(TripSnapshot? trip) {
     if (trip?.rideRequestId == null) return null;
     final target = switch (trip!.status) {
@@ -374,9 +373,7 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
     if (!opened &&
         _navigationKey(ref.read(driverTripControllerProvider).trip) == key) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Unable to open Google Maps. Try again.'),
-        ),
+        const SnackBar(content: Text('Unable to open Google Maps. Try again.')),
       );
     }
   }
@@ -385,8 +382,10 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
     final preview = route.preview!;
     final kilometres = (preview.distanceMeters / 1000).toStringAsFixed(1);
     final minutes = (preview.durationSeconds / 60).ceil();
-    final target = route.status == 'assigned' ? 'pickup' : 'destination';
-    return 'Estimated route to $target: $kilometres km, $minutes min';
+    final label = route.status == 'assigned'
+        ? 'Estimated route to pickup'
+        : 'Estimated full trip route';
+    return '$label: $kilometres km, $minutes min';
   }
 
   void _scheduleRouteFit(DriverRouteState route, String? rideRequestId) {
@@ -660,6 +659,7 @@ class _DriverReadinessPanel extends StatelessWidget {
     required this.onAvailabilityChanged,
     required this.selectionValid,
     required this.activeTrip,
+    required this.navigationControl,
     required this.onPublishLocation,
     required this.onRefresh,
   });
@@ -668,6 +668,7 @@ class _DriverReadinessPanel extends StatelessWidget {
   final bool onlinePresenceReady;
   final bool selectionValid;
   final bool activeTrip;
+  final Widget? navigationControl;
   final PublishedDriverLocation? location;
   final bool busy;
   final String? error;
@@ -683,6 +684,10 @@ class _DriverReadinessPanel extends StatelessWidget {
     physics: physics,
     padding: const EdgeInsets.all(AppSpacing.md),
     children: [
+      if (navigationControl != null) ...[
+        navigationControl!,
+        const SizedBox(height: AppSpacing.sm),
+      ],
       Text(
         activeTrip
             ? 'Your active trip'

@@ -42,32 +42,29 @@ void main() {
         });
     final flow = _Flow();
     final container = await _pump(tester, flow, _Routes());
-    expect(find.text('Estimated route to pickup: 2.0 km, 5 min'), findsOneWidget);
-    await tester.tap(find.text('Navigate to pickup'));
+    expect(
+      find.text('Estimated route to pickup: 2.0 km, 5 min'),
+      findsOneWidget,
+    );
+    await _tapNavigation(tester, 'Navigate to pickup');
     await tester.pumpAndSettle();
     expect(launched.single.method, 'openGoogleMaps');
-    expect(launched.single.arguments, {
-      'latitude': 24.87,
-      'longitude': 67.02,
-    });
+    expect(launched.single.arguments, {'latitude': 24.87, 'longitude': 67.02});
 
     await container.read(driverTripControllerProvider).startTrip('ride-1');
     await tester.pumpAndSettle();
     expect(find.text('Navigate to pickup'), findsNothing);
     expect(
-      find.text('Estimated route to destination: 2.0 km, 10 min'),
+      find.text('Estimated full trip route: 2.0 km, 10 min'),
       findsOneWidget,
     );
-    await tester.tap(find.text('Navigate to destination'));
+    await _tapNavigation(tester, 'Navigate to destination');
     await tester.pumpAndSettle();
-    expect(launched.last.arguments, {
-      'latitude': 24.90,
-      'longitude': 67.05,
-    });
+    expect(launched.last.arguments, {'latitude': 24.90, 'longitude': 67.05});
     await container.read(driverTripControllerProvider).completeTrip('ride-1');
     await tester.pumpAndSettle();
     expect(find.text('Navigate to destination'), findsNothing);
-    expect(find.textContaining('Estimated route to'), findsNothing);
+    expect(find.textContaining('Estimated '), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -77,13 +74,13 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(navigationChannel, (_) async => false);
     final container = await _pump(tester, _Flow(), _Routes());
-    await tester.tap(find.text('Navigate to pickup'));
+    await _tapNavigation(tester, 'Navigate to pickup');
     await tester.pumpAndSettle();
+    expect(find.text('Unable to open Google Maps. Try again.'), findsOneWidget);
     expect(
-      find.text('Unable to open Google Maps. Try again.'),
-      findsOneWidget,
+      container.read(driverTripControllerProvider).trip?.status,
+      'assigned',
     );
-    expect(container.read(driverTripControllerProvider).trip?.status, 'assigned');
     expect(find.text('Navigate to pickup'), findsOneWidget);
     expect(_map(tester).polylines, hasLength(1));
     await tester.pumpWidget(const SizedBox.shrink());
@@ -93,35 +90,35 @@ void main() {
     tester,
   ) async {
     await _pump(tester, _Flow(), _Routes()..fail = true);
-    expect(find.textContaining('Estimated route to'), findsNothing);
+    expect(find.textContaining('Estimated '), findsNothing);
     expect(find.text('Navigate to pickup'), findsOneWidget);
-    await tester.tap(find.text('Navigate to pickup'));
+    await _tapNavigation(tester, 'Navigate to pickup');
     await tester.pumpAndSettle();
     expect(find.text('Unable to open Google Maps. Try again.'), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('late navigation failure cannot leak into a different trip stage', (
-    tester,
-  ) async {
-    final reply = Completer<bool>();
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(navigationChannel, (_) => reply.future);
-    final container = await _pump(tester, _Flow(), _Routes());
-    await tester.tap(find.text('Navigate to pickup'));
-    await tester.pump();
-    await container.read(driverTripControllerProvider).startTrip('ride-1');
-    await tester.pumpAndSettle();
-    reply.complete(false);
-    await tester.pumpAndSettle();
-    expect(find.text('Unable to open Google Maps. Try again.'), findsNothing);
-    expect(find.text('Navigate to destination'), findsOneWidget);
-    await container.read(driverTripControllerProvider).cancelTrip('ride-1');
-    await tester.pumpAndSettle();
-    expect(find.text('Navigate to destination'), findsNothing);
-    await tester.pumpWidget(const SizedBox.shrink());
-  });
-
+  testWidgets(
+    'late navigation failure cannot leak into a different trip stage',
+    (tester) async {
+      final reply = Completer<bool>();
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(navigationChannel, (_) => reply.future);
+      final container = await _pump(tester, _Flow(), _Routes());
+      await _tapNavigation(tester, 'Navigate to pickup');
+      await tester.pump();
+      await container.read(driverTripControllerProvider).startTrip('ride-1');
+      await tester.pumpAndSettle();
+      reply.complete(false);
+      await tester.pumpAndSettle();
+      expect(find.text('Unable to open Google Maps. Try again.'), findsNothing);
+      expect(find.text('Navigate to destination'), findsOneWidget);
+      await container.read(driverTripControllerProvider).cancelTrip('ride-1');
+      await tester.pumpAndSettle();
+      expect(find.text('Navigate to destination'), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 
   testWidgets('navigation does not launch twice while a handoff is pending', (
     tester,
@@ -134,16 +131,15 @@ void main() {
           return reply.future;
         });
     await _pump(tester, _Flow(), _Routes());
-    await tester.tap(find.text('Navigate to pickup'));
+    await _tapNavigation(tester, 'Navigate to pickup');
     await tester.pump();
-    await tester.tap(find.text('Navigate to pickup'));
+    await _tapNavigation(tester, 'Navigate to pickup');
     await tester.pump();
     expect(calls, 1);
     reply.complete(true);
     await tester.pumpAndSettle();
     await tester.pumpWidget(const SizedBox.shrink());
   });
-
 
   testWidgets('small expanded panel keeps navigation clear of route errors', (
     tester,
@@ -163,6 +159,10 @@ void main() {
     );
     final status = tester.getRect(find.byType(DashboardStatusCard));
     expect(navigation.overlaps(status), isFalse);
+    final panel = tester.getRect(find.byKey(const Key('dashboardPanel')));
+    expect(navigation.top, greaterThanOrEqualTo(panel.top));
+    await tester.tap(find.text('Navigate to pickup'));
+    await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -308,6 +308,16 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+}
+
+Future<void> _tapNavigation(WidgetTester tester, String label) async {
+  await tester.drag(
+    find.byKey(const Key('dashboardPanelDragHandle')),
+    const Offset(0, -400),
+  );
+  await tester.pumpAndSettle();
+  await tester.ensureVisible(find.text(label));
+  await tester.tap(find.text(label));
 }
 
 RideMap _map(WidgetTester tester) =>
