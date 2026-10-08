@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-func requestPricingDB(t *testing.T) (*sql.DB, string, uuid.UUID, *pricing.PostgresRepository, pricing.Policy) {
+func requestPricingEmptyDB(t *testing.T) (*sql.DB, string, uuid.UUID, *pricing.PostgresRepository) {
 	t.Helper()
 	raw := os.Getenv("TEST_DATABASE_URL")
 	if raw == "" {
@@ -42,7 +42,12 @@ func requestPricingDB(t *testing.T) (*sql.DB, string, uuid.UUID, *pricing.Postgr
 		t.Fatal(e)
 	}
 	t.Cleanup(func() { _, _ = db.Exec("UPDATE driver_service_catalog SET rider_visible=false WHERE code=$1", code) })
-	policies := pricing.NewPostgresRepository(db)
+	return db, code, user, pricing.NewPostgresRepository(db)
+}
+
+func requestPricingDB(t *testing.T) (*sql.DB, string, uuid.UUID, *pricing.PostgresRepository, pricing.Policy) {
+	t.Helper()
+	db, code, user, policies := requestPricingEmptyDB(t)
 	p, e := policies.Publish(context.Background(), requestDraft(code), "owner-A")
 	if e != nil {
 		t.Fatal(e)

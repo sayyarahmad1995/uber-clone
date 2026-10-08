@@ -18,23 +18,20 @@ void main() {
     suggestedFare: Money(amountMinor: amount, currency: 'PKR'),
     pricingPolicyVersion: version,
   );
-  test(
-    'suggestion prefills an untouched proposal and preserves edits on refresh',
-    () {
-      final c = RiderFareController();
-      c.invalidate('A');
-      c.applyPreview('A', preview(12500, 'v1'));
-      expect(c.text, '125.00');
-      expect(c.version, 'v1');
-      expect(c.userEdited, false);
-      c.edit('1100');
-      c.applyPreview('A', preview(22500, 'v2'));
-      expect(c.text, '1100');
-      expect(c.version, 'v2');
-      expect(c.userEdited, true);
-      c.dispose();
-    },
-  );
+  test('suggestion replaces any former proposal on refresh', () {
+    final c = RiderFareController();
+    c.invalidate('A');
+    c.applyPreview('A', preview(12500, 'v1'));
+    expect(c.text, '125.00');
+    expect(c.version, 'v1');
+    expect(c.userEdited, false);
+    c.edit('1100');
+    c.applyPreview('A', preview(22500, 'v2'));
+    expect(c.text, '225.00');
+    expect(c.version, 'v2');
+    expect(c.userEdited, false);
+    c.dispose();
+  });
   test('changed input clears ownership and ignores an older preview', () {
     final c = RiderFareController();
     c.invalidate('A');

@@ -46,11 +46,11 @@ Record test date, current branch/SHA, Android app build and device/version, envi
 - [ ] Changing either endpoint or the selected service invalidates prior route/fare displays and ignores out-of-order responses.
 - [ ] Owner-approved Economy and Comfort parameters produce reproducible suggested PKR fares for controlled fixture distances/durations; backend owns math, version and final integer rounding.
 - [ ] A third test service has its **own** active pricing policy and its own reproducible suggestion; deleting/disabling its policy prevents new price-backed booking without changing previously agreed prices.
-- [ ] The Rider may edit the suggestion. Existing Driver exact-fare and counteroffer limits apply to the **Rider's submitted fare**, not the suggested amount.
+- [ ] The Rider cannot edit the suggested fare. The request uses that amount; existing Driver exact-fare and counteroffer limits apply to the saved request amount. The selected Driver offer becomes the final payable fare.
 
 ## 4. Complete ride and recovery
 
-- [ ] With one approved Driver, perform an Economy ride and a separate Comfort ride: search → route preview → estimate → Rider proposal → request → Driver exact/counteroffer → Rider selection → assigned → in progress → completed/unsettled → cash collected → receipts.
+- [ ] With one approved Driver, perform an Economy ride and a separate Comfort ride: search → route preview → read-only suggested fare → request → Driver exact/counteroffer → Rider selection → assigned → in progress → completed/unsettled → cash collected → receipts.
 - [ ] A third compatible service follows the same journey without an app update after its activation, policy approval and Driver enrollment.
 - [ ] The agreed Trip fare equals the **selected Driver offer**, not the earlier suggested fare. Reopening or settling the Trip does not reprice it.
 - [ ] Restart, background/foreground, provider timeout and transient network loss never display a stale fare as current or strand an active Trip.
@@ -80,9 +80,13 @@ CI is automated evidence only. Record device, app/backend commit, approved tarif
 
 - [ ] Keep the rollout flag off during deployment; verify manual booking and both existing Driver route stages.
 - [ ] Publish approved Economy and Comfort tariffs, deploy a compatible client, then explicitly enable the flag. Verify only priced active services appear in the original dropdown.
-- [ ] Untouched proposals prefill; edited proposals survive Retry. Changed pickup/destination, same-coordinate Place ID changes, service changes, logout and catalog removal invalidate old fare ownership. Delayed previews cannot restore an obsolete fare.
-- [ ] Publish B after preview A but before Request ride. Observe a clear rate-change message, updated suggestion, retained edited proposal and no request until another tap.
+- [ ] The suggested fare is read-only; Retry replaces it with the refreshed suggestion. Changed pickup/destination, same-coordinate Place ID changes, service changes, logout and catalog removal invalidate old fare ownership. Delayed previews cannot restore an obsolete fare.
+- [ ] Publish B after preview A but before Request ride. Observe a clear rate-change message, updated read-only suggestion and no request until another tap.
 - [ ] Create under A, then publish B while Drivers offer. Saved proposal and 90–130% limits stay fixed. Select a counteroffer, publish C, start, complete, reopen while unsettled, confirm cash, then read receipts. Agreed and settled amounts remain the selected offer; stored request snapshot remains A.
 - [ ] Disable pricing or service after assignment; finish the existing Trip and recover its history. New priced creation is blocked.
 - [ ] Verify the booked Rider polyline remains, assigned Driver location-to-pickup route appears, and Start trip replaces it with pickup-to-destination.
 - [ ] Exercise panel drag/scroll handoff, dropdown selection, map pan/zoom, rotation and background/resume with fare and Retry controls visible.
+
+- [ ] Change route conditions between preview and submission. A changed fare returns `suggested_fare_changed`, creates no request, refreshes the display and requires another tap. Verify selected Place IDs are retained during revalidation.
+
+- [ ] Named-place booking resolves the same canonical coordinates at submission. Mismatched or changed Place ID/coordinate pairs cannot create a request, and a failed Place Details lookup offers a clear error without writes. Free-pin coordinates remain exact.

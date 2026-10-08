@@ -167,6 +167,8 @@ class RiderRequestController extends ChangeNotifier {
         proposedFare: Money(amountMinor: amountMinor, currency: currency),
         serviceCode: serviceCode,
         pricingPolicyVersion: pricingPolicyVersion,
+        pickupPlaceId: _state.pickupPlaceId,
+        destinationPlaceId: _state.destinationPlaceId,
       );
       _set(
         _state.copyWith(

@@ -22,6 +22,8 @@ void main() {
         destination: const GeoPoint(latitude: 24.9056, longitude: 67.0822),
         proposedFare: const Money(amountMinor: 70000, currency: 'PKR'),
         pricingPolicyVersion: 'policy-version-1',
+        pickupPlaceId: 'pickup-poi',
+        destinationPlaceId: 'destination-poi',
       );
 
       expect(result.id, 'ride-1');
@@ -30,7 +32,12 @@ void main() {
       expect(adapter.body?['pickup'], {
         'latitude': 24.8607,
         'longitude': 67.0011,
+        'place_id': 'pickup-poi',
       });
+      expect(
+        (adapter.body?['destination'] as Map)['place_id'],
+        'destination-poi',
+      );
       expect(adapter.body?['proposed_fare'], {
         'amount_minor': 70000,
         'currency': 'PKR',

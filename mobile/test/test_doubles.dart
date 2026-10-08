@@ -122,6 +122,8 @@ class FakeRideRequestRepository implements RideRequestRepository {
     required Money proposedFare,
     String serviceCode = 'economy',
     String? pricingPolicyVersion,
+    String? pickupPlaceId,
+    String? destinationPlaceId,
   }) async {
     submittedPickup = pickup;
     submittedDestination = destination;

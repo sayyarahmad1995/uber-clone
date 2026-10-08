@@ -12,6 +12,8 @@ abstract interface class RideRequestRepository {
     required Money proposedFare,
     String serviceCode = 'economy',
     String? pricingPolicyVersion,
+    String? pickupPlaceId,
+    String? destinationPlaceId,
   });
   Future<RideRequest> get(String id);
   Future<void> cancel(String id);
@@ -60,6 +62,8 @@ class ApiRideRequestRepository implements RideRequestRepository {
     required Money proposedFare,
     String serviceCode = 'economy',
     String? pricingPolicyVersion,
+    String? pickupPlaceId,
+    String? destinationPlaceId,
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
@@ -68,8 +72,11 @@ class ApiRideRequestRepository implements RideRequestRepository {
         data: {
           'service_code': serviceCode,
           'pricing_policy_version': ?pricingPolicyVersion,
-          'pickup': pickup.toJson(),
-          'destination': destination.toJson(),
+          'pickup': {...pickup.toJson(), 'place_id': ?pickupPlaceId},
+          'destination': {
+            ...destination.toJson(),
+            'place_id': ?destinationPlaceId,
+          },
           'proposed_fare': proposedFare.toJson(),
         },
       );

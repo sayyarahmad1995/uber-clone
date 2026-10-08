@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"github.com/google/uuid"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/locationsearch"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/database"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/migrations"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/pricing"
@@ -167,12 +168,99 @@ func TestPricedRideRequestHTTP(t *testing.T) {
 		t.Fatal(e)
 	}
 	body["pricing_policy_version"] = b.ID.String()
+	body["proposed_fare"] = map[string]any{"amount_minor": 12500, "currency": "PKR"}
 	res = pricedHTTP(api, "/v1/ride-requests", body, true)
-	if res.Code != 201 || !strings.Contains(res.Body.String(), "110000") {
+	if res.Code != 201 || !strings.Contains(res.Body.String(), "12500") {
 		t.Fatalf("create %d %s", res.Code, res.Body.String())
 	}
 	var n int
 	if e := db.QueryRow("SELECT count(*) FROM ride_requests WHERE rider_user_id=$1", id).Scan(&n); e != nil || n != 1 {
 		t.Fatalf("requests %d %v", n, e)
 	}
+}
+
+func TestReadOnlySuggestedFareHTTP(t *testing.T) {
+	db, code, id, policies := pricedDB(t)
+	policy, err := policies.Publish(context.Background(), pricedDraft(code), "owner")
+	if err != nil {
+		t.Fatal(err)
+	}
+	spy := &readOnlyRouteSpy{}
+	api := pricedAPI(db, id, policies, true, &routePreviewSpy{})
+	api.routing = routing.NewService(spy)
+	api.locationSearch = &pricingPlaces{}
+	body := previewBody(code)
+	body["pickup"].(map[string]any)["place_id"] = "pickup-poi"
+	body["destination"].(map[string]any)["place_id"] = "destination-poi"
+	body["pricing_policy_version"] = policy.ID.String()
+	body["proposed_fare"] = map[string]any{"amount_minor": 110000, "currency": "PKR"}
+	res := pricedHTTP(api, "/v1/ride-requests", body, true)
+	if res.Code != 409 || !strings.Contains(res.Body.String(), "suggested_fare_changed") {
+		t.Fatalf("edited fare accepted: %d %s", res.Code, res.Body.String())
+	}
+	var count int
+	if err := db.QueryRow("SELECT count(*) FROM ride_requests WHERE rider_user_id=$1", id).Scan(&count); err != nil || count != 0 {
+		t.Fatalf("rejected fare wrote request: %d %v", count, err)
+	}
+	if spy.pickup.PlaceID != "pickup-poi" || spy.destination.PlaceID != "destination-poi" {
+		t.Fatalf("lost routing Place IDs: %+v %+v", spy.pickup, spy.destination)
+	}
+	body["proposed_fare"] = map[string]any{"amount_minor": 12500, "currency": "PKR"}
+	spy.err = routing.ErrUnavailable
+	res = pricedHTTP(api, "/v1/ride-requests", body, true)
+	if res.Code != 503 {
+		t.Fatalf("provider failure created request: %d %s", res.Code, res.Body.String())
+	}
+	spy.err = nil
+	res = pricedHTTP(api, "/v1/ride-requests", body, true)
+	if res.Code != 201 || !strings.Contains(res.Body.String(), "12500") || spy.calls != 3 {
+		t.Fatalf("suggestion booking: %d %s calls=%d", res.Code, res.Body.String(), spy.calls)
+	}
+}
+
+type readOnlyRouteSpy struct {
+	calls       int
+	pickup      routing.Endpoint
+	destination routing.Endpoint
+	err         error
+}
+
+func (s *readOnlyRouteSpy) Preview(_ context.Context, pickup, destination routing.Endpoint) (routing.Route, error) {
+	s.calls++
+	s.pickup, s.destination = pickup, destination
+	return routing.Route{DistanceMeters: 2000, DurationSeconds: 300, EncodedPolyline: "??_ibE_ibE"}, s.err
+}
+
+func TestSuggestedFareRejectsMismatchedPlaceCoordinates(t *testing.T) {
+	db, code, id, policies := pricedDB(t)
+	policy, err := policies.Publish(context.Background(), pricedDraft(code), "owner")
+	if err != nil {
+		t.Fatal(err)
+	}
+	spy := &routePreviewSpy{}
+	api := pricedAPI(db, id, policies, true, spy)
+	api.locationSearch = &pricingPlaces{}
+	body := previewBody(code)
+	body["pickup"] = map[string]any{"latitude": 25.86, "longitude": 68.01, "place_id": "pickup-poi"}
+	body["destination"].(map[string]any)["place_id"] = "destination-poi"
+	body["pricing_policy_version"] = policy.ID.String()
+	body["proposed_fare"] = map[string]any{"amount_minor": 12500, "currency": "PKR"}
+	res := pricedHTTP(api, "/v1/ride-requests", body, true)
+	if res.Code != 400 || !strings.Contains(res.Body.String(), "location_selection_changed") || spy.calls != 0 {
+		t.Fatalf("mismatched endpoint accepted: %d %s route calls %d", res.Code, res.Body.String(), spy.calls)
+	}
+	var count int
+	if err := db.QueryRow("SELECT count(*) FROM ride_requests WHERE rider_user_id=$1", id).Scan(&count); err != nil || count != 0 {
+		t.Fatalf("mismatch wrote request: %d %v", count, err)
+	}
+}
+
+type pricingPlaces struct{ locationsearch.Searcher }
+
+func (s *pricingPlaces) Details(_ context.Context, id, _ string) (locationsearch.Place, error) {
+	point := locationsearch.Point{Latitude: 24.86, Longitude: 67.01}
+	if id == "destination-poi" {
+		point = locationsearch.Point{Latitude: 24.90, Longitude: 67.05}
+	}
+	return locationsearch.Place{PlaceID: id, Location: point}, nil
 }

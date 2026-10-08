@@ -88,3 +88,14 @@ No pricing surge, automatic final price, toll/tax estimation, waiting fees, canc
 The original service dropdown remains. Suggestions prefill untouched proposals. Retry and a tariff conflict preserve edits; changes to coordinates, Place IDs, service or account reset ownership. A 409 refreshes the preview and requires a second explicit tap. Active-request views use the saved proposal and retain the booked route line.
 
 Operations approves tariffs at `/admin/operations/pricing`; JSON admin endpoints share Basic Auth and origin protections. History and request snapshots reject update/delete. Publication alone does not enable the rollout. No production tariff values are seeded.
+
+
+## Read-only Rider suggestion (owner revision, 2026-10-07)
+
+This revision supersedes the editable Rider proposal behavior described above when suggested fares are enabled. The Rider sees a read-only suggested fare and requests at that amount. Drivers may still accept or counteroffer within existing limits; the offer selected by the Rider remains the immutable final payable Trip fare.
+
+Priced request creation performs a fresh server-side route lookup and exact calculation, preserving selected Place IDs or exact pin coordinates. It rejects a submitted amount that differs with `suggested_fare_changed` (409), leaving no request or snapshot. The app refreshes the suggestion and requires another explicit tap. This adds one provider route call on submission and may require review if traffic changes the suggestion; no client route metrics or quote token are trusted. Concurrent tariff publication remains protected by the request transaction's policy UUID check. Saved requests, offers, Trip fares and settlements are never repriced.
+
+The disabled-rollout manual flow remains available for rollback compatibility. Deploy the updated backend and Flutter app together before validating the enabled flow; older editable clients may receive a fare-change conflict.
+
+Named-place submission also resolves each supplied Place ID through the existing Place Details boundary and verifies its canonical coordinates equal the saved request coordinates. Mismatches return `location_selection_changed` (400) before routing or writes; the Rider must reselect the changed place. Free pins are never moved. This adds up to two Place Details calls for named endpoints, guarded by the existing per-user location-search limiter; lookup failures fail closed.

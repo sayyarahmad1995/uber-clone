@@ -38,7 +38,7 @@ routine updates.
 1. Deploy migration 031 and backend with `SUGGESTED_FARES_ENABLED=false` (default). Verify manual booking and existing Trip recovery. Backups include immutable pricing history and request snapshots.
 2. Publish owner-approved PKR tariffs through Operations → Pricing for each intended active visible service. Enter all five values in rupees; verify history, reviewer and current identity. No example/test tariff is production approval. Publication does not enable suggestions.
 3. Deploy the compatible Flutter client and complete the physical acceptance matrix in `pilot-google-booking-acceptance.md`. Deploy backend before testing Driver routes.
-4. Explicitly set `SUGGESTED_FARES_ENABLED=true` and recreate the API container. Confirm catalog `pricing_required`, preview amount/version, edited booking and conflict recovery. Record the enable time and commits.
+4. Explicitly set `SUGGESTED_FARES_ENABLED=true` and recreate the API container. Confirm catalog `pricing_required`, preview amount/version, read-only booking and conflict recovery. Record the enable time and commits.
 5. For rollback, set the flag false and recreate the API container. Existing requests retain proposals and snapshots; agreed Trips retain the selected offer. Disabling a current policy prevents new priced requests for that service, without deleting history or changing active Trips.
 
 Do not enable from CI evidence alone. Physical Android validation and real tariff activation are pending.
