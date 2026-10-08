@@ -40,9 +40,14 @@ import '../features/rider_request/data/route_preview_repository.dart';
 import '../features/rider_request/data/ride_service_repository.dart';
 import '../features/rider_request/domain/ride_service.dart';
 import 'config/app_config.dart';
+import 'maps/driving_navigation.dart';
 import 'dashboard/dashboard_panel_session.dart';
 import 'models/account.dart';
 import 'session/session_store.dart';
+
+final drivingNavigationProvider = Provider<DrivingNavigation>(
+  (ref) => const AndroidDrivingNavigation(),
+);
 
 const _driverDetailTransitionDuration = Duration(milliseconds: 250);
 

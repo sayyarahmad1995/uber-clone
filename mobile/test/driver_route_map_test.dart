@@ -121,6 +121,28 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+
+  testWidgets('navigation does not launch twice while a handoff is pending', (
+    tester,
+  ) async {
+    final reply = Completer<bool>();
+    var calls = 0;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(navigationChannel, (_) {
+          calls++;
+          return reply.future;
+        });
+    await _pump(tester, _Flow(), _Routes());
+    await tester.tap(find.text('Navigate to pickup'));
+    await tester.pump();
+    await tester.tap(find.text('Navigate to pickup'));
+    await tester.pump();
+    expect(calls, 1);
+    reply.complete(true);
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets(
     'Driver route switches from pickup to destination on Start trip',
     (tester) async {
