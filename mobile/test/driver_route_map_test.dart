@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uber_clone/core/maps/ride_map.dart';
@@ -19,6 +20,107 @@ import 'package:uber_clone/features/rider_request/domain/ride_request.dart'
 import 'test_doubles.dart';
 
 void main() {
+  const navigationChannel = MethodChannel('higo/navigation');
+  setUp(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(navigationChannel, (_) async => true);
+  });
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(navigationChannel, null);
+  });
+
+  testWidgets('route estimates and navigation follow the current trip stage', (
+    tester,
+  ) async {
+    final launched = <MethodCall>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(navigationChannel, (call) async {
+          launched.add(call);
+          return true;
+        });
+    final flow = _Flow();
+    final container = await _pump(tester, flow, _Routes());
+    expect(find.text('Estimated route to pickup: 2.0 km, 5 min'), findsOneWidget);
+    await tester.tap(find.text('Navigate to pickup'));
+    await tester.pumpAndSettle();
+    expect(launched.single.method, 'openGoogleMaps');
+    expect(launched.single.arguments, {
+      'latitude': 24.87,
+      'longitude': 67.02,
+    });
+
+    await container.read(driverTripControllerProvider).startTrip('ride-1');
+    await tester.pumpAndSettle();
+    expect(find.text('Navigate to pickup'), findsNothing);
+    expect(
+      find.text('Estimated route to destination: 2.0 km, 10 min'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Navigate to destination'));
+    await tester.pumpAndSettle();
+    expect(launched.last.arguments, {
+      'latitude': 24.90,
+      'longitude': 67.05,
+    });
+    await container.read(driverTripControllerProvider).completeTrip('ride-1');
+    await tester.pumpAndSettle();
+    expect(find.text('Navigate to destination'), findsNothing);
+    expect(find.textContaining('Estimated route to'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('navigation failure is recoverable without changing the trip', (
+    tester,
+  ) async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(navigationChannel, (_) async => false);
+    final container = await _pump(tester, _Flow(), _Routes());
+    await tester.tap(find.text('Navigate to pickup'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Unable to open Google Maps. Try again.'),
+      findsOneWidget,
+    );
+    expect(container.read(driverTripControllerProvider).trip?.status, 'assigned');
+    expect(find.text('Navigate to pickup'), findsOneWidget);
+    expect(_map(tester).polylines, hasLength(1));
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('navigation remains usable when the HiGO route is unavailable', (
+    tester,
+  ) async {
+    await _pump(tester, _Flow(), _Routes()..fail = true);
+    expect(find.textContaining('Estimated route to'), findsNothing);
+    expect(find.text('Navigate to pickup'), findsOneWidget);
+    await tester.tap(find.text('Navigate to pickup'));
+    await tester.pumpAndSettle();
+    expect(find.text('Unable to open Google Maps. Try again.'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('late navigation failure cannot leak into a different trip stage', (
+    tester,
+  ) async {
+    final reply = Completer<bool>();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(navigationChannel, (_) => reply.future);
+    final container = await _pump(tester, _Flow(), _Routes());
+    await tester.tap(find.text('Navigate to pickup'));
+    await tester.pump();
+    await container.read(driverTripControllerProvider).startTrip('ride-1');
+    await tester.pumpAndSettle();
+    reply.complete(false);
+    await tester.pumpAndSettle();
+    expect(find.text('Unable to open Google Maps. Try again.'), findsNothing);
+    expect(find.text('Navigate to destination'), findsOneWidget);
+    await container.read(driverTripControllerProvider).cancelTrip('ride-1');
+    await tester.pumpAndSettle();
+    expect(find.text('Navigate to destination'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets(
     'Driver route switches from pickup to destination on Start trip',
     (tester) async {
@@ -279,7 +381,7 @@ ResponseBody _response(String status) => ResponseBody.fromString(
   jsonEncode({
     'route': {
       'distance_meters': 2000,
-      'duration_seconds': 300,
+      'duration_seconds': status == 'assigned' ? 300 : 600,
       'encoded_polyline': status == 'assigned'
           ? '_p~iF~ps|U_ulLnnqC'
           : '??_ibE_ibE',
