@@ -180,14 +180,30 @@ Both surfaces remain read-only. Approved Driver/vehicle changes continue to foll
 
 ## 18. Minimal cash settlement, receipt, and pilot acceptance
 
-The current cash-settlement milestone closes the MVP ride-hailing loop with minimal cash handling and receipt/history display, as defined by ADR-0011.
+The implemented cash-settlement slice closes the MVP ride-hailing loop in code with minimal cash handling and receipt/history display, as defined by ADR-0011. The full cash-loop physical-device acceptance checklist remains a separate release gate.
 
 A selected offer's agreed fare remains the authoritative settlement amount for the completed Trip. Settlement exists to close the current ride-hailing pilot loop, not to introduce a general payment platform.
 
-For the MVP, cash settlement may record simple states such as cash due, cash confirmed, and settled. Rider and Driver history should expose receipt-relevant facts from immutable Trip context: agreed fare, service, Driver/vehicle context, completion time, Trip status, and settlement status.
+For the MVP, completed cash Trips have settlement statuses `unsettled` and `cash_collected` independent of Trip status. Rider and Driver history expose receipt-relevant facts from immutable Trip context: agreed fare, service, Driver/vehicle context, completion time, Trip status, and settlement status.
 
 Before unrelated product domains or sophisticated payment infrastructure are started, the cash ride loop must be validated against the [Pilot cash ride acceptance checklist](pilot-cash-ride-acceptance.md). Any acceptance failure should become the next implementation slice before Courier, Freight, broad administration, advanced dispatch, multi-database architecture, or infrastructure scaling.
 
 This decision does not authorize Stripe, wallets, stored payment methods, payouts, refunds, cancellation fees, no-show policy, commissions, promo credits, routing-based pricing, broad administrator payment operations, Courier, or Freight.
 
 See [ADR-0011: Minimal Cash Settlement and Trip Receipt](ADR-0011-minimal-cash-settlement-and-receipt.md).
+
+## 19. Dynamic Rider ride service catalog
+
+The next MVP milestone reuses `driver_service_catalog` as the single authoritative list of ride services. An authenticated Rider-facing `GET /v1/ride-services` will return currently bookable service codes and presentation metadata in catalog order; the shared Flutter app will render that response rather than a hardcoded Economy/Comfort list. New compatible car categories can appear after the existing updated app refreshes its catalog, without another app release. Historical service and immutable Trip snapshots remain readable when a catalog entry is deactivated.
+
+Driver eligibility is unchanged: the online Driver's selected vehicle must have an active approved enrollment for the request service, plus the established profile/location/Trip checks. PR 1 may use the existing manual proposed-fare path; once fare preview launches, a bookable service must also have an applicable approved pricing policy. Service-specific pricing lives in separately versioned records keyed by service/currency, not in Flutter constants.
+
+See [ADR-0012: Dynamic Rider Ride Service Catalog](ADR-0012-dynamic-rider-service-catalog.md).
+
+## 20. Google Maps Rider booking preview and advisory fare
+
+After the catalog slice, replace the current shared map adapter with Google Maps for both dashboards, add application-owned Places/Geocoding and Routes adapters through Go, and render the selected trip's road distance, duration and polyline. Preserve ADR-0008 panel behavior and the current Haversine Driver discovery/ranking contract: route preview does **not** imply paid routing of the entire marketplace or Driver pickup ETA.
+
+The Go backend will compute an advisory suggested fare using the selected service's versioned, approved base fare, distance rate, time rate, minimum fare, rounding rule and currency. Actual Economy/Comfort launch values require owner approval. The Rider can edit the suggested amount; Driver responses are bounded against the **Rider's proposal**, and Rider selection alone creates a Trip. The selected offer's agreed fare remains immutable for settlement; automatic re-pricing, surge, tolls, fees and advanced payment infrastructure remain deferred.
+
+The [existing cash ride acceptance checklist](pilot-cash-ride-acceptance.md) and [new booking acceptance matrix](pilot-google-booking-acceptance.md) are separate gates for a pilot release. See [ADR-0013: Google Maps Booking Preview and Advisory Fare](ADR-0013-google-maps-booking-preview-and-fare.md).

@@ -4,15 +4,18 @@
 
 The backend implements accounts/authentication, Driver onboarding/review and operating
 context, ride requests, service-scoped geographic marketplace discovery and offers,
-Rider-selected assignment, Trip execution, cancellation, history, and Driver location
-storage/read access. Marketplace and assignment preserve the selected approved
+Rider-selected assignment, Trip execution, cancellation, history, Driver location,
+minimal cash settlement/receipt data, and the service catalog for Driver onboarding. Marketplace and assignment preserve the selected approved
 vehicle/service and agreed fare snapshot rather than following later profile changes.
 
 The shared Flutter Android client implements account entry, Rider-first capability
 selection, Rider request creation with Economy/Comfort and proposed fare, Rider offer
 comparison/selection/rejection, Driver marketplace responses and counteroffers, Trip
-start/completion/cancellation, foreground recovery/location publication, terminal
-history, Driver onboarding/review state, and the ADR-0008 capability-shell dashboard.
+start/completion/cancellation, foreground recovery/location publication, cash
+collection confirmation and receipt/history presentation, Driver onboarding/review
+state, and the ADR-0008 capability-shell dashboard. Android background Driver
+presence is implemented, but Google Maps route preview and dynamic Rider catalog
+rendering are not yet implemented.
 
 PR #70 introduced the ADR-0009 new-Driver onboarding application model. A Driver
 chooses one service for the first vehicle, reviews the application, and submits it
@@ -46,6 +49,10 @@ assigned/in-progress trips.
 ---
 
 ## Completed milestones
+
+- [x] Minimal cash settlement/receipt API and Flutter confirmation/history — PRs #83, #84, #86, #87 and #88; full physical-device cash checklist still requires a recorded pass
+- [x] Cash ride pilot acceptance **checklist document** — PR #89 (not evidence of a successful acceptance run)
+- [x] Android Driver background presence and guarded Driver-to-Rider switch — PRs #113–#118
 
 - [x] Deployment Foundation — PR #1
 - [x] User Entry and Rider Foundation — PR #2
@@ -162,10 +169,10 @@ See [ADR-0010](ADR-0010-minimal-driver-onboarding-reviewer.md).
 
 ### Driver online operating context
 
-- MVP operating context is exactly one selected verified vehicle and one selected
-  approved service at a time.
-- If a vehicle has one approved service, the client may omit the redundant service selector.
-- Changing vehicle/service requires the Driver to go offline first.
+- MVP operating context is exactly one selected verified vehicle. Marketplace
+  eligibility is derived from **all** active approved service enrollments on it.
+- The current operating selection has no independent global service selector.
+- Changing the selected operating vehicle requires the Driver to go offline first.
 - Going online publishes current location before the online transition.
 - Going offline never requires location permission.
 - Marketplace eligibility additionally requires Driver capability/approval, online
@@ -222,8 +229,9 @@ See [ADR-0011](ADR-0011-minimal-cash-settlement-and-receipt.md).
 - Marketplace locations must be no older than two minutes and not in the future.
 - Discovery ranks eligible requests by Haversine pickup distance before the feed limit.
 - Raw Driver coordinates and license plates are not exposed before assignment.
-- No arbitrary pickup radius, service boundary, routing ETA, or PostGIS requirement
-  has been introduced.
+- No arbitrary pickup radius, service boundary, Driver pickup ETA, or PostGIS requirement
+  has been introduced. Selected Rider trip routing and advisory fares are the next
+  milestone under ADR-0013; they are not yet implemented.
 
 ### Flutter client
 
@@ -354,30 +362,29 @@ analysis, and Flutter tests.
 
 ## Next implementation order
 
-The next implementation slice is selected: **minimal cash settlement and Trip
-receipt**, governed by ADR-0011.
+The owner-selected next feature milestone is **dynamic Rider ride services and Google
+Maps booking preview with advisory service-specific fare estimation**. ADR-0012
+and ADR-0013 are the implementation contracts. The precise PR order, service
+catalog/API design, Google provider boundaries, pricing versioning, and acceptance
+gates are in [the implementation plan](superpowers/plans/2026-09-29-google-maps-rider-booking.md).
 
-PR #83 should implement this as a vertical slice through PostgreSQL, Go domain/API,
-and Flutter UI. It should close the completed ride loop commercially without
-introducing a payment platform.
+1. Document and reconcile ADR-0012/ADR-0013 with the current code and worklog.
+2. Implement the Rider catalog from existing `driver_service_catalog`; remove
+   hardcoded Economy/Comfort checks in Go and Flutter, and prove that a third
+   compatible service is visible on an unchanged updated app after refresh.
+3. Migrate both shared dashboards to Google Maps while preserving ADR-0008.
+4. Add Google Places search/selection and route preview through app-owned Go APIs;
+   show road distance, estimated duration and polyline for the Rider's chosen trip.
+5. Add versioned service/currency-specific fare policies with owner-approved base
+   fare, distance rate, duration rate, minimum fare and rounding; compute an
+   advisory suggestion in Go, preserve Rider proposals and Driver counteroffers.
+6. Finish Rider booking UX and run the complete [Google booking acceptance matrix](pilot-google-booking-acceptance.md), plus all existing cash-ride regressions.
 
-PR #83 target behavior:
-
-- Preserve the selected offer's agreed fare as the authoritative settlement amount.
-- Add minimal settlement state for completed cash Trips, using `cash_due`,
-  `cash_confirmed`, and/or `settled` semantics as justified by implementation.
-- Let the Driver confirm cash collection, either as part of completion or as an
-  explicit immediately-following action.
-- Show Rider and Driver receipt/history details from immutable Trip context:
-  agreed fare, service, Driver/vehicle context, Trip status, completion time, and
-  settlement status.
-- Preserve restart and transient-network recovery for completion/settlement state.
-- Keep Rider-selected assignment, offer revision checks, cancellation semantics,
-  and marketplace eligibility unchanged.
-
-PR #83 must not implement Stripe, wallets, stored cards, payouts, refunds,
-cancellation fees, no-show policy, promotions, commissions, administrator payment
-operations, routing-based pricing, or Courier/Freight settlement.
+**Release prerequisite:** run and record the existing [pilot cash ride acceptance
+checklist](pilot-cash-ride-acceptance.md) on the current application. Its presence
+in the repository does not prove a complete physical-device pass. Any blocking
+failure takes priority before expansion into the pilot. Production Economy/Comfort
+pricing parameters require explicit owner approval; fixtures are not tariffs.
 
 The future approved-information revision/cancellation-window/withdrawal-appeal
 slice remains deferred until profile/vehicle change management becomes a concrete
@@ -391,15 +398,16 @@ Accepted ADRs, `architecture-decisions.md`, `product-and-capability-model.md`,
 `mvp-scope.md`, and this worklog describe the intended MVP. ADR-0007 is the Ride
 Request marketplace authority, ADR-0008 is the dashboard interaction authority,
 ADR-0009 is the Driver service/vehicle/onboarding authority, ADR-0010 is the
-initial Driver onboarding reviewer authority, and ADR-0011 is the minimal cash
-settlement and Trip receipt authority.
+initial Driver onboarding reviewer authority, ADR-0011 is the minimal cash
+settlement and Trip receipt authority, ADR-0012 is the next Rider catalog authority,
+and ADR-0013 is the next Google route preview/advisory pricing authority.
 
 Implementation must not silently redefine these product rules.
 
 ## Deferred
 
 - Fixed pickup/search radius and service areas until justified by launch policy.
-- Routing, ETA, geocoding, and PostGIS.
+- PostGIS, large-scale Route Matrix, Driver-to-pickup ETA/rerouting and full turn-by-turn navigation. Selected-trip routing and Places geocoding are in the next milestone under ADR-0013.
 - Live location streaming, breadcrumbs, and push notifications.
 - Redis, background dispatch workers, and advanced dispatch optimization.
 - Sophisticated payment infrastructure beyond the minimal cash settlement and
@@ -411,7 +419,7 @@ Implementation must not silently redefine these product rules.
   reviewer credentials.
 - Complete versioned Driver/vehicle change review, cancellation-window, and appeal UI.
 - Courier, Freight, promotions, analytics platforms, multi-round/chat negotiation,
-  CI/CD, Kubernetes, and iOS implementation.
+  full production continuous deployment, Kubernetes, and iOS implementation.
 
 ## Working principles
 

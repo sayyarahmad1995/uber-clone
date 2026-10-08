@@ -88,7 +88,7 @@ The Rider-facing offer view should be able to include:
 - offered fare;
 - a presentation marker when the offered fare equals the Rider proposed fare.
 
-Pickup ETA is explicitly deferred for the MVP. Straight-line geographic distance must not be presented as a trustworthy arrival-time estimate. Routing/traffic-based ETA remains a later capability.
+Pickup ETA is explicitly deferred for the original marketplace MVP. Straight-line geographic distance must not be presented as a trustworthy arrival-time estimate. The separately accepted ADR-0013 introduces **Rider-selected pickup-to-destination road route preview**, distance and trip-duration estimate as a new vertical slice; it does **not** introduce Driver-to-pickup ETA or replace inexpensive marketplace Haversine ranking.
 
 ## Marketplace competition invariant
 
@@ -124,7 +124,7 @@ The current location rules remain reusable:
 - deterministic tie-breaking is required;
 - active Trips remain authoritative exclusions at assignment time; pending offers do not reserve a Driver.
 
-A fixed pickup radius, service-area boundary, routing ETA, and PostGIS remain separate decisions and must not be invented without a concrete product requirement.
+A fixed pickup radius, service-area boundary, Driver-to-pickup routing ETA, and PostGIS remain separate decisions and must not be invented without a concrete product requirement. ADR-0013 separately governs the selected Rider's journey preview.
 
 ### Geographic marketplace slice contract
 

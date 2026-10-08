@@ -19,7 +19,7 @@ User Account
 
 A capability represents what the user can do in the product. It is not a separate identity.
 
-Ride services such as Economy or Comfort are not user capabilities. They are operational products a Driver may offer with a specific vehicle after that vehicle/service combination is approved.
+Ride services such as Economy or Comfort are not user capabilities. They are operational products a Driver may offer with a specific vehicle after that vehicle/service combination is approved. ADR-0012 extends the existing catalog to a Rider-visible, server-managed list, allowing compatible new car categories on an already-updated app after its next successful catalog refresh.
 
 ## Shared client
 
@@ -43,6 +43,8 @@ Capability-specific experience
 ```
 
 ## Ride-hailing product interaction
+
+The next selected milestone adds a dynamic Rider service picker, selected-trip Google road route preview and a **service-specific suggested fare**. The Rider can still edit the suggestion as their proposed fare. These planned features do not add a booking mode or change Rider-selected assignment; see [ADR-0012](ADR-0012-dynamic-rider-service-catalog.md) and [ADR-0013](ADR-0013-google-maps-booking-preview-and-fare.md).
 
 The Rider has one Ride Request flow:
 
