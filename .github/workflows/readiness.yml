@@ -65,7 +65,31 @@ jobs:
         env:
           TEST_DATABASE_URL: postgres://test:test@localhost:5432/uber_clone_test?sslmode=disable
         run: |
-          go test ./internal/ride -run '^TestRequestPricingFirstPublicationRace        working-directory: backend
+          go test ./internal/ride -run '^TestRequestPricingFirstPublicationRace$' -count=10 -v
+          cp internal/pricing/postgres_repository.go /tmp/pricing-repository-original.go
+          trap 'cp /tmp/pricing-repository-original.go internal/pricing/postgres_repository.go' EXIT
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("internal/pricing/postgres_repository.go")
+          source = path.read_text()
+          block = '\tif err := lockService(ctx, tx, service, "SHARE", true); err != nil {\n\t\treturn Policy{}, err\n\t}\n'
+          assert source.count(block) == 1
+          path.write_text(source.replace(block, "", 1))
+          PY
+          for ordering in creator_first publisher_first; do
+            if go test ./internal/ride -run "^TestRequestPricingFirstPublicationRace/${ordering}" -count=1 -v > "/tmp/${ordering}.log" 2>&1; then
+              cat "/tmp/${ordering}.log"
+              echo "Regression failed to catch missing catalog lock"
+              exit 1
+            fi
+            cat "/tmp/${ordering}.log"
+            grep -q -- "--- FAIL: TestRequestPricingFirstPublicationRace/" "/tmp/${ordering}.log"
+            if grep -q 'build failed' "/tmp/${ordering}.log"; then exit 1; fi
+          done
+          cp /tmp/pricing-repository-original.go internal/pricing/postgres_repository.go
+          git diff --exit-code -- internal/pricing/postgres_repository.go
+      - run: go vet ./...
+        working-directory: backend
       - run: go test -p 1 ./...
         working-directory: backend
         env:
@@ -191,29 +215,6 @@ jobs:
         working-directory: mobile
       - run: flutter test
         working-directory: mobile
- -count=10 -v
-          cp internal/pricing/postgres_repository.go /tmp/pricing-repository-original.go
-          trap 'cp /tmp/pricing-repository-original.go internal/pricing/postgres_repository.go' EXIT
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path("internal/pricing/postgres_repository.go")
-          source = path.read_text()
-          block = '\tif err := lockService(ctx, tx, service, "SHARE", true); err != nil {\n\t\treturn Policy{}, err\n\t}\n'
-          assert source.count(block) == 1
-          path.write_text(source.replace(block, "", 1))
-          PY
-          for ordering in creator_first publisher_first; do
-            if go test ./internal/ride -run "^TestRequestPricingFirstPublicationRace/${ordering}" -count=1 -v > "/tmp/${ordering}.log" 2>&1; then
-              cat "/tmp/${ordering}.log"
-              echo "Regression failed to catch missing catalog lock"
-              exit 1
-            fi
-            cat "/tmp/${ordering}.log"
-            grep -q -- "--- FAIL: TestRequestPricingFirstPublicationRace/" "/tmp/${ordering}.log"
-            if grep -q 'build failed' "/tmp/${ordering}.log"; then exit 1; fi
-          done
-          cp /tmp/pricing-repository-original.go internal/pricing/postgres_repository.go
-          git diff --exit-code -- internal/pricing/postgres_repository.go
       - run: go vet ./...
         working-directory: backend
       - run: go test -p 1 ./...
