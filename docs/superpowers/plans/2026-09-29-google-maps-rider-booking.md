@@ -109,12 +109,14 @@ Before writing implementation code, create **ADR-0012: Dynamic Rider Ride Servic
 
 ### PR 3 — Pickup/destination search and adjustment
 
-- [ ] Add authenticated, app-owned endpoints for Places Autocomplete (New), selected Place Details (New), and reverse geocoding when an arbitrary dragged pin needs a readable label. Choose narrow field masks; no generic Google API proxy.
-- [ ] Generate a fresh Places session token for each autocomplete session (pickup and destination independently), pass it through to the concluding Place Details request, and use credentials from the same Google Cloud project.
-- [ ] Use sensible local location bias rather than a fabricated permanent service boundary. Add a short debounce, minimum input length, stale-response cancellation and per-user rate limiting to control latency and billable calls.
-- [ ] Build Flutter pickup/destination inputs, suggestion selection, map pin adjustment and reverse-geocoded display. Show meaningful address text while retaining precise coordinates for booking.
-- [ ] Handle empty predictions, inaccurate GPS, location permission denied, invalid place, lost network, request cancellation, and unsupported areas without inventing an address.
+- [x] Add authenticated, app-owned endpoints for Places Autocomplete (New), selected Place Details (New), and pin resolution that first checks a bounded distance-ranked Nearby Search (New) for a named place, then falls back to Geocoding v4 for a readable formatted address. Choose narrow field masks; no generic Google API proxy.
+- [x] Generate a fresh Places session token for each autocomplete session (pickup and destination independently), pass it through to the concluding Place Details request, and use credentials from the same Google Cloud project.
+- [x] Use sensible local location bias rather than a fabricated permanent service boundary. Add a short debounce, minimum input length, stale-response cancellation and per-user rate limiting to control latency and billable calls.
+- [x] Build Flutter pickup/destination inputs, suggestion selection, explicit center-pin map selection plus draggable-pin adjustment, and reverse-geocoded display. Show meaningful address text while retaining precise coordinates for booking.
+- [x] Handle empty predictions, inaccurate GPS, location permission denied, invalid place, lost network, request cancellation, and unsupported areas without inventing an address.
 - **Tests:** fake Places adapter plus Go HTTP contract tests; Flutter search-session lifecycle and stale-result tests; physical Android search/select/drag flow.
+**Automated implementation evidence:** Go provider/service/HTTP tests cover narrow provider contracts, persisted Admin Operations location-search policy, 1–50 meter validation, per-resolution policy reload, distance-ranked named-place pin resolution, formatted-address fallback and application error mapping. Flutter repository/controller tests cover authenticated app-owned endpoints, independent pickup/destination sessions, fresh post-selection sessions, stale-result rejection, canonical named-place snapping and exact-coordinate fallback. Physical Android search/select/drag/error-state validation remains required.
+
 - **Done when:** Both endpoints can be searched or map-adjusted and the user can correct an imprecise pin; the current Ride Request contract is not yet changed.
 
 ### PR 4 — Authoritative road route preview and polyline
@@ -154,7 +156,7 @@ Before writing implementation code, create **ADR-0012: Dynamic Rider Ride Servic
 - GET /v1/ride-services: authenticated Rider-visible catalog with services [{code, display_name, description, display_order, presentation_token?}]; backend returns only currently bookable compatible entries in stable display order. Do not mix Driver onboarding requirements into this response. Re-fetch on Rider screen entry and app foreground/recovery; services appear after the next successful refresh, not an instantaneous pushed UI update.
 - POST /v1/places/autocomplete: input, session_token, optional user-location bias; returns place IDs and display text, not a raw provider object.
 - GET /v1/places/{place_id}: session_token; returns normalized place ID, label and coordinates. The matching autocomplete token concludes here.
-- POST /v1/places/reverse-geocode: coordinates; returns a readable label or an explicit unavailable result.
+- POST /v1/places/reverse-geocode: confirmed pin coordinates; returns a readable label, resolved coordinates and `snap_to_place`. The location-search service loads the current Admin Operations snap-radius policy (1–50 meters, default 5) for every resolution and passes it to a distance-ranked Nearby Search (New). When a named place is found within that radius, the response uses its canonical coordinates and `snap_to_place=true`; otherwise Geocoding v4 supplies a formatted address while the exact submitted pin coordinate is retained.
 - POST /v1/ride-previews: pickup (latitude/longitude), destination (latitude/longitude), dynamic catalog service_code; returns route {distance_meters, duration_seconds, encoded_polyline}, suggested_fare {amount_minor, currency}, pricing_policy_version, and request correlation metadata. During PR 4, suggested_fare may be null; it is required only after an active pricing policy is configured for the released PR 5+ experience.
 - Existing POST /v1/ride-requests remains the booking command (dynamic catalog service_code, pickup, destination, proposed_fare). Validate service activation on each creation. Do not introduce a second booking mode or require a durable quote token for an **editable suggestion** in this milestone.
 

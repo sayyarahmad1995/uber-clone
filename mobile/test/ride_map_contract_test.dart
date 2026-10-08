@@ -13,6 +13,31 @@ void main() {
     expect(const RideMapPoint(double.nan, 0).isValid, isFalse);
   });
 
+  test('RideMap exposes provider-neutral center-pin selection state', () {
+    final source = File('lib/core/maps/ride_map.dart').readAsStringSync();
+
+    expect(source, contains('RideMapPoint? get center'));
+    expect(source, contains('showCenterPin'));
+    expect(source, contains("Key('rideMapCenterPin')"));
+    expect(source, contains('onCameraMove: _onCameraMove'));
+  });
+
+  test('Rider map selection exposes explicit pin-mode controls', () {
+    final source = File(
+      'lib/features/rider_request/presentation/rider_request_screen.dart',
+    ).readAsStringSync();
+
+    expect(source, contains("'pickupSetOnMapButton'"));
+    expect(source, contains("'destinationSetOnMapButton'"));
+    expect(source, contains("Key('confirmPinButton')"));
+    expect(source, contains('_confirmPinSelection'));
+    expect(source, contains('FloatingActionButton.extended'));
+    expect(
+      source,
+      contains('showCenterPin: active == null && _pinSelectionMode'),
+    );
+  });
+
   test('Google Maps provider types stay behind the shared map boundary', () {
     final rider = File(
       'lib/features/rider_request/presentation/rider_request_screen.dart',

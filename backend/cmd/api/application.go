@@ -17,6 +17,8 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/httpapi"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/identity"
 	identitykratos "github.com/sayyarahmad1995/uber-clone/backend/internal/identity/kratos"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/locationsearch"
+	locationsearchgoogle "github.com/sayyarahmad1995/uber-clone/backend/internal/locationsearch/google"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/offer"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/database"
@@ -54,28 +56,36 @@ func newApplication(cfg config) (application, func(), error) {
 	)
 	marketplacePolicyService := marketplace.NewPolicyService(db)
 	driverOnboardingRepository := driveronboarding.NewPostgresRepository(db)
+	locationSearchPolicyService := locationsearch.NewPolicyService(db)
+	locationSearchService := locationsearch.NewService(
+		locationsearchgoogle.New(cfg.GoogleMapsServerAPIKey),
+		locationSearchPolicyService,
+	)
 	api := httpapi.New(httpapi.Dependencies{
-		Health:                 db,
-		Users:                  user.NewService(user.NewPostgresRepository(db)),
-		Drivers:                driver.NewService(driver.NewPostgresRepository(db)),
-		DriverOnboarding:       driveronboarding.NewService(driverOnboardingRepository),
-		DriverOnboardingReview: driveronboarding.NewReviewService(driverOnboardingRepository),
-		DriverLocations:        driverlocation.NewService(driverlocation.NewPostgresRepository(db)),
-		DriverTrips:            drivertrip.NewService(drivertrip.NewPostgresRepository(db)),
-		RiderLocations:         riderlocation.NewService(riderlocation.NewPostgresRepository(db)),
-		Rides:                  ride.NewService(ride.NewPostgresRepository(db)),
-		RideServices:           rideservice.NewService(rideservice.NewPostgresRepository(db)),
-		RideStatuses:           ridestatus.NewService(ridestatus.NewPostgresRepository(db)),
-		Cancellations:          cancellation.NewService(cancellation.NewPostgresRepository(db)),
-		Offers:                 offer.NewService(offer.NewPostgresRepository(db)),
-		MarketplaceAssignments: marketplaceAssignmentService,
-		MarketplacePolicy:      marketplacePolicyService,
-		Trips:                  tripService,
-		Identity:               identityProvider,
-		Auth:                   auth.NewHandler(auth.NewService(authProvider)),
-		AdminReviewUsername:    cfg.AdminReviewUsername,
-		AdminReviewPassword:    cfg.AdminReviewPassword,
-		AdminReviewOrigin:      cfg.AdminReviewOrigin,
+		Health:                          db,
+		Users:                           user.NewService(user.NewPostgresRepository(db)),
+		Drivers:                         driver.NewService(driver.NewPostgresRepository(db)),
+		DriverOnboarding:                driveronboarding.NewService(driverOnboardingRepository),
+		DriverOnboardingReview:          driveronboarding.NewReviewService(driverOnboardingRepository),
+		DriverLocations:                 driverlocation.NewService(driverlocation.NewPostgresRepository(db)),
+		DriverTrips:                     drivertrip.NewService(drivertrip.NewPostgresRepository(db)),
+		RiderLocations:                  riderlocation.NewService(riderlocation.NewPostgresRepository(db)),
+		Rides:                           ride.NewService(ride.NewPostgresRepository(db)),
+		RideServices:                    rideservice.NewService(rideservice.NewPostgresRepository(db)),
+		RideStatuses:                    ridestatus.NewService(ridestatus.NewPostgresRepository(db)),
+		Cancellations:                   cancellation.NewService(cancellation.NewPostgresRepository(db)),
+		Offers:                          offer.NewService(offer.NewPostgresRepository(db)),
+		MarketplaceAssignments:          marketplaceAssignmentService,
+		MarketplacePolicy:               marketplacePolicyService,
+		Trips:                           tripService,
+		LocationSearch:                  locationSearchService,
+		LocationSearchPolicy:            locationSearchPolicyService,
+		LocationSearchRequestsPerMinute: cfg.LocationSearchRequestsPerMinute,
+		Identity:                        identityProvider,
+		Auth:                            auth.NewHandler(auth.NewService(authProvider)),
+		AdminReviewUsername:             cfg.AdminReviewUsername,
+		AdminReviewPassword:             cfg.AdminReviewPassword,
+		AdminReviewOrigin:               cfg.AdminReviewOrigin,
 	})
 
 	presenceCtx, cancelPresence := context.WithCancel(context.Background())

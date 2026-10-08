@@ -14,9 +14,9 @@
 | Secure storage | Flutter Secure Storage | Platform-specific implementations hidden behind clear boundaries |
 | Simple preferences | SharedPreferences | Keep lightweight unless offline requirements require a database |
 | Real-time/update transport | HTTP polling for ride-flow pilot | Introduce another transport only when a concrete live-update requirement justifies it |
-| Maps | Google Maps SDK for Android via pinned google_maps_flutter 2.18.2 behind the app-owned `core/maps` boundary | Places search, route polylines and route-aware camera fit are subsequent slices |
+| Maps | Google Maps SDK for Android via pinned google_maps_flutter 2.18.2 behind the app-owned `core/maps` boundary; provider-neutral draggable markers support Rider pin adjustment | Route polylines and route-aware camera fit are subsequent slices |
 | Device location | geolocator behind DeviceLocation | Preserve through the map migration; existing background Driver presence remains independent | 
-| Pickup/destination search | Not yet implemented | Google Places Autocomplete (New), Place Details (New) and optional reverse geocoding through authenticated Go APIs |
+| Pickup/destination search | Google Places Autocomplete (New), Place Details (New), Nearby Search (New) for confirmed named-place pin snapping, and Geocoding v4 formatted-address fallback through authenticated app-owned Go APIs; separate pickup/destination sessions, debounced search and stale-result protection | Add richer place semantics only when a booking workflow requires them |
 
 ## Backend
 

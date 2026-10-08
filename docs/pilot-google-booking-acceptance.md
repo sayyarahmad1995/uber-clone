@@ -22,11 +22,20 @@ Record test date, current branch/SHA, Android app build and device/version, envi
 
 ## 2. Shared map and places
 
+**PR 3 automated evidence:** Backend-owned Places/Geocoding adapters use narrow field masks and a five-second provider timeout; app endpoints require Rider capability and apply a configurable per-user request guard. Flutter uses independent UUID-style pickup/destination sessions, 300 ms debounce, cancellation plus stale-response guards, and provider-neutral draggable pins. Physical search/select/drag and adverse-network/location checks remain open.
+
+
 **Physical-device evidence — 2026-10-01:** Rider and Driver Google Maps rendering, map taps, pickup/destination/Driver markers, explicit current-location focus, manual pan without unwanted re-centering, ADR-0008 panel interactions, rotation/background recovery and the existing Rider→Driver marketplace flow passed on Android. An online-Driver close/reopen auto-center regression was found during the first pass, fixed on `97bfd4b75b20072e19d339a4fc8b716d6ea3ac84`, and the retest passed. Places/search items below remain for PR 3.
 
+**PR 3 physical regression — 2026-10-01:** Places search succeeded after the backend Google key was supplied to the development API container. During the active Rider request flow, a dashboard scroll-handoff defect was found: after content had scrolled away from the top, a continuing downward pull could reach the top without transferring ownership to panel collapse, making the panel feel locked. The shared ADR-0008 handoff is being corrected and requires device retest before PR 3 is accepted.
+
+**PR 3 follow-up regression — 2026-10-01:** Device retest initially found intermittent scroll stalls. The shared raw-pointer handoff could claim panel dragging on a few pixels of downward touch jitter at the top, immediately disabling ListView scrolling even when the intended gesture then moved upward. Collapse ownership now requires Flutter touch slop before scroll physics are locked. The Rider active-request retest passed after this fix; broader Rider/Driver ADR-0008 coverage remains part of the PR gate.
+
+**PR 3 pin-selection clarification — 2026-10-01:** Device review exposed that the implemented map path supported tap-to-drop and dragging existing markers but did not expose the expected visible center-pin selector. A first center-pin iteration also made confirmation hard to discover. PR 3 now gives Pickup and Destination their own field-level map buttons, keeps an explicit confirmation control visible over the map, and resolves a confirmed pin server-side. The named-place snap radius is configurable in Admin Operations from 1–50 meters, defaults to 5 meters, is audited by reviewer identity, and applies to the next pin resolution without restart. When no named place is returned within the configured radius, the exact chosen coordinate is retained with Google's formatted address. Physical retest remains required.
+
 - [x] Rider and Driver dashboards render Google Maps, markers, current-location focus and cached location using the shared app-owned map adapter.
-- [x] Shared panel gesture sizes/ownership/scrolling and expanded/collapsed persistence still pass ADR-0008 regression on both capabilities.
-- [ ] Rider searches for pickup and destination, selects Places results and sees readable labels and accurate pins. Dragging/adjusting a pin triggers coordinate and label reconciliation.
+- [ ] Shared panel gesture sizes/ownership/scrolling and expanded/collapsed persistence pass ADR-0008 regression on both capabilities after the PR 3 scroll-handoff fix.
+- [ ] Rider searches for pickup and destination, selects Places results and sees readable labels and accurate pins. Each field has its own map-pin button. Set-on-map mode shows a visible center pin and explicit confirm action. Admin Operations exposes the audited named-place snap radius (1–50 meters, default 5); changing it affects the next confirmation without restart. A named Google place within the configured radius snaps to its canonical coordinate, while any location without such a place retains the exact chosen coordinate with Google's formatted address. Tapping or dragging/adjusting a pin follows the same resolution rule.
 - [ ] Validate no prediction, denied location permission, poor GPS, lost internet and a stale autocomplete response. No wrong-place selection or hidden provider error.
 - [ ] Google content displays over the Google map with appropriate provider attribution. No API key is shipped in committed source.
 

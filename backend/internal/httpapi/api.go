@@ -11,6 +11,7 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/driveronboarding"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/drivertrip"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/identity"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/locationsearch"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/offer"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/ride"
@@ -22,27 +23,30 @@ import (
 )
 
 type Dependencies struct {
-	Health                 interface{ PingContext(context.Context) error }
-	Users                  user.Service
-	Drivers                driver.Service
-	DriverOnboarding       driveronboarding.Service
-	DriverOnboardingReview driveronboarding.ReviewService
-	DriverLocations        driverlocation.Service
-	DriverTrips            drivertrip.Service
-	RiderLocations         riderlocation.Service
-	Rides                  ride.Service
-	RideServices           rideservice.Service
-	RideStatuses           ridestatus.Service
-	Cancellations          cancellation.Service
-	Offers                 offer.Service
-	MarketplaceAssignments marketplace.AssignmentService
-	MarketplacePolicy      marketplace.PolicyService
-	Trips                  trip.Service
-	Identity               identity.Provider
-	Auth                   auth.Handler
-	AdminReviewUsername    string
-	AdminReviewPassword    string
-	AdminReviewOrigin      string
+	Health                          interface{ PingContext(context.Context) error }
+	Users                           user.Service
+	Drivers                         driver.Service
+	DriverOnboarding                driveronboarding.Service
+	DriverOnboardingReview          driveronboarding.ReviewService
+	DriverLocations                 driverlocation.Service
+	DriverTrips                     drivertrip.Service
+	RiderLocations                  riderlocation.Service
+	Rides                           ride.Service
+	RideServices                    rideservice.Service
+	RideStatuses                    ridestatus.Service
+	Cancellations                   cancellation.Service
+	Offers                          offer.Service
+	MarketplaceAssignments          marketplace.AssignmentService
+	MarketplacePolicy               marketplace.PolicyService
+	Trips                           trip.Service
+	LocationSearch                  locationsearch.Searcher
+	LocationSearchPolicy            locationsearch.PolicyService
+	LocationSearchRequestsPerMinute int
+	Identity                        identity.Provider
+	Auth                            auth.Handler
+	AdminReviewUsername             string
+	AdminReviewPassword             string
+	AdminReviewOrigin               string
 }
 
 type API struct {
@@ -62,6 +66,9 @@ type API struct {
 	marketplaceAssignments marketplace.AssignmentService
 	marketplacePolicy      marketplace.PolicyService
 	trips                  trip.Service
+	locationSearch         locationsearch.Searcher
+	locationSearchPolicy   locationsearch.PolicyService
+	locationSearchLimiter  *userWindowLimiter
 	identity               identity.Provider
 	auth                   auth.Handler
 	adminReviewUsername    string
@@ -87,6 +94,9 @@ func New(deps Dependencies) *API {
 		marketplaceAssignments: deps.MarketplaceAssignments,
 		marketplacePolicy:      deps.MarketplacePolicy,
 		trips:                  deps.Trips,
+		locationSearch:         deps.LocationSearch,
+		locationSearchPolicy:   deps.LocationSearchPolicy,
+		locationSearchLimiter:  newUserWindowLimiter(deps.LocationSearchRequestsPerMinute),
 		identity:               deps.Identity,
 		auth:                   deps.Auth,
 		adminReviewUsername:    deps.AdminReviewUsername,
