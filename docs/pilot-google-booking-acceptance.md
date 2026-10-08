@@ -10,12 +10,14 @@ Record test date, current branch/SHA, Android app build and device/version, envi
 
 ## 1. Dynamic service catalog
 
+**Physical-device evidence — 2026-09-30:** On the same installed PR #120 Android build, the owner added a compatible third service and it appeared after refresh without rebuild/reinstall. The Rider created a request for it. An unenrolled Driver could not receive/respond; after approved vehicle/service enrollment, the Driver could discover the request, accept/counteroffer, and the Rider could select it. After service disablement, new requests were blocked while existing Trip/history context remained readable. Rename/reorder, unknown-token fallback, empty/error catalog UI and future price-policy gating remain separate checks.
+
 - [ ] Existing Economy/Comfort appear from authenticated `GET /v1/ride-services` in documented order, with readable descriptions; the app does not hardcode the service list.
-- [ ] On the **same installed post-PR-1 Android build**, activate an ordinary third test car service in the existing catalog; refreshing the Rider dashboard displays it without reinstalling or rebuilding the app.
+- [x] On the **same installed post-PR-1 Android build**, activate an ordinary third test car service in the existing catalog; refreshing the Rider dashboard displays it without reinstalling or rebuilding the app.
 - [ ] Rename, reorder and disable the test service from the backend. Its presentation changes on the next successful refresh; a disabled service cannot create a new Ride Request. A historical Trip with that code remains readable.
 - [ ] Unknown presentation tokens render with a generic icon. A failed/empty catalog shows an explicit recoverable state, not silently fabricated current availability.
 - [ ] A selected service removed while the app is backgrounded is deselected on foreground refresh, and any prior route/fare preview is invalidated.
-- [ ] Driver eligibility for the test service requires real approved vehicle/service enrollment. Merely activating a catalog entry does not authorize an unenrolled Driver.
+- [x] Driver eligibility for the test service requires real approved vehicle/service enrollment. Merely activating a catalog entry does not authorize an unenrolled Driver.
 - [ ] Once priced booking launches, a test service without a current approved fare policy is not presented as ready for price-backed booking.
 
 ## 2. Shared map and places

@@ -46,6 +46,9 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.invalidate(riderServicesProvider);
+    }
     final id = ref.read(riderRequestControllerProvider).state.active?.id;
     if (id == null) return;
     if (state == AppLifecycleState.resumed) {
@@ -61,6 +64,15 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
   }
 
   Future<void> _submit() async {
+    final services = ref.read(riderServicesProvider).asData?.value;
+    final selected = ref.read(riderRequestControllerProvider).serviceCode;
+    if (services == null ||
+        !services.any((service) => service.code == selected)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Choose an available ride service.')),
+      );
+      return;
+    }
     final amount = parseFareMinor(_fare.text);
     if (amount == null) {
       ScaffoldMessenger.of(context).showSnackBar(

@@ -32,7 +32,11 @@ func (r PostgresRepository) Create(ctx context.Context, riderUserID uuid.UUID, i
 			proposed_fare_minor,currency,status,service_code,expires_at
 		)
 		SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,statement_timestamp() + ($11 * INTERVAL '1 second')
-		WHERE EXISTS (SELECT 1 FROM driver_service_catalog WHERE code=$10 AND is_active)
+		WHERE EXISTS (
+				SELECT 1 FROM driver_service_catalog
+				WHERE code=$10 AND is_active AND rider_visible
+				FOR SHARE
+			)
 		RETURNING id,rider_user_id,pickup_latitude,pickup_longitude,destination_latitude,destination_longitude,
 			proposed_fare_minor,currency,status,created_at,expires_at
 	`, uuid.New(), riderUserID, input.Pickup.Latitude, input.Pickup.Longitude, input.Destination.Latitude, input.Destination.Longitude, proposedAmount, proposedCurrency, StatusRequested, input.ServiceCode, policy.RideRequestTTLSeconds).Scan(

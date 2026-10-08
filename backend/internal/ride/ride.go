@@ -74,9 +74,8 @@ func (s Service) Create(ctx context.Context, riderUserID uuid.UUID, input Create
 	if input.ServiceCode == "" {
 		input.ServiceCode = "economy"
 	}
-	if input.ServiceCode != "economy" && input.ServiceCode != "comfort" {
-		return Request{}, ErrInvalidService
-	}
+	// The repository validates catalog activation at the same write boundary
+	// as request creation. Do not hardcode Rider-visible service codes here.
 	if !validLocation(input.Pickup) || !validLocation(input.Destination) {
 		return Request{}, ErrInvalidLocation
 	}
