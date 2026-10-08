@@ -1,7 +1,8 @@
 # Mobile UI/UX audit and proposed journey structure
 
 Date: 2026-10-08
-Status: audit complete; proposed structure awaits owner review.
+Status: historical source audit; visual direction and horizontal rollout accepted.
+The detailed structure is now governed by the proposed redesign specification.
 Baseline: main at 3a9fdfa2ca9305d20102ed1b5a61e84129452bfc (PR #132 merged).
 Scope: shared Flutter Rider/Driver app. Operations/admin redesign is excluded.
 
@@ -189,4 +190,8 @@ Prototype/device checks:
 - Existing business regression tests remain; update gesture tests only for
   deliberately approved shared interaction changes.
 
-No visual direction or implementation is approved by this document.
+Subsequent owner decisions on 2026-10-08 accepted the white/slate/blue concept
+boards and horizontal rollout. Detailed interaction decisions are proposed in
+[the redesign specification](../superpowers/specs/2026-10-08-mobile-ui-ux-redesign-design.md)
+for written review. This audit remains the record of the initial findings;
+product-code implementation is not started.
