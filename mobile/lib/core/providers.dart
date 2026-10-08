@@ -32,6 +32,7 @@ import '../features/driver_workspace/presentation/driver_readonly_surfaces.dart'
 import '../features/rider_request/application/rider_place_search_controller.dart';
 import '../features/rider_request/application/rider_route_preview_controller.dart';
 import '../features/rider_request/application/rider_request_controller.dart';
+import '../features/rider_request/application/rider_fare_controller.dart';
 import '../features/rider_request/data/device_location.dart';
 import '../features/rider_request/data/place_search_repository.dart';
 import '../features/rider_request/data/ride_request_repository.dart';
@@ -145,7 +146,7 @@ final riderPlaceSearchControllerProvider =
       ref.watch(sessionControllerProvider.select((s) => s.state.account?.id));
       return RiderPlaceSearchController(
         ref.watch(placeSearchRepositoryProvider),
-        ref.watch(riderRequestControllerProvider),
+        ref.watch(riderRequestControllerProvider.notifier),
         ref.watch(deviceLocationProvider),
       );
     });
@@ -158,10 +159,40 @@ final routePreviewRepositoryProvider = Provider<RoutePreviewRepository>(
 final riderRoutePreviewControllerProvider =
     ChangeNotifierProvider.autoDispose<RiderRoutePreviewController>((ref) {
       ref.watch(sessionControllerProvider.select((s) => s.state.account?.id));
+      ref.listen(riderRequestControllerProvider, (_, _) {});
       return RiderRoutePreviewController(
         ref.watch(routePreviewRepositoryProvider),
-        ref.watch(riderRequestControllerProvider),
+        ref.read(riderRequestControllerProvider),
       );
+    });
+final riderFareControllerProvider =
+    ChangeNotifierProvider.autoDispose<RiderFareController>((ref) {
+      ref.watch(sessionControllerProvider.select((s) => s.state.account?.id));
+      final fare = RiderFareController();
+      void sync() {
+        final rider = ref.read(riderRequestControllerProvider);
+        final route = ref.read(riderRoutePreviewControllerProvider);
+        if (rider.state.active != null) return;
+        final key = route.selectionKey ?? '';
+        fare.invalidate(key);
+        final preview = route.state.preview;
+        if (preview != null) fare.applyPreview(key, preview);
+      }
+
+      // Listen without rebuilding the proposal owner on route/request notifications.
+      ref.listen(riderRequestControllerProvider, (_, _) => sync());
+      ref.listen(riderRoutePreviewControllerProvider, (_, _) => sync());
+      ref.listen(riderServicesProvider, (_, next) {
+        final rider = ref.read(riderRequestControllerProvider);
+        final services = next.asData?.value;
+        if (services != null &&
+            rider.state.active == null &&
+            !services.any((s) => s.code == rider.serviceCode)) {
+          rider.selectService('');
+        }
+      });
+      sync();
+      return fare;
     });
 final driverRouteRepositoryProvider =
     Provider.autoDispose<DriverRouteRepository>((ref) {

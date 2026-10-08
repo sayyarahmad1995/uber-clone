@@ -34,6 +34,7 @@ class RiderRoutePreviewController extends ChangeNotifier {
   RiderRoutePreviewState get state => _state;
 
   String? _selectionKey;
+  String? get selectionKey => _selectionKey;
   int _revision = 0;
   bool _disposed = false;
 

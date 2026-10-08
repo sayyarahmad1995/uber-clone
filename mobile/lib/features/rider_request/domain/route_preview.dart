@@ -5,7 +5,17 @@ class RoutePreview {
     required this.distanceMeters,
     required this.durationSeconds,
     required this.encodedPolyline,
+    this.suggestedFare,
+    this.pricingPolicyVersion,
   }) : points = decodeEncodedPolyline(encodedPolyline) {
+    if ((suggestedFare == null) != (pricingPolicyVersion == null) ||
+        (suggestedFare != null &&
+            (suggestedFare!.currency != 'PKR' ||
+                suggestedFare!.amountMinor <= 0 ||
+                suggestedFare!.amountMinor > 1000000000000 ||
+                pricingPolicyVersion!.trim().isEmpty))) {
+      throw const FormatException('Suggested fare is invalid.');
+    }
     if (distanceMeters <= 0 || durationSeconds <= 0) {
       throw const FormatException('Route preview is invalid.');
     }
@@ -15,6 +25,8 @@ class RoutePreview {
   final int durationSeconds;
   final String encodedPolyline;
   final List<GeoPoint> points;
+  final Money? suggestedFare;
+  final String? pricingPolicyVersion;
 
   factory RoutePreview.fromJson(Map<String, dynamic> json) {
     final route = json['route'] as Map<String, dynamic>?;
@@ -25,6 +37,20 @@ class RoutePreview {
       distanceMeters: (route['distance_meters'] as num).toInt(),
       durationSeconds: (route['duration_seconds'] as num).toInt(),
       encodedPolyline: route['encoded_polyline'] as String,
+      suggestedFare: _fare(json['suggested_fare']),
+      pricingPolicyVersion: json['pricing_policy_version'] as String?,
+    );
+  }
+  static Money? _fare(dynamic value) {
+    if (value == null) return null;
+    if (value is! Map ||
+        value['amount_minor'] is! int ||
+        value['currency'] is! String) {
+      throw const FormatException('Suggested fare is invalid.');
+    }
+    return Money(
+      amountMinor: value['amount_minor'] as int,
+      currency: value['currency'] as String,
     );
   }
 }

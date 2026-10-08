@@ -41,24 +41,26 @@ type Money struct {
 }
 
 type CreateInput struct {
-	ServiceCode  string
-	Pickup       Location
-	Destination  Location
-	ProposedFare *Money
+	PricingPolicyVersion string
+	ServiceCode          string
+	Pickup               Location
+	Destination          Location
+	ProposedFare         *Money
 }
 
 type Request struct {
-	ServiceCode  string
-	ID           uuid.UUID
-	RiderUserID  uuid.UUID
-	Pickup       Location
-	Destination  Location
-	ProposedFare *Money
-	Status       Status
-	CreatedAt    time.Time
-	ExpiresAt    time.Time
-	CancelledAt  *time.Time
-	CancelledBy  CancellationActor
+	PricingSnapshot *PricingSnapshot
+	ServiceCode     string
+	ID              uuid.UUID
+	RiderUserID     uuid.UUID
+	Pickup          Location
+	Destination     Location
+	ProposedFare    *Money
+	Status          Status
+	CreatedAt       time.Time
+	ExpiresAt       time.Time
+	CancelledAt     *time.Time
+	CancelledBy     CancellationActor
 }
 
 type Repository interface {
@@ -101,4 +103,18 @@ func validMoney(money Money) bool {
 		}
 	}
 	return true
+}
+
+type PricingSnapshot struct {
+	PolicyID               uuid.UUID
+	Version                int64
+	ServiceCode            string
+	Currency               string
+	BaseFareMinor          int64
+	RateMinorPerKm         int64
+	RateMinorPerMinute     int64
+	MinimumFareMinor       int64
+	RoundingIncrementMinor int64
+	CalculationRule        string
+	SnapshotAt             time.Time
 }

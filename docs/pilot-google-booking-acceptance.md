@@ -73,3 +73,16 @@ Physical Android validation remains pending for the Driver route endpoint and ma
 ## Validation gate
 
 Before each PR merges, use the existing Readiness workflow on its exact head: Go formatting/vet/PostgreSQL tests and Flutter format/build-runner/drift/analyze/full tests. Android map/plugin PRs also require physical build/device checks. Do not call the expanded booking flow pilot-ready until this matrix **and** the existing cash-loop gate are recorded as passed. Any failed critical case becomes the next fix.
+
+## Suggested fare rebuild acceptance — pending physical Android validation
+
+CI is automated evidence only. Record device, app/backend commit, approved tariff identities and actual observations for these checks:
+
+- [ ] Keep the rollout flag off during deployment; verify manual booking and both existing Driver route stages.
+- [ ] Publish approved Economy and Comfort tariffs, deploy a compatible client, then explicitly enable the flag. Verify only priced active services appear in the original dropdown.
+- [ ] Untouched proposals prefill; edited proposals survive Retry. Changed pickup/destination, same-coordinate Place ID changes, service changes, logout and catalog removal invalidate old fare ownership. Delayed previews cannot restore an obsolete fare.
+- [ ] Publish B after preview A but before Request ride. Observe a clear rate-change message, updated suggestion, retained edited proposal and no request until another tap.
+- [ ] Create under A, then publish B while Drivers offer. Saved proposal and 90–130% limits stay fixed. Select a counteroffer, publish C, start, complete, reopen while unsettled, confirm cash, then read receipts. Agreed and settled amounts remain the selected offer; stored request snapshot remains A.
+- [ ] Disable pricing or service after assignment; finish the existing Trip and recover its history. New priced creation is blocked.
+- [ ] Verify the booked Rider polyline remains, assigned Driver location-to-pickup route appears, and Start trip replaces it with pickup-to-destination.
+- [ ] Exercise panel drag/scroll handoff, dropdown selection, map pan/zoom, rotation and background/resume with fare and Retry controls visible.

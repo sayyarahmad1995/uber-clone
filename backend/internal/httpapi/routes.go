@@ -91,6 +91,12 @@ func (api *API) registerAdminRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /admin", api.adminAuthenticated(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/admin/operations", http.StatusSeeOther)
 	}))
+	mux.Handle("GET /admin/operations/pricing", api.adminAuthenticated(api.adminPricingIndex))
+	mux.Handle("POST /admin/operations/pricing/publish", api.adminMutation(api.adminPublishPricingPolicy))
+	mux.Handle("POST /admin/operations/pricing/disable", api.adminMutation(api.adminDisablePricingPolicy))
+	mux.Handle("GET /v1/admin/pricing-policies", api.adminAuthenticated(api.getAdminPricingPolicies))
+	mux.Handle("POST /v1/admin/pricing-policies", api.adminMutation(api.publishAdminPricingPolicy))
+	mux.Handle("POST /v1/admin/pricing-policies/{policy_id}/disable", api.adminMutation(api.disableAdminPricingPolicy))
 	mux.Handle("GET /admin/operations", api.adminAuthenticated(api.adminOperationsIndex))
 	mux.Handle("POST /admin/operations/marketplace-timing-policy", api.adminMutation(api.adminUpdateMarketplaceTimingPolicy))
 	mux.Handle("POST /admin/operations/place-search-policy", api.adminMutation(api.adminUpdatePlaceSearchPolicy))

@@ -14,6 +14,7 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/locationsearch"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/offer"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/pricing"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/ride"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/riderlocation"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/rideservice"
@@ -24,6 +25,8 @@ import (
 )
 
 type Dependencies struct {
+	Pricing                         *pricing.PostgresRepository
+	SuggestedFaresEnabled           bool
 	Health                          interface{ PingContext(context.Context) error }
 	Users                           user.Service
 	Drivers                         driver.Service
@@ -52,6 +55,8 @@ type Dependencies struct {
 }
 
 type API struct {
+	pricing                *pricing.PostgresRepository
+	suggestedFaresEnabled  bool
 	health                 interface{ PingContext(context.Context) error }
 	users                  user.Service
 	drivers                driver.Service
@@ -81,6 +86,8 @@ type API struct {
 
 func New(deps Dependencies) *API {
 	return &API{
+		pricing:                deps.Pricing,
+		suggestedFaresEnabled:  deps.SuggestedFaresEnabled,
 		health:                 deps.Health,
 		users:                  deps.Users,
 		drivers:                deps.Drivers,

@@ -6,6 +6,7 @@ class RideService {
     required this.description,
     required this.displayOrder,
     required this.presentationToken,
+    this.pricingRequired = false,
   });
 
   final String code;
@@ -13,6 +14,7 @@ class RideService {
   final String description;
   final int displayOrder;
   final String presentationToken;
+  final bool pricingRequired;
 
   factory RideService.fromJson(Map<String, dynamic> json) => RideService(
     code: json['code'] as String,
@@ -20,5 +22,6 @@ class RideService {
     description: json['description'] as String? ?? '',
     displayOrder: (json['display_order'] as num).toInt(),
     presentationToken: json['presentation_token'] as String? ?? 'car',
+    pricingRequired: json['pricing_required'] as bool? ?? false,
   );
 }

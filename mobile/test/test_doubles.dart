@@ -121,6 +121,7 @@ class FakeRideRequestRepository implements RideRequestRepository {
     required GeoPoint destination,
     required Money proposedFare,
     String serviceCode = 'economy',
+    String? pricingPolicyVersion,
   }) async {
     submittedPickup = pickup;
     submittedDestination = destination;

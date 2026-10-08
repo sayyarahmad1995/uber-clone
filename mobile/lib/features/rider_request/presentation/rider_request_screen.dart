@@ -83,6 +83,23 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
       );
       return;
     }
+    final service = services.firstWhere((service) => service.code == selected);
+    final route = ref.read(riderRoutePreviewControllerProvider);
+    final fare = ref.read(riderFareControllerProvider);
+    if (service.pricingRequired &&
+        (route.state.loading ||
+            route.state.error != null ||
+            route.state.preview?.suggestedFare == null ||
+            fare.version == null ||
+            fare.selectionKey != route.selectionKey ||
+            fare.version != route.state.preview?.pricingPolicyVersion)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Refresh the suggested fare before requesting.'),
+        ),
+      );
+      return;
+    }
     final amount = parseFareMinor(_fare.text);
     if (amount == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -90,9 +107,18 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
       );
       return;
     }
-    await ref
-        .read(riderRequestControllerProvider)
-        .submit(amountMinor: amount, currency: 'PKR');
+    final controller = ref.read(riderRequestControllerProvider);
+    final submitted = await controller.submit(
+      amountMinor: amount,
+      currency: 'PKR',
+      pricingPolicyVersion: route.state.preview?.pricingPolicyVersion,
+    );
+    if (!mounted) return;
+    if (!submitted &&
+        controller.state.submissionErrorCode == 'pricing_policy_changed') {
+      ref.invalidate(riderServicesProvider);
+      await route.retry();
+    }
   }
 
   Future<void> _focusCurrentLocation({bool showError = true}) async {
@@ -115,6 +141,9 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
   Widget build(BuildContext context) {
     // Keep the catalog available when the lazy service picker scrolls offscreen.
     ref.watch(riderServicesProvider);
+    final fareState = ref.watch(riderFareControllerProvider);
+    ref.listen(riderFareControllerProvider, (_, next) => _syncFare(next.text));
+    _syncFare(fareState.text);
     final controller = ref.watch(riderRequestControllerProvider);
     final state = controller.state;
     final active = state.active;
@@ -204,6 +233,14 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     );
   }
 
+  void _syncFare(String text) {
+    if (_fare.text == text) return;
+    _fare.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
+
   Widget _buildPanel({
     required ScrollController scrollController,
     required bool scrollEnabled,
@@ -224,6 +261,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
         scrollController: scrollController,
         scrollEnabled: scrollEnabled,
         fare: _fare,
+        onFareChanged: ref.read(riderFareControllerProvider).edit,
         pickupSearch: _pickupSearch,
         destinationSearch: _destinationSearch,
         state: state,
@@ -543,6 +581,7 @@ class _RequestRidePanel extends StatelessWidget {
     required this.scrollController,
     required this.scrollEnabled,
     required this.fare,
+    required this.onFareChanged,
     required this.pickupSearch,
     required this.destinationSearch,
     required this.state,
@@ -562,6 +601,7 @@ class _RequestRidePanel extends StatelessWidget {
   final ScrollController scrollController;
   final bool scrollEnabled;
   final TextEditingController fare;
+  final ValueChanged<String> onFareChanged;
   final TextEditingController pickupSearch;
   final TextEditingController destinationSearch;
   final RiderRequestState state;
@@ -672,11 +712,16 @@ class _RequestRidePanel extends StatelessWidget {
           hasEndpoints: state.pickup != null && state.destination != null,
           onRetry: onRetryRoute,
         ),
+        if (routeState.preview?.suggestedFare != null)
+          Text(
+            'Suggested fare: PKR ${(routeState.preview!.suggestedFare!.amountMinor / 100).toStringAsFixed(2)}',
+          ),
         const SizedBox(height: AppSpacing.sm),
         DashboardPanelControl(
           child: TextField(
             key: const Key('fareField'),
             controller: fare,
+            onChanged: onFareChanged,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: const InputDecoration(
               labelText: 'Your proposed fare',
