@@ -1,6 +1,6 @@
 # HiGO Dynamic Ride Services and Google Maps Rider Booking Experience — implementation plan
 
-**Status:** Implementation merged into `main`; complete milestone acceptance and rollout evidence remain open. This is the current development plan, not a pilot-release approval.
+**Status:** Milestone complete: implementation merged, and PR 6 end-to-end acceptance plus deployment validation passed per the owner's 2026-10-08 reports. Detailed operational evidence and additional cases below are follow-ups, not reported blocking failures.
 **Prepared:** 2026-09-29
 **Revised:** 2026-10-08 — reconciled with merged PRs #119–#123, #125, #127–#130 and the owner's read-only suggested-fare revision.
 **Baseline reviewed:** main at 2285d8febf455e31db4049f0d2e1464bdcd410af (2026-09-28)
@@ -20,7 +20,7 @@ The ten implementation/documentation PRs were merged into `main` in dependency o
 | PR 4 — recommended road route | #123; booked Rider line fix #127 | Implemented and automated checks passed. #127 retains the booking preview within the current session; it does not reconstruct a Rider booked route after a fresh restart. Complete physical route/viewport/failure evidence remains open. |
 | PR 5 — suggested fare | #129, read-only revision and race follow-up #130 | Implemented. Owner reported the feature device test passed on 2026-10-08 and confirmed disabling pricing removes the service from selection. Full pricing-change-to-cash acceptance and production tariff/rollout evidence are not recorded here. |
 | Driver stage routes — approved extension | #128 | Implemented: fresh Driver location to pickup after assignment, pickup to destination after Start trip, line cleared at completion/cancellation. Automated stage/retry/stale-response tests passed; dedicated physical stage/recovery evidence remains open. |
-| PR 6 — integrated booking and verification | Integrated code across the above PRs | Booking integration is implemented. Owner reported all requested end-to-end tests passed on 2026-10-08: Economy/Comfort, exact-fare/counteroffer paths, selected-offer final fare and restart/network recovery. Remaining case-specific/release evidence is tracked below. |
+| PR 6 — integrated booking and verification | Integrated code across the above PRs | Booking integration is implemented. Owner reported all requested end-to-end tests passed on 2026-10-08: Economy/Comfort, exact-fare/counteroffer paths, selected-offer final fare and restart/network recovery. Owner also confirmed the build is already deployed and working; PR 6 is complete on that reported acceptance. Additional evidence is tracked below. |
 
 **Approved fare behavior:** #130 supersedes the original editable suggestion. With suggested fares enabled, the Rider cannot edit the calculated amount. The server re-routes and re-calculates before creating a request; a fare/policy change refreshes the suggestion and requires another tap. Drivers can accept or counteroffer; the Rider-selected Driver offer is the immutable final payable fare. Rollout-off manual booking remains available for compatibility.
 
@@ -28,7 +28,7 @@ The ten implementation/documentation PRs were merged into `main` in dependency o
 
 **PR 6 owner-reported acceptance — 2026-10-08:** After being asked to run the merged-main search → route/read-only fare → request → Driver offer → Rider selection → trip → cash receipt journey for Economy and Comfort, exact-fare/counteroffer paths, selected-offer final fare and restart/network recovery, the owner reported: “everything went smooth. All the tests are passed.” Record this requested end-to-end scope as passed; no blocking failure was reported.
 
-**Evidence limits:** Device/build identifiers, ride/Trip IDs and individual case artifacts were not supplied. The report establishes owner-reported end-to-end acceptance, not independent execution or proof of every additional adversarial/provider/tariff-change case in the wider matrix. Production tariff approval, deployed flag/key configuration and provider latency/load evaluation remain separate. Preserve the merged plan branches as development references, per the owner.
+**Evidence limits:** Device/build identifiers, ride/Trip IDs and individual case artifacts were not supplied. The report establishes owner-reported end-to-end acceptance, not independent execution or proof of every additional adversarial/provider/tariff-change case in the wider matrix. The owner subsequently confirmed the build was already deployed and working and that deployment tests had passed. This closes the deployment-validation status for this milestone. Exact deployed identifiers, tariff approval records, flag/key settings and provider latency/load measurements were not independently inspected. Preserve the merged plan branches as development references, per the owner.
 
 ## 1. Goal and release boundary
 
@@ -175,16 +175,17 @@ PR #119 recorded **ADR-0012: Dynamic Rider Ride Service Catalog** and **ADR-0013
 - **Tests:** Flutter booking-controller, widget/interaction and full regression; Go provider/HTTP/pricing and PostgreSQL regression; synthetic third-service configuration/refresh/deactivation on unchanged client; physical Android complete Economy and Comfort ride paths including no-route and network recovery; exact-HEAD readiness CI.
 - **Done when:** Record complete Economy and Comfort real-device route-preview-to-cash-receipt cases, including read-only suggestion, exact-fare/counteroffer selection and recoverable failures, with build/device and case outcomes. Automated integration is complete. The owner reported the requested end-to-end scope passed on 2026-10-08; detailed run identifiers and any wider matrix cases remain separate evidence items.
 
-### Remaining PR 6 work — acceptance audit, not a new feature build
+### Follow-up evidence — PR 6 accepted, no reported blocker
 
 - [ ] Reconcile each open item in [the booking matrix](../../pilot-google-booking-acceptance.md) and [cash-loop checklist](../../pilot-cash-ride-acceptance.md) with concrete existing evidence. Request only missing cases; do not repeat the already reported suggested-fare and pricing-disable checks without a reason.
 - [ ] Verify the integrated small-screen/keyboard/text-scaling/panel/map flow, catalog invalidation, duplicate-submit protection and timeout/restart recovery on the merged build.
 - [x] Owner-reported Economy and Comfort exact-fare/counteroffer journeys through completion/cash receipt, selected-offer final payable fare and restart/network recovery passed on 2026-10-08. Device/build/ride identifiers were not supplied.
 - [ ] Record specific publication A/B/C and disable-after-assignment cases if required for pilot release; the general end-to-end pass does not identify those individual cases.
 - [ ] Record Driver stage-route/restoration/retry/late-response and camera-gesture checks. Assess the known current-session-only Rider booked-route limitation against required restart UX before proposing a fix.
-- [ ] Record actual launch tariff approvals, restricted key/permission checks and staged deployment/flag state before pilot release. Merging implementation is not activation evidence.
+- [x] Owner confirmed deployment was already completed, working, and deployment tests passed on 2026-10-08. This is owner-reported validation; exact deployment settings were not supplied.
+- [ ] Retain build/device/ride identifiers and tariff/key/flag records when available for operational traceability. This documentation follow-up does not require repeating the passed end-to-end run.
 
-Any demonstrated failure becomes a bounded fix with a regression test. Choose the next implementation only after this audit identifies an actual gap.
+The owner accepted PR 6 after the reported end-to-end and deployment passes. Do not reopen this milestone solely because additional case artifacts were not supplied. Any later demonstrated failure becomes a bounded fix with a regression test; choose subsequent feature scope separately.
 
 ## 5. Proposed application contracts (finalize in PR 0)
 

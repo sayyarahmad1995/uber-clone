@@ -1,12 +1,14 @@
 # Dynamic Ride Services and Google Maps Booking — Acceptance Matrix
 
-**Status:** Mixed evidence: automated checks and scoped owner-reported physical passes are recorded below; remaining unchecked cases are not individually confirmed.
+**Status:** PR 6 end-to-end acceptance and deployment validation passed per the owner's 2026-10-08 reports. Automated and scoped physical evidence are recorded below; unchecked wider cases are not individually confirmed and are follow-ups rather than reported PR 6 blockers.
 
 Do not replace [the current cash-ride pilot acceptance checklist](pilot-cash-ride-acceptance.md). Confirm that existing flow separately before allowing expanded booking to enter the pilot.
 
 ## PR 6 owner-reported end-to-end pass — 2026-10-08
 
 The owner was asked to test merged `main` through search → route/read-only fare → request → Driver offer → Rider selection → trip → cash receipt, covering Economy and Comfort, exact-fare/counteroffer paths, selected-offer final payable fare, and restart/network recovery. The owner reported: “everything went smooth. All the tests are passed.”
+
+The owner subsequently confirmed the build was already deployed and working and that deployment tests had passed. PR 6 is accepted on these reported end-to-end and deployment results; no blocking failure was reported.
 
 This records the requested scope as an owner-reported pass. Device/Android version, actual app/backend build SHA, ride/Trip IDs and individual case artifacts were not supplied. Checked items below use this report; do not reinterpret it as independent execution or completion of every wider provider, tariff-race, catalog, gesture and release-configuration case. Earlier owner confirmation also established that disabling the current pricing policy removes that service from Rider selection.
 
@@ -81,7 +83,7 @@ Physical Android validation remains pending for the Driver route endpoint and ma
 
 Before each PR merges, use the existing Readiness workflow on its exact head: Go formatting/vet/PostgreSQL tests and Flutter format/build-runner/drift/analyze/full tests. Android map/plugin PRs also require physical build/device checks. Do not call the expanded booking flow pilot-ready until this matrix **and** the existing cash-loop gate are recorded as passed. Any failed critical case becomes the next fix.
 
-## Suggested fare rebuild acceptance — pending physical Android validation
+## Suggested fare acceptance — reported core pass; additional case evidence
 
 CI is automated evidence only. Record device, app/backend commit, approved tariff identities and actual observations for these checks:
 
