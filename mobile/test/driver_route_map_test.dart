@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uber_clone/core/maps/ride_map.dart';
+import 'package:uber_clone/core/dashboard/ride_dashboard_scaffold.dart';
 import 'package:uber_clone/core/providers.dart';
 import 'package:uber_clone/core/session/session_store.dart';
 import 'package:uber_clone/features/driver_workspace/presentation/driver_workspace_screen.dart';
@@ -140,6 +141,29 @@ void main() {
     expect(calls, 1);
     reply.complete(true);
     await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+
+  testWidgets('small expanded panel keeps navigation clear of route errors', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 500);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await _pump(tester, _Flow(), _Routes()..fail = true);
+    await tester.drag(
+      find.byKey(const Key('dashboardPanelDragHandle')),
+      const Offset(0, -400),
+    );
+    await tester.pumpAndSettle();
+    final navigation = tester.getRect(
+      find.byKey(const Key('driverNavigationButton')),
+    );
+    final status = tester.getRect(find.byType(DashboardStatusCard));
+    expect(navigation.overlaps(status), isFalse);
+    expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
