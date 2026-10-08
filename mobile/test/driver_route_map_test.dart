@@ -148,6 +148,12 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    var launches = 0;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(navigationChannel, (_) async {
+          launches++;
+          return true;
+        });
     await _pump(tester, _Flow(), _Routes()..fail = true);
     await tester.drag(
       find.byKey(const Key('dashboardPanelDragHandle')),
@@ -160,9 +166,11 @@ void main() {
     final status = tester.getRect(find.byType(DashboardStatusCard));
     expect(navigation.overlaps(status), isFalse);
     final panel = tester.getRect(find.byKey(const Key('dashboardPanel')));
-    expect(navigation.top, greaterThanOrEqualTo(panel.top));
+    expect(panel.contains(navigation.topLeft), isTrue);
+    expect(panel.contains(navigation.bottomRight), isTrue);
     await tester.tap(find.text('Navigate to pickup'));
     await tester.pumpAndSettle();
+    expect(launches, 1);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });

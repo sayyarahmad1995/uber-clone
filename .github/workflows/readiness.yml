@@ -78,20 +78,6 @@ jobs:
           echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
       - run: flutter pub get
         working-directory: mobile
-      - name: Temporary Driver navigation formatting diagnostics
-        working-directory: mobile
-        run: |
-          dart format lib/core/maps/driving_navigation.dart lib/core/providers.dart lib/features/driver_workspace/presentation/driver_workspace_screen.dart test/driver_route_map_test.dart test/driving_navigation_test.dart
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-          paths = ['lib/core/maps/driving_navigation.dart', 'lib/core/providers.dart', 'lib/features/driver_workspace/presentation/driver_workspace_screen.dart', 'test/driver_route_map_test.dart', 'test/driving_navigation_test.dart']
-          print('NAV_FORMATTED=' + json.dumps({'mobile/' + path: Path(path).read_text() for path in paths}))
-          PY
-          git add lib/core/maps/driving_navigation.dart lib/core/providers.dart lib/features/driver_workspace/presentation/driver_workspace_screen.dart test/driver_route_map_test.dart test/driving_navigation_test.dart
-      - name: Driver navigation focused regression
-        working-directory: mobile
-        run: flutter test test/driver_route_map_test.dart test/driving_navigation_test.dart --reporter expanded
       - name: Check changed Dart file formatting
         env:
           EVENT_BEFORE: ${{ github.event.before }}
@@ -201,8 +187,3 @@ jobs:
         working-directory: mobile
       - run: flutter test
         working-directory: mobile
-      - name: Android navigation build smoke
-        working-directory: mobile
-        run: |
-          flutter build apk --debug --no-pub
-          flutter build apk --release --no-pub
