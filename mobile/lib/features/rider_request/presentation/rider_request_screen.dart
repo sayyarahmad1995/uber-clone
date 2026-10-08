@@ -6,15 +6,16 @@ import '../../ride_flow/ride_flow_panels.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/dashboard/dashboard_panel_session.dart';
 import '../../../core/dashboard/ride_dashboard_scaffold.dart';
 import '../../../core/maps/ride_map.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../application/rider_place_search_controller.dart';
+import '../application/rider_route_preview_controller.dart';
 import '../application/rider_request_controller.dart';
 import '../domain/place_search.dart';
 import '../domain/ride_request.dart';
+import '../domain/route_preview.dart';
 
 class RiderRequestScreen extends ConsumerStatefulWidget {
   const RiderRequestScreen({super.key});
@@ -31,6 +32,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
   final _mapController = RideMapController();
   bool _selectingPickup = true;
   bool _pinSelectionMode = false;
+  String? _lastFittedRouteKey;
 
   @override
   void initState() {
@@ -115,6 +117,9 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     final state = controller.state;
     final active = state.active;
     final placeState = ref.watch(riderPlaceSearchControllerProvider).state;
+    final routeState = ref.watch(riderRoutePreviewControllerProvider).state;
+    final routePreview = active == null ? routeState.preview : null;
+    _scheduleRouteFit(routePreview);
     final driverLocation = active == null
         ? null
         : freshDriverLocation(
@@ -147,7 +152,19 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
               label: 'Driver',
             ),
         ],
+        polylines: active == null && routePreview != null
+            ? [
+                RideMapPolyline(
+                  points: routePreview.points
+                      .map(_latLng)
+                      .toList(growable: false),
+                  color: Theme.of(context).colorScheme.primary,
+                  width: 6,
+                ),
+              ]
+            : const [],
         onTap: active == null ? _handleMapTap : null,
+        onPlaceTap: active == null ? _handlePlaceTap : null,
         showCenterPin: active == null && _pinSelectionMode,
         centerPinColor: _selectingPickup ? AppColors.success : AppColors.danger,
       ),
@@ -163,8 +180,8 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
         title: active == null ? 'Ride dashboard' : 'Active ride request',
         message: active == null
             ? _pinSelectionMode
-                  ? 'Move the map under the pin, then confirm the ${_selectingPickup ? 'pickup' : 'destination'}.'
-                  : 'Search for a place, tap the map, or use Set on map.'
+                  ? 'Move the map under the pin and confirm, or tap a labeled place to select it directly.'
+                  : 'Search, tap a labeled place, tap the map, or use Set on map.'
             : 'Status updates appear in the ride panel below.',
       ),
       panelBuilder: (context, scrollController, scrollEnabled) {
@@ -175,6 +192,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
           active: active,
           controller: controller,
           placeState: placeState,
+          routeState: routeState,
         );
       },
     );
@@ -187,6 +205,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     required RideRequest? active,
     required RiderRequestController controller,
     required RiderPlaceSearchState placeState,
+    required RiderRoutePreviewState routeState,
   }) {
     if (state.loading && state.requests.isEmpty) {
       return _LoadingPanel(
@@ -203,6 +222,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
         destinationSearch: _destinationSearch,
         state: state,
         placeState: placeState,
+        routeState: routeState,
         selectingPickup: _selectingPickup,
         pinSelectionMode: _pinSelectionMode,
         onSelectionChanged: _selectField,
@@ -210,6 +230,7 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
         onSearch: _searchPlaces,
         onSuggestionSelected: _selectSuggestion,
         onUseCurrentPickup: _useCurrentPickup,
+        onRetryRoute: ref.read(riderRoutePreviewControllerProvider).retry,
         onSubmit: _submit,
       );
     }
@@ -233,17 +254,10 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
 
   void _startPinSelection(RiderPlaceField field) {
     FocusScope.of(context).unfocus();
-    DashboardPanelSessionScope.maybeOf(context)?.setExpanded(false);
-    final pickup = field == RiderPlaceField.pickup;
-    final rider = ref.read(riderRequestControllerProvider).state;
-    final existing = pickup ? rider.pickup : rider.destination;
     setState(() {
-      _selectingPickup = pickup;
+      _selectingPickup = field == RiderPlaceField.pickup;
       _pinSelectionMode = true;
     });
-    if (existing != null) {
-      unawaited(_mapController.move(_latLng(existing), 16));
-    }
   }
 
   Future<void> _confirmPinSelection() async {
@@ -267,9 +281,6 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     }
     final resolved = await _reconcilePoint(field, point);
     if (!mounted || resolved == null) return;
-    if (resolved.snapToPlace) {
-      await _mapController.move(_latLng(resolved.point), 16);
-    }
     if (!mounted) return;
     setState(() {
       _pinSelectionMode = false;
@@ -289,6 +300,31 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
     if (_selectingPickup) {
       setState(() => _selectingPickup = false);
     }
+  }
+
+  Future<void> _handlePlaceTap(RideMapPlace place) async {
+    final field = _selectedField;
+    if (ref
+        .read(riderPlaceSearchControllerProvider)
+        .state
+        .field(field)
+        .resolving) {
+      return;
+    }
+
+    final selected = await ref
+        .read(riderPlaceSearchControllerProvider)
+        .selectPlaceId(field, place.placeId);
+    if (!mounted || selected == null) return;
+
+    _searchController(field).text = selected.label;
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _pinSelectionMode = false;
+      if (field == RiderPlaceField.pickup) {
+        _selectingPickup = false;
+      }
+    });
   }
 
   void _searchPlaces(RiderPlaceField field, String input) {
@@ -401,6 +437,22 @@ class _RiderRequestScreenState extends ConsumerState<RiderRequestScreen>
       ),
   ];
 
+  void _scheduleRouteFit(RoutePreview? preview) {
+    if (preview == null) {
+      _lastFittedRouteKey = null;
+      return;
+    }
+    final key = preview.encodedPolyline;
+    if (_lastFittedRouteKey == key) {
+      return;
+    }
+    _lastFittedRouteKey = key;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(_mapController.fit(preview.points.map(_latLng), padding: 48));
+    });
+  }
+
   RideMapPoint _latLng(GeoPoint point) =>
       RideMapPoint(point.latitude, point.longitude);
 }
@@ -489,6 +541,7 @@ class _RequestRidePanel extends StatelessWidget {
     required this.destinationSearch,
     required this.state,
     required this.placeState,
+    required this.routeState,
     required this.selectingPickup,
     required this.pinSelectionMode,
     required this.onSelectionChanged,
@@ -496,6 +549,7 @@ class _RequestRidePanel extends StatelessWidget {
     required this.onSearch,
     required this.onSuggestionSelected,
     required this.onUseCurrentPickup,
+    required this.onRetryRoute,
     required this.onSubmit,
   });
 
@@ -506,6 +560,7 @@ class _RequestRidePanel extends StatelessWidget {
   final TextEditingController destinationSearch;
   final RiderRequestState state;
   final RiderPlaceSearchState placeState;
+  final RiderRoutePreviewState routeState;
   final bool selectingPickup;
   final bool pinSelectionMode;
   final ValueChanged<bool> onSelectionChanged;
@@ -514,6 +569,7 @@ class _RequestRidePanel extends StatelessWidget {
   final Future<void> Function(RiderPlaceField field, PlaceSuggestion suggestion)
   onSuggestionSelected;
   final Future<void> Function() onUseCurrentPickup;
+  final Future<void> Function() onRetryRoute;
   final Future<void> Function() onSubmit;
 
   @override
@@ -603,6 +659,12 @@ class _RequestRidePanel extends StatelessWidget {
           label: 'Destination',
           point: state.destination,
           address: placeState.destination.label,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _RoutePreviewCard(
+          state: routeState,
+          hasEndpoints: state.pickup != null && state.destination != null,
+          onRetry: onRetryRoute,
         ),
         const SizedBox(height: AppSpacing.sm),
         DashboardPanelControl(
@@ -743,6 +805,107 @@ class _PlaceSearchField extends StatelessWidget {
       ),
     );
   }
+}
+
+class _RoutePreviewCard extends StatelessWidget {
+  const _RoutePreviewCard({
+    required this.state,
+    required this.hasEndpoints,
+    required this.onRetry,
+  });
+
+  final RiderRoutePreviewState state;
+  final bool hasEndpoints;
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!hasEndpoints) {
+      return const Text(
+        'Select pickup and destination to calculate the driving route.',
+      );
+    }
+    if (state.loading) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(AppSpacing.md),
+          child: Row(
+            children: [
+              SizedBox.square(
+                dimension: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              SizedBox(width: AppSpacing.sm),
+              Expanded(child: Text('Calculating traffic-aware route...')),
+            ],
+          ),
+        ),
+      );
+    }
+    if (state.error != null) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                state.error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              DashboardPanelControl(
+                child: OutlinedButton.icon(
+                  key: const Key('retryRoutePreviewButton'),
+                  onPressed: () => onRetry(),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Retry route'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final preview = state.preview;
+    if (preview == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Card(
+      key: const Key('routePreviewSummary'),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+        child: ListTile(
+          leading: const Icon(Icons.route),
+          title: Text(
+            '${_formatRouteDuration(preview.durationSeconds)} · '
+            '${_formatRouteDistance(preview.distanceMeters)}',
+          ),
+          subtitle: const Text('Google recommended · current traffic'),
+        ),
+      ),
+    );
+  }
+}
+
+String _formatRouteDistance(int meters) {
+  if (meters < 1000) {
+    return '$meters m';
+  }
+  final kilometers = meters / 1000;
+  return '${kilometers.toStringAsFixed(kilometers < 10 ? 1 : 0)} km';
+}
+
+String _formatRouteDuration(int seconds) {
+  final minutes = (seconds + 59) ~/ 60;
+  if (minutes < 60) {
+    return '$minutes min';
+  }
+  final hours = minutes ~/ 60;
+  final remainder = minutes % 60;
+  return remainder == 0 ? '$hours hr' : '$hours hr $remainder min';
 }
 
 class _PointSummary extends StatelessWidget {

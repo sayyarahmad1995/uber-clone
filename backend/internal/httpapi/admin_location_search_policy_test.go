@@ -12,23 +12,22 @@ import (
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/marketplace"
 )
 
-type fakeLocationSearchPolicyService struct {
-	policy locationsearch.Policy
+type fakePlaceSearchPolicyService struct {
+	policy locationsearch.SearchPolicy
 }
 
-func (f *fakeLocationSearchPolicyService) Load(context.Context) (locationsearch.Policy, error) {
+func (f *fakePlaceSearchPolicyService) Load(context.Context) (locationsearch.SearchPolicy, error) {
 	return f.policy, nil
 }
 
-func (f *fakeLocationSearchPolicyService) Update(
+func (f *fakePlaceSearchPolicyService) Update(
 	_ context.Context,
-	policy locationsearch.Policy,
+	policy locationsearch.SearchPolicy,
 	actor string,
-) (locationsearch.Policy, error) {
-	if actor == "" || !locationsearch.ValidPolicy(policy) {
-		return locationsearch.Policy{}, locationsearch.ErrInvalidPolicy
+) (locationsearch.SearchPolicy, error) {
+	if !locationsearch.ValidSearchPolicy(policy) {
+		return locationsearch.SearchPolicy{}, locationsearch.ErrInvalidSearchPolicy
 	}
-	policy.UpdatedAt = time.Now().UTC()
 	policy.UpdatedBy = actor
 	f.policy = policy
 	return policy, nil
@@ -52,15 +51,8 @@ func (f *fakeMarketplacePolicyService) Update(
 	return policy, nil
 }
 
-func adminOperationsTestAPI() (*API, *fakeLocationSearchPolicyService) {
-	locationPolicy := &fakeLocationSearchPolicyService{
-		policy: locationsearch.Policy{
-			NamedPlaceSnapRadiusMeters: 5,
-			UpdatedAt:                  time.Now().UTC(),
-			UpdatedBy:                  "migration",
-		},
-	}
-	return &API{
+func TestAdminOperationsNoLongerExposesLocationSnapControls(t *testing.T) {
+	api := &API{
 		marketplacePolicy: &fakeMarketplacePolicyService{
 			policy: marketplace.TimingPolicy{
 				RideRequestTTLSeconds:       180,
@@ -70,14 +62,16 @@ func adminOperationsTestAPI() (*API, *fakeLocationSearchPolicyService) {
 				UpdatedBy:                   "migration",
 			},
 		},
-		locationSearchPolicy: locationPolicy,
-		adminReviewUsername:  "reviewer",
-		adminReviewPassword:  "secret",
-	}, locationPolicy
-}
-
-func TestAdminOperationsRendersLocationSearchPolicy(t *testing.T) {
-	api, _ := adminOperationsTestAPI()
+		locationSearchPolicy: &fakePlaceSearchPolicyService{
+			policy: locationsearch.SearchPolicy{
+				AutocompleteRadiusMeters: 25000,
+				UpdatedAt:                time.Now().UTC(),
+				UpdatedBy:                "migration",
+			},
+		},
+		adminReviewUsername: "reviewer",
+		adminReviewPassword: "secret",
+	}
 	request := httptest.NewRequest(http.MethodGet, "/admin/operations", nil)
 	request.SetBasicAuth("reviewer", "secret")
 	response := httptest.NewRecorder()
@@ -88,55 +82,49 @@ func TestAdminOperationsRendersLocationSearchPolicy(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", response.Code, response.Body.String())
 	}
 	body := response.Body.String()
-	if !strings.Contains(body, "Named-place snap radius") ||
-		!strings.Contains(body, "value=\"5\"") {
-		t.Fatalf("location policy was not rendered: %s", body)
+	if !strings.Contains(body, "Marketplace timing") {
+		t.Fatalf("marketplace controls missing: %s", body)
+	}
+	if !strings.Contains(body, "Rider place search") ||
+		!strings.Contains(body, "Nearby search radius") ||
+		!strings.Contains(body, "value=\"25\"") {
+		t.Fatalf("place search controls missing: %s", body)
+	}
+	if strings.Contains(body, "Named-place snap radius") ||
+		strings.Contains(body, "location-search-policy") {
+		t.Fatalf("removed snap controls still rendered: %s", body)
 	}
 }
 
-func TestAdminCanUpdateLocationSearchPolicyWithoutRestart(t *testing.T) {
-	api, policy := adminOperationsTestAPI()
+func TestAdminOperationsUpdatesPlaceSearchRadius(t *testing.T) {
+	searchPolicy := &fakePlaceSearchPolicyService{
+		policy: locationsearch.SearchPolicy{
+			AutocompleteRadiusMeters: 50000,
+			UpdatedAt:                time.Now().UTC(),
+			UpdatedBy:                "migration",
+		},
+	}
+	api := &API{
+		locationSearchPolicy: searchPolicy,
+	}
 	request := httptest.NewRequest(
 		http.MethodPost,
-		"http://application.test/admin/operations/location-search-policy",
-		strings.NewReader("named_place_snap_radius_meters=7"),
+		"/admin/operations/place-search-policy",
+		strings.NewReader("autocomplete_radius_kilometers=20"),
 	)
-	request.Host = "application.test"
-	request.Header.Set("Origin", "http://application.test")
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.SetBasicAuth("reviewer", "secret")
 	response := httptest.NewRecorder()
 
-	api.routes().ServeHTTP(response, request)
+	api.adminUpdatePlaceSearchPolicy(response, request)
 
 	if response.Code != http.StatusSeeOther {
 		t.Fatalf("expected redirect, got %d: %s", response.Code, response.Body.String())
 	}
-	if policy.policy.NamedPlaceSnapRadiusMeters != 7 ||
-		policy.policy.UpdatedBy != "reviewer" {
-		t.Fatalf("admin update was not applied/audited: %#v", policy.policy)
+	if searchPolicy.policy.AutocompleteRadiusMeters != 20000 {
+		t.Fatalf("unexpected saved radius: %#v", searchPolicy.policy)
 	}
-}
-
-func TestAdminRejectsLocationSearchPolicyOutsideBounds(t *testing.T) {
-	api, policy := adminOperationsTestAPI()
-	request := httptest.NewRequest(
-		http.MethodPut,
-		"http://application.test/v1/admin/location-search-policy",
-		strings.NewReader(`{"named_place_snap_radius_meters":51}`),
-	)
-	request.Host = "application.test"
-	request.Header.Set("Origin", "http://application.test")
-	request.Header.Set("Content-Type", "application/json")
-	request.SetBasicAuth("reviewer", "secret")
-	response := httptest.NewRecorder()
-
-	api.routes().ServeHTTP(response, request)
-
-	if response.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", response.Code, response.Body.String())
-	}
-	if policy.policy.NamedPlaceSnapRadiusMeters != 5 {
-		t.Fatalf("invalid update mutated policy: %#v", policy.policy)
+	if searchPolicy.policy.UpdatedBy != "reviewer" {
+		t.Fatalf("unexpected policy actor: %#v", searchPolicy.policy)
 	}
 }

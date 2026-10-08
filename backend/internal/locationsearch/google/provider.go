@@ -9,16 +9,19 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/locationsearch"
 )
 
 const (
-	defaultPlacesBase  = "https://places.googleapis.com"
-	defaultGeocodeBase = "https://geocode.googleapis.com"
+	defaultPlacesBase       = "https://places.googleapis.com"
+	defaultGeocodeBase      = "https://geocode.googleapis.com"
+	popularityCacheLifetime = 24 * time.Hour
 )
 
 type Provider struct {
@@ -26,6 +29,14 @@ type Provider struct {
 	client      *http.Client
 	placesBase  string
 	geocodeBase string
+
+	popularityMu    sync.Mutex
+	popularityCache map[string]cachedPopularity
+}
+
+type cachedPopularity struct {
+	userRatingCount int64
+	expiresAt       time.Time
 }
 
 func New(apiKey string) *Provider {
@@ -39,10 +50,11 @@ func New(apiKey string) *Provider {
 
 func newProvider(apiKey string, client *http.Client, placesBase, geocodeBase string) *Provider {
 	return &Provider{
-		apiKey:      strings.TrimSpace(apiKey),
-		client:      client,
-		placesBase:  strings.TrimRight(placesBase, "/"),
-		geocodeBase: strings.TrimRight(geocodeBase, "/"),
+		apiKey:          strings.TrimSpace(apiKey),
+		client:          client,
+		placesBase:      strings.TrimRight(placesBase, "/"),
+		geocodeBase:     strings.TrimRight(geocodeBase, "/"),
+		popularityCache: make(map[string]cachedPopularity),
 	}
 }
 
@@ -55,13 +67,13 @@ func (p *Provider) Autocomplete(ctx context.Context, input locationsearch.Autoco
 		"sessionToken": input.SessionToken,
 	}
 	if input.Bias != nil {
-		body["locationBias"] = map[string]any{
+		body["locationRestriction"] = map[string]any{
 			"circle": map[string]any{
 				"center": map[string]any{
 					"latitude":  input.Bias.Latitude,
 					"longitude": input.Bias.Longitude,
 				},
-				"radius": 50000.0,
+				"radius": float64(input.RestrictionRadiusMeters),
 			},
 		}
 	}
@@ -123,7 +135,89 @@ func (p *Provider) Autocomplete(ctx context.Context, input locationsearch.Autoco
 		}
 		items = append(items, locationsearch.Suggestion{PlaceID: placeID, Label: label})
 	}
-	return items, nil
+	return p.rankSuggestionsByPopularity(ctx, items), nil
+}
+
+func (p *Provider) rankSuggestionsByPopularity(
+	ctx context.Context,
+	items []locationsearch.Suggestion,
+) []locationsearch.Suggestion {
+	if len(items) < 2 {
+		return items
+	}
+
+	type rankedSuggestion struct {
+		suggestion locationsearch.Suggestion
+		popularity int64
+		index      int
+	}
+	ranked := make([]rankedSuggestion, len(items))
+	var wait sync.WaitGroup
+	for i, item := range items {
+		ranked[i] = rankedSuggestion{suggestion: item, index: i}
+		wait.Add(1)
+		go func(index int, placeID string) {
+			defer wait.Done()
+			ranked[index].popularity = p.userRatingCount(ctx, placeID)
+		}(i, item.PlaceID)
+	}
+	wait.Wait()
+
+	sort.SliceStable(ranked, func(i, j int) bool {
+		if ranked[i].popularity == ranked[j].popularity {
+			return ranked[i].index < ranked[j].index
+		}
+		return ranked[i].popularity > ranked[j].popularity
+	})
+	for i := range ranked {
+		items[i] = ranked[i].suggestion
+	}
+	return items
+}
+
+func (p *Provider) userRatingCount(ctx context.Context, placeID string) int64 {
+	now := time.Now()
+	p.popularityMu.Lock()
+	if cached, ok := p.popularityCache[placeID]; ok && now.Before(cached.expiresAt) {
+		p.popularityMu.Unlock()
+		return cached.userRatingCount
+	}
+	p.popularityMu.Unlock()
+
+	endpoint, err := url.Parse(p.placesBase + "/v1/places/" + url.PathEscape(placeID))
+	if err != nil {
+		return 0
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	if err != nil {
+		return 0
+	}
+	req.Header.Set("X-Goog-Api-Key", p.apiKey)
+	req.Header.Set("X-Goog-FieldMask", "userRatingCount")
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return 0
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return 0
+	}
+
+	var payload struct {
+		UserRatingCount int64 `json:"userRatingCount"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return 0
+	}
+
+	p.popularityMu.Lock()
+	p.popularityCache[placeID] = cachedPopularity{
+		userRatingCount: payload.UserRatingCount,
+		expiresAt:       now.Add(popularityCacheLifetime),
+	}
+	p.popularityMu.Unlock()
+	return payload.UserRatingCount
 }
 
 func (p *Provider) Details(ctx context.Context, placeID, sessionToken string) (locationsearch.Place, error) {
@@ -134,16 +228,21 @@ func (p *Provider) Details(ctx context.Context, placeID, sessionToken string) (l
 	if err != nil {
 		return locationsearch.Place{}, fmt.Errorf("%w: build place details URL", locationsearch.ErrProvider)
 	}
-	query := endpoint.Query()
-	query.Set("sessionToken", sessionToken)
-	endpoint.RawQuery = query.Encode()
+	if sessionToken = strings.TrimSpace(sessionToken); sessionToken != "" {
+		query := endpoint.Query()
+		query.Set("sessionToken", sessionToken)
+		endpoint.RawQuery = query.Encode()
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
 		return locationsearch.Place{}, fmt.Errorf("%w: build place details request", locationsearch.ErrProvider)
 	}
 	req.Header.Set("X-Goog-Api-Key", p.apiKey)
-	req.Header.Set("X-Goog-FieldMask", "id,formattedAddress,location")
+	req.Header.Set(
+		"X-Goog-FieldMask",
+		"id,displayName.text,formattedAddress,location",
+	)
 
 	resp, err := p.client.Do(req)
 	if err != nil {
@@ -158,7 +257,10 @@ func (p *Provider) Details(ctx context.Context, placeID, sessionToken string) (l
 	}
 
 	var payload struct {
-		ID               string `json:"id"`
+		ID          string `json:"id"`
+		DisplayName struct {
+			Text string `json:"text"`
+		} `json:"displayName"`
 		FormattedAddress string `json:"formattedAddress"`
 		Location         struct {
 			Latitude  float64 `json:"latitude"`
@@ -168,10 +270,15 @@ func (p *Provider) Details(ctx context.Context, placeID, sessionToken string) (l
 	if err := decodeJSON(resp.Body, &payload); err != nil {
 		return locationsearch.Place{}, err
 	}
+	label := strings.TrimSpace(payload.FormattedAddress)
+	if strings.TrimSpace(sessionToken) == "" {
+		if displayName := strings.TrimSpace(payload.DisplayName.Text); displayName != "" {
+			label = displayName
+		}
+	}
 	place := locationsearch.Place{
-		PlaceID:     strings.TrimSpace(payload.ID),
-		Label:       strings.TrimSpace(payload.FormattedAddress),
-		SnapToPlace: true,
+		PlaceID: strings.TrimSpace(payload.ID),
+		Label:   label,
 		Location: locationsearch.Point{
 			Latitude:  payload.Location.Latitude,
 			Longitude: payload.Location.Longitude,
@@ -183,95 +290,11 @@ func (p *Provider) Details(ctx context.Context, placeID, sessionToken string) (l
 	return place, nil
 }
 
-func (p *Provider) ReverseGeocode(ctx context.Context, point locationsearch.Point, namedPlaceSnapRadiusMeters int64) (locationsearch.Place, error) {
+func (p *Provider) ReverseGeocode(ctx context.Context, point locationsearch.Point) (locationsearch.Place, error) {
 	if p.apiKey == "" {
 		return locationsearch.Place{}, locationsearch.ErrUnavailable
 	}
-	if namedPlaceSnapRadiusMeters < locationsearch.MinNamedPlaceSnapRadiusMeters ||
-		namedPlaceSnapRadiusMeters > locationsearch.MaxNamedPlaceSnapRadiusMeters {
-		return locationsearch.Place{}, locationsearch.ErrInvalidInput
-	}
-	if place, found, err := p.nearbyNamedPlace(ctx, point, namedPlaceSnapRadiusMeters); err != nil {
-		return locationsearch.Place{}, err
-	} else if found {
-		return place, nil
-	}
 	return p.reverseGeocodeAddress(ctx, point)
-}
-
-func (p *Provider) nearbyNamedPlace(ctx context.Context, point locationsearch.Point, radiusMeters int64) (locationsearch.Place, bool, error) {
-	body := map[string]any{
-		"maxResultCount": 1,
-		"rankPreference": "DISTANCE",
-		"locationRestriction": map[string]any{
-			"circle": map[string]any{
-				"center": map[string]any{
-					"latitude":  point.Latitude,
-					"longitude": point.Longitude,
-				},
-				"radius": float64(radiusMeters),
-			},
-		},
-	}
-	encoded, err := json.Marshal(body)
-	if err != nil {
-		return locationsearch.Place{}, false, fmt.Errorf("%w: encode nearby search request", locationsearch.ErrProvider)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.placesBase+"/v1/places:searchNearby", bytes.NewReader(encoded))
-	if err != nil {
-		return locationsearch.Place{}, false, fmt.Errorf("%w: build nearby search request", locationsearch.ErrProvider)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Goog-Api-Key", p.apiKey)
-	req.Header.Set("X-Goog-FieldMask", "places.id,places.displayName,places.formattedAddress,places.location")
-
-	resp, err := p.client.Do(req)
-	if err != nil {
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			return locationsearch.Place{}, false, err
-		}
-		return locationsearch.Place{}, false, fmt.Errorf("%w: nearby search request", locationsearch.ErrProvider)
-	}
-	defer resp.Body.Close()
-	if err := providerStatus(resp.StatusCode); err != nil {
-		return locationsearch.Place{}, false, err
-	}
-
-	var payload struct {
-		Places []struct {
-			ID          string `json:"id"`
-			DisplayName struct {
-				Text string `json:"text"`
-			} `json:"displayName"`
-			FormattedAddress string `json:"formattedAddress"`
-			Location         struct {
-				Latitude  float64 `json:"latitude"`
-				Longitude float64 `json:"longitude"`
-			} `json:"location"`
-		} `json:"places"`
-	}
-	if err := decodeJSON(resp.Body, &payload); err != nil {
-		return locationsearch.Place{}, false, err
-	}
-	for _, candidate := range payload.Places {
-		name := strings.TrimSpace(candidate.DisplayName.Text)
-		location := locationsearch.Point{Latitude: candidate.Location.Latitude, Longitude: candidate.Location.Longitude}
-		if name == "" || !location.Valid() {
-			continue
-		}
-		address := strings.TrimSpace(candidate.FormattedAddress)
-		label := name
-		if address != "" && !strings.Contains(strings.ToLower(address), strings.ToLower(name)) {
-			label += ", " + address
-		}
-		return locationsearch.Place{
-			PlaceID:     strings.TrimSpace(candidate.ID),
-			Label:       label,
-			Location:    location,
-			SnapToPlace: true,
-		}, true, nil
-	}
-	return locationsearch.Place{}, false, nil
 }
 
 func (p *Provider) reverseGeocodeAddress(ctx context.Context, point locationsearch.Point) (locationsearch.Place, error) {
@@ -324,10 +347,9 @@ func (p *Provider) reverseGeocodeAddress(ctx context.Context, point locationsear
 	}
 	first := payload.Results[0]
 	place := locationsearch.Place{
-		PlaceID:     strings.TrimSpace(first.PlaceID),
-		Label:       strings.TrimSpace(first.FormattedAddress),
-		Location:    point,
-		SnapToPlace: false,
+		PlaceID:  strings.TrimSpace(first.PlaceID),
+		Label:    strings.TrimSpace(first.FormattedAddress),
+		Location: point,
 	}
 	if place.Label == "" {
 		return locationsearch.Place{}, locationsearch.ErrNotFound

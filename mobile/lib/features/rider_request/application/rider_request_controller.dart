@@ -10,7 +10,9 @@ class RiderRequestState {
   const RiderRequestState({
     this.requests = const [],
     this.pickup,
+    this.pickupPlaceId,
     this.destination,
+    this.destinationPlaceId,
     this.loading = true,
     this.submitting = false,
     this.locating = false,
@@ -18,7 +20,9 @@ class RiderRequestState {
   });
   final List<RideRequest> requests;
   final GeoPoint? pickup;
+  final String? pickupPlaceId;
   final GeoPoint? destination;
+  final String? destinationPlaceId;
   final bool loading;
   final bool submitting;
   final bool locating;
@@ -41,16 +45,26 @@ class RiderRequestState {
   RiderRequestState copyWith({
     List<RideRequest>? requests,
     GeoPoint? pickup,
+    String? pickupPlaceId,
     GeoPoint? destination,
+    String? destinationPlaceId,
     bool? loading,
     bool? submitting,
     bool? locating,
     String? error,
+    bool clearPickupPlaceId = false,
+    bool clearDestinationPlaceId = false,
     bool clearError = false,
   }) => RiderRequestState(
     requests: requests ?? this.requests,
     pickup: pickup ?? this.pickup,
+    pickupPlaceId: clearPickupPlaceId
+        ? null
+        : pickupPlaceId ?? this.pickupPlaceId,
     destination: destination ?? this.destination,
+    destinationPlaceId: clearDestinationPlaceId
+        ? null
+        : destinationPlaceId ?? this.destinationPlaceId,
     loading: loading ?? this.loading,
     submitting: submitting ?? this.submitting,
     locating: locating ?? this.locating,
@@ -91,16 +105,35 @@ class RiderRequestController extends ChangeNotifier {
     _set(_state.copyWith(locating: true, clearError: true));
     try {
       final pickup = await _location.current();
-      _set(_state.copyWith(pickup: pickup, locating: false));
+      _set(
+        _state.copyWith(
+          pickup: pickup,
+          locating: false,
+          clearPickupPlaceId: true,
+        ),
+      );
     } catch (error) {
       _set(_state.copyWith(locating: false, error: '$error'));
     }
   }
 
-  void setPickup(GeoPoint point) =>
-      _set(_state.copyWith(pickup: point, clearError: true));
-  void setDestination(GeoPoint point) =>
-      _set(_state.copyWith(destination: point, clearError: true));
+  void setPickup(GeoPoint point, {String? placeId}) => _set(
+    _state.copyWith(
+      pickup: point,
+      pickupPlaceId: placeId,
+      clearPickupPlaceId: placeId == null,
+      clearError: true,
+    ),
+  );
+
+  void setDestination(GeoPoint point, {String? placeId}) => _set(
+    _state.copyWith(
+      destination: point,
+      destinationPlaceId: placeId,
+      clearDestinationPlaceId: placeId == null,
+      clearError: true,
+    ),
+  );
 
   Future<bool> submit({
     required int amountMinor,

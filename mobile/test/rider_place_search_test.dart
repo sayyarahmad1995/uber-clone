@@ -30,6 +30,7 @@ void main() {
       placeId: suggestions.single.placeId,
       sessionToken: 'session-1',
     );
+    final direct = await repository.placeById('poi-1');
     final reverse = await repository.reverseGeocode(
       const GeoPoint(latitude: 24.87, longitude: 67.02),
     );
@@ -38,11 +39,14 @@ void main() {
     expect(adapter.paths, [
       '/v1/places/autocomplete',
       '/v1/places/p1',
+      '/v1/places/poi-1',
       '/v1/places/reverse-geocode',
     ]);
     expect(adapter.autocompleteSessionToken, 'session-1');
     expect(adapter.detailsSessionToken, 'session-1');
     expect(details.label, 'Clifton, Karachi');
+    expect(direct.label, 'Faisal Mosque');
+    expect(adapter.directDetailsSessionToken, isNull);
     expect(reverse!.label, 'Pinned Road, Karachi');
   });
 
@@ -80,6 +84,7 @@ void main() {
         const PlaceSuggestion(placeId: 'pickup-1', label: 'Clifton'),
       );
       expect(places.detailsTokens.single, pickupToken);
+      expect(rider.state.pickupPlaceId, 'pickup-1');
 
       controller.search(RiderPlaceField.pickup, 'Sea View');
       await Future<void>.delayed(const Duration(milliseconds: 350));
@@ -126,8 +131,34 @@ void main() {
     );
   });
 
+  test('visible POI tap selects canonical place directly', () async {
+    final rider = RiderRequestController(
+      FakeRideRequestRepository(),
+      const FakeDeviceLocation(),
+    );
+    addTearDown(rider.dispose);
+    final places = _FakePlaceSearchRepository();
+    final controller = RiderPlaceSearchController(
+      places,
+      rider,
+      const FakeDeviceLocation(),
+    );
+    addTearDown(controller.dispose);
+
+    final selected = await controller.selectPlaceId(
+      RiderPlaceField.pickup,
+      'poi-1',
+    );
+
+    expect(selected!.label, 'Faisal Mosque');
+    expect(selected.point, const GeoPoint(latitude: 33.7295, longitude: 73.0372));
+    expect(rider.state.pickup, selected.point);
+    expect(rider.state.pickupPlaceId, 'poi-1');
+    expect(controller.state.pickup.label, selected.label);
+  });
+
   test(
-    'reverse geocode keeps exact pin when no named place is available',
+    'reverse geocode always keeps the exact Rider pin',
     () async {
       final rider = RiderRequestController(
         FakeRideRequestRepository(),
@@ -149,44 +180,12 @@ void main() {
       );
 
       expect(resolved!.label, 'Pinned Road, Karachi');
-      expect(resolved.snapToPlace, isFalse);
       expect(resolved.point, pin);
       expect(rider.state.pickup, pin);
+      expect(rider.state.pickupPlaceId, isNull);
       expect(controller.state.pickup.label, 'Pinned Road, Karachi');
     },
   );
-
-  test('reverse geocode snaps Rider pin to a nearby named place', () async {
-    final rider = RiderRequestController(
-      FakeRideRequestRepository(),
-      const FakeDeviceLocation(),
-    );
-    addTearDown(rider.dispose);
-    final places = _FakePlaceSearchRepository()
-      ..reverseSelection = const PlaceSelection(
-        placeId: 'named-1',
-        label: 'Named Place, Islamabad',
-        point: GeoPoint(latitude: 33.7295, longitude: 73.0372),
-        snapToPlace: true,
-      );
-    final controller = RiderPlaceSearchController(
-      places,
-      rider,
-      const FakeDeviceLocation(),
-    );
-    addTearDown(controller.dispose);
-
-    const pin = GeoPoint(latitude: 33.7294, longitude: 73.0371);
-    final resolved = await controller.reconcilePin(
-      RiderPlaceField.destination,
-      pin,
-    );
-
-    expect(resolved!.snapToPlace, isTrue);
-    expect(resolved.point, places.reverseSelection.point);
-    expect(rider.state.destination, places.reverseSelection.point);
-    expect(controller.state.destination.label, 'Named Place, Islamabad');
-  });
 }
 
 class _AutocompleteCall {
@@ -238,6 +237,15 @@ class _FakePlaceSearchRepository implements PlaceSearchRepository {
   }
 
   @override
+  Future<PlaceSelection> placeById(String placeId) async {
+    return const PlaceSelection(
+      placeId: 'poi-1',
+      label: 'Faisal Mosque',
+      point: GeoPoint(latitude: 33.7295, longitude: 73.0372),
+    );
+  }
+
+  @override
   Future<PlaceSelection?> reverseGeocode(GeoPoint point) async =>
       reverseSelection;
 
@@ -261,6 +269,7 @@ class _PlacesAdapter implements HttpClientAdapter {
   final authorizations = <String?>[];
   String? autocompleteSessionToken;
   String? detailsSessionToken;
+  String? directDetailsSessionToken;
 
   @override
   Future<ResponseBody> fetch(
@@ -289,13 +298,22 @@ class _PlacesAdapter implements HttpClientAdapter {
         'longitude': 67.03,
       });
     }
+    if (options.path == '/v1/places/poi-1') {
+      directDetailsSessionToken =
+          options.queryParameters['session_token'] as String?;
+      return _json({
+        'place_id': 'poi-1',
+        'label': 'Faisal Mosque',
+        'latitude': 33.7295,
+        'longitude': 73.0372,
+      });
+    }
     if (options.path == '/v1/places/reverse-geocode') {
       return _json({
         'place_id': 'pin-1',
         'label': 'Pinned Road, Karachi',
         'latitude': 24.87,
         'longitude': 67.02,
-        'snap_to_place': false,
       });
     }
     return ResponseBody.fromString(
