@@ -10,6 +10,7 @@ import '../../../core/models/account.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../ride_flow/ride_flow_panels.dart';
+import '../../ride_flow/domain/trip.dart';
 import '../application/driver_onboarding_controller.dart';
 import '../application/driver_route_controller.dart';
 import '../domain/driver_onboarding.dart';
@@ -32,6 +33,7 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
   final _mapController = RideMapController();
   bool _reapplying = false;
   String? _lastFittedRouteKey;
+  String? _navigationInFlight;
 
   @override
   void initState() {
@@ -110,6 +112,8 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
         ? const DriverRouteState()
         : ref.watch(driverRouteControllerProvider).state;
     _scheduleRouteFit(route, trip?.rideRequestId);
+    final navigationTarget = _navigationTarget(trip);
+    final navigationKey = _navigationKey(trip);
     final onboarding = driver.loaded && profile == null
         ? ref.watch(driverOnboardingControllerProvider)
         : null;
@@ -214,9 +218,7 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
                   : 'Loading route to destination.'
             : route.error ??
                   (route.preview != null
-                      ? route.status == 'assigned'
-                            ? 'Driving route to pickup.'
-                            : 'Driving route to destination.'
+                      ? _routeEstimate(route)
                       : _statusMessage(
                           loading: loading,
                           onboardingFailed: onboardingFailed,
@@ -257,6 +259,22 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
             onAvailabilityChanged: driver.setOnline,
             selectionValid: driver.operation?.valid == true,
             activeTrip: trip != null,
+            navigationControl: navigationTarget == null
+                ? null
+                : DashboardPanelControl(
+                    child: FilledButton.icon(
+                      key: const Key('driverNavigationButton'),
+                      onPressed: _navigationInFlight == navigationKey
+                          ? null
+                          : _navigate,
+                      icon: const Icon(Icons.navigation),
+                      label: Text(
+                        trip!.status == 'assigned'
+                            ? 'Navigate to pickup'
+                            : 'Navigate to destination',
+                      ),
+                    ),
+                  ),
             onPublishLocation: _focusCurrentLocation,
             onRefresh: driver.load,
           );
@@ -310,6 +328,64 @@ class _DriverWorkspaceScreenState extends ConsumerState<DriverWorkspaceScreen>
         );
       },
     );
+  }
+
+  RideMapPoint? _navigationTarget(TripSnapshot? trip) {
+    if (trip?.rideRequestId == null) return null;
+    final target = switch (trip!.status) {
+      'assigned' => trip.pickup,
+      'in_progress' => trip.destination,
+      _ => null,
+    };
+    if (target == null ||
+        !target.latitude.isFinite ||
+        !target.longitude.isFinite ||
+        target.latitude.abs() > 90 ||
+        target.longitude.abs() > 180) {
+      return null;
+    }
+    return RideMapPoint(target.latitude, target.longitude);
+  }
+
+  String? _navigationKey(TripSnapshot? trip) {
+    final target = _navigationTarget(trip);
+    if (target == null) return null;
+    return '${widget.accountID}|${trip!.rideRequestId}|${trip.status}|'
+        '${target.latitude},${target.longitude}';
+  }
+
+  Future<void> _navigate() async {
+    final trip = ref.read(driverTripControllerProvider).trip;
+    final target = _navigationTarget(trip);
+    final key = _navigationKey(trip);
+    if (target == null || key == null || _navigationInFlight == key) return;
+    setState(() => _navigationInFlight = key);
+    var opened = false;
+    try {
+      opened = await ref.read(drivingNavigationProvider).open(target);
+    } catch (_) {
+      // Keep a launcher failure recoverable without changing the Trip.
+    }
+    if (!mounted) return;
+    if (_navigationInFlight == key) {
+      setState(() => _navigationInFlight = null);
+    }
+    if (!opened &&
+        _navigationKey(ref.read(driverTripControllerProvider).trip) == key) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open Google Maps. Try again.')),
+      );
+    }
+  }
+
+  String _routeEstimate(DriverRouteState route) {
+    final preview = route.preview!;
+    final kilometres = (preview.distanceMeters / 1000).toStringAsFixed(1);
+    final minutes = (preview.durationSeconds / 60).ceil();
+    final label = route.status == 'assigned'
+        ? 'Estimated route to pickup'
+        : 'Estimated full trip route';
+    return '$label: $kilometres km, $minutes min';
   }
 
   void _scheduleRouteFit(DriverRouteState route, String? rideRequestId) {
@@ -583,6 +659,7 @@ class _DriverReadinessPanel extends StatelessWidget {
     required this.onAvailabilityChanged,
     required this.selectionValid,
     required this.activeTrip,
+    required this.navigationControl,
     required this.onPublishLocation,
     required this.onRefresh,
   });
@@ -591,6 +668,7 @@ class _DriverReadinessPanel extends StatelessWidget {
   final bool onlinePresenceReady;
   final bool selectionValid;
   final bool activeTrip;
+  final Widget? navigationControl;
   final PublishedDriverLocation? location;
   final bool busy;
   final String? error;
@@ -606,6 +684,10 @@ class _DriverReadinessPanel extends StatelessWidget {
     physics: physics,
     padding: const EdgeInsets.all(AppSpacing.md),
     children: [
+      if (navigationControl != null) ...[
+        navigationControl!,
+        const SizedBox(height: AppSpacing.sm),
+      ],
       Text(
         activeTrip
             ? 'Your active trip'
