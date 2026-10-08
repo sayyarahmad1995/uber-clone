@@ -1,15 +1,38 @@
 # HiGO Dynamic Ride Services and Google Maps Rider Booking Experience — implementation plan
 
-**Status:** Selected for implementation; PR 0 documentation is committed on this branch for review. No application code is included.
+**Status:** Milestone complete: implementation merged, and PR 6 end-to-end acceptance plus deployment validation passed per the owner's 2026-10-08 reports. Detailed operational evidence and additional cases below are follow-ups, not reported blocking failures.
 **Prepared:** 2026-09-29
-**Revised:** 2026-09-29 — dynamic Rider service catalog is the first implementation dependency.
+**Revised:** 2026-10-08 — reconciled with merged PRs #119–#123, #125, #127–#130 and the owner's read-only suggested-fare revision.
 **Baseline reviewed:** main at 2285d8febf455e31db4049f0d2e1464bdcd410af (2026-09-28)
 **Owner:** HiGO ride-hailing MVP
 **Execution model:** Small, independently reviewable pull requests; test-driven changes; physical Android acceptance before pilot release.
 
+## Current progress and evidence — 2026-10-08
+
+The ten implementation/documentation PRs were merged into `main` in dependency order. The final integration commit is `afa95bd98f0e42d46c7644aa206e18d6ffc37d52`. [Final main Readiness](https://github.com/sayyarahmad1995/uber-clone/actions/runs/37744424250) passed backend formatting/vet/full PostgreSQL tests and Flutter formatting/generated drift/analyze/all 233 tests. These are automated results, not a substitute for case-by-case device evidence.
+
+| Plan slice | Merged implementation | Current status |
+| --- | --- | --- |
+| PR 0 — architecture and plan | #119 | Documentation merged; this update reconciles its original future-tense status. |
+| PR 1 — dynamic Rider services | #120; submission lifetime fix #125 | Implemented. Owner reported third-service discovery on the same installed app, Driver enrollment enforcement, selection and disablement on 2026-09-30. Remaining catalog presentation/error cases stay in the acceptance matrix. |
+| PR 2 — shared Google Maps | #121 | Implemented; Android debug/release smoke and owner-reported map/interaction checks, including online Driver restart retest, passed. Later Places/route interaction changes still require their own regression checks. |
+| PR 3 — Places and map selection | #122, refined in #123 | Implemented. Search and the active-request scroll regression have owner-reported device evidence; the full search/pin/permission/error matrix is not recorded as passed. Free pins remain exact; explicit Google POIs use canonical Place Details coordinates. |
+| PR 4 — recommended road route | #123; booked Rider line fix #127 | Implemented and automated checks passed. #127 retains the booking preview within the current session; it does not reconstruct a Rider booked route after a fresh restart. Complete physical route/viewport/failure evidence remains open. |
+| PR 5 — suggested fare | #129, read-only revision and race follow-up #130 | Implemented. Owner reported the feature device test passed on 2026-10-08 and confirmed disabling pricing removes the service from selection. Full pricing-change-to-cash acceptance and production tariff/rollout evidence are not recorded here. |
+| Driver stage routes — approved extension | #128 | Implemented: fresh Driver location to pickup after assignment, pickup to destination after Start trip, line cleared at completion/cancellation. Automated stage/retry/stale-response tests passed; dedicated physical stage/recovery evidence remains open. |
+| PR 6 — integrated booking and verification | Integrated code across the above PRs | Booking integration is implemented. Owner reported all requested end-to-end tests passed on 2026-10-08: Economy/Comfort, exact-fare/counteroffer paths, selected-offer final fare and restart/network recovery. Owner also confirmed the build is already deployed and working; PR 6 is complete on that reported acceptance. Additional evidence is tracked below. |
+
+**Approved fare behavior:** #130 supersedes the original editable suggestion. With suggested fares enabled, the Rider cannot edit the calculated amount. The server re-routes and re-calculates before creating a request; a fare/policy change refreshes the suggestion and requires another tap. Drivers can accept or counteroffer; the Rider-selected Driver offer is the immutable final payable fare. Rollout-off manual booking remains available for compatibility.
+
+**Coverage follow-up resolved:** `TestRequestPricingFirstPublicationRace` covers creator-first and publisher-first orderings with no pre-existing policy/current pointer. Both cases passed ten repeated PostgreSQL runs and failed when the catalog lock was removed in the CI workspace. The production lock was unchanged, the mutation was not committed, and temporary diagnostics were removed.
+
+**PR 6 owner-reported acceptance — 2026-10-08:** After being asked to run the merged-main search → route/read-only fare → request → Driver offer → Rider selection → trip → cash receipt journey for Economy and Comfort, exact-fare/counteroffer paths, selected-offer final fare and restart/network recovery, the owner reported: “everything went smooth. All the tests are passed.” Record this requested end-to-end scope as passed; no blocking failure was reported.
+
+**Evidence limits:** Device/build identifiers, ride/Trip IDs and individual case artifacts were not supplied. The report establishes owner-reported end-to-end acceptance, not independent execution or proof of every additional adversarial/provider/tariff-change case in the wider matrix. The owner subsequently confirmed the build was already deployed and working and that deployment tests had passed. This closes the deployment-validation status for this milestone. Exact deployed identifiers, tariff approval records, flag/key settings and provider latency/load measurements were not independently inspected. Preserve the merged plan branches as development references, per the owner.
+
 ## 1. Goal and release boundary
 
-First make ride services server-configurable and discoverable by the existing Flutter Rider app without subsequent app-store releases. Then deliver a complete Rider booking preview using the owner's existing working Google Maps Platform setup. A signed-in Rider can discover currently bookable services, find pickup and destination, adjust them on a Google map, see a valid **driving** route and polyline, view road distance and estimated duration, see a backend-calculated **suggested** fare for the selected service, optionally change the proposed fare, and submit the existing Ride Request.
+First make ride services server-configurable and discoverable by the existing Flutter Rider app without subsequent app-store releases. Then deliver a complete Rider booking preview using the owner's existing working Google Maps Platform setup. A signed-in Rider can discover currently bookable services, find pickup and destination, adjust them on a Google map, see a valid **driving** route and polyline, view road distance and estimated duration, see a backend-calculated **suggested** fare for the selected service, view that suggestion read-only, and submit the existing Ride Request at the server-validated amount.
 
 This is a core booking-experience milestone, not a dispatch rewrite, new booking mode, full navigation product, or general payments platform. A single shared Flutter application and a Go modular monolith remain authoritative.
 
@@ -29,7 +52,7 @@ This is a core booking-experience milestone, not a dispatch rewrite, new booking
 4. Pickup/destination can be selected by address search or map adjustment, with meaningful labels.
 5. Backend returns a valid road route, distance in meters, duration in seconds, and encoded polyline; Flutter draws it and fits the camera.
 6. The Go backend returns a suggested PKR fare from an approved, versioned pricing policy keyed by catalog service, never from client-side math. Economy and Comfort launch parameters require approval; a synthetic third service proves extensibility in tests.
-7. Rider can retain or edit the suggested amount as their proposed fare and create a Ride Request; current exact-fare/counteroffer/selection behavior is unchanged.
+7. In priced booking, the Rider sees a read-only suggestion and creates a Ride Request at the server-validated amount. Drivers may accept or counteroffer within existing bounds; Rider selection alone assigns the Trip and fixes the final payable fare.
 8. No route/no results/location denial/provider error lead to explicit, recoverable states; no Haversine distance is mislabeled as driving distance or ETA.
 9. The full route-preview-to-cash-receipt path passes backend, Flutter and physical-device acceptance, including recovery.
 
@@ -46,7 +69,7 @@ Gate 0 may be executed while the new documentation PR is prepared, but is a rele
 - Go modular monolith, PostgreSQL transactional ownership, application-owned transport and provider interfaces; compose concrete adapters in backend/cmd/api.
 - One account and one shared Flutter app. Rider is default. Driver eligibility derives from the operating vehicle's active approved service enrollments. Catalog codes are stable business identifiers; presentation metadata and service ordering come from the server, not Flutter enums.
 - One Rider request with pickup, destination, service, proposed fare and currency. Drivers may accept that fare or counteroffer. **Only Rider offer selection creates a Trip.** Selection and offer revision checks stay atomic.
-- Existing offer bounds (currently 90–130% of the **Rider-proposed** fare) are not silently rebased to the calculated suggestion.
+- Existing offer bounds (currently 90–130% of the **saved request amount**) remain fixed for that request. In priced booking this amount is the validated suggestion; later tariff changes do not rebase the bounds.
 - Selected offer fare and Driver/vehicle/service context remain immutable Trip snapshots; completion and cash settlement do not recalculate the fare.
 - Haversine distance continues to rank/filter inexpensive marketplace discovery; routing is for the Rider's chosen trip preview, not a Google request for every Driver/request pair.
 - ADR-0008 RideDashboardScaffold behavior is unchanged: Rider 18%, Driver 16% collapsed, maximum 60%, shared committed extent and the existing gesture/scroll contract.
@@ -71,7 +94,7 @@ Gate 0 may be executed while the new documentation PR is prepared, but is a rele
 
 ### New documentation decisions
 
-Before writing implementation code, create **ADR-0012: Dynamic Rider Ride Service Catalog** and **ADR-0013: Google Maps booking preview and advisory fare policy**. ADR-0012 extends ADR-0009's existing vehicle/service enrollments into a Rider-facing catalog without a second booking mode. ADR-0013 explicitly moves **selected-trip route preview** out of ADR-0007's earlier deferral while preserving Haversine discovery and Rider-selected assignment. Update docs/technology-stack.md, docs/flutter-client-architecture.md, docs/mvp-scope.md, docs/architecture-decisions.md and docs/WORKLOG.md accordingly. ADR-0011 remains the historical scope of **cash settlement**; do not rewrite it as if it authorized pricing.
+PR #119 recorded **ADR-0012: Dynamic Rider Ride Service Catalog** and **ADR-0013: Google Maps booking preview and advisory fare policy** before implementation. ADR-0012 extends ADR-0009's existing vehicle/service enrollments into a Rider-facing catalog without a second booking mode. ADR-0013 explicitly moves **selected-trip route preview** out of ADR-0007's earlier deferral while preserving Haversine discovery and Rider-selected assignment. Update docs/technology-stack.md, docs/flutter-client-architecture.md, docs/mvp-scope.md, docs/architecture-decisions.md and docs/WORKLOG.md accordingly. ADR-0011 remains the historical scope of **cash settlement**; do not rewrite it as if it authorized pricing.
 
 ## 4. Delivery sequence
 
@@ -85,12 +108,12 @@ Before writing implementation code, create **ADR-0012: Dynamic Rider Ride Servic
 
 ### PR 1 — Dynamic Rider service catalog (backend + Flutter)
 
-- [ ] Reuse driver_service_catalog and existing GET /v1/driver/services. Add only the Rider-facing visibility/order/presentation metadata required to serve a stable catalog; provide a data migration with Economy and Comfort intact.
-- [ ] Add authenticated GET /v1/ride-services returning only currently bookable compatible services (code, display_name, description, display_order, optional presentation token). Avoid a general-purpose configuration/admin service and do not expose Driver eligibility internals.
-- [ ] Replace the Go Ride Request service's economy/comfort-only validation with repository/catalog-backed checks. Keep the PostgreSQL active-service guard; reject unknown or disabled services, and preserve Rider-only offer selection, vehicle/service eligibility and immutable service snapshots.
-- [ ] Implement an API-backed Flutter RiderServicePicker. Re-fetch when entering the Rider dashboard and on app foreground/recovery; handle loading, empty/error, disabled selected service and reorder changes. Render known icons when available and a generic default for unknown service codes. Never require a compile-time enum or asset for a newly configured compatible service.
-- [ ] Bind service changes to route/fare preview invalidation; once pricing is introduced, list as bookable in the new booking flow only those services with an active approved compatible fare policy. Do not silently substitute Economy parameters.
-- [ ] Define an owner-controlled rollout procedure: create service metadata and pricing configuration, set visible/bookable only after backend and Driver enrollment readiness, and verify a catalog refresh on an already-installed compatible app. An operator UI is **not** required for this MVP.
+- [x] Reuse driver_service_catalog and existing GET /v1/driver/services. Add only the Rider-facing visibility/order/presentation metadata required to serve a stable catalog; provide a data migration with Economy and Comfort intact.
+- [x] Add authenticated GET /v1/ride-services returning only currently bookable compatible services (code, display_name, description, display_order, optional presentation token). Avoid a general-purpose configuration/admin service and do not expose Driver eligibility internals.
+- [x] Replace the Go Ride Request service's economy/comfort-only validation with repository/catalog-backed checks. Keep the PostgreSQL active-service guard; reject unknown or disabled services, and preserve Rider-only offer selection, vehicle/service eligibility and immutable service snapshots.
+- [x] Implement an API-backed Flutter RiderServicePicker. Re-fetch when entering the Rider dashboard and on app foreground/recovery; handle loading, empty/error, disabled selected service and reorder changes. Render known icons when available and a generic default for unknown service codes. Never require a compile-time enum or asset for a newly configured compatible service.
+- [x] Bind service changes to route/fare preview invalidation; once pricing is introduced, list as bookable in the new booking flow only those services with an active approved compatible fare policy. Do not silently substitute Economy parameters.
+- [x] Define an owner-controlled rollout procedure: create service metadata and pricing configuration, set visible/bookable only after backend and Driver enrollment readiness, and verify a catalog refresh on an already-installed compatible app. An operator UI is **not** required for this MVP.
 - **Tests:** Go PostgreSQL and HTTP cases for active/disabled/unknown services, deterministic display order and concurrent deactivation; Flutter contract/controller/widget tests with a synthetic third service, unknown icon fallback, catalog refresh and removal of an obsolete selection; regression for Driver service eligibility and historical Trip context.
 - **Done when:** A third synthetic service can appear, be selected and create a valid Ride Request (with eligible approved Driver enrollment), then disappear from new booking after disablement, **without changing or rebuilding the already-updated Flutter client**. Economy/Comfort and existing lifecycle remain unaffected.
 
@@ -104,7 +127,7 @@ Before writing implementation code, create **ADR-0012: Dynamic Rider Ride Servic
 - [x] Explicit user-initiated focus/fit should control the camera. Do not automatically recenter on each Driver location update after the user pans the map.
 - **Tests:** shared-map widget/adapter tests; Rider and Driver dashboard gesture/persistence regression; Flutter analyze/test; Android debug/release build smoke; physical-device map/permission/rotation/background checks.
 
-**PR 2 automated evidence:** Readiness passed with the pinned dependency and provider-boundary regression test. A temporary CI smoke run built both Android debug and release APKs successfully with the non-secret fallback key, then the workflow was restored. Physical-device Google map/permission/rotation/background and ADR-0008 gesture checks remain required before PR 2 is marked done.
+**PR 2 evidence:** Readiness passed with the pinned dependency and provider-boundary regression test. A temporary CI smoke run built both Android debug and release APKs successfully with the non-secret fallback key, then the workflow was restored. The owner reported the shared map/interaction physical checks and online-Driver restart retest passed; later Places/route changes remain subject to their own acceptance cases.
 - **Done when:** Existing pickup/destination and Driver markers render correctly on Google maps and the prior booking behavior still works. **Done on physical Android 2026-10-01 after retesting the online-Driver restart auto-center fix.**
 
 ### PR 3 — Pickup/destination search and adjustment
@@ -121,35 +144,48 @@ Before writing implementation code, create **ADR-0012: Dynamic Rider Ride Servic
 
 ### PR 4 — Authoritative road route preview and polyline
 
-- [ ] Add backend/internal/routing (or equivalent domain-owned package) with a provider-neutral Preview route operation, a Google Routes adapter and injected HTTP client/config.
-- [ ] Request one `DRIVE` route with `TRAFFIC_AWARE_OPTIMAL`, `BEST_GUESS`, and `computeAlternativeRoutes=false`. Do not request `SHORTER_DISTANCE` or other reference routes. For typed Place/explicit POI selections, preserve the selected Place ID through Flutter state and `POST /v1/ride-previews`, then use a Google Routes `placeId` waypoint; for free pins/current location, omit `place_id` and use the exact lat/lng waypoint. Use the narrow field mask for distanceMeters, duration and encodedPolyline only. Treat Google's returned default route as the booking recommendation. Define timeout, cancellation, bounded retry for transient errors, and deterministic error mapping. Do not request detailed navigation instructions.
-- [ ] Expose a narrow authenticated POST /v1/ride-previews endpoint accepting pickup/destination required coordinates, optional per-endpoint `place_id` for explicit Google Place selections, and service_code. Coordinates remain present for app state/validation; the Google adapter prefers `placeId` only when explicitly supplied. Initially return route geometry/distance/duration; PR 5 adds an optional suggested_fare object and policy version.
-- [ ] Normalize the public response to one `route` with `distance_meters`, `duration_seconds` and `encoded_polyline`. Reject zero/invalid/unroutable or malformed responses. Keep Google-specific wire types inside the adapter.
-- [ ] Add a Flutter route preview controller; decode/draw the single recommended route polyline on Google Maps and fit it once when the route changes. Invalidate outdated previews whenever pickup/destination changes; discard late replies and allow explicit retry. Panel expand/collapse must not move or re-fit the map.
-- [ ] Clearly label all numbers as *route estimates*. Keep Haversine pickup distance in marketplace discovery unchanged. Do not confuse trip distance with Driver-to-pickup distance.
+- [x] Add backend/internal/routing (or equivalent domain-owned package) with a provider-neutral Preview route operation, a Google Routes adapter and injected HTTP client/config.
+- [x] Request one `DRIVE` route with `TRAFFIC_AWARE_OPTIMAL`, `BEST_GUESS`, and `computeAlternativeRoutes=false`. Do not request `SHORTER_DISTANCE` or other reference routes. For typed Place/explicit POI selections, preserve the selected Place ID through Flutter state and `POST /v1/ride-previews`, then use a Google Routes `placeId` waypoint; for free pins/current location, omit `place_id` and use the exact lat/lng waypoint. Use the narrow field mask for distanceMeters, duration and encodedPolyline only. Treat Google's returned default route as the booking recommendation. Define timeout, cancellation, bounded retry for transient errors, and deterministic error mapping. Do not request detailed navigation instructions.
+- [x] Expose a narrow authenticated POST /v1/ride-previews endpoint accepting pickup/destination required coordinates, optional per-endpoint `place_id` for explicit Google Place selections, and service_code. Coordinates remain present for app state/validation; the Google adapter prefers `placeId` only when explicitly supplied. Initially return route geometry/distance/duration; PR 5 adds an optional suggested_fare object and policy version.
+- [x] Normalize the public response to one `route` with `distance_meters`, `duration_seconds` and `encoded_polyline`. Reject zero/invalid/unroutable or malformed responses. Keep Google-specific wire types inside the adapter.
+- [x] Add a Flutter route preview controller; decode/draw the single recommended route polyline on Google Maps and fit it once when the route changes. Invalidate outdated previews whenever pickup/destination changes; discard late replies and allow explicit retry. Panel expand/collapse must not move or re-fit the map.
+- [x] Clearly label all numbers as *route estimates*. Keep Haversine pickup distance in marketplace discovery unchanged. Do not confuse trip distance with Driver-to-pickup distance.
 - **Tests:** fake Routes HTTP fixtures, field mask/timeout/error/coordinate validation tests; encoded-polyline/viewport widget tests; contract checks; physical route on Android.
 - **Done when:** A Rider selecting two routable locations sees the road polyline, road distance and estimated duration; an unroutable pair shows a real error, not a straight line presented as a road route.
 
 ### PR 5 — Versioned suggested fare, without changing negotiation
 
-- [ ] Add an app-owned pricing policy keyed by catalog service and currency, initially Economy/Comfort and PKR; a synthetic third service is required for extensibility tests. For each service approve: minimum fare, base fare, minor-units-per-km, minor-units-per-minute, rounding rule, version and effective-date policy. **Production values require explicit business approval**; test-fixture numbers are not tariffs.
-- [ ] Compute suggested fare in Go from the valid route distance and duration using integer minor units and explicitly defined rounding/overflow guards. Recommended starting formula: max(minimum, round(base + perKm * distanceMeters/1000 + perMinute * durationSeconds/60)). No surge, tolls, taxes, discounts or cancellation charges in this slice.
-- [ ] Extend POST /v1/ride-previews with suggested_fare (amount_minor, currency) and pricing_policy_version for the same recommended route. Calculate the fare from that route's distance/duration without duplicating Google calls.
-- [ ] The result is **advisory**. The Rider may accept or edit it as proposed_fare; the existing offer bounds still apply to that proposal. The backend must never accept a client-computed suggestion as a trusted charge or silently mutate the settled amount.
-- [ ] Do not add a persistent Google polyline/duration history as a side effect. Retain user-owned pickup/destination and the already immutable selected-offer fare. Any proposal to persist additional Google-derived content must pass a fresh terms/caching review.
-- [ ] If a route or pricing policy is unavailable, do not fabricate a price. For the initial Google-preview-enabled path, block price-backed request submission with a clear retry state; manual-only fallback is a separate explicit product decision.
-- **Tests:** zero/near-zero, long, invalid, overflow, rounding, policy version, Economy vs Comfort vs synthetic third service, disabled/unpriced service rejection, route failure and price display/edited-proposal tests.
-- **Done when:** Backend reproduces an approved fare for the exact preview inputs and the Rider can propose a different amount without altering assignment or settlement.
+- [x] Add an app-owned pricing policy keyed by catalog service and currency, initially Economy/Comfort and PKR; a synthetic third service is required for extensibility tests. The implemented immutable policy contains minimum fare, base fare, minor-units-per-km, minor-units-per-minute, rounding increment, version and immediate publication metadata. Exact calculation uses one final half-up increment rounding step, then enforces the minimum. **Production values require explicit business approval**; test-fixture numbers are not tariffs.
+- [ ] Record the owner's approval of actual launch tariffs and the enabled deployment's service/policy identities. Publishing test values or a passing calculation test does not establish production approval.
+- [x] Compute suggested fare in Go from the valid route distance and duration using integer minor units and explicitly defined rounding/overflow guards. Recommended starting formula: max(minimum, round(base + perKm * distanceMeters/1000 + perMinute * durationSeconds/60)). No surge, tolls, taxes, discounts or cancellation charges in this slice.
+- [x] Extend POST /v1/ride-previews with suggested_fare (amount_minor, currency) and pricing_policy_version for the same recommended route. Calculate the fare from that route's distance/duration without duplicating Google calls.
+- [x] The result is the read-only Rider request amount in priced booking. The backend resolves selected Place IDs, checks canonical coordinates, obtains a fresh route and calculates the fare again before creation. A mismatch returns `suggested_fare_changed` (409), with no request/snapshot; the app refreshes and requires another tap. The atomic policy UUID check remains. Driver counteroffers and Rider selection fix the final Trip/settlement amount.
+- [x] Do not add a persistent Google polyline/duration history as a side effect. Retain user-owned pickup/destination and the already immutable selected-offer fare. Any proposal to persist additional Google-derived content must pass a fresh terms/caching review.
+- [x] If a route or pricing policy is unavailable, do not fabricate a price. For the initial Google-preview-enabled path, block price-backed request submission with a clear retry state; manual-only fallback is a separate explicit product decision.
+- **Tests:** zero/near-zero, long, invalid, overflow, rounding, policy version, Economy vs Comfort vs synthetic third service, disabled/unpriced service rejection, route failure and read-only price display, tampered amount/endpoint rejection, explicit conflict resubmission and first-publication race tests.
+- **Done when:** Backend reproduces the configured fare for the preview inputs, the Rider cannot edit it in priced booking, and the selected Driver offer remains the final payable fare. Production tariff approval is a separate rollout gate.
 
 ### PR 6 — Complete Rider booking UX and end-to-end verification
 
-- [ ] Connect dynamic catalog loading/refresh, location search, map adjustment, chosen service, combined route/fare preview, price editing and the existing POST /v1/ride-requests action in a single comprehensible flow.
+- [x] Connect dynamic catalog loading/refresh, location search, map adjustment, chosen service, combined route/fare preview, read-only suggested fare and the existing POST /v1/ride-requests action. #125 keeps catalog state alive during submission; #127 retains the current-session booked route.
 - [ ] Keep ADR-0008 panel behavior intact. Ensure the polyline/markers are visible with an expanded bottom sheet, keyboard, small device and text scaling; show appropriate loading, empty, permission and retry states.
-- [ ] Do not show a stale route/price after any pickup, destination or service change or catalog deactivation. Prevent accidental duplicate submission and recover the backend-authoritative active ride after restart or request timeout.
-- [ ] Preserve Rider offer comparison, rejection, chosen offer/assignment, Driver operations, cash confirmation, and both histories. The agreed fare shown in history must remain the selected Driver offer rather than the earlier suggestion.
-- [ ] Extend docs/pilot-cash-ride-acceptance.md (or a companion feature checklist) with Google routing/search/fare/UX physical-device cases, while retaining all existing lifecycle and settlement checks.
+- [x] Do not show a stale route/price after any pickup, destination or service change or catalog deactivation. Prevent accidental duplicate submission and recover the backend-authoritative active ride after restart or request timeout.
+- [x] Preserve Rider offer comparison, rejection, chosen offer/assignment, Driver operations, cash confirmation, and both histories. The agreed fare shown in history must remain the selected Driver offer rather than the earlier suggestion.
+- [x] Extend docs/pilot-cash-ride-acceptance.md (or a companion feature checklist) with Google routing/search/fare/UX physical-device cases, while retaining all existing lifecycle and settlement checks.
 - **Tests:** Flutter booking-controller, widget/interaction and full regression; Go provider/HTTP/pricing and PostgreSQL regression; synthetic third-service configuration/refresh/deactivation on unchanged client; physical Android complete Economy and Comfort ride paths including no-route and network recovery; exact-HEAD readiness CI.
-- **Done when:** The owner can demonstrate one complete, real-device route-preview-to-cash-receipt ride, including edited proposed fare/counteroffer and recoverable failures.
+- **Done when:** Record complete Economy and Comfort real-device route-preview-to-cash-receipt cases, including read-only suggestion, exact-fare/counteroffer selection and recoverable failures, with build/device and case outcomes. Automated integration is complete. The owner reported the requested end-to-end scope passed on 2026-10-08; detailed run identifiers and any wider matrix cases remain separate evidence items.
+
+### Follow-up evidence — PR 6 accepted, no reported blocker
+
+- [ ] Reconcile each open item in [the booking matrix](../../pilot-google-booking-acceptance.md) and [cash-loop checklist](../../pilot-cash-ride-acceptance.md) with concrete existing evidence. Request only missing cases; do not repeat the already reported suggested-fare and pricing-disable checks without a reason.
+- [ ] Verify the integrated small-screen/keyboard/text-scaling/panel/map flow, catalog invalidation, duplicate-submit protection and timeout/restart recovery on the merged build.
+- [x] Owner-reported Economy and Comfort exact-fare/counteroffer journeys through completion/cash receipt, selected-offer final payable fare and restart/network recovery passed on 2026-10-08. Device/build/ride identifiers were not supplied.
+- [ ] Record specific publication A/B/C and disable-after-assignment cases if required for pilot release; the general end-to-end pass does not identify those individual cases.
+- [ ] Record Driver stage-route/restoration/retry/late-response and camera-gesture checks. Assess the known current-session-only Rider booked-route limitation against required restart UX before proposing a fix.
+- [x] Owner confirmed deployment was already completed, working, and deployment tests passed on 2026-10-08. This is owner-reported validation; exact deployment settings were not supplied.
+- [ ] Retain build/device/ride identifiers and tariff/key/flag records when available for operational traceability. This documentation follow-up does not require repeating the passed end-to-end run.
+
+The owner accepted PR 6 after the reported end-to-end and deployment passes. Do not reopen this milestone solely because additional case artifacts were not supplied. Any later demonstrated failure becomes a bounded fix with a regression test; choose subsequent feature scope separately.
 
 ## 5. Proposed application contracts (finalize in PR 0)
 
@@ -158,7 +194,7 @@ Before writing implementation code, create **ADR-0012: Dynamic Rider Ride Servic
 - GET /v1/places/{place_id}: session_token; returns normalized place ID, label and coordinates. The matching autocomplete token concludes here.
 - GET /v1/places/{place_id}: returns normalized Place Details. Autocomplete selections include their session_token; direct taps on a Google-rendered POI resolve the tapped Place ID without fabricating an autocomplete session.\n- POST /v1/places/reverse-geocode: confirmed free-pin coordinates; returns a readable label while preserving the exact submitted coordinates. Reverse geocoding is descriptive only and must never snap or reposition the Rider's pin.
 - POST /v1/ride-previews: pickup and destination require latitude/longitude and may include `place_id` only for an explicitly selected Google Place; reverse-geocoded free pins omit it. Include dynamic catalog service_code; return route {distance_meters, duration_seconds, encoded_polyline}, suggested_fare {amount_minor, currency}, pricing_policy_version, and request correlation metadata. During PR 4, suggested_fare may be null; it is required only after an active pricing policy is configured for the released PR 5+ experience.
-- Existing POST /v1/ride-requests remains the booking command (dynamic catalog service_code, pickup, destination, proposed_fare). Validate service activation on each creation. Do not introduce a second booking mode or require a durable quote token for an **editable suggestion** in this milestone.
+- Existing POST /v1/ride-requests remains the booking command (dynamic catalog service_code, pickup, destination, proposed_fare). Validate service activation, selected Place-ID/coordinate consistency, current policy UUID and fresh server-calculated fare on each priced creation. Do not introduce a second booking mode or require a durable quote token for this read-only suggestion flow. Fresh server-side validation and atomic policy snapshots are implemented instead.
 
 All new endpoints are authenticated; validate payload sizes and coordinates, bound external provider calls, and avoid placing raw secrets or precise location trails in operational logs. Public response structs must not leak Google billing/error internals.
 
@@ -175,7 +211,7 @@ Before merging each implementation PR:
 
 ## 7. Deferred follow-ups (not part of this milestone)
 
-1. Driver-to-pickup route, traffic-aware arrival estimates, and optional open-in-Google-Maps navigation.
+1. Driver-to-pickup and pickup-to-destination stage routes were brought forward and implemented in #128. Live arrival ETA presentation, continuous rerouting and optional open-in-Google-Maps navigation remain separate follow-ups; do not reimplement the delivered stage polylines.
 2. Smooth Driver marker animation and measured live trip tracking; keep the existing server presence policy until deliberately revised.
 3. Broader visual design-system and accessibility refresh across authentication, Driver onboarding and history after the Rider journey is validated.
 4. Stage-specific arrival/pickup verification, no-show and interrupted-trip policies based on pilot findings.
@@ -215,4 +251,4 @@ Current Google documentation to re-check when each adapter is implemented:
 - Google Maps Platform terms: https://cloud.google.com/maps-platform/terms
 - Service-specific terms: https://cloud.google.com/maps-platform/terms/maps-service-terms
 
-**Documentation PR branch:** ADRs and documentation for PR 0 are committed for review. PRs 1–6 remain unimplemented. Do not enable production fare suggestions without the owner's explicit approval of real per-service tariffs.
+**Current integration state:** PRs #119–#123, #125 and #127–#130 are merged. The original documentation/development branches are retained as references. Implementation checkboxes above describe delivered code; open physical/release checkboxes require evidence. Do not enable production fare suggestions without the owner's explicit approval of real per-service tariffs.

@@ -41,4 +41,6 @@ routine updates.
 4. Explicitly set `SUGGESTED_FARES_ENABLED=true` and recreate the API container. Confirm catalog `pricing_required`, preview amount/version, read-only booking and conflict recovery. Record the enable time and commits.
 5. For rollback, set the flag false and recreate the API container. Existing requests retain proposals and snapshots; agreed Trips retain the selected offer. Disabling a current policy prevents new priced requests for that service, without deleting history or changing active Trips.
 
-Do not enable from CI evidence alone. Physical Android validation and real tariff activation are pending.
+Do not enable from CI evidence alone.
+
+**Owner-reported deployment validation — 2026-10-08:** The owner confirmed the build was already deployed and working, deployment tests passed, and the requested PR 6 end-to-end tests passed. Deployment validation is therefore recorded as passed for this milestone. Exact app/backend build identifiers, environment/flag/key settings and tariff approval records were not supplied or independently inspected; the staged procedure above remains the operating guidance for future deployments.

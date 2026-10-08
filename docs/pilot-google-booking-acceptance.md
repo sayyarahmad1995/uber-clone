@@ -1,8 +1,16 @@
 # Dynamic Ride Services and Google Maps Booking — Acceptance Matrix
 
-**Status:** Planned validation for ADR-0012 and ADR-0013; not a record of completed tests.
+**Status:** PR 6 end-to-end acceptance and deployment validation passed per the owner's 2026-10-08 reports. Automated and scoped physical evidence are recorded below; unchecked wider cases are not individually confirmed and are follow-ups rather than reported PR 6 blockers.
 
 Do not replace [the current cash-ride pilot acceptance checklist](pilot-cash-ride-acceptance.md). Confirm that existing flow separately before allowing expanded booking to enter the pilot.
+
+## PR 6 owner-reported end-to-end pass — 2026-10-08
+
+The owner was asked to test merged `main` through search → route/read-only fare → request → Driver offer → Rider selection → trip → cash receipt, covering Economy and Comfort, exact-fare/counteroffer paths, selected-offer final payable fare, and restart/network recovery. The owner reported: “everything went smooth. All the tests are passed.”
+
+The owner subsequently confirmed the build was already deployed and working and that deployment tests had passed. PR 6 is accepted on these reported end-to-end and deployment results; no blocking failure was reported.
+
+This records the requested scope as an owner-reported pass. Device/Android version, actual app/backend build SHA, ride/Trip IDs and individual case artifacts were not supplied. Checked items below use this report; do not reinterpret it as independent execution or completion of every wider provider, tariff-race, catalog, gesture and release-configuration case. Earlier owner confirmation also established that disabling the current pricing policy removes that service from Rider selection.
 
 ## Record evidence for every physical run
 
@@ -46,14 +54,15 @@ Record test date, current branch/SHA, Android app build and device/version, envi
 - [ ] Changing either endpoint or the selected service invalidates prior route/fare displays and ignores out-of-order responses.
 - [ ] Owner-approved Economy and Comfort parameters produce reproducible suggested PKR fares for controlled fixture distances/durations; backend owns math, version and final integer rounding.
 - [ ] A third test service has its **own** active pricing policy and its own reproducible suggestion; deleting/disabling its policy prevents new price-backed booking without changing previously agreed prices.
-- [ ] The Rider cannot edit the suggested fare. The request uses that amount; existing Driver exact-fare and counteroffer limits apply to the saved request amount. The selected Driver offer becomes the final payable fare.
+- [x] The Rider cannot edit the suggested fare. The request uses that amount; existing Driver exact-fare and counteroffer limits apply to the saved request amount. The selected Driver offer becomes the final payable fare.
 
 ## 4. Complete ride and recovery
 
-- [ ] With one approved Driver, perform an Economy ride and a separate Comfort ride: search → route preview → read-only suggested fare → request → Driver exact/counteroffer → Rider selection → assigned → in progress → completed/unsettled → cash collected → receipts.
+- [x] With one approved Driver, perform an Economy ride and a separate Comfort ride: search → route preview → read-only suggested fare → request → Driver exact/counteroffer → Rider selection → assigned → in progress → completed/unsettled → cash collected → receipts.
 - [ ] A third compatible service follows the same journey without an app update after its activation, policy approval and Driver enrollment.
-- [ ] The agreed Trip fare equals the **selected Driver offer**, not the earlier suggested fare. Reopening or settling the Trip does not reprice it.
-- [ ] Restart, background/foreground, provider timeout and transient network loss never display a stale fare as current or strand an active Trip.
+- [x] The agreed Trip fare equals the **selected Driver offer**, not the earlier suggested fare. Reopening or settling the Trip does not reprice it.
+- [x] Restart and transient network-loss recovery in the requested end-to-end scope passed, per the owner's 2026-10-08 report.
+- [ ] Record specific background/foreground and injected provider-timeout cases separately; these individual cases were not identified in the end-to-end report.
 - [ ] Disable a service after an assignment: no new requests may use it, but the existing Trip can finish and its immutable service/amount/history remain readable.
 
 ## Driver trip route stages
@@ -74,7 +83,7 @@ Physical Android validation remains pending for the Driver route endpoint and ma
 
 Before each PR merges, use the existing Readiness workflow on its exact head: Go formatting/vet/PostgreSQL tests and Flutter format/build-runner/drift/analyze/full tests. Android map/plugin PRs also require physical build/device checks. Do not call the expanded booking flow pilot-ready until this matrix **and** the existing cash-loop gate are recorded as passed. Any failed critical case becomes the next fix.
 
-## Suggested fare rebuild acceptance — pending physical Android validation
+## Suggested fare acceptance — reported core pass; additional case evidence
 
 CI is automated evidence only. Record device, app/backend commit, approved tariff identities and actual observations for these checks:
 
