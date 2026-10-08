@@ -116,9 +116,12 @@ class DriverController extends ChangeNotifier {
     if (!_disposed &&
         _foreground &&
         profile != null &&
-        profile?.isOnline != true &&
         operation?.valid == true &&
         location == null) {
+      // Background presence writes independently of this UI controller. After
+      // a process restart an online Driver can therefore have durable presence
+      // but no in-memory location for the map. Publish one foreground fix to
+      // hydrate the dashboard and trigger the shared map's initial auto-center.
       unawaited(_publishForDriverModeEntry());
     }
   }
