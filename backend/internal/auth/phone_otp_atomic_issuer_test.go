@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -33,19 +34,19 @@ func TestAtomicPhoneOTPIssuerAndWorker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	phone := "+923001234578"
+	phone := fmt.Sprintf("+923%09d", uuid.New().ID()%1000000000)
 	ctx := context.Background()
-	_ = store.client.Del(ctx, store.scope(phone, PhoneChallengeSignInOrRegister)+":cooldown").Err()
 	request := PhoneChallengeRequest{PhoneNumber: phone, Purpose: PhoneChallengeSignInOrRegister}
 	idem := uuid.NewString()
-	created, err := issuer.Issue(ctx, request, uuid.NewString(), idem)
+	source := uuid.NewString()
+	created, err := issuer.Issue(ctx, request, source, idem)
 	if err != nil || !created.ShouldSend {
 		t.Fatalf("issue: %+v %v", created, err)
 	}
 	if sender.calls != 0 {
 		t.Fatal("issuer performed SMS delivery")
 	}
-	replayed, err := issuer.Issue(ctx, request, uuid.NewString(), idem)
+	replayed, err := issuer.Issue(ctx, request, source, idem)
 	if err != nil || replayed.ShouldSend || replayed.ID != created.ID {
 		t.Fatalf("replay: %+v %v", replayed, err)
 	}
