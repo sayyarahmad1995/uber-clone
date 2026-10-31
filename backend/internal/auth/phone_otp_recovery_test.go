@@ -14,6 +14,8 @@ func TestRedisOTPDispatchDueRecovery(t *testing.T) {
 	dispatch,err:=NewRedisOTPDispatch(store.client,bytes.Repeat([]byte{0x81},32))
 	if err!=nil {t.Fatal(err)}
 	ctx:=context.Background()
+	// Dedicated TEST_REDIS_URL database only: clear earlier integration-test jobs.
+	if err:=store.client.Del(ctx,redisOTPDispatchQueueKey).Err();err!=nil{t.Fatal(err)}
 	phone:="+923001234580"
 	_ = store.client.Del(ctx,store.scope(phone,PhoneChallengeSignInOrRegister)+":cooldown").Err()
 	id:=uuid.New()
