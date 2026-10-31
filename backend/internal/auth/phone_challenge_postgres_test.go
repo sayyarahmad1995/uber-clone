@@ -102,8 +102,8 @@ func TestPhoneChallengePostgresLifecycle(t *testing.T) {
 	if _, err := store.Consume(ctx, limitedID, valid); !errors.Is(err, ErrPhoneChallengeLimited) {
 		t.Fatalf("attempt limit ignored: %v", err)
 	}
-	expiredID, expiredDigest := phoneChallengeFixture(t, store, "+923001234569", time.Now().Add(3*time.Second))
-	if _, err := store.db.ExecContext(ctx, "UPDATE auth_phone_challenges SET expires_at=clock_timestamp()-interval '1 second' WHERE id=$1", expiredID); err != nil {
+	expiredID, expiredDigest := phoneChallengeFixture(t, store, "+923001234569", time.Now().Add(5*time.Minute))
+	if _, err := store.db.ExecContext(ctx, `UPDATE auth_phone_challenges SET created_at=clock_timestamp()-interval '3 minutes', resend_after=clock_timestamp()-interval '2 minutes', expires_at=clock_timestamp()-interval '1 minute' WHERE id=$1`, expiredID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.Consume(ctx, expiredID, expiredDigest); !errors.Is(err, ErrPhoneChallengeInvalid) {
