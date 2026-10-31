@@ -196,19 +196,31 @@ func (s RedisOTPDispatch) Finish(ctx context.Context, id uuid.UUID, owner string
 // opaque UUIDs; stale entries are pruned in bounded batches. Workers must
 // still claim a lease before sending. No PostgreSQL polling is involved.
 func (s RedisOTPDispatch) Due(ctx context.Context, limit int64) ([]uuid.UUID, error) {
-	if limit < 1 || limit > 100 { return nil, ErrInvalidPhoneChallengeRequest }
+	if limit < 1 || limit > 100 {
+		return nil, ErrInvalidPhoneChallengeRequest
+	}
 	ids, err := s.client.ZRangeByScore(ctx, redisOTPDispatchQueueKey, &redis.ZRangeBy{
 		Min: "-inf", Max: fmt.Sprint(time.Now().UnixMilli()), Offset: 0, Count: limit,
 	}).Result()
-	if err != nil { return nil, err }
-	result := make([]uuid.UUID,0,len(ids))
+	if err != nil {
+		return nil, err
+	}
+	result := make([]uuid.UUID, 0, len(ids))
 	for _, raw := range ids {
 		id, err := uuid.Parse(raw)
-		if err != nil { _ = s.client.ZRem(ctx, redisOTPDispatchQueueKey,raw).Err(); continue }
-		exists, err := s.client.Exists(ctx,dispatchKey(id)).Result()
-		if err != nil { return nil,err }
-		if exists == 0 { _ = s.client.ZRem(ctx, redisOTPDispatchQueueKey,raw).Err(); continue }
-		result = append(result,id)
+		if err != nil {
+			_ = s.client.ZRem(ctx, redisOTPDispatchQueueKey, raw).Err()
+			continue
+		}
+		exists, err := s.client.Exists(ctx, dispatchKey(id)).Result()
+		if err != nil {
+			return nil, err
+		}
+		if exists == 0 {
+			_ = s.client.ZRem(ctx, redisOTPDispatchQueueKey, raw).Err()
+			continue
+		}
+		result = append(result, id)
 	}
-	return result,nil
+	return result, nil
 }
