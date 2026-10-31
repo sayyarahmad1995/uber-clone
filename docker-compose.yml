@@ -6,6 +6,7 @@ services:
     environment:
       APP_PORT: ${APP_PORT:-8080}
       DATABASE_URL: postgres://${POSTGRES_USER:-uber_clone}:${POSTGRES_PASSWORD:-uber_clone_local}@postgres:5432/${POSTGRES_DB:-uber_clone}?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
       KRATOS_PUBLIC_URL: http://kratos:4433
       KRATOS_ADMIN_URL: http://kratos:4434
       ADMIN_REVIEW_USERNAME: ${ADMIN_REVIEW_USERNAME:-}
@@ -21,6 +22,19 @@ services:
         condition: service_healthy
       kratos:
         condition: service_started
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "128mb", "--maxmemory-policy", "noeviction"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    # Internal only: do not publish 6379 to the host.
 
   postgres:
     image: postgres:17-alpine
