@@ -55,9 +55,7 @@ func newRedisOTPChallenge(t *testing.T, id uuid.UUID, phone, idem string) (NewPh
 func TestRedisOTPIdempotencyAndCooldown(t *testing.T) {
 	store := redisOTPTestStore(t)
 	ctx := context.Background()
-	phone := "+923" + uuid.NewString()[:9] // replaced below with numeric fixture
-	_ = phone
-	phone = "+923001234567"
+	phone := "+923001234567"
 	// Unique idempotency values and a dedicated Redis test DB should isolate
 	// these cases; do not run this against production Redis.
 	scope := store.scope(phone, PhoneChallengeSignInOrRegister)
