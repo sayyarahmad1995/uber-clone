@@ -44,6 +44,8 @@ func NewRedisOTPDispatch(client *redis.Client, encryptionKey []byte) (RedisOTPDi
 	return RedisOTPDispatch{client: client, aead: aead}, nil
 }
 
+const redisOTPDispatchQueueKey = "higo:otp:dispatch:v1:due"
+
 func dispatchKey(id uuid.UUID) string { return "higo:otp:dispatch:v1:" + id.String() }
 
 var redisDispatchEnqueue = redis.NewScript(`
@@ -56,9 +58,12 @@ var redisDispatchClaim = redis.NewScript(`
 if redis.call('EXISTS',KEYS[1])==0 then return {0,''} end
 local state=redis.call('HGET',KEYS[1],'state')
 if state=='done' then return {2,''} end
+if tonumber(redis.call('HGET',KEYS[1],'attempts') or '0')>=3 then return {2,''} end
 if state=='leased' and redis.call('PTTL',KEYS[2])>0 then return {3,''} end
 redis.call('SET',KEYS[2],ARGV[1],'PX',ARGV[2])
 redis.call('HSET',KEYS[1],'state','leased','owner',ARGV[1])
+redis.call('HINCRBY',KEYS[1],'attempts',1)
+redis.call('ZADD',KEYS[3],tonumber(ARGV[3])+tonumber(ARGV[2]),ARGV[4])
 return {1,redis.call('HGET',KEYS[1],'payload')}
 `)
 var redisDispatchFinish = redis.NewScript(`
@@ -66,7 +71,18 @@ if redis.call('HGET',KEYS[1],'owner')~=ARGV[1] then return 0 end
 if redis.call('GET',KEYS[2])~=ARGV[1] then return 0 end
 redis.call('HSET',KEYS[1],'state',ARGV[2],'owner','')
 redis.call('DEL',KEYS[2])
-if ARGV[2]=='done' then redis.call('HDEL',KEYS[1],'payload') end
+if ARGV[2]=='done' then
+ redis.call('HDEL',KEYS[1],'payload')
+ redis.call('ZREM',KEYS[3],ARGV[4])
+else
+ if tonumber(redis.call('HGET',KEYS[1],'attempts') or '0')>=3 then
+  redis.call('HSET',KEYS[1],'state','exhausted')
+  redis.call('HDEL',KEYS[1],'payload')
+  redis.call('ZREM',KEYS[3],ARGV[4])
+ else
+  redis.call('ZADD',KEYS[3],tonumber(ARGV[3]),ARGV[4])
+ end
+end
 return 1
 `)
 
@@ -135,7 +151,7 @@ func (s RedisOTPDispatch) Claim(ctx context.Context, id uuid.UUID, lease time.Du
 		return "", "", "", ErrInvalidPhoneChallengeRequest
 	}
 	owner := uuid.NewString()
-	result, err := redisDispatchClaim.Run(ctx, s.client, []string{dispatchKey(id), dispatchKey(id) + ":lease"}, owner, lease.Milliseconds()).Slice()
+	result, err := redisDispatchClaim.Run(ctx, s.client, []string{dispatchKey(id), dispatchKey(id) + ":lease", redisOTPDispatchQueueKey}, owner, lease.Milliseconds(), time.Now().UnixMilli(), id.String()).Slice()
 	if err != nil {
 		return "", "", "", err
 	}
@@ -166,7 +182,7 @@ func (s RedisOTPDispatch) Finish(ctx context.Context, id uuid.UUID, owner string
 	if success {
 		state = "done"
 	}
-	n, err := redisDispatchFinish.Run(ctx, s.client, []string{dispatchKey(id), dispatchKey(id) + ":lease"}, owner, state).Int()
+	n, err := redisDispatchFinish.Run(ctx, s.client, []string{dispatchKey(id), dispatchKey(id) + ":lease", redisOTPDispatchQueueKey}, owner, state, time.Now().Add(5*time.Second).UnixMilli(), id.String()).Int()
 	if err != nil {
 		return err
 	}
@@ -174,4 +190,25 @@ func (s RedisOTPDispatch) Finish(ctx context.Context, id uuid.UUID, owner string
 		return ErrOTPDispatchOwnership
 	}
 	return nil
+}
+
+// Due returns at most limit scheduled IDs. The sorted-set index contains only
+// opaque UUIDs; stale entries are pruned in bounded batches. Workers must
+// still claim a lease before sending. No PostgreSQL polling is involved.
+func (s RedisOTPDispatch) Due(ctx context.Context, limit int64) ([]uuid.UUID, error) {
+	if limit < 1 || limit > 100 { return nil, ErrInvalidPhoneChallengeRequest }
+	ids, err := s.client.ZRangeByScore(ctx, redisOTPDispatchQueueKey, &redis.ZRangeBy{
+		Min: "-inf", Max: fmt.Sprint(time.Now().UnixMilli()), Offset: 0, Count: limit,
+	}).Result()
+	if err != nil { return nil, err }
+	result := make([]uuid.UUID,0,len(ids))
+	for _, raw := range ids {
+		id, err := uuid.Parse(raw)
+		if err != nil { _ = s.client.ZRem(ctx, redisOTPDispatchQueueKey,raw).Err(); continue }
+		exists, err := s.client.Exists(ctx,dispatchKey(id)).Result()
+		if err != nil { return nil,err }
+		if exists == 0 { _ = s.client.ZRem(ctx, redisOTPDispatchQueueKey,raw).Err(); continue }
+		result = append(result,id)
+	}
+	return result,nil
 }
