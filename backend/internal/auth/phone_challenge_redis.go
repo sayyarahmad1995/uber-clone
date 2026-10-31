@@ -145,7 +145,6 @@ func (s RedisPhoneChallengeStore) Consume(ctx context.Context, id uuid.UUID, can
 	}
 }
 
-
 // redisIssueOTPWithDispatch creates the challenge and its encrypted delivery
 // record in the same atomic operation. It never creates an orphaned challenge.
 // This script targets a standalone Redis instance, not Redis Cluster.
@@ -169,7 +168,7 @@ return {1,ARGV[5],tonumber(ARGV[4])}
 // encrypted SMS dispatch. The caller must use this method for production
 // issuance rather than separate Create and Enqueue operations.
 func (s RedisPhoneChallengeStore) CreateWithDispatch(ctx context.Context, c NewPhoneChallenge, dispatch RedisOTPDispatch, code string) (PhoneChallengeCreation, error) {
-	normalized, err := (PhoneChallengeRequest{PhoneNumber:c.PhoneNumber,Purpose:c.Purpose}).Validate()
+	normalized, err := (PhoneChallengeRequest{PhoneNumber: c.PhoneNumber, Purpose: c.Purpose}).Validate()
 	now := time.Now()
 	if err != nil || c.ID == uuid.Nil || len(c.CodeDigest) != 32 ||
 		len(c.IdempotencyKey) < 16 || len(c.IdempotencyKey) > 128 ||
@@ -177,29 +176,52 @@ func (s RedisPhoneChallengeStore) CreateWithDispatch(ctx context.Context, c NewP
 		s.client == nil || dispatch.client == nil || s.client != dispatch.client || dispatch.aead == nil {
 		return PhoneChallengeCreation{}, ErrInvalidPhoneChallengeRequest
 	}
-	if len(code)!=6 {return PhoneChallengeCreation{},ErrPhoneOTPCode}
-	for i:=0;i<len(code);i++ {if code[i]<'0'||code[i]>'9' {return PhoneChallengeCreation{},ErrPhoneOTPCode}}
-	ttl,cooldown:=time.Until(c.ExpiresAt).Milliseconds(),time.Until(c.ResendAfter).Milliseconds()
-	if ttl<=0||cooldown<=0 {return PhoneChallengeCreation{},ErrInvalidPhoneChallengeRequest}
-	sealed,err:=dispatch.seal(c.ID,normalized.PhoneNumber,code)
-	if err!=nil{return PhoneChallengeCreation{},err}
-	scope:=s.scope(normalized.PhoneNumber,c.Purpose)
-	idemHash:=sha256.Sum256([]byte(c.IdempotencyKey))
-	keys:=[]string{
-		scope+":challenge:"+c.ID.String(),
-		scope+":cooldown",
-		scope+":idem:"+hex.EncodeToString(idemHash[:]),
-		"higo:otp:v1:lookup:"+c.ID.String(),
+	if len(code) != 6 {
+		return PhoneChallengeCreation{}, ErrPhoneOTPCode
+	}
+	for i := 0; i < len(code); i++ {
+		if code[i] < '0' || code[i] > '9' {
+			return PhoneChallengeCreation{}, ErrPhoneOTPCode
+		}
+	}
+	ttl, cooldown := time.Until(c.ExpiresAt).Milliseconds(), time.Until(c.ResendAfter).Milliseconds()
+	if ttl <= 0 || cooldown <= 0 {
+		return PhoneChallengeCreation{}, ErrInvalidPhoneChallengeRequest
+	}
+	sealed, err := dispatch.seal(c.ID, normalized.PhoneNumber, code)
+	if err != nil {
+		return PhoneChallengeCreation{}, err
+	}
+	scope := s.scope(normalized.PhoneNumber, c.Purpose)
+	idemHash := sha256.Sum256([]byte(c.IdempotencyKey))
+	keys := []string{
+		scope + ":challenge:" + c.ID.String(),
+		scope + ":cooldown",
+		scope + ":idem:" + hex.EncodeToString(idemHash[:]),
+		"higo:otp:v1:lookup:" + c.ID.String(),
 		dispatchKey(c.ID),
 	}
-	output,err:=redisIssueOTPWithDispatch.Run(ctx,s.client,keys,normalized.PhoneNumber,hex.EncodeToString(c.CodeDigest),ttl,cooldown,c.ID.String(),sealed).Slice()
-	if err!=nil{return PhoneChallengeCreation{},err}
-	status,err:=redisInteger(output[0]);if err!=nil{return PhoneChallengeCreation{},err}
-	if status==-1 {
-		remaining,err:=redisInteger(output[2]);if err!=nil{return PhoneChallengeCreation{},err}
-		return PhoneChallengeCreation{ResendAfter:time.Now().Add(time.Duration(remaining)*time.Millisecond)},ErrPhoneChallengeCooldown
+	output, err := redisIssueOTPWithDispatch.Run(ctx, s.client, keys, normalized.PhoneNumber, hex.EncodeToString(c.CodeDigest), ttl, cooldown, c.ID.String(), sealed).Slice()
+	if err != nil {
+		return PhoneChallengeCreation{}, err
 	}
-	if status==-2{return PhoneChallengeCreation{},ErrInvalidPhoneChallengeRequest}
-	id,err:=uuid.Parse(fmt.Sprint(output[1]));if err!=nil{return PhoneChallengeCreation{},err}
-	return PhoneChallengeCreation{ID:id,ShouldSend:status==1,ResendAfter:c.ResendAfter},nil
+	status, err := redisInteger(output[0])
+	if err != nil {
+		return PhoneChallengeCreation{}, err
+	}
+	if status == -1 {
+		remaining, err := redisInteger(output[2])
+		if err != nil {
+			return PhoneChallengeCreation{}, err
+		}
+		return PhoneChallengeCreation{ResendAfter: time.Now().Add(time.Duration(remaining) * time.Millisecond)}, ErrPhoneChallengeCooldown
+	}
+	if status == -2 {
+		return PhoneChallengeCreation{}, ErrInvalidPhoneChallengeRequest
+	}
+	id, err := uuid.Parse(fmt.Sprint(output[1]))
+	if err != nil {
+		return PhoneChallengeCreation{}, err
+	}
+	return PhoneChallengeCreation{ID: id, ShouldSend: status == 1, ResendAfter: c.ResendAfter}, nil
 }
