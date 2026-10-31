@@ -15,7 +15,9 @@ import (
 func TestRedisOTPRateLimit(t *testing.T) {
 	store := redisOTPTestStore(t)
 	limiter, err := NewOTPRateLimiter(store.client, bytes.Repeat([]byte{0x43}, 32))
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	ctx := context.Background()
 	subject := uuid.NewString()
 	for i := 0; i < 3; i++ {
@@ -35,7 +37,9 @@ func TestRedisOTPRateLimit(t *testing.T) {
 func TestRedisOTPRateLimitConcurrent(t *testing.T) {
 	store := redisOTPTestStore(t)
 	limiter, err := NewOTPRateLimiter(store.client, bytes.Repeat([]byte{0x44}, 32))
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	const workers = 20
 	var wg sync.WaitGroup
 	results := make(chan error, workers)
@@ -52,9 +56,15 @@ func TestRedisOTPRateLimitConcurrent(t *testing.T) {
 	close(results)
 	success := 0
 	for err := range results {
-		if err == nil { success++ } else if !errors.Is(err, ErrPhoneOTPRateLimited) { t.Fatalf("unexpected error: %v", err) }
+		if err == nil {
+			success++
+		} else if !errors.Is(err, ErrPhoneOTPRateLimited) {
+			t.Fatalf("unexpected error: %v", err)
+		}
 	}
-	if success != 5 { t.Fatalf("expected exactly 5 allowed requests, got %d", success) }
+	if success != 5 {
+		t.Fatalf("expected exactly 5 allowed requests, got %d", success)
+	}
 }
 
 func TestRedisOTPExpiredAndUnavailable(t *testing.T) {
@@ -64,7 +74,9 @@ func TestRedisOTPExpiredAndUnavailable(t *testing.T) {
 	c, digest := newRedisOTPChallenge(t, id, "+923001234573", uuid.NewString())
 	c.ExpiresAt = time.Now().Add(180 * time.Millisecond)
 	c.ResendAfter = time.Now().Add(100 * time.Millisecond)
-	if _, err := store.Create(ctx, c); err != nil { t.Fatal(err) }
+	if _, err := store.Create(ctx, c); err != nil {
+		t.Fatal(err)
+	}
 	time.Sleep(250 * time.Millisecond)
 	if _, err := store.Consume(ctx, id, digest); !errors.Is(err, ErrPhoneChallengeInvalid) {
 		t.Fatalf("expired code was accepted or returned wrong error: %v", err)
@@ -75,8 +87,14 @@ func TestRedisOTPExpiredAndUnavailable(t *testing.T) {
 	closed := redis.NewClient(opts)
 	_ = closed.Close()
 	failStore, err := NewRedisPhoneChallengeStore(closed, bytes.Repeat([]byte{0x42}, 32))
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	c2, d2 := newRedisOTPChallenge(t, uuid.New(), "+923001234574", uuid.NewString())
-	if _, err := failStore.Create(ctx, c2); err == nil { t.Fatal("issuing during Redis outage must fail") }
-	if _, err := failStore.Consume(ctx, id, d2); err == nil { t.Fatal("verification during Redis outage must fail") }
+	if _, err := failStore.Create(ctx, c2); err == nil {
+		t.Fatal("issuing during Redis outage must fail")
+	}
+	if _, err := failStore.Consume(ctx, id, d2); err == nil {
+		t.Fatal("verification during Redis outage must fail")
+	}
 }
