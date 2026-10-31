@@ -161,6 +161,7 @@ redis.call('SET',KEYS[3],ARGV[5],'PX',ARGV[3])
 redis.call('SET',KEYS[4],KEYS[1],'PX',ARGV[3])
 redis.call('HSET',KEYS[5],'payload',ARGV[6],'state','ready','owner','')
 redis.call('PEXPIRE',KEYS[5],ARGV[3])
+redis.call('ZADD',KEYS[6],ARGV[7],ARGV[5])
 return {1,ARGV[5],tonumber(ARGV[4])}
 `)
 
@@ -200,8 +201,9 @@ func (s RedisPhoneChallengeStore) CreateWithDispatch(ctx context.Context, c NewP
 		scope + ":idem:" + hex.EncodeToString(idemHash[:]),
 		"higo:otp:v1:lookup:" + c.ID.String(),
 		dispatchKey(c.ID),
+		redisOTPDispatchQueueKey,
 	}
-	output, err := redisIssueOTPWithDispatch.Run(ctx, s.client, keys, normalized.PhoneNumber, hex.EncodeToString(c.CodeDigest), ttl, cooldown, c.ID.String(), sealed).Slice()
+	output, err := redisIssueOTPWithDispatch.Run(ctx, s.client, keys, normalized.PhoneNumber, hex.EncodeToString(c.CodeDigest), ttl, cooldown, c.ID.String(), sealed, time.Now().UnixMilli()).Slice()
 	if err != nil {
 		return PhoneChallengeCreation{}, err
 	}
