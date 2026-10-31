@@ -19,6 +19,20 @@ Redis uses a 128 MB memory limit with `noeviction`, and RDB/AOF persistence is d
 
 For production, configure an authenticated private Redis endpoint with TLS, network isolation, monitored memory headroom, and a separately provisioned secret for HMAC keying. The local no-password container is **not production configuration**.
 
+## Production transport-security policy
+
+**Production requirement:** Encrypt and authenticate every service-to-service network connection. Local Docker Compose HTTP/plaintext connections are for isolated development only and must not be copied into production configuration.
+
+- Flutter to API: HTTPS with publicly trusted certificate and hostname verification.
+- Go API to Redis: `rediss://`, trusted CA, certificate and hostname verification. Configure Redis server TLS (or a trusted TLS-terminating private proxy); changing a URL scheme alone does not enable TLS.
+- Go API and Kratos to PostgreSQL: TLS with `sslmode=verify-full` and a trusted root CA; `sslmode=disable` is development-only.
+- Go API to Kratos: HTTPS with trusted certificates and hostname verification.
+- SMS/email and other third-party APIs: HTTPS or authenticated TLS transport with certificate validation.
+- Do not disable certificate validation (`InsecureSkipVerify` / `sslmode=verify-ca` without hostname checks) to work around certificate errors.
+- Use mTLS where workloads require mutual machine authentication, particularly across trust boundaries; do not introduce complex certificate infrastructure solely for single-host local development.
+- Keep private services off public interfaces, use per-service credentials and least-privilege network policies, and rotate credentials/certificates.
+- Test production configuration for accidental `http://`, `redis://`, and `sslmode=disable` values before deployment. Health probes and telemetry must also use protected transport when crossing network boundaries.
+
 ## Required implementation before activation
 
 - Redis operations for issue, deduplicate, verify and consume must be **atomic** across all API replicas (Lua scripts or equivalent).
