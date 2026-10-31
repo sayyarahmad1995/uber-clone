@@ -42,7 +42,7 @@ local prior=redis.call('GET',KEYS[3])
 if prior then return {0,prior,redis.call('PTTL',KEYS[2])} end
 local remaining=redis.call('PTTL',KEYS[2])
 if remaining>0 then return {-1,'',remaining} end
-redis.call('HSET',KEYS[1],'phone',ARGV[1],'digest',ARGV[2],'attempts',0,'max_attempts',5,'state','pending')
+redis.call('HSET',KEYS[1],'phone',ARGV[1],'purpose',ARGV[6],'digest',ARGV[2],'attempts',0,'max_attempts',5,'state','pending')
 redis.call('PEXPIRE',KEYS[1],ARGV[3])
 redis.call('SET',KEYS[2],'1','PX',ARGV[4])
 redis.call('SET',KEYS[3],ARGV[5],'PX',ARGV[3])
@@ -91,7 +91,7 @@ func (s RedisPhoneChallengeStore) Create(ctx context.Context, c NewPhoneChalleng
 	// An idempotency key can contain user-controlled text, so hash it.
 	idemHash := sha256.Sum256([]byte(c.IdempotencyKey))
 	keys := []string{scope + ":challenge:" + c.ID.String(), scope + ":cooldown", scope + ":idem:" + hex.EncodeToString(idemHash[:]), lookup}
-	output, err := redisIssueOTP.Run(ctx, s.client, keys, normalized.PhoneNumber, hex.EncodeToString(c.CodeDigest), ttl, cooldown, c.ID.String()).Slice()
+	output, err := redisIssueOTP.Run(ctx, s.client, keys, normalized.PhoneNumber, hex.EncodeToString(c.CodeDigest), ttl, cooldown, c.ID.String(), string(c.Purpose)).Slice()
 	if err != nil {
 		return PhoneChallengeCreation{}, err
 	}
@@ -154,7 +154,7 @@ if prior then return {0,prior,redis.call('PTTL',KEYS[2])} end
 local remaining=redis.call('PTTL',KEYS[2])
 if remaining>0 then return {-1,'',remaining} end
 if redis.call('EXISTS',KEYS[1])==1 or redis.call('EXISTS',KEYS[4])==1 or redis.call('EXISTS',KEYS[5])==1 then return {-2,'',0} end
-redis.call('HSET',KEYS[1],'phone',ARGV[1],'digest',ARGV[2],'attempts',0,'max_attempts',5,'state','pending')
+redis.call('HSET',KEYS[1],'phone',ARGV[1],'purpose',ARGV[8],'digest',ARGV[2],'attempts',0,'max_attempts',5,'state','pending')
 redis.call('PEXPIRE',KEYS[1],ARGV[3])
 redis.call('SET',KEYS[2],'1','PX',ARGV[4])
 redis.call('SET',KEYS[3],ARGV[5],'PX',ARGV[3])
@@ -203,7 +203,7 @@ func (s RedisPhoneChallengeStore) CreateWithDispatch(ctx context.Context, c NewP
 		dispatchKey(c.ID),
 		redisOTPDispatchQueueKey,
 	}
-	output, err := redisIssueOTPWithDispatch.Run(ctx, s.client, keys, normalized.PhoneNumber, hex.EncodeToString(c.CodeDigest), ttl, cooldown, c.ID.String(), sealed, time.Now().UnixMilli()).Slice()
+	output, err := redisIssueOTPWithDispatch.Run(ctx, s.client, keys, normalized.PhoneNumber, hex.EncodeToString(c.CodeDigest), ttl, cooldown, c.ID.String(), sealed, time.Now().UnixMilli(), string(c.Purpose)).Slice()
 	if err != nil {
 		return PhoneChallengeCreation{}, err
 	}
