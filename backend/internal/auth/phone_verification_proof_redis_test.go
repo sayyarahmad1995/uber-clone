@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"strings"
 	"testing"
 	"time"
 
@@ -46,7 +47,7 @@ func TestRedisOTPProofConcurrentConsumeAndExpiration(t *testing.T) {
 	proofs,err:=NewRedisPhoneProofs(store.client)
 	if err!=nil{t.Fatal(err)}
 	ctx:=context.Background()
-	token:=uuid.NewString()+uuid.NewString()
+	token:=strings.ReplaceAll(uuid.NewString()+uuid.NewString(), "-", "")
 	// Proofs are never written directly by production callers; this fixture
 	// tests only the atomic single-use consumption and expiration behavior.
 	if err:=store.client.Set(ctx,proofKey(token),"+923001234582|sign_in_or_register",time.Minute).Err();err!=nil{t.Fatal(err)}
@@ -63,7 +64,7 @@ func TestRedisOTPProofConcurrentConsumeAndExpiration(t *testing.T) {
 		if err==nil {success++} else if !errors.Is(err,ErrPhoneVerificationProof) {t.Fatalf("unexpected: %v",err)}
 	}
 	if success!=1{t.Fatalf("expected one proof consumer, got %d",success)}
-	expiring:=uuid.NewString()+uuid.NewString()
+	expiring:=strings.ReplaceAll(uuid.NewString()+uuid.NewString(), "-", "")
 	if err:=store.client.Set(ctx,proofKey(expiring),"+923001234582|sign_in_or_register",80*time.Millisecond).Err();err!=nil{t.Fatal(err)}
 	time.Sleep(120*time.Millisecond)
 	if _,err:=proofs.ConsumeProof(ctx,expiring,PhoneChallengeSignInOrRegister);!errors.Is(err,ErrPhoneVerificationProof){t.Fatalf("expired proof accepted: %v",err)}
