@@ -44,6 +44,22 @@ Target response: `{"id":"uuid","capabilities":["rider"],"phone_number":"+9230012
 
 Preserve existing `POST /v1/auth/logout`, `GET /v1/me`, `POST /v1/auth/session/extend` behavior until migrated. Flutter uses secure token storage; bootstrapping requires an authenticated `/v1/me` request. No unimplemented refresh endpoint should be assumed.
 
+## Request efficiency and server-load policy
+
+The goal is to minimize **unnecessary** requests, not to skip security enforcement.
+
+- Flutter validates E.164 formatting locally for UX; Go independently validates all untrusted input. Do not call the API on every digit typed or widget rebuild.
+- **One phone challenge issuance** per deliberate action. The server returns `resend_after_seconds`; the client counts down locally without polling. Server-side throttling is authoritative. A duplicate tap while a request is in flight is suppressed.
+- A verification completion response includes `next_step` so Flutter does **not** issue a second account-existence lookup. Never reveal account existence before successful phone verification.
+- Registration and login requests are initiated once per user submission. Disable submit while pending and do not blindly retry mutations on timeout. For challenge issuance, support a bounded idempotency key so retrying after network loss does not send a duplicate SMS; scope keys to the requester/phone/purpose and expire them.
+- A successful login's `access_token` and `expires_in` are retained securely. Restore sessions with **one** authenticated `GET /v1/me` at app startup, not a check on each screen or navigation. Do not assume a refresh endpoint exists.
+- Share an in-memory current-user snapshot across screens. Deduplicate concurrent `GET /v1/me` calls and refresh only after account mutations, explicit user action, authorization failure, or session restoration. Never use cached capabilities to authorize backend operations.
+- Email verification status must not be polled. Prefer completion responses that already describe the updated state, or a single `GET /v1/me` after successful mutation.
+- HTTP clients should reuse connections, use bounded timeouts, cancel obsolete calls and avoid automatic retry storms. Never persist unverified state as if it were authoritative.
+- Backend OTP and login abuse controls are enforced on every relevant action independent of client behavior. Use persistent/distributed rate limiting and atomic challenge state, not per-process in-memory counters, when multiple API replicas are deployed.
+- Apply conservative, explicit rate limits per phone, IP, account and purpose; return `429` with `Retry-After` for throttling. Do not disclose account existence through limits or response differences. Track SMS sends, failed OTP completions, login failures and duplicate requests with privacy-safe metrics.
+- Aim for the normal successful **existing-user** sign-in flow to require one challenge-issuance call, one challenge-completion call, one password-login call, and one authenticated user fetch as needed; registration substitutes a registration call and subsequent authenticated bootstrap. Do not add a separate lookup call or repeated status polling.
+
 ## Verified email rules
 
 - Email is optional at registration; malformed nonempty email is rejected.
@@ -71,3 +87,5 @@ The engineering implementation must settle Kratos phone identity/verification su
 6. Attempt limits, rate limits and generic errors work; sensitive values are not logged.
 7. Authenticated `/v1/me`, server revocation/logout, session restoration and Rider/Driver capability authorization are tested.
 8. Existing Go endpoints stay stable until the versioned extension and Flutter cutover are validated.
+9. OTP resend countdowns do not poll; parallel profile reads coalesce; repeat taps do not issue duplicate mutations.
+10. Duplicate challenge issuance using the same idempotency key does not generate a second SMS, and server rate limits return a bounded retry window.
