@@ -120,7 +120,7 @@ func (s RedisPhoneChallengeStore) Consume(ctx context.Context, id uuid.UUID, can
 	if id == uuid.Nil || len(candidateDigest) != 32 {
 		return "", ErrPhoneChallengeInvalid
 	}
-	key, err := s.client.Get(ctx, "higo:otp:v1:lookup:" + id.String()).Result()
+	key, err := s.client.Get(ctx, "higo:otp:v1:lookup:"+id.String()).Result()
 	if errors.Is(err, redis.Nil) {
 		return "", ErrPhoneChallengeInvalid
 	}
