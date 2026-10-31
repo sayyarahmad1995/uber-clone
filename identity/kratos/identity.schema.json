@@ -20,16 +20,26 @@
               "via": "email"
             }
           }
+        },
+        "phone": {
+          "type": "string",
+          "pattern": "^[+][1-9][0-9]{7,14}$",
+          "ory.sh/kratos": {
+            "credentials": {
+              "password": {
+                "identifier": true
+              }
+            }
+          }
         }
       },
-      "required": [
-        "email"
+      "anyOf": [
+        {"required": ["email"]},
+        {"required": ["phone"]}
       ],
       "additionalProperties": false
     }
   },
-  "required": [
-    "traits"
-  ],
+  "required": ["traits"],
   "additionalProperties": false
 }
