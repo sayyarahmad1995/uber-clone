@@ -50,20 +50,30 @@ func (s PhoneChallengeStore) Create(ctx context.Context, c NewPhoneChallenge) (P
 		return PhoneChallengeCreation{}, ErrInvalidPhoneChallengeRequest
 	}
 	var result PhoneChallengeCreation
-	var inserted bool
 	err = s.db.QueryRowContext(ctx, `
 		INSERT INTO auth_phone_challenges
 			(id, phone_number, purpose, code_digest, idempotency_key, expires_at, resend_after)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		ON CONFLICT (phone_number, purpose, idempotency_key)
-		DO UPDATE SET idempotency_key = auth_phone_challenges.idempotency_key
-		RETURNING id, resend_after, (id = $1) AS inserted
+		ON CONFLICT (phone_number, purpose, idempotency_key) DO NOTHING
+		RETURNING id, resend_after
 	`, c.ID, normalized.PhoneNumber, c.Purpose, c.CodeDigest, c.IdempotencyKey,
-		c.ExpiresAt, c.ResendAfter).Scan(&result.ID, &result.ResendAfter, &inserted)
+		c.ExpiresAt, c.ResendAfter).Scan(&result.ID, &result.ResendAfter)
+	if err == nil {
+		result.ShouldSend = true
+		return result, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return PhoneChallengeCreation{}, err
+	}
+	// A conflicting insert is already committed when the INSERT returns.
+	// Read its stored challenge without modifying it or triggering another SMS.
+	err = s.db.QueryRowContext(ctx, `
+		SELECT id, resend_after FROM auth_phone_challenges
+		WHERE phone_number = $1 AND purpose = $2 AND idempotency_key = $3
+	`, normalized.PhoneNumber, c.Purpose, c.IdempotencyKey).Scan(&result.ID, &result.ResendAfter)
 	if err != nil {
 		return PhoneChallengeCreation{}, err
 	}
-	result.ShouldSend = inserted
 	return result, nil
 }
 
