@@ -21,7 +21,9 @@ func (r PostgresPhoneAccountResolver) CreatePhoneAccount(ctx context.Context, su
 		return uuid.Nil, ErrPhoneIdentityBinding
 	}
 	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil { return uuid.Nil, err }
+	if err != nil {
+		return uuid.Nil, err
+	}
 	defer tx.Rollback()
 
 	var userID uuid.UUID
@@ -40,28 +42,44 @@ func (r PostgresPhoneAccountResolver) CreatePhoneAccount(ctx context.Context, su
 		if errors.Is(err, sql.ErrNoRows) || (err == nil && boundPhone != normalized.PhoneNumber) {
 			return uuid.Nil, ErrPhoneIdentityBinding
 		}
-		if err != nil { return uuid.Nil, err }
+		if err != nil {
+			return uuid.Nil, err
+		}
 	case errors.Is(err, sql.ErrNoRows):
 		// Prevent silently binding a phone already owned by another identity.
 		var exists bool
-		if err = tx.QueryRowContext(ctx,`
+		if err = tx.QueryRowContext(ctx, `
 			SELECT EXISTS(SELECT 1 FROM user_verified_phones WHERE phone_number=$1)
-		`, normalized.PhoneNumber).Scan(&exists); err != nil { return uuid.Nil, err }
-		if exists { return uuid.Nil, ErrPhoneIdentityBinding }
+		`, normalized.PhoneNumber).Scan(&exists); err != nil {
+			return uuid.Nil, err
+		}
+		if exists {
+			return uuid.Nil, ErrPhoneIdentityBinding
+		}
 		userID = uuid.New()
-		if _, err = tx.ExecContext(ctx, `INSERT INTO users(id) VALUES ($1)`,userID);err != nil{return uuid.Nil,err}
-		if _, err = tx.ExecContext(ctx,`
+		if _, err = tx.ExecContext(ctx, `INSERT INTO users(id) VALUES ($1)`, userID); err != nil {
+			return uuid.Nil, err
+		}
+		if _, err = tx.ExecContext(ctx, `
 			INSERT INTO external_identities(user_id,issuer,subject) VALUES ($1,$2,$3)
-		`,userID,r.issuer,subject);err != nil{return uuid.Nil,err}
-		if _, err = tx.ExecContext(ctx,`
+		`, userID, r.issuer, subject); err != nil {
+			return uuid.Nil, err
+		}
+		if _, err = tx.ExecContext(ctx, `
 			INSERT INTO user_verified_phones(phone_number,user_id,issuer,subject) VALUES ($1,$2,$3,$4)
-		`,normalized.PhoneNumber,userID,r.issuer,subject);err != nil{return uuid.Nil,err}
+		`, normalized.PhoneNumber, userID, r.issuer, subject); err != nil {
+			return uuid.Nil, err
+		}
 	default:
 		return uuid.Nil, err
 	}
-	if _, err = tx.ExecContext(ctx,`
+	if _, err = tx.ExecContext(ctx, `
 		INSERT INTO user_capabilities(user_id,capability) VALUES ($1,'rider') ON CONFLICT DO NOTHING
-	`,userID);err != nil{return uuid.Nil,err}
-	if err = tx.Commit();err != nil{return uuid.Nil,err}
-	return userID,nil
+	`, userID); err != nil {
+		return uuid.Nil, err
+	}
+	if err = tx.Commit(); err != nil {
+		return uuid.Nil, err
+	}
+	return userID, nil
 }

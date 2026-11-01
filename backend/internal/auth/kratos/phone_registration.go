@@ -26,14 +26,18 @@ func (p *Provider) RegisterPhoneIdentity(ctx context.Context, phone, password st
 		return PhoneRegistration{}, auth.ErrRegistrationInvalid
 	}
 	f, err := p.createFlow(ctx, "/self-service/registration/api")
-	if err != nil { return PhoneRegistration{}, auth.ErrUnavailable }
+	if err != nil {
+		return PhoneRegistration{}, auth.ErrUnavailable
+	}
 	body := map[string]any{
-		"method": "password",
+		"method":   "password",
 		"password": password,
-		"traits": map[string]string{"phone": normalized.PhoneNumber},
+		"traits":   map[string]string{"phone": normalized.PhoneNumber},
 	}
 	var result struct {
-		Identity struct { ID string `json:"id"` } `json:"identity"`
+		Identity struct {
+			ID string `json:"id"`
+		} `json:"identity"`
 	}
 	if err := p.submitFlow(ctx, "/self-service/registration", f.ID, body, &result); err != nil {
 		return PhoneRegistration{}, classifyRegistrationError(err)
