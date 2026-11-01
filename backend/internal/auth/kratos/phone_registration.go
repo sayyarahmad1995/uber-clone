@@ -10,9 +10,7 @@ import (
 // PhoneRegistration is the result of Kratos password registration, not proof
 // of phone possession. Do not return or expose a session from this method.
 // The caller must have independently verified phone ownership before using it.
-type PhoneRegistration struct {
-	IdentitySubject string
-}
+type PhoneRegistration = auth.PhoneRegistrationIdentity
 
 // RegisterPhoneIdentity creates a phone/password Kratos identity using the
 // existing self-service API. Missing identity IDs fail closed: no email
