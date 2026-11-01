@@ -89,3 +89,23 @@ func (r PostgresPhoneAccountResolver) BindVerifiedPhone(ctx context.Context, use
 	}
 	return nil
 }
+
+// MatchesVerifiedPhone authorizes an already authenticated Kratos subject.
+// Unlike a phone-only existence check, this requires an exact three-way match.
+func (r PostgresPhoneAccountResolver) MatchesVerifiedPhone(ctx context.Context, issuer, subject, phone string) (bool, error) {
+	if issuer != r.issuer || subject == "" {
+		return false, nil
+	}
+	normalized, err := (PhoneChallengeRequest{PhoneNumber: phone, Purpose: PhoneChallengeSignInOrRegister}).Validate()
+	if err != nil { return false, nil }
+	var exists bool
+	err = r.db.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM user_verified_phones p
+			JOIN external_identities e ON e.user_id=p.user_id
+				AND e.issuer=p.issuer AND e.subject=p.subject
+			WHERE p.phone_number=$1 AND p.issuer=$2 AND p.subject=$3
+		)
+	`, normalized.PhoneNumber, issuer, subject).Scan(&exists)
+	return exists, err
+}
