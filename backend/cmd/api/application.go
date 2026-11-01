@@ -53,6 +53,16 @@ func newApplication(cfg config) (application, func(), error) {
 		cleanup()
 		return application{}, nil, fmt.Errorf("identity infrastructure initialization failed: %w", err)
 	}
+	// Only the verified PostgreSQL owner of the Kratos identity may use
+	// the phone-only protected-route authorization path.
+	phoneBindings, err := auth.NewPostgresPhoneAccountResolver(db, cfg.IdentitySource)
+	if err != nil {
+		cleanup()
+		return application{}, nil, fmt.Errorf("phone identity resolver initialization failed: %w", err)
+	}
+	if kratosIdentity, ok := identityProvider.(*identitykratos.Provider); ok {
+		kratosIdentity.WithVerifiedPhoneBindings(phoneBindings)
+	}
 	tripService := trip.NewService(trip.NewPostgresRepository(db))
 	marketplaceAssignmentService := marketplace.NewAssignmentService(
 		marketplace.NewPostgresAssignmentRepository(db),
