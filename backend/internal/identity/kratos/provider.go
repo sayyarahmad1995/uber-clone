@@ -12,9 +12,9 @@ import (
 )
 
 type Provider struct {
-	baseURL string
-	source  string
-	client  *http.Client
+	baseURL       string
+	source        string
+	client        *http.Client
 	phoneBindings VerifiedPhoneBindingChecker
 }
 

@@ -97,7 +97,9 @@ func (r PostgresPhoneAccountResolver) MatchesVerifiedPhone(ctx context.Context, 
 		return false, nil
 	}
 	normalized, err := (PhoneChallengeRequest{PhoneNumber: phone, Purpose: PhoneChallengeSignInOrRegister}).Validate()
-	if err != nil { return false, nil }
+	if err != nil {
+		return false, nil
+	}
 	var exists bool
 	err = r.db.QueryRowContext(ctx, `
 		SELECT EXISTS (
