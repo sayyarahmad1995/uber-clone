@@ -23,3 +23,9 @@ Known limitations: the coordinator is not wired to public HTTP routes, cannot au
 ## Live Kratos compatibility gate
 
 Opt-in test `TestLiveKratosPhoneRegistration` makes actual registration and admin identity-read requests, verifies phone-only traits, and attempts to delete the test identity. It requires both `TEST_KRATOS_PUBLIC_URL` and `TEST_KRATOS_ADMIN_URL`. Run **only against disposable, isolated Kratos test data**, not a shared production database. The test is skipped in ordinary `go test ./...` runs. If it fails, do not activate phone authentication; Kratos 1.3.1 registration response shape/schema behavior must be corrected first. This smoke test does not cover OTP consumption, account recovery, or issuance of an authenticated session.
+
+## Operator-directed recovery
+
+Internal `ReconcilePhoneRegistration` can complete a stranded `submitting` or `identity_created` operation when an operator supplies its operation ID, phone and exact Kratos identity subject. It checks the operation belongs to that phone, uses a **fresh Kratos admin identity lookup** to match subject and phone, then records the subject and commits the PostgreSQL registration. Repeated completion is idempotent; mismatched phone, subject and operation ID are rejected.
+
+**Not automated or exposed publicly.** An admin must first investigate the uncertain registration and check for duplicate Kratos identities. Matching the traits of one candidate does **not** prove no other identity exists. Do not invoke recovery using untrusted user-supplied identity IDs. Production activation still requires proof-to-reservation durability, live Kratos testing and guarded operator authentication/authorization.
