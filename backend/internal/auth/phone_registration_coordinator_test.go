@@ -11,6 +11,7 @@ import (
 type coordinatorProof struct {
 	calls int
 	phone string
+ consumeErr error
 }
 
 func (p *coordinatorProof) PeekProof(_ context.Context, _ string, purpose PhoneChallengePurpose) (PhoneVerificationProof, error) {
@@ -18,6 +19,7 @@ func (p *coordinatorProof) PeekProof(_ context.Context, _ string, purpose PhoneC
 }
 func (p *coordinatorProof) ConsumeProof(_ context.Context, _ string, purpose PhoneChallengePurpose) (PhoneVerificationProof, error) {
 	p.calls++
+ if p.consumeErr != nil { return PhoneVerificationProof{},p.consumeErr }
 	return PhoneVerificationProof{PhoneNumber: p.phone, Purpose: purpose}, nil
 }
 
@@ -78,4 +80,19 @@ func TestRegistrationCoordinatorAmbiguousKratosFailureDoesNotRetry(t *testing.T)
 	if err != nil || operation.State != "submitting" {
 		t.Fatalf("state: %+v %v", operation, err)
 	}
+}
+
+func TestRegistrationCoordinatorProofFailureAfterClaimDoesNotCreateIdentity(t *testing.T) {
+ store:=phoneChallengeTestStore(t)
+ repo,err:=NewPostgresPhoneAccountResolver(store.db,"primary-identity-v1")
+ if err!=nil { t.Fatal(err) }
+ proof:=&coordinatorProof{phone:"+923001234596",consumeErr:errors.New("redis unavailable")}
+ creator:=&coordinatorKratos{}
+ service:=PhoneRegistrationCoordinator{Proofs:proof,Identities:creator,Operations:repo}
+ if _,err=service.Register(context.Background(),"token","password");!errors.Is(err,ErrPhoneRegistrationPending) {t.Fatalf("expected pending reconciliation: %v",err)}
+ op,err:=repo.GetRegistration(context.Background(),proof.phone)
+ if err!=nil||op.State!="submitting" {t.Fatalf("expected durable claim before Redis failure: %+v %v",op,err)}
+ if creator.calls!=0 {t.Fatalf("Kratos invoked after Redis failure: %d",creator.calls)}
+ if _,err=service.Register(context.Background(),"token","password");!errors.Is(err,ErrPhoneRegistrationPending) {t.Fatalf("replay: %v",err)}
+ if proof.calls!=1 || creator.calls!=0 {t.Fatalf("proof replay or duplicate external call: proof=%d kratos=%d",proof.calls,creator.calls)}
 }
