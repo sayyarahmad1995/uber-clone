@@ -13,3 +13,9 @@ New repository methods: `ReserveRegistration`, `GetRegistration`, `RecordRegistr
 Security note: the methods that record and complete a registration do **not** verify a Redis proof or query Kratos themselves. They must not be exposed as HTTP handlers or invoked by untrusted callers. Validate the real Kratos v1.3.1 registration payload and identity response before activating this workflow.
 
 PostgreSQL stores durable recovery metadata; Redis remains the ephemeral OTP/proof store. Credentials remain in Kratos.
+
+## Coordinator (internal only)
+
+`PhoneRegistrationCoordinator.Register` consumes one Redis proof, reserves a durable operation, atomically claims the new `submitting` state, calls Kratos at most once, records a confirmed subject, and commits the account + verified-phone binding together. If creation times out or crashes after claim, the operation stays `submitting` and returns `ErrPhoneRegistrationPending` on retries. **Never automatically resubmit**; reconcile the identity against Kratos using a separately authorized maintenance path. Migration `035` introduces this state.
+
+Known limitations: the coordinator is not wired to public HTTP routes, cannot automatically recover uncertain Kratos calls, and has not been tested against live Kratos v1.3.1. A successful proof consumption followed by database unavailability also needs an operator-guided recovery policy. Existing registration primitives require trusted internal callers and must not be directly exposed. No session is issued by this workflow.
