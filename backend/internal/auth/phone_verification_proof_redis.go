@@ -117,6 +117,30 @@ func (s RedisPhoneProofs) ConsumeProof(ctx context.Context, token string, purpos
 	if err != nil {
 		return PhoneVerificationProof{}, err
 	}
+	return parsePhoneVerificationProof(v,purpose)
+}
+
+// PeekProof validates an unconsumed proof without deleting it. The coordinator
+// reserves durable registration state before consuming the same token.
+func (s RedisPhoneProofs) PeekProof(ctx context.Context, token string, purpose PhoneChallengePurpose) (PhoneVerificationProof, error) {
+	if len(token) != 64 || purpose != PhoneChallengeSignInOrRegister {
+		return PhoneVerificationProof{}, ErrPhoneVerificationProof
+	}
+	for i := 0; i < len(token); i++ {
+		b := token[i]
+		if (b < '0' || b > '9') && (b < 'a' || b > 'f') {
+			return PhoneVerificationProof{}, ErrPhoneVerificationProof
+		}
+	}
+	v, err := s.client.Get(ctx, proofKey(token)).Result()
+	if errors.Is(err, redis.Nil) {
+		return PhoneVerificationProof{}, ErrPhoneVerificationProof
+	}
+	if err != nil { return PhoneVerificationProof{}, err }
+	return parsePhoneVerificationProof(v,purpose)
+}
+
+func parsePhoneVerificationProof(v string, purpose PhoneChallengePurpose) (PhoneVerificationProof,error) {
 	// The proof value is server-generated and has a tightly defined shape.
 	// A mismatch fails closed, although consumption is irreversible.
 	parts := []byte(v)
