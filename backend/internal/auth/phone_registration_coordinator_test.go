@@ -13,8 +13,8 @@ type coordinatorProof struct {
 	phone string
 }
 
-func (p *coordinatorProof) PeekProof(_ context.Context, _ string, purpose PhoneChallengePurpose) (PhoneVerificationProof,error) {
- return PhoneVerificationProof{PhoneNumber:p.phone,Purpose:purpose},nil
+func (p *coordinatorProof) PeekProof(_ context.Context, _ string, purpose PhoneChallengePurpose) (PhoneVerificationProof, error) {
+	return PhoneVerificationProof{PhoneNumber: p.phone, Purpose: purpose}, nil
 }
 func (p *coordinatorProof) ConsumeProof(_ context.Context, _ string, purpose PhoneChallengePurpose) (PhoneVerificationProof, error) {
 	p.calls++

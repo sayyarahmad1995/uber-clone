@@ -60,7 +60,9 @@ func (s PhoneRegistrationCoordinator) Register(ctx context.Context, proofToken, 
 		return uuid.Nil, ErrPhoneRegistrationPending
 	}
 	consumed, err := s.Proofs.ConsumeProof(ctx, proofToken, PhoneChallengeSignInOrRegister)
-	if err != nil { return uuid.Nil, err }
+	if err != nil {
+		return uuid.Nil, err
+	}
 	if consumed.PhoneNumber != phone.PhoneNumber || consumed.Purpose != proof.Purpose {
 		return uuid.Nil, ErrPhoneVerificationProof
 	}

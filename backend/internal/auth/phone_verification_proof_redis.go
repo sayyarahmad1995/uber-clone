@@ -117,7 +117,7 @@ func (s RedisPhoneProofs) ConsumeProof(ctx context.Context, token string, purpos
 	if err != nil {
 		return PhoneVerificationProof{}, err
 	}
-	return parsePhoneVerificationProof(v,purpose)
+	return parsePhoneVerificationProof(v, purpose)
 }
 
 // PeekProof validates an unconsumed proof without deleting it. The coordinator
@@ -136,11 +136,13 @@ func (s RedisPhoneProofs) PeekProof(ctx context.Context, token string, purpose P
 	if errors.Is(err, redis.Nil) {
 		return PhoneVerificationProof{}, ErrPhoneVerificationProof
 	}
-	if err != nil { return PhoneVerificationProof{}, err }
-	return parsePhoneVerificationProof(v,purpose)
+	if err != nil {
+		return PhoneVerificationProof{}, err
+	}
+	return parsePhoneVerificationProof(v, purpose)
 }
 
-func parsePhoneVerificationProof(v string, purpose PhoneChallengePurpose) (PhoneVerificationProof,error) {
+func parsePhoneVerificationProof(v string, purpose PhoneChallengePurpose) (PhoneVerificationProof, error) {
 	// The proof value is server-generated and has a tightly defined shape.
 	// A mismatch fails closed, although consumption is irreversible.
 	parts := []byte(v)
