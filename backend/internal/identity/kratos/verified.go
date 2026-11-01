@@ -28,6 +28,7 @@ func (p *Provider) AuthenticateVerified(ctx context.Context, token string) (iden
 	var session struct {
 		Identity struct {
 			ID                  string `json:"id"`
+			Traits struct { Phone string `json:"phone"` } `json:"traits"`
 			VerifiableAddresses []struct {
 				Verified bool `json:"verified"`
 			} `json:"verifiable_addresses"`
@@ -40,6 +41,11 @@ func (p *Provider) AuthenticateVerified(ctx context.Context, token string) (iden
 		if address.Verified {
 			return identity.Principal{Issuer: p.source, Subject: session.Identity.ID}, nil
 		}
+	}
+	if p.phoneBindings != nil && session.Identity.Traits.Phone != "" {
+		ok, err := p.phoneBindings.MatchesVerifiedPhone(ctx, p.source, session.Identity.ID, session.Identity.Traits.Phone)
+		if err != nil { return identity.Principal{}, err }
+		if ok { return identity.Principal{Issuer:p.source,Subject:session.Identity.ID},nil }
 	}
 	return identity.Principal{}, identity.ErrVerificationRequired
 }
