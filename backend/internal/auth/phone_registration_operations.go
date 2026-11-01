@@ -70,7 +70,7 @@ func (r PostgresPhoneAccountResolver) RecordRegistrationIdentity(ctx context.Con
 	result, err := r.db.ExecContext(ctx, `
  UPDATE phone_registration_operations SET state='identity_created',
  identity_subject=$2,updated_at=clock_timestamp()
- WHERE id=$1 AND state='reserved'
+ WHERE id=$1 AND state='submitting'
  `, id, subject)
 	if err != nil {
 		return RegistrationOperation{}, err
@@ -135,7 +135,7 @@ func (r PostgresPhoneAccountResolver) CompleteRegistration(ctx context.Context, 
 		if _, err = tx.ExecContext(ctx, `INSERT INTO users(id) VALUES($1)`, userID); err != nil {
 			return uuid.Nil, err
 		}
-		if _, err = tx.ExecContext(ctx, `INSERT INTO external_identities(user_id,issuer,subject) VALUES($1,$2,$3)`, userID, r.issuer, subject); err != nil {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO external_identities(user_id,issuer,subject) VALUES($1,$2,$3)`, userID, r.issuer, subject.String); err != nil {
 			return uuid.Nil, err
 		}
 	} else if err != nil {
@@ -181,4 +181,17 @@ func (r PostgresPhoneAccountResolver) CompleteRegistration(ctx context.Context, 
 		return uuid.Nil, err
 	}
 	return userID, nil
+}
+
+// ClaimRegistrationSubmission is an atomic, one-way claim before any external
+// Kratos call. An ambiguous result must never be submitted again automatically.
+func (r PostgresPhoneAccountResolver) ClaimRegistrationSubmission(ctx context.Context, id uuid.UUID) (bool, error) {
+ result, err := r.db.ExecContext(ctx, `
+ UPDATE phone_registration_operations
+ SET state='submitting',updated_at=clock_timestamp()
+ WHERE id=$1 AND issuer=$2 AND state='reserved'
+ `, id, r.issuer)
+ if err != nil { return false, err }
+ count, err := result.RowsAffected()
+ return count==1,err
 }
