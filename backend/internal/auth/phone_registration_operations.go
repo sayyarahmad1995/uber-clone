@@ -86,7 +86,8 @@ func (r PostgresPhoneAccountResolver) CompleteRegistration(ctx context.Context,i
  tx,err:=r.db.BeginTx(ctx,nil)
  if err!=nil{return uuid.Nil,err}
  defer tx.Rollback()
- var phone,subject,state string
+ var phone,state string
+ var subject sql.NullString
  var existing uuid.NullUUID
  err=tx.QueryRowContext(ctx,`
  SELECT phone_number,identity_subject,state,user_id
@@ -94,11 +95,11 @@ func (r PostgresPhoneAccountResolver) CompleteRegistration(ctx context.Context,i
  `,id).Scan(&phone,&subject,&state,&existing)
  if err!=nil{return uuid.Nil,err}
  if state=="completed"&&existing.Valid{return existing.UUID,nil}
- if state!="identity_created"||subject==""{return uuid.Nil,ErrPhoneIdentityBinding}
+ if state!="identity_created"||!subject.Valid||subject.String==""{return uuid.Nil,ErrPhoneIdentityBinding}
  var userID uuid.UUID
  err=tx.QueryRowContext(ctx,`
  SELECT user_id FROM external_identities WHERE issuer=$1 AND subject=$2
- `,r.issuer,subject).Scan(&userID)
+ `,r.issuer,subject.String).Scan(&userID)
  if errors.Is(err,sql.ErrNoRows){
   userID=uuid.New()
   if _,err=tx.ExecContext(ctx,`INSERT INTO users(id) VALUES($1)`,userID);err!=nil{return uuid.Nil,err}
@@ -117,7 +118,7 @@ func (r PostgresPhoneAccountResolver) CompleteRegistration(ctx context.Context,i
  if err=tx.QueryRowContext(ctx,`
  SELECT EXISTS(SELECT 1 FROM user_verified_phones WHERE
  phone_number=$1 AND user_id=$2 AND issuer=$3 AND subject=$4)
- `,phone,userID,r.issuer,subject).Scan(&matches);err!=nil{return uuid.Nil,err}
+ `,phone,userID,r.issuer,subject.String).Scan(&matches);err!=nil{return uuid.Nil,err}
  if !matches{return uuid.Nil,ErrPhoneIdentityBinding}
  if _,err=tx.ExecContext(ctx,`
  INSERT INTO user_capabilities(user_id,capability) VALUES($1,'rider') ON CONFLICT DO NOTHING
