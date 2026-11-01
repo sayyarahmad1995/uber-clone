@@ -35,3 +35,9 @@ Internal `ReconcilePhoneRegistration` can complete a stranded `submitting` or `i
 The coordinator now uses `RedisPhoneProofs.PeekProof` to validate the short-lived proof, persists the PostgreSQL registration reservation, then consumes the same proof once before claiming `submitting`. When PostgreSQL reservation fails, the Redis proof remains usable until its original expiry. A regression test asserts this ordering. If the Redis proof expires or is consumed concurrently between peek and consume, no Kratos request is dispatched.
 
 **Remaining limitation:** After the proof is consumed, a database failure before the `submitting` claim can leave a `reserved` operation without a usable proof. This requires a cross-store handoff/recovery protocol before public activation. Peeking does not extend proof expiry or authorize a session; do not expose `PeekProof` publicly.
+
+## Durable claim before proof consumption
+
+The coordinator now reserves the operation, atomically transitions it to `submitting`, **then** consumes the Redis proof, and only after successful consumption calls Kratos. This eliminates the prior gap where a proof could be irreversibly consumed while the operation was still `reserved`. A failed PostgreSQL claim leaves the proof unconsumed. A Redis failure after the claim leaves `submitting` as a durable, fail-closed marker, with **no Kratos request dispatched**.
+
+A `submitting` state therefore means **submission may have happened**, not proof that it happened. Do not automatically reset or resubmit it: recovering an uncertain outcome requires privileged investigation and, where appropriate, renewed proof of possession. The operator reconciler requires an independently verified Kratos identity and must not infer one from `submitting` alone. This design favors preventing duplicate or unauthorized identity creation over fully automatic recovery. Public phone-auth endpoints remain disabled.
