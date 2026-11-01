@@ -29,3 +29,9 @@ Opt-in test `TestLiveKratosPhoneRegistration` makes actual registration and admi
 Internal `ReconcilePhoneRegistration` can complete a stranded `submitting` or `identity_created` operation when an operator supplies its operation ID, phone and exact Kratos identity subject. It checks the operation belongs to that phone, uses a **fresh Kratos admin identity lookup** to match subject and phone, then records the subject and commits the PostgreSQL registration. Repeated completion is idempotent; mismatched phone, subject and operation ID are rejected.
 
 **Not automated or exposed publicly.** An admin must first investigate the uncertain registration and check for duplicate Kratos identities. Matching the traits of one candidate does **not** prove no other identity exists. Do not invoke recovery using untrusted user-supplied identity IDs. Production activation still requires proof-to-reservation durability, live Kratos testing and guarded operator authentication/authorization.
+
+## Proof-to-reservation hardening
+
+The coordinator now uses `RedisPhoneProofs.PeekProof` to validate the short-lived proof, persists the PostgreSQL registration reservation, then consumes the same proof once before claiming `submitting`. When PostgreSQL reservation fails, the Redis proof remains usable until its original expiry. A regression test asserts this ordering. If the Redis proof expires or is consumed concurrently between peek and consume, no Kratos request is dispatched.
+
+**Remaining limitation:** After the proof is consumed, a database failure before the `submitting` claim can leave a `reserved` operation without a usable proof. This requires a cross-store handoff/recovery protocol before public activation. Peeking does not extend proof expiry or authorize a session; do not expose `PeekProof` publicly.
