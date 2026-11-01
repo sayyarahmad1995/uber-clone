@@ -1,0 +1,47 @@
+# Opt-in, disposable Kratos integration environment.
+# Run with: docker compose -f docker-compose.yml -f docker-compose.test.yml up -d kratos-test
+# Destructive tests must target kratos-test, NEVER the normal kratos service.
+services:
+  postgres-test:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ory_kratos_test
+      POSTGRES_USER: kratos_test
+      POSTGRES_PASSWORD: kratos_test_local_only
+    volumes:
+      - kratos_test_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kratos_test -d ory_kratos_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # Deliberately no host ports or connection to the main postgres volume.
+
+  kratos-test-migrate:
+    image: oryd/kratos:v1.3.1
+    environment:
+      DSN: postgres://kratos_test:kratos_test_local_only@postgres-test:5432/ory_kratos_test?sslmode=disable
+    volumes:
+      - ./identity/kratos:/etc/config/kratos:ro
+    command: ["migrate", "sql", "-e", "--yes", "-c", "/etc/config/kratos/kratos.yml"]
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    restart: "no"
+
+  kratos-test:
+    image: oryd/kratos:v1.3.1
+    environment:
+      DSN: postgres://kratos_test:kratos_test_local_only@postgres-test:5432/ory_kratos_test?sslmode=disable
+      SESSION_LIFESPAN: 1h
+    volumes:
+      - ./identity/kratos:/etc/config/kratos:ro
+    command: ["serve", "-c", "/etc/config/kratos/kratos.yml", "--dev"]
+    depends_on:
+      kratos-test-migrate:
+        condition: service_completed_successfully
+    # The live test reaches these ports from the Compose network only.
+    # Never expose the Kratos test admin API to the host.
+
+volumes:
+  kratos_test_postgres_data:
