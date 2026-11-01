@@ -59,7 +59,7 @@ func TestLivePhoneRegistrationCoordinator(t *testing.T) {
  random:=make([]byte,8)
  if _,err=rand.Read(random);err!=nil{t.Fatal(err)}
  // Test-only E.164-shaped identifier; no SMS sent.
- phone:=fmt.Sprintf("+9%014d",uint64(random[0])<<40|uint64(random[1])<<32|uint64(random[2])<<24|uint64(random[3])<<16|uint64(random[4])<<8|uint64(random[5]))
+ phone:=fmt.Sprintf("+9%013d",(uint64(random[0])<<40|uint64(random[1])<<32|uint64(random[2])<<24|uint64(random[3])<<16|uint64(random[4])<<8|uint64(random[5]))%10000000000000)
  tokenBytes:=make([]byte,32)
  if _,err=rand.Read(tokenBytes);err!=nil{t.Fatal(err)}
  token:=hex.EncodeToString(tokenBytes)
