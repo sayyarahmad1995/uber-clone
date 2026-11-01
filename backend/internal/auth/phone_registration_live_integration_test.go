@@ -111,7 +111,7 @@ func TestLivePhoneRegistrationCoordinator(t *testing.T) {
 	service := auth.PhoneRegistrationCoordinator{Proofs: proofs, Identities: provider, Operations: repo}
 	id, err := service.Register(ctx, token, "HiGO-Isolated-Registration-Test-123!")
 	// Always cleanup after session tests, including when registration fails.
-	t.Cleanup(func() {
+	defer func() {
 		op, lookupErr := repo.GetRegistration(context.Background(), phone)
 		if lookupErr == nil && op.Subject != "" {
 		cleanupReq, e := http.NewRequest(http.MethodDelete, strings.TrimRight(adminURL, "/")+"/admin/identities/"+url.PathEscape(op.Subject), nil)
@@ -127,7 +127,7 @@ func TestLivePhoneRegistrationCoordinator(t *testing.T) {
 			}
 		}
 		}
-	})
+	}()
 	op, lookupErr := repo.GetRegistration(ctx, phone)
 	if lookupErr != nil { t.Fatal(lookupErr) }
 	if err != nil || id == uuid.Nil {
