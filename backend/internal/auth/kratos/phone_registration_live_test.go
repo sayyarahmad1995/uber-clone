@@ -25,7 +25,7 @@ func TestLiveKratosPhoneRegistration(t *testing.T) {
  defer cancel()
  // Unique valid E.164 identifier within the disposable Kratos test DB.
  id:=uuid.New()
- phone:=fmt.Sprintf("+%d", 900000000000000+int64(id[0])<<16+int64(id[1])<<8+int64(id[2]))
+ phone:=fmt.Sprintf("+%d", 900000000000000+(int64(id[0])<<16)+(int64(id[1])<<8)+int64(id[2]))
  // Normalize to valid E.164 length and avoid potentially live phone allocations:
  // no SMS is sent by this test.
  created,err:=provider.RegisterPhoneIdentity(ctx,phone,"Kratos-Phone-Test-Password-123!")
