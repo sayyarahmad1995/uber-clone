@@ -152,7 +152,7 @@ func (r PostgresPhoneAccountResolver) CompleteRegistration(ctx context.Context, 
 	if _, err = tx.ExecContext(ctx, `
  INSERT INTO user_verified_phones(phone_number,user_id,issuer,subject)
  VALUES($1,$2,$3,$4) ON CONFLICT(phone_number) DO NOTHING
- `, phone, userID, r.issuer, subject); err != nil {
+ `, phone, userID, r.issuer, subject.String); err != nil {
 		return uuid.Nil, err
 	}
 	// Verify exact ownership, including subject and issuer, after any conflict.
