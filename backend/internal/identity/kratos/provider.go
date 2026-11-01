@@ -15,6 +15,7 @@ type Provider struct {
 	baseURL string
 	source  string
 	client  *http.Client
+	phoneBindings VerifiedPhoneBindingChecker
 }
 
 func New(baseURL, source string) (*Provider, error) {
@@ -54,4 +55,17 @@ func (p *Provider) Authenticate(ctx context.Context, token string) (identity.Pri
 		return identity.Principal{}, identity.ErrInvalidToken
 	}
 	return identity.Principal{Issuer: p.source, Subject: session.Identity.ID}, nil
+}
+
+// VerifiedPhoneBindingChecker must consult durable account state and confirm
+// that the phone belongs to exactly this authenticated Kratos identity.
+type VerifiedPhoneBindingChecker interface {
+	MatchesVerifiedPhone(ctx context.Context, issuer, subject, phone string) (bool, error)
+}
+
+// WithVerifiedPhoneBindings opts into the phone-only authorization path.
+// Without this dependency, legacy verified-email session policy remains.
+func (p *Provider) WithVerifiedPhoneBindings(checker VerifiedPhoneBindingChecker) *Provider {
+	p.phoneBindings = checker
+	return p
 }
