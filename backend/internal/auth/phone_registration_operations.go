@@ -186,12 +186,14 @@ func (r PostgresPhoneAccountResolver) CompleteRegistration(ctx context.Context, 
 // ClaimRegistrationSubmission is an atomic, one-way claim before any external
 // Kratos call. An ambiguous result must never be submitted again automatically.
 func (r PostgresPhoneAccountResolver) ClaimRegistrationSubmission(ctx context.Context, id uuid.UUID) (bool, error) {
- result, err := r.db.ExecContext(ctx, `
+	result, err := r.db.ExecContext(ctx, `
  UPDATE phone_registration_operations
  SET state='submitting',updated_at=clock_timestamp()
  WHERE id=$1 AND issuer=$2 AND state='reserved'
  `, id, r.issuer)
- if err != nil { return false, err }
- count, err := result.RowsAffected()
- return count==1,err
+	if err != nil {
+		return false, err
+	}
+	count, err := result.RowsAffected()
+	return count == 1, err
 }

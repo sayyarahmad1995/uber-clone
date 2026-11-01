@@ -27,11 +27,15 @@ func TestPhoneRegistrationOperationLifecycle(t *testing.T) {
 	if _, err := resolver.CompleteRegistration(ctx, op.ID); !errors.Is(err, ErrPhoneIdentityBinding) {
 		t.Fatalf("completed without Kratos subject: %v", err)
 	}
-	claimed, claimErr := resolver.ClaimRegistrationSubmission(ctx,op.ID)
- if claimErr!=nil || !claimed { t.Fatalf("claim: %v %v",claimed,claimErr) }
- claimed, claimErr=resolver.ClaimRegistrationSubmission(ctx,op.ID)
- if claimErr!=nil || claimed { t.Fatalf("duplicate claim: %v %v",claimed,claimErr) }
- subject := uuid.NewString()
+	claimed, claimErr := resolver.ClaimRegistrationSubmission(ctx, op.ID)
+	if claimErr != nil || !claimed {
+		t.Fatalf("claim: %v %v", claimed, claimErr)
+	}
+	claimed, claimErr = resolver.ClaimRegistrationSubmission(ctx, op.ID)
+	if claimErr != nil || claimed {
+		t.Fatalf("duplicate claim: %v %v", claimed, claimErr)
+	}
+	subject := uuid.NewString()
 	confirmed, err := resolver.RecordRegistrationIdentity(ctx, op.ID, subject)
 	if err != nil || confirmed.State != "identity_created" || confirmed.Subject != subject {
 		t.Fatalf("record: %+v %v", confirmed, err)
@@ -81,8 +85,10 @@ func TestPhoneRegistrationOperationDoesNotReplacePhoneOwner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if claimed, err := resolver.ClaimRegistrationSubmission(ctx,op.ID); err != nil || !claimed {t.Fatalf("claim: %v %v",claimed,err)}
- if _, err := resolver.RecordRegistrationIdentity(ctx, op.ID, uuid.NewString()); err != nil {
+	if claimed, err := resolver.ClaimRegistrationSubmission(ctx, op.ID); err != nil || !claimed {
+		t.Fatalf("claim: %v %v", claimed, err)
+	}
+	if _, err := resolver.RecordRegistrationIdentity(ctx, op.ID, uuid.NewString()); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := resolver.CompleteRegistration(ctx, op.ID); err == nil {
