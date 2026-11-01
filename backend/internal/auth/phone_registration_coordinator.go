@@ -12,6 +12,7 @@ var ErrPhoneRegistrationPending = errors.New("phone registration requires reconc
 // RegistrationProofConsumer deletes the verified phone-possession proof once.
 // A proof is authorization to begin one registration, never a login session.
 type RegistrationProofConsumer interface {
+	PeekProof(context.Context, string, PhoneChallengePurpose) (PhoneVerificationProof, error)
 	ConsumeProof(context.Context, string, PhoneChallengePurpose) (PhoneVerificationProof, error)
 }
 type RegistrationIdentityCreator interface {
@@ -41,7 +42,7 @@ func (s PhoneRegistrationCoordinator) Register(ctx context.Context, proofToken, 
 	if password == "" {
 		return uuid.Nil, ErrRegistrationInvalid
 	}
-	proof, err := s.Proofs.ConsumeProof(ctx, proofToken, PhoneChallengeSignInOrRegister)
+	proof, err := s.Proofs.PeekProof(ctx, proofToken, PhoneChallengeSignInOrRegister)
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -53,9 +54,15 @@ func (s PhoneRegistrationCoordinator) Register(ctx context.Context, proofToken, 
 	if err != nil {
 		return uuid.Nil, err
 	}
+	// Persist recovery state before irreversibly consuming the proof.
 	// A proof must never permit a second Kratos creation or replay completion.
 	if operation.State != "reserved" {
 		return uuid.Nil, ErrPhoneRegistrationPending
+	}
+	consumed, err := s.Proofs.ConsumeProof(ctx, proofToken, PhoneChallengeSignInOrRegister)
+	if err != nil { return uuid.Nil, err }
+	if consumed.PhoneNumber != phone.PhoneNumber || consumed.Purpose != proof.Purpose {
+		return uuid.Nil, ErrPhoneVerificationProof
 	}
 	claimed, err := s.Operations.ClaimRegistrationSubmission(ctx, operation.ID)
 	if err != nil {
