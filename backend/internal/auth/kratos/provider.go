@@ -15,11 +15,11 @@ import (
 )
 
 type Provider struct {
-	baseURL  string
-	adminURL string
-	client   *http.Client
+	baseURL       string
+	adminURL      string
+	client        *http.Client
 	phoneBindings VerifiedPhoneBindingChecker
-	phoneIssuer string
+	phoneIssuer   string
 }
 
 type flow struct {
@@ -270,8 +270,7 @@ func classifyRegistrationError(err error) error {
 	if strings.Contains(text, "password") || strings.Contains(text, "breach") || strings.Contains(text, "pwn") {
 		return auth.NewPublicError(auth.ErrPasswordRejected, "password_rejected", fallback(message, "Password does not meet requirements."))
 	}
-	if strings.Contains(text, "already") && (
-		strings.Contains(text, "exist") ||
+	if strings.Contains(text, "already") && (strings.Contains(text, "exist") ||
 		strings.Contains(text, "used") ||
 		strings.Contains(text, "taken") ||
 		strings.Contains(text, "registered")) {
@@ -385,16 +384,16 @@ func max(a, b int64) int64 {
 	return b
 }
 
- // VerifiedPhoneBindingChecker checks durable ownership for an authenticated
- // Kratos identity. It must fail closed on database errors.
- type VerifiedPhoneBindingChecker interface {
- 	MatchesVerifiedPhone(context.Context, string, string, string) (bool, error)
- }
- 
- // WithVerifiedPhoneBindings enables the phone-only verification alternative.
- // Legacy verified-email sessions continue to work without this dependency.
- func (p *Provider) WithVerifiedPhoneBindings(issuer string, checker VerifiedPhoneBindingChecker) *Provider {
- 	p.phoneBindings = checker
+// VerifiedPhoneBindingChecker checks durable ownership for an authenticated
+// Kratos identity. It must fail closed on database errors.
+type VerifiedPhoneBindingChecker interface {
+	MatchesVerifiedPhone(context.Context, string, string, string) (bool, error)
+}
+
+// WithVerifiedPhoneBindings enables the phone-only verification alternative.
+// Legacy verified-email sessions continue to work without this dependency.
+func (p *Provider) WithVerifiedPhoneBindings(issuer string, checker VerifiedPhoneBindingChecker) *Provider {
+	p.phoneBindings = checker
 	p.phoneIssuer = issuer
- 	return p
- }
+	return p
+}
