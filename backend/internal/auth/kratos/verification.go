@@ -36,6 +36,8 @@ func (p *Provider) EnsureVerifiedSession(ctx context.Context, token string) erro
 
 	var result struct {
 		Identity struct {
+			ID string `json:"id"`
+			Traits struct { Phone string `json:"phone"` } `json:"traits"`
 			VerifiableAddresses []struct {
 				Verified bool `json:"verified"`
 			} `json:"verifiable_addresses"`
@@ -48,6 +50,11 @@ func (p *Provider) EnsureVerifiedSession(ctx context.Context, token string) erro
 		if address.Verified {
 			return nil
 		}
+	}
+	if p.phoneBindings != nil && result.Identity.ID != "" && result.Identity.Traits.Phone != "" {
+		ok, err := p.phoneBindings.MatchesVerifiedPhone(ctx, p.phoneIssuer, result.Identity.ID, result.Identity.Traits.Phone)
+		if err != nil { return auth.ErrUnavailable }
+		if ok { return nil }
 	}
 	return auth.ErrVerificationRequired
 }
