@@ -54,23 +54,25 @@ func (s PhoneRegistrationCoordinator) Register(ctx context.Context, proofToken, 
 	if err != nil {
 		return uuid.Nil, err
 	}
-	// Persist recovery state before irreversibly consuming the proof.
+	// Persist and claim recovery state before irreversibly consuming the proof.
 	// A proof must never permit a second Kratos creation or replay completion.
 	if operation.State != "reserved" {
 		return uuid.Nil, ErrPhoneRegistrationPending
 	}
-	consumed, err := s.Proofs.ConsumeProof(ctx, proofToken, PhoneChallengeSignInOrRegister)
-	if err != nil {
-		return uuid.Nil, err
-	}
-	if consumed.PhoneNumber != phone.PhoneNumber || consumed.Purpose != proof.Purpose {
-		return uuid.Nil, ErrPhoneVerificationProof
-	}
+	// Claim durably before the destructive Redis GETDEL. Once claimed,
+	// any failure is held for reconciliation; never submit Kratos again.
 	claimed, err := s.Operations.ClaimRegistrationSubmission(ctx, operation.ID)
 	if err != nil {
 		return uuid.Nil, err
 	}
 	if !claimed {
+		return uuid.Nil, ErrPhoneRegistrationPending
+	}
+	consumed, err := s.Proofs.ConsumeProof(ctx, proofToken, PhoneChallengeSignInOrRegister)
+	if err != nil {
+		return uuid.Nil, ErrPhoneRegistrationPending
+	}
+	if consumed.PhoneNumber != phone.PhoneNumber || consumed.Purpose != proof.Purpose {
 		return uuid.Nil, ErrPhoneRegistrationPending
 	}
 	created, err := s.Identities.RegisterPhoneIdentity(ctx, phone.PhoneNumber, password)
