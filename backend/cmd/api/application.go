@@ -63,6 +63,9 @@ func newApplication(cfg config) (application, func(), error) {
 	if kratosIdentity, ok := identityProvider.(*identitykratos.Provider); ok {
 		kratosIdentity.WithVerifiedPhoneBindings(phoneBindings)
 	}
+	if kratosAuth, ok := authProvider.(*authkratos.Provider); ok {
+		kratosAuth.WithVerifiedPhoneBindings(cfg.IdentitySource, phoneBindings)
+	}
 	tripService := trip.NewService(trip.NewPostgresRepository(db))
 	marketplaceAssignmentService := marketplace.NewAssignmentService(
 		marketplace.NewPostgresAssignmentRepository(db),
