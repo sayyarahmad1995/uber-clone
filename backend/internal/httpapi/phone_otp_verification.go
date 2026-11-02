@@ -26,7 +26,7 @@ func (v PhoneOTPVerification) Verify(ctx context.Context,id uuid.UUID,code strin
  return v.Store.VerifyAndIssueProof(ctx,id,code,auth.PhoneChallengeSignInOrRegister,v.Codec)
 }
 
-type phoneProofIssuer interface { Verify(context.Context,uuid.UUID,string)(string,error) }
+type PhoneProofIssuer interface { Verify(context.Context,uuid.UUID,string)(string,error) }
 
 func (api *API) verifyPhoneChallenge(w http.ResponseWriter,r *http.Request) {
  if api.phoneOTPVerifier==nil {http.NotFound(w,r);return}
