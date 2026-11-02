@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+ "github.com/redis/go-redis/v9"
 	"time"
 
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/auth"
@@ -66,6 +67,37 @@ func newApplication(cfg config) (application, func(), error) {
 	if kratosAuth, ok := authProvider.(*authkratos.Provider); ok {
 		kratosAuth.WithVerifiedPhoneBindings(cfg.IdentitySource, phoneBindings)
 	}
+	var phoneRegistration *auth.PhoneRegistrationCoordinator
+	var closePhoneRedis func()
+	if cfg.PhoneRegistrationEnabled {
+		// Explicit opt-in only. No OTP issuance or SMS route is enabled yet.
+		if cfg.AuthProvider != "kratos" {
+			cleanup()
+			return application{}, nil, fmt.Errorf("phone registration requires Kratos")
+		}
+		options, err := redis.ParseURL(cfg.RedisURL)
+		if err != nil {
+			cleanup()
+			return application{}, nil, fmt.Errorf("invalid phone registration Redis configuration: %w", err)
+		}
+		redisClient := redis.NewClient(options)
+		closePhoneRedis = func() { _ = redisClient.Close() }
+		if err := redisClient.Ping(context.Background()).Err(); err != nil {
+			closePhoneRedis()
+			cleanup()
+			return application{}, nil, fmt.Errorf("phone registration Redis unavailable: %w", err)
+		}
+		proofs, err := auth.NewRedisPhoneProofs(redisClient)
+		if err != nil {
+			closePhoneRedis()
+			cleanup()
+			return application{}, nil, err
+		}
+		kratosProvider := authProvider.(*authkratos.Provider)
+		phoneRegistration = &auth.PhoneRegistrationCoordinator{
+			Proofs: proofs, Identities: kratosProvider, Operations: phoneBindings,
+		}
+	}
 	tripService := trip.NewService(trip.NewPostgresRepository(db))
 	marketplaceAssignmentService := marketplace.NewAssignmentService(
 		marketplace.NewPostgresAssignmentRepository(db),
@@ -104,6 +136,8 @@ func newApplication(cfg config) (application, func(), error) {
 		LocationSearchRequestsPerMinute: cfg.LocationSearchRequestsPerMinute,
 		Identity:                        identityProvider,
 		Auth:                            auth.NewHandler(auth.NewService(authProvider)),
+ PhoneRegistrationEnabled: cfg.PhoneRegistrationEnabled,
+ PhoneRegistration: phoneRegistration,
 		AdminReviewUsername:             cfg.AdminReviewUsername,
 		AdminReviewPassword:             cfg.AdminReviewPassword,
 		AdminReviewOrigin:               cfg.AdminReviewOrigin,
@@ -157,6 +191,7 @@ func newApplication(cfg config) (application, func(), error) {
 		cancelPresence()
 		<-expiryDone
 		<-presenceDone
+		if closePhoneRedis != nil { closePhoneRedis() }
 		cleanup()
 	}, nil
 }
