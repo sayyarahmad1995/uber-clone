@@ -50,7 +50,7 @@ type Dependencies struct {
 	Identity                        identity.Provider
 	Auth                            auth.Handler
  PhoneRegistrationEnabled bool
- PhoneOTPVerifier PhoneOTPVerifier
+ PhoneOTPVerifier PhoneProofIssuer
  PhoneRegistration *auth.PhoneRegistrationCoordinator
 	AdminReviewUsername             string
 	AdminReviewPassword             string
@@ -83,7 +83,7 @@ type API struct {
 	identity               identity.Provider
 	auth                   auth.Handler
  phoneRegistrationEnabled bool
- phoneOTPVerifier PhoneOTPVerifier
+ phoneOTPVerifier PhoneProofIssuer
  phoneRegistration *auth.PhoneRegistrationCoordinator
 	adminReviewUsername    string
 	adminReviewPassword    string
