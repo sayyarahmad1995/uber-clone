@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -78,7 +79,11 @@ func (w OTPDispatchWorker) Deliver(ctx context.Context, id uuid.UUID) error {
 	}
 	// Use the same challenge ID as the provider idempotency reference on
 	// every attempt, including attempts after a worker crash.
-	sendErr := w.sender.SendPhoneOTP(ctx, id, phone, code)
+	// Reserve time for Finish before the non-renewing lease expires.
+	// A sender must honor cancellation and deduplicate by challenge UUID.
+	sendCtx, sendCancel := context.WithTimeout(ctx, w.lease/2)
+	sendErr := w.sender.SendPhoneOTP(sendCtx, id, phone, code)
+	sendCancel()
 	// A canceled request must not prevent the worker from recording delivery.
 	// Bound the acknowledgement independently instead of using Background forever.
 	ackCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
@@ -88,4 +93,60 @@ func (w OTPDispatchWorker) Deliver(ctx context.Context, id uuid.UUID) error {
 		return errors.Join(ErrPhoneOTPDelivery, sendErr, finishErr)
 	}
 	return finishErr
+}
+
+// Run polls the existing Redis due index without creating a second dispatch
+// mechanism. Each batch completes before the next poll; at most concurrency
+// sends are in flight. The caller controls lifecycle via ctx. Provider failures
+// are retryable queue outcomes, not fatal scheduler errors.
+func (w OTPDispatchWorker) Run(ctx context.Context, interval time.Duration, batchSize int64, concurrency int) error {
+	if interval <= 0 || batchSize < 1 || batchSize > 100 || concurrency < 1 || concurrency > 100 ||
+		w.dispatch.client == nil || w.dispatch.aead == nil || w.sender == nil {
+		return ErrPhoneOTPConfiguration
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	poll := func() error {
+		ids, err := w.dispatch.Due(ctx, batchSize)
+		if err != nil {
+			return err
+		}
+		var wg sync.WaitGroup
+		sem := make(chan struct{}, concurrency)
+		for _, id := range ids {
+			select {
+			case <-ctx.Done():
+				wg.Wait()
+				return ctx.Err()
+			case sem <- struct{}{}:
+			}
+			wg.Add(1)
+			go func(id uuid.UUID) {
+				defer wg.Done()
+				defer func() { <-sem }()
+				// Busy/missing leases and provider failures are expected; Redis
+				// retains retry state. Never retry directly in the scheduler.
+				_ = w.Deliver(ctx, id)
+			}(id)
+		}
+		wg.Wait()
+		return nil
+	}
+	for {
+		if err := ctx.Err(); err != nil {
+			return nil
+		}
+		if err := poll(); err != nil {
+			if ctx.Err() != nil {
+				return nil
+			}
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+		}
+	}
 }
