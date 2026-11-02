@@ -57,8 +57,12 @@ return 1
 var redisDispatchClaim = redis.NewScript(`
 if redis.call('EXISTS',KEYS[1])==0 then return {0,''} end
 local state=redis.call('HGET',KEYS[1],'state')
-if state=='done' then return {2,''} end
-if tonumber(redis.call('HGET',KEYS[1],'attempts') or '0')>=3 then return {2,''} end
+if state=='done' or state=='exhausted' or tonumber(redis.call('HGET',KEYS[1],'attempts') or '0')>=3 then
+ redis.call('HSET',KEYS[1],'state','exhausted','owner','')
+ redis.call('HDEL',KEYS[1],'payload')
+ redis.call('ZREM',KEYS[3],ARGV[4])
+ return {2,''}
+end
 if state=='leased' and redis.call('PTTL',KEYS[2])>0 then return {3,''} end
 redis.call('SET',KEYS[2],ARGV[1],'PX',ARGV[2])
 redis.call('HSET',KEYS[1],'state','leased','owner',ARGV[1])
