@@ -2,10 +2,10 @@ package auth_test
 
 import (
 	"context"
- "errors"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -17,9 +17,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/auth"
- "github.com/sayyarahmad1995/uber-clone/backend/internal/identity"
- identitykratos "github.com/sayyarahmad1995/uber-clone/backend/internal/identity/kratos"
 	authkratos "github.com/sayyarahmad1995/uber-clone/backend/internal/auth/kratos"
+	"github.com/sayyarahmad1995/uber-clone/backend/internal/identity"
+	identitykratos "github.com/sayyarahmad1995/uber-clone/backend/internal/identity/kratos"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/database"
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/platform/migrations"
 )
@@ -114,22 +114,24 @@ func TestLivePhoneRegistrationCoordinator(t *testing.T) {
 	defer func() {
 		op, lookupErr := repo.GetRegistration(context.Background(), phone)
 		if lookupErr == nil && op.Subject != "" {
-		cleanupReq, e := http.NewRequest(http.MethodDelete, strings.TrimRight(adminURL, "/")+"/admin/identities/"+url.PathEscape(op.Subject), nil)
-		if e == nil {
-			resp, e := http.DefaultClient.Do(cleanupReq)
-			if e != nil {
-				t.Errorf("Kratos cleanup: %v", e)
-			} else {
-				resp.Body.Close()
-				if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
-					t.Errorf("Kratos cleanup status: %s", resp.Status)
+			cleanupReq, e := http.NewRequest(http.MethodDelete, strings.TrimRight(adminURL, "/")+"/admin/identities/"+url.PathEscape(op.Subject), nil)
+			if e == nil {
+				resp, e := http.DefaultClient.Do(cleanupReq)
+				if e != nil {
+					t.Errorf("Kratos cleanup: %v", e)
+				} else {
+					resp.Body.Close()
+					if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
+						t.Errorf("Kratos cleanup status: %s", resp.Status)
+					}
 				}
 			}
 		}
-		}
 	}()
 	op, lookupErr := repo.GetRegistration(ctx, phone)
-	if lookupErr != nil { t.Fatal(lookupErr) }
+	if lookupErr != nil {
+		t.Fatal(lookupErr)
+	}
 	if err != nil || id == uuid.Nil {
 		t.Fatalf("live coordinator failed: user=%v error=%v operation=%+v", id, err, op)
 	}
@@ -148,31 +150,41 @@ func TestLivePhoneRegistrationCoordinator(t *testing.T) {
 	const password = "HiGO-Isolated-Registration-Test-123!"
 	provider.WithVerifiedPhoneBindings("primary-identity-v1", repo)
 	routeIdentity, err := identitykratos.New(publicURL, "primary-identity-v1")
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	routeIdentity.WithVerifiedPhoneBindings(repo)
-	if _, err = provider.Login(ctx, auth.Credentials{Identifier:phone,Password:"incorrect-password"}); !errors.Is(err,auth.ErrInvalidCredentials) {
-		t.Fatalf("incorrect password accepted: %v",err)
+	if _, err = provider.Login(ctx, auth.Credentials{Identifier: phone, Password: "incorrect-password"}); !errors.Is(err, auth.ErrInvalidCredentials) {
+		t.Fatalf("incorrect password accepted: %v", err)
 	}
-	session, err := provider.Login(ctx, auth.Credentials{Identifier:phone,Password:password})
-	if err != nil || session.AccessToken=="" { t.Fatalf("phone login failed: %v",err) }
-	if err=provider.EnsureVerifiedSession(ctx,session.AccessToken); err!=nil {t.Fatalf("login authorization: %v",err)}
-	principal, err:=routeIdentity.AuthenticateVerified(ctx,session.AccessToken)
-	if err!=nil || principal.Subject!=op.Subject || principal.Issuer!="primary-identity-v1" {
-		t.Fatalf("protected identity guard: %+v %v",principal,err)
+	session, err := provider.Login(ctx, auth.Credentials{Identifier: phone, Password: password})
+	if err != nil || session.AccessToken == "" {
+		t.Fatalf("phone login failed: %v", err)
 	}
-	if _,err=routeIdentity.AuthenticateVerified(ctx,"invalid-session"); !errors.Is(err,identity.ErrInvalidToken){
-		t.Fatalf("invalid token accepted: %v",err)
+	if err = provider.EnsureVerifiedSession(ctx, session.AccessToken); err != nil {
+		t.Fatalf("login authorization: %v", err)
+	}
+	principal, err := routeIdentity.AuthenticateVerified(ctx, session.AccessToken)
+	if err != nil || principal.Subject != op.Subject || principal.Issuer != "primary-identity-v1" {
+		t.Fatalf("protected identity guard: %+v %v", principal, err)
+	}
+	if _, err = routeIdentity.AuthenticateVerified(ctx, "invalid-session"); !errors.Is(err, identity.ErrInvalidToken) {
+		t.Fatalf("invalid token accepted: %v", err)
 	}
 	// Revoking phone ownership must immediately prevent both HiGO authorization paths.
-	if _,err=db.ExecContext(ctx,"DELETE FROM user_verified_phones WHERE phone_number=$1",phone);err!=nil {t.Fatal(err)}
-	if err=provider.EnsureVerifiedSession(ctx,session.AccessToken); !errors.Is(err,auth.ErrVerificationRequired){
-		t.Fatalf("unbound phone passed login guard: %v",err)
+	if _, err = db.ExecContext(ctx, "DELETE FROM user_verified_phones WHERE phone_number=$1", phone); err != nil {
+		t.Fatal(err)
 	}
-	if _,err=routeIdentity.AuthenticateVerified(ctx,session.AccessToken); !errors.Is(err,identity.ErrVerificationRequired){
-		t.Fatalf("unbound phone passed protected-route guard: %v",err)
+	if err = provider.EnsureVerifiedSession(ctx, session.AccessToken); !errors.Is(err, auth.ErrVerificationRequired) {
+		t.Fatalf("unbound phone passed login guard: %v", err)
 	}
-	if err=provider.Logout(ctx,session.AccessToken);err!=nil {t.Fatalf("logout: %v",err)}
-	if _,err=routeIdentity.AuthenticateVerified(ctx,session.AccessToken); !errors.Is(err,identity.ErrInvalidToken){
-		t.Fatalf("logged-out session accepted: %v",err)
+	if _, err = routeIdentity.AuthenticateVerified(ctx, session.AccessToken); !errors.Is(err, identity.ErrVerificationRequired) {
+		t.Fatalf("unbound phone passed protected-route guard: %v", err)
+	}
+	if err = provider.Logout(ctx, session.AccessToken); err != nil {
+		t.Fatalf("logout: %v", err)
+	}
+	if _, err = routeIdentity.AuthenticateVerified(ctx, session.AccessToken); !errors.Is(err, identity.ErrInvalidToken) {
+		t.Fatalf("logged-out session accepted: %v", err)
 	}
 }
