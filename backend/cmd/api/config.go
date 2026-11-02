@@ -11,6 +11,7 @@ import (
 type config struct {
 	SuggestedFaresEnabled           bool
  PhoneRegistrationEnabled bool
+ PhoneOTPSecret string
  RedisURL string
 	Port                            string
 	DatabaseURL                     string
@@ -29,6 +30,7 @@ func loadConfig() config {
 	return config{
 		SuggestedFaresEnabled:           strings.TrimSpace(os.Getenv("SUGGESTED_FARES_ENABLED")) == "true",
  PhoneRegistrationEnabled: strings.TrimSpace(os.Getenv("PHONE_REGISTRATION_ENABLED")) == "true",
+ PhoneOTPSecret: os.Getenv("PHONE_OTP_HMAC_SECRET"),
  RedisURL: getenv("REDIS_URL","redis://redis:6379/0"),
 		Port:                            getenv("APP_PORT", "8080"),
 		DatabaseURL:                     os.Getenv("DATABASE_URL"),
