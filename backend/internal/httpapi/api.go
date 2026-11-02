@@ -50,6 +50,7 @@ type Dependencies struct {
 	Identity                        identity.Provider
 	Auth                            auth.Handler
  PhoneRegistrationEnabled bool
+ PhoneOTPVerifier PhoneOTPVerifier
  PhoneRegistration *auth.PhoneRegistrationCoordinator
 	AdminReviewUsername             string
 	AdminReviewPassword             string
@@ -82,6 +83,7 @@ type API struct {
 	identity               identity.Provider
 	auth                   auth.Handler
  phoneRegistrationEnabled bool
+ phoneOTPVerifier PhoneOTPVerifier
  phoneRegistration *auth.PhoneRegistrationCoordinator
 	adminReviewUsername    string
 	adminReviewPassword    string
@@ -115,6 +117,7 @@ func New(deps Dependencies) *API {
 		identity:               deps.Identity,
 		auth:                   deps.Auth,
  phoneRegistrationEnabled: deps.PhoneRegistrationEnabled,
+ phoneOTPVerifier: deps.PhoneOTPVerifier,
  phoneRegistration: deps.PhoneRegistration,
 		adminReviewUsername:    deps.AdminReviewUsername,
 		adminReviewPassword:    deps.AdminReviewPassword,
