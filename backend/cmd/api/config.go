@@ -12,6 +12,13 @@ type config struct {
 	SuggestedFaresEnabled           bool
 	PhoneRegistrationEnabled        bool
 	PhoneOTPSecret                  string
+	PhoneSMSWorkerEnabled          bool
+	PhoneSMSDispatchKey            string
+	TwilioAccountSID               string
+	TwilioAPIKeySID                string
+	TwilioAPIKeySecret             string
+	TwilioMessagingServiceSID      string
+	TwilioFromNumber               string
 	RedisURL                        string
 	Port                            string
 	DatabaseURL                     string
@@ -31,6 +38,13 @@ func loadConfig() config {
 		SuggestedFaresEnabled:           strings.TrimSpace(os.Getenv("SUGGESTED_FARES_ENABLED")) == "true",
 		PhoneRegistrationEnabled:        strings.TrimSpace(os.Getenv("PHONE_REGISTRATION_ENABLED")) == "true",
 		PhoneOTPSecret:                  os.Getenv("PHONE_OTP_HMAC_SECRET"),
+		PhoneSMSWorkerEnabled:          strings.TrimSpace(os.Getenv("PHONE_SMS_WORKER_ENABLED")) == "true",
+		PhoneSMSDispatchKey:            os.Getenv("PHONE_SMS_DISPATCH_ENCRYPTION_KEY"),
+		TwilioAccountSID:               strings.TrimSpace(os.Getenv("TWILIO_ACCOUNT_SID")),
+		TwilioAPIKeySID:                strings.TrimSpace(os.Getenv("TWILIO_API_KEY_SID")),
+		TwilioAPIKeySecret:             os.Getenv("TWILIO_API_KEY_SECRET"),
+		TwilioMessagingServiceSID:      strings.TrimSpace(os.Getenv("TWILIO_MESSAGING_SERVICE_SID")),
+		TwilioFromNumber:               strings.TrimSpace(os.Getenv("TWILIO_FROM_NUMBER")),
 		RedisURL:                        getenv("REDIS_URL", "redis://redis:6379/0"),
 		Port:                            getenv("APP_PORT", "8080"),
 		DatabaseURL:                     os.Getenv("DATABASE_URL"),
