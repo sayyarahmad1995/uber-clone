@@ -158,6 +158,30 @@ func newApplication(cfg config) (application, func(), error) {
 		AdminReviewOrigin:               cfg.AdminReviewOrigin,
 	})
 
+	// SMS dispatch is explicitly opt-in and independent of public phone routes.
+	// The existing Run scheduler owns polling, leasing, and concurrency.
+	var stopSMS func()
+	var smsDone <-chan struct{}
+	if cfg.PhoneSMSWorkerEnabled {
+		worker, closeSMSRedis, err := buildPhoneSMSWorker(cfg)
+		if err != nil {
+			if closePhoneRedis != nil { closePhoneRedis() }
+			cleanup()
+			return application{}, nil, fmt.Errorf("SMS worker initialization failed: %w", err)
+		}
+		smsCtx, cancelSMS := context.WithCancel(context.Background())
+		stopSMS = cancelSMS
+		done := make(chan struct{})
+		smsDone = done
+		go func() {
+			defer close(done)
+			defer closeSMSRedis()
+			if err := worker.Run(smsCtx, time.Second, 20, 2); err != nil && smsCtx.Err() == nil {
+				slog.Error("phone SMS dispatch worker stopped", "error", err)
+			}
+		}()
+	}
+
 	presenceCtx, cancelPresence := context.WithCancel(context.Background())
 	presenceDone := make(chan struct{})
 	go func() {
@@ -202,8 +226,10 @@ func newApplication(cfg config) (application, func(), error) {
 	}()
 
 	return application{handler: api.Handler()}, func() {
+		if stopSMS != nil { stopSMS() }
 		cancelExpiry()
 		cancelPresence()
+		if smsDone != nil { <-smsDone }
 		<-expiryDone
 		<-presenceDone
 		if closePhoneRedis != nil {
