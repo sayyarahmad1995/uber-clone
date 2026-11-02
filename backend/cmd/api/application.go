@@ -68,6 +68,7 @@ func newApplication(cfg config) (application, func(), error) {
 		kratosAuth.WithVerifiedPhoneBindings(cfg.IdentitySource, phoneBindings)
 	}
 	var phoneRegistration *auth.PhoneRegistrationCoordinator
+ var phoneOTPVerifier httpapi.PhoneProofIssuer
 	var closePhoneRedis func()
 	if cfg.PhoneRegistrationEnabled {
 		// Explicit opt-in only. No OTP issuance or SMS route is enabled yet.
@@ -87,6 +88,19 @@ func newApplication(cfg config) (application, func(), error) {
 			cleanup()
 			return application{}, nil, fmt.Errorf("phone registration Redis unavailable: %w", err)
 		}
+		codec, err := auth.NewPhoneOTPCodec([]byte(cfg.PhoneOTPSecret))
+		if err != nil {
+			closePhoneRedis()
+			cleanup()
+			return application{}, nil, fmt.Errorf("phone OTP HMAC secret must contain at least 32 bytes")
+		}
+		store, err := auth.NewRedisPhoneChallengeStore(redisClient, []byte(cfg.PhoneOTPSecret))
+		if err != nil {
+			closePhoneRedis()
+			cleanup()
+			return application{}, nil, err
+		}
+		phoneOTPVerifier = httpapi.PhoneOTPVerification{Store: store, Codec: codec}
 		proofs, err := auth.NewRedisPhoneProofs(redisClient)
 		if err != nil {
 			closePhoneRedis()
@@ -138,6 +152,7 @@ func newApplication(cfg config) (application, func(), error) {
 		Auth:                            auth.NewHandler(auth.NewService(authProvider)),
  PhoneRegistrationEnabled: cfg.PhoneRegistrationEnabled,
  PhoneRegistration: phoneRegistration,
+ PhoneOTPVerifier: phoneOTPVerifier,
 		AdminReviewUsername:             cfg.AdminReviewUsername,
 		AdminReviewPassword:             cfg.AdminReviewPassword,
 		AdminReviewOrigin:               cfg.AdminReviewOrigin,
