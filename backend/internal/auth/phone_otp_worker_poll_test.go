@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -146,5 +147,85 @@ func TestOTPDispatchWorkerRejectsInvalidPollingConfig(t *testing.T) {
 		if err := worker.Run(context.Background(), tc.interval, tc.batch, tc.concurrency); !errors.Is(err, ErrPhoneOTPConfiguration) {
 			t.Fatalf("expected configuration error for %+v: %v", tc, err)
 		}
+	}
+}
+
+func TestOTPDispatchWorkerConcurrentPollersClaimOnce(t *testing.T) {
+	store := redisOTPTestStore(t)
+	dispatch, err := NewRedisOTPDispatch(store.client, bytes.Repeat([]byte{0x95}, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	limiter, err := NewOTPRateLimiter(store.client, bytes.Repeat([]byte{0x96}, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	codec, err := NewPhoneOTPCodec(bytes.Repeat([]byte{0x97}, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	issuer, err := NewAtomicPhoneOTPIssuer(store, dispatch, limiter, codec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids := make([]uuid.UUID, 0, 8)
+	for i := 0; i < 8; i++ {
+		created, err := issuer.Issue(context.Background(), PhoneChallengeRequest{
+			PhoneNumber: fmt.Sprintf("+923%09d", 100000000+i),
+			Purpose: PhoneChallengeSignInOrRegister,
+		}, uuid.NewString(), uuid.NewString())
+		if err != nil || !created.ShouldSend {
+			t.Fatalf("issue %d: %+v %v", i, created, err)
+		}
+		ids = append(ids, created.ID)
+	}
+	sender := &pollingOTPSender{}
+	worker, err := NewOTPDispatchWorker(dispatch, sender, 10*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	var wg sync.WaitGroup
+	errs := make(chan error, 2)
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errs <- worker.Run(ctx, 10*time.Millisecond, 8, 2)
+		}()
+	}
+	deadline := time.After(4 * time.Second)
+	for {
+		sender.mu.Lock()
+		completed := len(sender.attempts)
+		sender.mu.Unlock()
+		if completed == len(ids) {
+			break
+		}
+		select {
+		case <-deadline:
+			cancel()
+			wg.Wait()
+			t.Fatalf("only %d of %d deliveries attempted", completed, len(ids))
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	cancel()
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("worker: %v", err)
+		}
+	}
+	sender.mu.Lock()
+	defer sender.mu.Unlock()
+	for _, id := range ids {
+		if sender.attempts[id] != 1 {
+			t.Errorf("challenge %s sent %d times", id, sender.attempts[id])
+		}
+	}
+	if sender.maxInFlight > 4 {
+		t.Errorf("global in-flight count %d exceeded both workers' combined cap", sender.maxInFlight)
 	}
 }
