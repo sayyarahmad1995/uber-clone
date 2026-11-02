@@ -6,7 +6,6 @@ import (
  "errors"
  "net/http"
  "net/http/httptest"
- "net/url"
  "strings"
  "testing"
  "time"
@@ -75,4 +74,3 @@ func TestOTPDispatchWorkerSuppressesUncertainSendRetry(t *testing.T) {
  if err:=worker.Deliver(context.Background(),id);!errors.Is(err,ErrOTPDispatchMissing) { t.Fatalf("unexpected retry: %v",err) }
 }
 
-var _ = url.Values{}
