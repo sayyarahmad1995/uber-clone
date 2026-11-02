@@ -64,4 +64,19 @@ When `PHONE_REGISTRATION_ENABLED=true` and `PHONE_OTP_HMAC_SECRET` is a stable s
 
 The repository already implements `OTPDispatchWorker`, `NewOTPDispatchWorker`, and `Deliver` in `backend/internal/auth/phone_otp_atomic_issuer.go`, with the provider-neutral `PhoneOTPSender` contract. A subsequent implementation accidentally duplicated the worker and was reverted. Keep a single worker implementation.
 
-The existing worker handles one challenge ID and uses encrypted Redis leases and provider idempotency. The queue supports `Due` discovery, but a scheduled polling loop, production SMS provider, and end-to-end dispatch integration are not yet connected. OTP initiation must remain disabled until those and abuse controls are tested.
+The existing `OTPDispatchWorker.Run()` polls `RedisOTPDispatch.Due()` with bounded concurrency, uses existing leases, and stops on context cancellation. Redis-backed polling, retry, and race tests passed at commit `a210ece`. The Twilio Programmable Messaging adapter and uncertain-send suppression passed owner-reported mock and Redis/race tests at commit `acc13bc`. Twilio does **not** offer verified challenge-UUID deduplication for message creation: accepted-but-unacknowledged submissions can still be duplicated after a process crash. Ambiguous responses are not automatically retried when acknowledged successfully to Redis.
+
+## Opt-in SMS worker configuration (pending validation)
+
+The application now constructs and starts the existing SMS worker only when `PHONE_SMS_WORKER_ENABLED=true`; otherwise no SMS worker or extra Redis connection is created. The feature is independent of the phone registration flag and does not mount OTP initiation endpoints.
+
+Required when enabled:
+
+- `PHONE_SMS_DISPATCH_ENCRYPTION_KEY`: standard-base64-encoded **32-byte** AES key, stable across instances and **identical** to the key used when atomic issuance stores encrypted dispatch payloads. This is distinct from `PHONE_OTP_HMAC_SECRET`.
+- `TWILIO_ACCOUNT_SID`, `TWILIO_API_KEY_SID`, and `TWILIO_API_KEY_SECRET`: server-only credentials.
+- Exactly one of `TWILIO_MESSAGING_SERVICE_SID` or `TWILIO_FROM_NUMBER`.
+- `REDIS_URL`: existing Redis configuration.
+
+The worker uses a 20-second lease, a 10-second HTTP timeout, a one-second poll interval, a maximum batch size of 20, and two concurrent sends. Its cancellation and Redis shutdown participate in the existing application cleanup lifecycle. Invalid enabled configuration or unavailable Redis prevents startup. Actual Twilio SMS delivery, worker boot integration tests and production operations have **not** yet been validated.
+
+**Do not enable this flag for an unreviewed live deployment.** Challenge initiation remains unmounted; public phone registration remains disabled pending end-to-end verification, abuse controls, and real SMS delivery testing.
