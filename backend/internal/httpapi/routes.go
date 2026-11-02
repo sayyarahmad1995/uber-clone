@@ -26,7 +26,7 @@ func (api *API) registerAuthRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v1/auth/register", api.auth.Register)
  if api.phoneRegistrationEnabled && api.phoneRegistration != nil {
  mux.HandleFunc("POST /v1/auth/phone/register", api.registerPhone)
- if api.phoneOTPVerifier != nil { mux.HandleFunc("POST /v1/auth/phone/challenges/verify",api.verifyPhoneChallenge) }
+ if api.phoneRegistrationEnabled && api.phoneRegistration != nil && api.phoneOTPVerifier != nil { mux.HandleFunc("POST /v1/auth/phone/challenges/verify",api.verifyPhoneChallenge) }
  }
 	mux.HandleFunc("POST /v1/auth/login", api.auth.Login)
 	mux.HandleFunc("POST /v1/auth/verify", api.auth.Verify)
