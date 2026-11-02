@@ -10,6 +10,8 @@ import (
 
 type config struct {
 	SuggestedFaresEnabled           bool
+ PhoneRegistrationEnabled bool
+ RedisURL string
 	Port                            string
 	DatabaseURL                     string
 	AuthProvider                    string
@@ -26,6 +28,8 @@ type config struct {
 func loadConfig() config {
 	return config{
 		SuggestedFaresEnabled:           strings.TrimSpace(os.Getenv("SUGGESTED_FARES_ENABLED")) == "true",
+ PhoneRegistrationEnabled: strings.TrimSpace(os.Getenv("PHONE_REGISTRATION_ENABLED")) == "true",
+ RedisURL: getenv("REDIS_URL","redis://redis:6379/0"),
 		Port:                            getenv("APP_PORT", "8080"),
 		DatabaseURL:                     os.Getenv("DATABASE_URL"),
 		AuthProvider:                    getenv("AUTH_PROVIDER", "kratos"),
