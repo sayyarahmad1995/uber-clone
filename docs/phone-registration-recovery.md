@@ -60,8 +60,8 @@ When `PHONE_REGISTRATION_ENABLED=true` and `PHONE_OTP_HMAC_SECRET` is a stable s
 
 **Challenge initiation remains deliberately unmounted.** The encrypted Redis SMS queue exists, but no configured production SMS sender/dispatcher and IP-level abuse controls have been validated. Enabling the feature flag does not make OTP issuance available. Before a public launch, configure actual SMS delivery, a worker with provider-side idempotency, issue-side IP/global limits, secrets management, and HTTP end-to-end tests. Do not publish this flow merely because the verification endpoint compiles.
 
-## SMS dispatch worker foundation
+## SMS dispatch worker status
 
-`OTPDispatchWorker` now consumes the existing encrypted Redis dispatch queue through `Due`, `Claim`, and `Finish`. The provider-neutral `SMSSender` must support **provider-side idempotency** using the original challenge UUID: ambiguous provider results can be retried with the same ID. Each send is bounded by half the queue lease; failed sends are acknowledged as retryable by the queue, and a missing sender fails closed. The worker never logs OTP codes or recipients.
+The repository already implements `OTPDispatchWorker`, `NewOTPDispatchWorker`, and `Deliver` in `backend/internal/auth/phone_otp_atomic_issuer.go`, with the provider-neutral `PhoneOTPSender` contract. A subsequent implementation accidentally duplicated the worker and was reverted. Keep a single worker implementation.
 
-This commit intentionally **does not configure a provider, run a background worker, or expose OTP initiation**. The queue's retry ceiling is three attempts and its delivery window is bounded by the challenge TTL. Deployment additionally needs provider-specific idempotency verification, worker lifecycle management, metrics, rate limiting, and SMS delivery failure alerts. Until those exist, keep `PHONE_REGISTRATION_ENABLED=false` in publicly exposed deployments.
+The existing worker handles one challenge ID and uses encrypted Redis leases and provider idempotency. The queue supports `Due` discovery, but a scheduled polling loop, production SMS provider, and end-to-end dispatch integration are not yet connected. OTP initiation must remain disabled until those and abuse controls are tested.
