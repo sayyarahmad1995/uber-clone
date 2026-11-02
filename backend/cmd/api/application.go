@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/redis/go-redis/v9"
 	"log/slog"
 	"net/http"
- "github.com/redis/go-redis/v9"
 	"time"
 
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/auth"
@@ -68,7 +68,7 @@ func newApplication(cfg config) (application, func(), error) {
 		kratosAuth.WithVerifiedPhoneBindings(cfg.IdentitySource, phoneBindings)
 	}
 	var phoneRegistration *auth.PhoneRegistrationCoordinator
- var phoneOTPVerifier httpapi.PhoneProofIssuer
+	var phoneOTPVerifier httpapi.PhoneProofIssuer
 	var closePhoneRedis func()
 	if cfg.PhoneRegistrationEnabled {
 		// Explicit opt-in only. No OTP issuance or SMS route is enabled yet.
@@ -150,9 +150,9 @@ func newApplication(cfg config) (application, func(), error) {
 		LocationSearchRequestsPerMinute: cfg.LocationSearchRequestsPerMinute,
 		Identity:                        identityProvider,
 		Auth:                            auth.NewHandler(auth.NewService(authProvider)),
- PhoneRegistrationEnabled: cfg.PhoneRegistrationEnabled,
- PhoneRegistration: phoneRegistration,
- PhoneOTPVerifier: phoneOTPVerifier,
+		PhoneRegistrationEnabled:        cfg.PhoneRegistrationEnabled,
+		PhoneRegistration:               phoneRegistration,
+		PhoneOTPVerifier:                phoneOTPVerifier,
 		AdminReviewUsername:             cfg.AdminReviewUsername,
 		AdminReviewPassword:             cfg.AdminReviewPassword,
 		AdminReviewOrigin:               cfg.AdminReviewOrigin,
@@ -206,7 +206,9 @@ func newApplication(cfg config) (application, func(), error) {
 		cancelPresence()
 		<-expiryDone
 		<-presenceDone
-		if closePhoneRedis != nil { closePhoneRedis() }
+		if closePhoneRedis != nil {
+			closePhoneRedis()
+		}
 		cleanup()
 	}, nil
 }

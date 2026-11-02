@@ -49,79 +49,79 @@ type Dependencies struct {
 	LocationSearchRequestsPerMinute int
 	Identity                        identity.Provider
 	Auth                            auth.Handler
- PhoneRegistrationEnabled bool
- PhoneOTPVerifier PhoneProofIssuer
- PhoneRegistration *auth.PhoneRegistrationCoordinator
+	PhoneRegistrationEnabled        bool
+	PhoneOTPVerifier                PhoneProofIssuer
+	PhoneRegistration               *auth.PhoneRegistrationCoordinator
 	AdminReviewUsername             string
 	AdminReviewPassword             string
 	AdminReviewOrigin               string
 }
 
 type API struct {
-	pricing                *pricing.PostgresRepository
-	suggestedFaresEnabled  bool
-	health                 interface{ PingContext(context.Context) error }
-	users                  user.Service
-	drivers                driver.Service
-	driverOnboarding       driveronboarding.Service
-	driverOnboardingReview driveronboarding.ReviewService
-	driverLocations        driverlocation.Service
-	driverTrips            drivertrip.Service
-	riderLocations         riderlocation.Service
-	rides                  ride.Service
-	rideServices           rideservice.Service
-	rideStatuses           ridestatus.Service
-	cancellations          cancellation.Service
-	offers                 offer.Service
-	marketplaceAssignments marketplace.AssignmentService
-	marketplacePolicy      marketplace.PolicyService
-	trips                  trip.Service
-	locationSearch         locationsearch.Searcher
-	locationSearchPolicy   locationsearch.SearchPolicyService
-	routing                routing.Previewer
-	locationSearchLimiter  *userWindowLimiter
-	identity               identity.Provider
-	auth                   auth.Handler
- phoneRegistrationEnabled bool
- phoneOTPVerifier PhoneProofIssuer
- phoneRegistration *auth.PhoneRegistrationCoordinator
-	adminReviewUsername    string
-	adminReviewPassword    string
-	adminReviewOrigin      string
+	pricing                  *pricing.PostgresRepository
+	suggestedFaresEnabled    bool
+	health                   interface{ PingContext(context.Context) error }
+	users                    user.Service
+	drivers                  driver.Service
+	driverOnboarding         driveronboarding.Service
+	driverOnboardingReview   driveronboarding.ReviewService
+	driverLocations          driverlocation.Service
+	driverTrips              drivertrip.Service
+	riderLocations           riderlocation.Service
+	rides                    ride.Service
+	rideServices             rideservice.Service
+	rideStatuses             ridestatus.Service
+	cancellations            cancellation.Service
+	offers                   offer.Service
+	marketplaceAssignments   marketplace.AssignmentService
+	marketplacePolicy        marketplace.PolicyService
+	trips                    trip.Service
+	locationSearch           locationsearch.Searcher
+	locationSearchPolicy     locationsearch.SearchPolicyService
+	routing                  routing.Previewer
+	locationSearchLimiter    *userWindowLimiter
+	identity                 identity.Provider
+	auth                     auth.Handler
+	phoneRegistrationEnabled bool
+	phoneOTPVerifier         PhoneProofIssuer
+	phoneRegistration        *auth.PhoneRegistrationCoordinator
+	adminReviewUsername      string
+	adminReviewPassword      string
+	adminReviewOrigin        string
 }
 
 func New(deps Dependencies) *API {
 	return &API{
-		pricing:                deps.Pricing,
-		suggestedFaresEnabled:  deps.SuggestedFaresEnabled,
-		health:                 deps.Health,
-		users:                  deps.Users,
-		drivers:                deps.Drivers,
-		driverOnboarding:       deps.DriverOnboarding,
-		driverOnboardingReview: deps.DriverOnboardingReview,
-		driverLocations:        deps.DriverLocations,
-		driverTrips:            deps.DriverTrips,
-		riderLocations:         deps.RiderLocations,
-		rides:                  deps.Rides,
-		rideServices:           deps.RideServices,
-		rideStatuses:           deps.RideStatuses,
-		cancellations:          deps.Cancellations,
-		offers:                 deps.Offers,
-		marketplaceAssignments: deps.MarketplaceAssignments,
-		marketplacePolicy:      deps.MarketplacePolicy,
-		trips:                  deps.Trips,
-		locationSearch:         deps.LocationSearch,
-		locationSearchPolicy:   deps.LocationSearchPolicy,
-		routing:                deps.Routing,
-		locationSearchLimiter:  newUserWindowLimiter(deps.LocationSearchRequestsPerMinute),
-		identity:               deps.Identity,
-		auth:                   deps.Auth,
- phoneRegistrationEnabled: deps.PhoneRegistrationEnabled,
- phoneOTPVerifier: deps.PhoneOTPVerifier,
- phoneRegistration: deps.PhoneRegistration,
-		adminReviewUsername:    deps.AdminReviewUsername,
-		adminReviewPassword:    deps.AdminReviewPassword,
-		adminReviewOrigin:      deps.AdminReviewOrigin,
+		pricing:                  deps.Pricing,
+		suggestedFaresEnabled:    deps.SuggestedFaresEnabled,
+		health:                   deps.Health,
+		users:                    deps.Users,
+		drivers:                  deps.Drivers,
+		driverOnboarding:         deps.DriverOnboarding,
+		driverOnboardingReview:   deps.DriverOnboardingReview,
+		driverLocations:          deps.DriverLocations,
+		driverTrips:              deps.DriverTrips,
+		riderLocations:           deps.RiderLocations,
+		rides:                    deps.Rides,
+		rideServices:             deps.RideServices,
+		rideStatuses:             deps.RideStatuses,
+		cancellations:            deps.Cancellations,
+		offers:                   deps.Offers,
+		marketplaceAssignments:   deps.MarketplaceAssignments,
+		marketplacePolicy:        deps.MarketplacePolicy,
+		trips:                    deps.Trips,
+		locationSearch:           deps.LocationSearch,
+		locationSearchPolicy:     deps.LocationSearchPolicy,
+		routing:                  deps.Routing,
+		locationSearchLimiter:    newUserWindowLimiter(deps.LocationSearchRequestsPerMinute),
+		identity:                 deps.Identity,
+		auth:                     deps.Auth,
+		phoneRegistrationEnabled: deps.PhoneRegistrationEnabled,
+		phoneOTPVerifier:         deps.PhoneOTPVerifier,
+		phoneRegistration:        deps.PhoneRegistration,
+		adminReviewUsername:      deps.AdminReviewUsername,
+		adminReviewPassword:      deps.AdminReviewPassword,
+		adminReviewOrigin:        deps.AdminReviewOrigin,
 	}
 }
 
