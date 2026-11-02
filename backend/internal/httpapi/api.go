@@ -49,6 +49,8 @@ type Dependencies struct {
 	LocationSearchRequestsPerMinute int
 	Identity                        identity.Provider
 	Auth                            auth.Handler
+ PhoneRegistrationEnabled bool
+ PhoneRegistration *auth.PhoneRegistrationCoordinator
 	AdminReviewUsername             string
 	AdminReviewPassword             string
 	AdminReviewOrigin               string
@@ -79,6 +81,8 @@ type API struct {
 	locationSearchLimiter  *userWindowLimiter
 	identity               identity.Provider
 	auth                   auth.Handler
+ phoneRegistrationEnabled bool
+ phoneRegistration *auth.PhoneRegistrationCoordinator
 	adminReviewUsername    string
 	adminReviewPassword    string
 	adminReviewOrigin      string
@@ -110,6 +114,8 @@ func New(deps Dependencies) *API {
 		locationSearchLimiter:  newUserWindowLimiter(deps.LocationSearchRequestsPerMinute),
 		identity:               deps.Identity,
 		auth:                   deps.Auth,
+ phoneRegistrationEnabled: deps.PhoneRegistrationEnabled,
+ phoneRegistration: deps.PhoneRegistration,
 		adminReviewUsername:    deps.AdminReviewUsername,
 		adminReviewPassword:    deps.AdminReviewPassword,
 		adminReviewOrigin:      deps.AdminReviewOrigin,
