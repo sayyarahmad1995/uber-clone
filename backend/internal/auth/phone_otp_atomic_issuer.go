@@ -88,7 +88,10 @@ func (w OTPDispatchWorker) Deliver(ctx context.Context, id uuid.UUID) error {
 	// Bound the acknowledgement independently instead of using Background forever.
 	ackCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
 	defer cancel()
-	finishErr := w.dispatch.Finish(ackCtx, id, owner, sendErr == nil)
+	// An ambiguous provider response must not trigger an automatic retry.
+	// Marking it complete sacrifices automatic recovery for this OTP but
+	// prevents duplicate messages when Twilio accepted an unseen POST.
+	finishErr := w.dispatch.Finish(ackCtx, id, owner, sendErr == nil || errors.Is(sendErr, ErrPhoneOTPSendUncertain))
 	if sendErr != nil {
 		return errors.Join(ErrPhoneOTPDelivery, sendErr, finishErr)
 	}
