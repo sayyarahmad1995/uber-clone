@@ -50,6 +50,9 @@ type Dependencies struct {
 	Identity                        identity.Provider
 	Auth                            auth.Handler
 	PhoneRegistrationEnabled        bool
+	PhoneSMSIssuanceEnabled         bool
+	PhoneOTPIssuer                 PhoneChallengeIssuer
+	PhoneSMSTestAllowedNumbers      map[string]struct{}
 	PhoneOTPVerifier                PhoneProofIssuer
 	PhoneRegistration               *auth.PhoneRegistrationCoordinator
 	AdminReviewUsername             string
@@ -83,6 +86,9 @@ type API struct {
 	identity                 identity.Provider
 	auth                     auth.Handler
 	phoneRegistrationEnabled bool
+	phoneSMSIssuanceEnabled  bool
+	phoneOTPIssuer          PhoneChallengeIssuer
+	phoneSMSTestAllowedNumbers map[string]struct{}
 	phoneOTPVerifier         PhoneProofIssuer
 	phoneRegistration        *auth.PhoneRegistrationCoordinator
 	adminReviewUsername      string
@@ -117,6 +123,9 @@ func New(deps Dependencies) *API {
 		identity:                 deps.Identity,
 		auth:                     deps.Auth,
 		phoneRegistrationEnabled: deps.PhoneRegistrationEnabled,
+		phoneSMSIssuanceEnabled:  deps.PhoneSMSIssuanceEnabled,
+		phoneOTPIssuer:          deps.PhoneOTPIssuer,
+		phoneSMSTestAllowedNumbers: deps.PhoneSMSTestAllowedNumbers,
 		phoneOTPVerifier:         deps.PhoneOTPVerifier,
 		phoneRegistration:        deps.PhoneRegistration,
 		adminReviewUsername:      deps.AdminReviewUsername,
