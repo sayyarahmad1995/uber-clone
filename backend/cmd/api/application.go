@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
+	"strings"
 	"fmt"
 	"github.com/redis/go-redis/v9"
 	"log/slog"
@@ -40,6 +42,9 @@ type application struct {
 }
 
 func newApplication(cfg config) (application, func(), error) {
+	if cfg.PhoneSMSIssuanceEnabled && (!cfg.PhoneRegistrationEnabled || !cfg.PhoneSMSWorkerEnabled) {
+		return application{}, nil, fmt.Errorf("PHONE_SMS_ISSUANCE_ENABLED requires both phone registration and the SMS worker")
+	}
 	db, err := database.Open(cfg.DatabaseURL)
 	if err != nil {
 		return application{}, nil, fmt.Errorf("database connection failed: %w", err)
@@ -69,9 +74,11 @@ func newApplication(cfg config) (application, func(), error) {
 	}
 	var phoneRegistration *auth.PhoneRegistrationCoordinator
 	var phoneOTPVerifier httpapi.PhoneProofIssuer
+	var phoneOTPIssuer httpapi.PhoneChallengeIssuer
+	var phoneSMSTestAllowedNumbers map[string]struct{}
 	var closePhoneRedis func()
 	if cfg.PhoneRegistrationEnabled {
-		// Explicit opt-in only. No OTP issuance or SMS route is enabled yet.
+		// Phone registration alone does not expose SMS issuance.
 		if cfg.AuthProvider != "kratos" {
 			cleanup()
 			return application{}, nil, fmt.Errorf("phone registration requires Kratos")
@@ -101,6 +108,40 @@ func newApplication(cfg config) (application, func(), error) {
 			return application{}, nil, err
 		}
 		phoneOTPVerifier = httpapi.PhoneOTPVerification{Store: store, Codec: codec}
+		if cfg.PhoneSMSIssuanceEnabled {
+			allowed, err := parsePhoneSMSTestAllowlist(cfg.PhoneSMSTestAllowedNumbers)
+			if err != nil {
+				closePhoneRedis()
+				cleanup()
+				return application{}, nil, err
+			}
+			key, err := base64.StdEncoding.DecodeString(cfg.PhoneSMSDispatchKey)
+			if err != nil || len(key) != 32 {
+				closePhoneRedis()
+				cleanup()
+				return application{}, nil, fmt.Errorf("PHONE_SMS_DISPATCH_ENCRYPTION_KEY must be base64 of exactly 32 bytes")
+			}
+			dispatch, err := auth.NewRedisOTPDispatch(redisClient, key)
+			if err != nil {
+				closePhoneRedis()
+				cleanup()
+				return application{}, nil, err
+			}
+			limiter, err := auth.NewOTPRateLimiter(redisClient, []byte(cfg.PhoneOTPSecret))
+			if err != nil {
+				closePhoneRedis()
+				cleanup()
+				return application{}, nil, err
+			}
+			issuer, err := auth.NewAtomicPhoneOTPIssuer(store, dispatch, limiter, codec)
+			if err != nil {
+				closePhoneRedis()
+				cleanup()
+				return application{}, nil, err
+			}
+			phoneOTPIssuer = issuer
+			phoneSMSTestAllowedNumbers = allowed
+		}
 		proofs, err := auth.NewRedisPhoneProofs(redisClient)
 		if err != nil {
 			closePhoneRedis()
@@ -153,6 +194,9 @@ func newApplication(cfg config) (application, func(), error) {
 		PhoneRegistrationEnabled:        cfg.PhoneRegistrationEnabled,
 		PhoneRegistration:               phoneRegistration,
 		PhoneOTPVerifier:                phoneOTPVerifier,
+		PhoneSMSIssuanceEnabled:         cfg.PhoneSMSIssuanceEnabled,
+		PhoneOTPIssuer:                 phoneOTPIssuer,
+		PhoneSMSTestAllowedNumbers:      phoneSMSTestAllowedNumbers,
 		AdminReviewUsername:             cfg.AdminReviewUsername,
 		AdminReviewPassword:             cfg.AdminReviewPassword,
 		AdminReviewOrigin:               cfg.AdminReviewOrigin,
@@ -254,4 +298,27 @@ func buildIdentityProviders(cfg config) (auth.Provider, identity.Provider, error
 	default:
 		return nil, nil, fmt.Errorf("unsupported AUTH_PROVIDER %q", cfg.AuthProvider)
 	}
+}
+
+
+// A deliberately narrow development gate. Do not accept wildcard or
+// arbitrary destinations until the production abuse policy is implemented.
+func parsePhoneSMSTestAllowlist(raw string) (map[string]struct{}, error) {
+	parts := strings.Split(strings.TrimSpace(raw), ",")
+	if len(parts) < 1 || len(parts) > 10 {
+		return nil, fmt.Errorf("PHONE_SMS_TEST_ALLOWED_NUMBERS must contain 1 to 10 E.164 numbers")
+	}
+	allowed := make(map[string]struct{}, len(parts))
+	for _, part := range parts {
+		value := strings.TrimSpace(part)
+		validated, err := (auth.PhoneChallengeRequest{
+			PhoneNumber: value,
+			Purpose: auth.PhoneChallengeSignInOrRegister,
+		}).Validate()
+		if err != nil || validated.PhoneNumber != value {
+			return nil, fmt.Errorf("PHONE_SMS_TEST_ALLOWED_NUMBERS contains an invalid E.164 number")
+		}
+		allowed[value] = struct{}{}
+	}
+	return allowed, nil
 }
