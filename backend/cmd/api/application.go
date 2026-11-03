@@ -42,8 +42,8 @@ type application struct {
 }
 
 func newApplication(cfg config) (application, func(), error) {
-	if cfg.PhoneSMSIssuanceEnabled && (!cfg.PhoneRegistrationEnabled || !cfg.PhoneSMSWorkerEnabled) {
-		return application{}, nil, fmt.Errorf("PHONE_SMS_ISSUANCE_ENABLED requires both phone registration and the SMS worker")
+	if cfg.PhoneSMSIssuanceEnabled && !cfg.PhoneSMSWorkerEnabled {
+		return application{}, nil, fmt.Errorf("PHONE_SMS_ISSUANCE_ENABLED requires PHONE_SMS_WORKER_ENABLED")
 	}
 	db, err := database.Open(cfg.DatabaseURL)
 	if err != nil {
@@ -77,9 +77,9 @@ func newApplication(cfg config) (application, func(), error) {
 	var phoneOTPIssuer httpapi.PhoneChallengeIssuer
 	var phoneSMSTestAllowedNumbers map[string]struct{}
 	var closePhoneRedis func()
-	if cfg.PhoneRegistrationEnabled {
-		// Phone registration alone does not expose SMS issuance.
-		if cfg.AuthProvider != "kratos" {
+	if cfg.PhoneRegistrationEnabled || cfg.PhoneSMSIssuanceEnabled {
+		// OTP testing is independent of phone registration and the identity provider.
+		if cfg.PhoneRegistrationEnabled && cfg.AuthProvider != "kratos" {
 			cleanup()
 			return application{}, nil, fmt.Errorf("phone registration requires Kratos")
 		}
@@ -142,15 +142,17 @@ func newApplication(cfg config) (application, func(), error) {
 			phoneOTPIssuer = issuer
 			phoneSMSTestAllowedNumbers = allowed
 		}
-		proofs, err := auth.NewRedisPhoneProofs(redisClient)
-		if err != nil {
-			closePhoneRedis()
-			cleanup()
-			return application{}, nil, err
-		}
-		kratosProvider := authProvider.(*authkratos.Provider)
-		phoneRegistration = &auth.PhoneRegistrationCoordinator{
-			Proofs: proofs, Identities: kratosProvider, Operations: phoneBindings,
+		if cfg.PhoneRegistrationEnabled {
+			proofs, err := auth.NewRedisPhoneProofs(redisClient)
+			if err != nil {
+				closePhoneRedis()
+				cleanup()
+				return application{}, nil, err
+			}
+			kratosProvider := authProvider.(*authkratos.Provider)
+			phoneRegistration = &auth.PhoneRegistrationCoordinator{
+				Proofs: proofs, Identities: kratosProvider, Operations: phoneBindings,
+			}
 		}
 	}
 	tripService := trip.NewService(trip.NewPostgresRepository(db))
