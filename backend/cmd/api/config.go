@@ -13,6 +13,8 @@ type config struct {
 	PhoneRegistrationEnabled        bool
 	PhoneOTPSecret                  string
 	PhoneSMSWorkerEnabled          bool
+	PhoneSMSIssuanceEnabled        bool
+	PhoneSMSTestAllowedNumbers     string
 	PhoneSMSDispatchKey            string
 	TwilioAccountSID               string
 	TwilioAPIKeySID                string
@@ -39,6 +41,8 @@ func loadConfig() config {
 		PhoneRegistrationEnabled:        strings.TrimSpace(os.Getenv("PHONE_REGISTRATION_ENABLED")) == "true",
 		PhoneOTPSecret:                  os.Getenv("PHONE_OTP_HMAC_SECRET"),
 		PhoneSMSWorkerEnabled:          strings.TrimSpace(os.Getenv("PHONE_SMS_WORKER_ENABLED")) == "true",
+		PhoneSMSIssuanceEnabled:        strings.TrimSpace(os.Getenv("PHONE_SMS_ISSUANCE_ENABLED")) == "true",
+		PhoneSMSTestAllowedNumbers:     strings.TrimSpace(os.Getenv("PHONE_SMS_TEST_ALLOWED_NUMBERS")),
 		PhoneSMSDispatchKey:            os.Getenv("PHONE_SMS_DISPATCH_ENCRYPTION_KEY"),
 		TwilioAccountSID:               strings.TrimSpace(os.Getenv("TWILIO_ACCOUNT_SID")),
 		TwilioAPIKeySID:                strings.TrimSpace(os.Getenv("TWILIO_API_KEY_SID")),
