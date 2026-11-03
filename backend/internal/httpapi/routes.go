@@ -23,6 +23,9 @@ func (api *API) registerSystemRoutes(mux *http.ServeMux) {
 }
 
 func (api *API) registerAuthRoutes(mux *http.ServeMux) {
+	if api.phoneSMSIssuanceEnabled && api.phoneOTPIssuer != nil && len(api.phoneSMSTestAllowedNumbers) > 0 {
+		mux.HandleFunc("POST /v1/auth/phone/challenges", api.issuePhoneChallenge)
+	}
 	mux.HandleFunc("POST /v1/auth/register", api.auth.Register)
 	if api.phoneRegistrationEnabled && api.phoneRegistration != nil {
 		mux.HandleFunc("POST /v1/auth/phone/register", api.registerPhone)
