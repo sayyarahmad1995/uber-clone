@@ -1,6 +1,6 @@
 # HiGO phone-first authentication contract (proposed v1 extension)
 
-Status: **design contract — not implemented**. Existing routes and semantics remain unchanged until handlers, persistence, provider integration, abuse controls and tests land. This document records the agreed Flutter/backend requirements and establishes implementation acceptance criteria.
+Status: **proposed production contract — not fully implemented**. The development branch now includes a disabled-by-default SMS smoke-test `POST /v1/auth/phone/challenges` route and a proof-only `POST /v1/auth/phone/challenges/verify` route. These require an explicit test-number allowlist and a configured worker; they are not the complete public sign-in/registration flow. Refer to [Twilio SMS smoke-test runbook](phone-sms-twilio-smoke-test.md). This document remains the target for the final Go-native identity integration.
 
 ## Boundary and identity
 
