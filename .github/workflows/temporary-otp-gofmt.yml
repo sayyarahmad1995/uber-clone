@@ -1,0 +1,42 @@
+name: Temporary OTP gofmt
+on:
+  push:
+    branches: [feat/phone-otp-test-issuance]
+permissions:
+  contents: write
+jobs:
+  gofmt:
+    if: github.repository == 'sayyarahmad1995/uber-clone'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Format only the OTP PR's Go source
+        shell: bash
+        run: |
+          gofmt -w \
+            backend/cmd/api/application.go \
+            backend/cmd/api/config.go \
+            backend/cmd/api/phone_sms_issuance_test.go \
+            backend/internal/httpapi/api.go \
+            backend/internal/httpapi/phone_otp_issuance.go \
+            backend/internal/httpapi/phone_otp_issuance_test.go \
+            backend/internal/httpapi/routes.go
+          git diff --check
+          if git diff --quiet; then
+            echo "Already formatted."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- \
+            backend/cmd/api/application.go \
+            backend/cmd/api/config.go \
+            backend/cmd/api/phone_sms_issuance_test.go \
+            backend/internal/httpapi/api.go \
+            backend/internal/httpapi/phone_otp_issuance.go \
+            backend/internal/httpapi/phone_otp_issuance_test.go \
+            backend/internal/httpapi/routes.go
+          git commit -m "style(auth): gofmt SMS test issuance changes"
+          git push origin HEAD:feat/phone-otp-test-issuance
