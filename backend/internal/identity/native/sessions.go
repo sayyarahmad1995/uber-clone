@@ -86,7 +86,7 @@ func (m SessionManager) Issue(ctx context.Context, userID uuid.UUID) (SessionTok
 	now := m.now().UTC()
 	tokens := SessionTokens{
 		AccessToken: access, RefreshToken: refresh,
-		AccessExpiresAt: now.Add(accessLifetime),
+		AccessExpiresAt:  now.Add(accessLifetime),
 		RefreshExpiresAt: now.Add(refreshLifetime),
 	}
 	if err := m.store.InsertSession(ctx, SessionRecord{
@@ -131,7 +131,7 @@ func (m SessionManager) Refresh(ctx context.Context, refreshToken string) (Sessi
 	}
 	return SessionTokens{
 		AccessToken: access, RefreshToken: refresh,
-		AccessExpiresAt: accessExpiry, RefreshExpiresAt: refreshExpiry,
+		AccessExpiresAt:  accessExpiry, RefreshExpiresAt: refreshExpiry,
 	}, nil
 }
 
