@@ -41,8 +41,8 @@ func New(baseURL, identitySource string) (*Provider, error) {
 	}
 	return &Provider{
 		baseURL: strings.TrimRight(u.String(), "/"),
-		source: strings.TrimSpace(identitySource),
-		client: &http.Client{Timeout: 5 * time.Second},
+		source:  strings.TrimSpace(identitySource),
+		client:  &http.Client{Timeout: 5 * time.Second},
 	}, nil
 }
 
