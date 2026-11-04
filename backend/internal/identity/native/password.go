@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	ErrPasswordPolicy     = errors.New("password does not meet requirements")
+	ErrPasswordPolicy      = errors.New("password does not meet requirements")
 	ErrInvalidPasswordHash = errors.New("invalid stored password hash")
 )
 
