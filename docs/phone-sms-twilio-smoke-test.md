@@ -114,6 +114,36 @@ fail, as must an incorrect/expired code.
 9. Test ambiguous Twilio outcomes: the queue must not blindly retry and send
    duplicates after a potentially accepted submission.
 
+## Owner-reported physical smoke-test results — 2026-11-04
+
+The developer executed the development-stack API flow with a consented +92
+test number and reported the following results:
+
+- `GET /health` returned HTTP 200 and `GET /ready` returned HTTP 200.
+- An intentionally malformed OTP issuance request returned HTTP 400.
+- `POST /v1/auth/phone/challenges` returned HTTP 202 with a challenge ID
+  and a 30-second resend cooldown.
+- An initial delivery attempt was rejected in Twilio Messaging Logs with
+  error 21267 (trial-account alphanumeric sender restriction). After local
+  configuration adjustments, the owner confirmed receipt of an SMS on the
+  test handset. The exact causal configuration change is not independently
+  established; the two commonly used Redis URLs ending in `/` and `/0`
+  both normally resolve to database 0.
+- `POST /v1/auth/phone/challenges/verify` returned HTTP 200 for the
+  received code.
+- Reusing the same challenge ID and code returned HTTP 400, consistent
+  with single-use OTP consumption.
+
+Evidence: owner-provided terminal output and physical handset confirmation;
+the assistant did not access Twilio credentials or inspect provider delivery
+logs independently. Do not include the test phone number, OTP code,
+verification proof, or credential values in the repository.
+
+**Not yet physically exercised:** expired codes, wrong-code attempt ceilings,
+phone/source rate limits, resend cooldown on a different idempotency key,
+ambiguous Twilio outcomes, and production-session integration. These remain
+separate acceptance checks, and the route must remain development-only.
+
 ## Known limitations / next steps
 
 - The new issuer is for **explicitly allowlisted development testing** only.
