@@ -1,0 +1,60 @@
+# Disposable Supabase Auth (GoTrue) evaluation only.
+#
+# Run independently: sudo docker compose -f docker-compose.gotrue-dev.yml up -d
+# NEVER merge into production deployment or reuse a production database.
+# Fixed test OTP is intentionally usable only on a loopback-bound dev service.
+name: higo-gotrue-evaluation
+
+services:
+  gotrue-dev-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: gotrue_dev
+      POSTGRES_PASSWORD: gotrue_dev_local_only
+      POSTGRES_DB: gotrue_dev
+    volumes:
+      - gotrue_dev_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gotrue_dev -d gotrue_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    # No host port or access to HiGO's main PostgreSQL volume.
+
+  gotrue-dev:
+    # Tag from upstream Supabase self-hosted Compose (2026-11-04).
+    image: supabase/gotrue:v2.197.0
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: "9999"
+      API_EXTERNAL_URL: http://127.0.0.1:9999
+      GOTRUE_SITE_URL: http://127.0.0.1:3000
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://gotrue_dev:gotrue_dev_local_only@gotrue-dev-db:5432/gotrue_dev?sslmode=disable
+      GOTRUE_JWT_SECRET: ${GOTRUE_DEV_JWT_SECRET:?Set GOTRUE_DEV_JWT_SECRET to an unshared random 32+ character value}
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_EXP: "3600"
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "false"
+      GOTRUE_EXTERNAL_PHONE_ENABLED: "true"
+      GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED: "false"
+      GOTRUE_DISABLE_SIGNUP: "false"
+      # Never bypass verification in a production identity system.
+      GOTRUE_SMS_AUTOCONFIRM: "false"
+      GOTRUE_SMS_OTP_EXP: "300"
+      GOTRUE_SMS_OTP_LENGTH: "6"
+      GOTRUE_SMS_MAX_FREQUENCY: 60s
+      # A deterministic *non-delivered* test code for one fake phone.
+      # Remove before any internet-accessible environment.
+      GOTRUE_SMS_TEST_OTP: "923001234567:123456"
+      GOTRUE_SMS_TEST_OTP_VALID_UNTIL: "2026-12-01T00:00:00Z"
+      GOTRUE_SECURITY_REFRESH_TOKEN_ROTATION_ENABLED: "true"
+    ports:
+      - "127.0.0.1:9999:9999"
+    depends_on:
+      gotrue-dev-db:
+        condition: service_healthy
+    # No SMS provider, no external SMS charges and no public GoTrue API.
+
+volumes:
+  gotrue_dev_db:
