@@ -60,6 +60,13 @@ The mobile client authenticates only through application-owned APIs. The backend
 uses provider-neutral authentication and identity interfaces, with Ory Kratos as
 the current internal adapter for identity lifecycle and credentials.
 
+**Future authentication policy (ADR-0014):** a verified E.164 phone identifies an
+account; normal sign-in uses a password with no per-login SMS; OTP is reserved for
+registration, recovery and warranted step-up. Anonymous phone-existence lookup
+is prohibited to prevent account enumeration. The Go-native Identity Module and
+new session lifecycle are planned, not implemented; current Kratos-backed paths
+remain authoritative until migration and integration tests complete.
+
 Hydra/OIDC and Authorization Code + PKCE are deferred; the client does not call
 provider APIs or render provider-owned authentication interfaces.
 
