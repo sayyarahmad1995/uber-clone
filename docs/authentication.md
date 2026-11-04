@@ -34,4 +34,11 @@ The Authentication domain depends on provider-neutral interfaces.
 
 Ory Kratos is the initial internal implementation.
 
+Supabase Auth (GoTrue) is the selected **target** under
+[ADR-0014](ADR-0014-supabase-auth-provider.md). The current public
+endpoints and Kratos session contract are unchanged until a reviewed
+implementation cutover. Password login after phone verification must not
+send a routine OTP; secure phone-only recovery is a launch gate.
+GoTrue issues and refreshes tokens; HiGO authorizes business operations.
+
 Business domains do not depend on Kratos types or APIs.
