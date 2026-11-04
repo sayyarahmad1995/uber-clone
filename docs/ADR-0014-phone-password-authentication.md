@@ -6,6 +6,15 @@ Accepted product/architecture decision — 2026-11-04. **Design decision only:**
 does not assert that the future Go-native Identity Module, new routes, or session
 refresh have been implemented.
 
+**Pre-launch simplification (confirmed by the owner, 2026-11-04):** HiGO has
+**no real users**, so existing Kratos identities, passwords, and sessions
+require **no production-user migration**. Build new Go-native account
+credentials and sessions directly. Development-only identities may be
+discarded **only** in disposable environments; never automatically wipe a
+shared database or unrelated business data. Existing running Kratos routes
+remain unchanged until the replacement is proven working, then remove them
+instead of maintaining a dual-provider compatibility layer.
+
 Supersedes the *OTP-before-every-sign-in* flow proposed in
 [phone-first-authentication-contract.md](phone-first-authentication-contract.md).
 Preserves the application-owned API boundary of ADR-0004 and provider-neutral
@@ -107,17 +116,24 @@ Neither capability creates a second identity.
 - Reuse the already tested provider-neutral OTP engine, SMS outbox and
   Twilio adapter for **registration and recovery**. Do not delete the
   in-progress development-only issuance endpoint; do not expose it broadly.
-- Implement Go-native identity/credential/session ownership through a
-  separate, reviewed migration plan, reconciling existing Kratos subjects,
-  user mappings and sessions before changing runtime auth. Existing
-  Kratos-based endpoints stay operational during cutover.
+- Implement Go-native identity, credential and session ownership directly;
+  **skip Kratos account/password/session migration** because there are no
+  real users. Do not introduce a long-lived dual-provider compatibility
+  layer. Keep existing Kratos routes only while native flows are incomplete.
+  Once native flows and protected-route authorization pass tests, replace
+  the Kratos adapters, routes, container and configuration.
+- Review the existing `users`, `external_identities` and
+  `user_verified_phones` relationships before removing Kratos-specific
+  columns or tables. Preserve non-authentication marketplace data and
+  avoid destructive cleanup on shared databases.
 - Maintain application-owned auth APIs so the client never calls Kratos
   or messaging providers directly. Final route names and response schemas
   must be specified and tested before Flutter cutover; avoid claiming
   draft endpoints already exist.
-- Prefer one vertical slice at a time: identity model and migration;
+- Prefer one vertical slice at a time: native account model and credentials;
   password login and secure session lifecycle; registration with OTP;
-  password recovery; risk-based step-up and operational safeguards.
+  password recovery; protected-route cutover and Kratos retirement;
+  risk-based step-up and operational safeguards.
 - Move the existing Flutter sign-in flow to the approved model only
   after backend integration and device testing.
 
@@ -137,8 +153,10 @@ Neither capability creates a second identity.
    credential attacks; no passwords, OTPs or tokens reach logs.
 7. SMS frequency/cost limits and retries are enforced server-side; Twilio
    can be replaced behind the delivery port without changing identity APIs.
-8. Current Rider/Driver authorization, account continuity and migration
-   rollback are validated before retiring Kratos.
+8. Rider/Driver authorization and session behavior pass native integration
+   and physical-device tests before removing Kratos. No legacy-user
+   continuity migration is required; destructive test-data reset is not
+   an automatic part of this change.
 
 ## Deliberate non-goals
 
