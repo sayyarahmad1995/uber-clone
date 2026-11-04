@@ -131,7 +131,7 @@ func (m SessionManager) Refresh(ctx context.Context, refreshToken string) (Sessi
 	}
 	return SessionTokens{
 		AccessToken: access, RefreshToken: refresh,
-		AccessExpiresAt:  accessExpiry, RefreshExpiresAt: refreshExpiry,
+		AccessExpiresAt: accessExpiry, RefreshExpiresAt: refreshExpiry,
 	}, nil
 }
 
