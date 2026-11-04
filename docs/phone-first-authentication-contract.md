@@ -1,5 +1,12 @@
 # HiGO phone-first authentication contract (proposed v1 extension)
 
+> **Superseded design proposal:** [ADR-0014](ADR-0014-supabase-auth-provider.md)
+> selects self-hosted Supabase Auth with phone + password for routine login
+> and OTP for registration/recovery as needed. Do **not** implement the
+> OTP-before-every-password-login flow or duplicate GoTrue's OTP challenge
+> state machine described below. This document remains historical design
+> context, not the future GoTrue API contract.
+
 Status: **design contract — not implemented**. Existing routes and semantics remain unchanged until handlers, persistence, provider integration, abuse controls and tests land. This document records the agreed Flutter/backend requirements and establishes implementation acceptance criteria.
 
 ## Boundary and identity
