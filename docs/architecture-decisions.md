@@ -60,6 +60,15 @@ The mobile client authenticates only through application-owned APIs. The backend
 uses provider-neutral authentication and identity interfaces, with Ory Kratos as
 the current internal adapter for identity lifecycle and credentials.
 
+**Decision for pre-launch authentication (ADR-0014):** Supabase Auth (GoTrue)
+is the selected self-hosted future provider for phone-number + password sign-in,
+SMS registration verification and secure recovery. Normal password sign-ins
+and valid restored sessions must not send SMS. Anonymous phone-existence
+lookups are not allowed. Kratos remains the **running** adapter until the
+separately tested GoTrue integration, phone-only recovery and Rider/Driver
+authorization pass. No real users exist, so no production account migration
+is required; test data cleanup must still be intentional.
+
 Hydra/OIDC and Authorization Code + PKCE are deferred; the client does not call
 provider APIs or render provider-owned authentication interfaces.
 
