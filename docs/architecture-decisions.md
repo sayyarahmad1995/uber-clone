@@ -65,7 +65,9 @@ account; normal sign-in uses a password with no per-login SMS; OTP is reserved f
 registration, recovery and warranted step-up. Anonymous phone-existence lookup
 is prohibited to prevent account enumeration. The Go-native Identity Module and
 new session lifecycle are planned, not implemented; current Kratos-backed paths
-remain authoritative until migration and integration tests complete.
+remain authoritative until native integration tests and client cutover complete.
+No real users exist, so there is no legacy account/session migration requirement;
+after native acceptance, retire Kratos rather than preserving compatibility.
 
 Hydra/OIDC and Authorization Code + PKCE are deferred; the client does not call
 provider APIs or render provider-owned authentication interfaces.
