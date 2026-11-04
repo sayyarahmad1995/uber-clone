@@ -28,6 +28,24 @@ sudo --preserve-env=GOTRUE_DEV_JWT_SECRET docker compose -f docker-compose.gotru
 curl -fsS http://127.0.0.1:9999/health
 ```
 
+The Compose stack runs a one-shot `gotrue-dev-schema-init` job that
+idempotently creates the PostgreSQL `auth` namespace **before** GoTrue's
+first migration. This is required even when the disposable database volume
+already exists; do not reset the volume just to repair a missing schema.
+
+If you started the stack before this init job was added, use the **same
+terminal session** where you exported `GOTRUE_DEV_JWT_SECRET`:
+
+```bash
+git pull --ff-only
+sudo --preserve-env=GOTRUE_DEV_JWT_SECRET docker compose -f docker-compose.gotrue-dev.yml up -d
+curl -i http://127.0.0.1:9999/health
+```
+
+If GoTrue still fails, inspect its logs without a Compose interpolation
+dependency: `sudo docker logs --tail=100 higo-gotrue-evaluation-gotrue-dev-1`.
+Do not use `down -v` to recover from a schema initialization error.
+
 The service binds the HTTP API to **localhost only**. It has **no live SMS
 provider** and configures the fixed fake phone `+923001234567` with test
 OTP `123456` until **2026-12-01**. The test phone/password are
