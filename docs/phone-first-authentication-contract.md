@@ -1,5 +1,12 @@
 # HiGO phone-first authentication contract (proposed v1 extension)
 
+> **Historical proposal — superseded for the next implementation.**
+> [ADR-0014](ADR-0014-phone-password-authentication.md) accepts phone-number
+> identification with **password-based routine sign-in and no per-login OTP**.
+> The earlier OTP-before-login and OTP-first existence-branching targets below
+> are **not** current requirements. Preserve only compatible registration,
+> verification, abuse-control and provider-neutral building blocks.
+
 Status: **design contract — not implemented**. Existing routes and semantics remain unchanged until handlers, persistence, provider integration, abuse controls and tests land. This document records the agreed Flutter/backend requirements and establishes implementation acceptance criteria.
 
 ## Boundary and identity
