@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"encoding/base64"
-	"strings"
 	"fmt"
 	"github.com/redis/go-redis/v9"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/sayyarahmad1995/uber-clone/backend/internal/auth"
@@ -197,7 +197,7 @@ func newApplication(cfg config) (application, func(), error) {
 		PhoneRegistration:               phoneRegistration,
 		PhoneOTPVerifier:                phoneOTPVerifier,
 		PhoneSMSIssuanceEnabled:         cfg.PhoneSMSIssuanceEnabled,
-		PhoneOTPIssuer:                 phoneOTPIssuer,
+		PhoneOTPIssuer:                  phoneOTPIssuer,
 		PhoneSMSTestAllowedNumbers:      phoneSMSTestAllowedNumbers,
 		AdminReviewUsername:             cfg.AdminReviewUsername,
 		AdminReviewPassword:             cfg.AdminReviewPassword,
@@ -211,7 +211,9 @@ func newApplication(cfg config) (application, func(), error) {
 	if cfg.PhoneSMSWorkerEnabled {
 		worker, closeSMSRedis, err := buildPhoneSMSWorker(cfg)
 		if err != nil {
-			if closePhoneRedis != nil { closePhoneRedis() }
+			if closePhoneRedis != nil {
+				closePhoneRedis()
+			}
 			cleanup()
 			return application{}, nil, fmt.Errorf("SMS worker initialization failed: %w", err)
 		}
@@ -272,10 +274,14 @@ func newApplication(cfg config) (application, func(), error) {
 	}()
 
 	return application{handler: api.Handler()}, func() {
-		if stopSMS != nil { stopSMS() }
+		if stopSMS != nil {
+			stopSMS()
+		}
 		cancelExpiry()
 		cancelPresence()
-		if smsDone != nil { <-smsDone }
+		if smsDone != nil {
+			<-smsDone
+		}
 		<-expiryDone
 		<-presenceDone
 		if closePhoneRedis != nil {
@@ -302,7 +308,6 @@ func buildIdentityProviders(cfg config) (auth.Provider, identity.Provider, error
 	}
 }
 
-
 // A deliberately narrow development gate. Do not accept wildcard or
 // arbitrary destinations until the production abuse policy is implemented.
 func parsePhoneSMSTestAllowlist(raw string) (map[string]struct{}, error) {
@@ -315,7 +320,7 @@ func parsePhoneSMSTestAllowlist(raw string) (map[string]struct{}, error) {
 		value := strings.TrimSpace(part)
 		validated, err := (auth.PhoneChallengeRequest{
 			PhoneNumber: value,
-			Purpose: auth.PhoneChallengeSignInOrRegister,
+			Purpose:     auth.PhoneChallengeSignInOrRegister,
 		}).Validate()
 		if err != nil || validated.PhoneNumber != value {
 			return nil, fmt.Errorf("PHONE_SMS_TEST_ALLOWED_NUMBERS contains an invalid E.164 number")

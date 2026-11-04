@@ -51,7 +51,7 @@ type Dependencies struct {
 	Auth                            auth.Handler
 	PhoneRegistrationEnabled        bool
 	PhoneSMSIssuanceEnabled         bool
-	PhoneOTPIssuer                 PhoneChallengeIssuer
+	PhoneOTPIssuer                  PhoneChallengeIssuer
 	PhoneSMSTestAllowedNumbers      map[string]struct{}
 	PhoneOTPVerifier                PhoneProofIssuer
 	PhoneRegistration               *auth.PhoneRegistrationCoordinator
@@ -61,76 +61,76 @@ type Dependencies struct {
 }
 
 type API struct {
-	pricing                  *pricing.PostgresRepository
-	suggestedFaresEnabled    bool
-	health                   interface{ PingContext(context.Context) error }
-	users                    user.Service
-	drivers                  driver.Service
-	driverOnboarding         driveronboarding.Service
-	driverOnboardingReview   driveronboarding.ReviewService
-	driverLocations          driverlocation.Service
-	driverTrips              drivertrip.Service
-	riderLocations           riderlocation.Service
-	rides                    ride.Service
-	rideServices             rideservice.Service
-	rideStatuses             ridestatus.Service
-	cancellations            cancellation.Service
-	offers                   offer.Service
-	marketplaceAssignments   marketplace.AssignmentService
-	marketplacePolicy        marketplace.PolicyService
-	trips                    trip.Service
-	locationSearch           locationsearch.Searcher
-	locationSearchPolicy     locationsearch.SearchPolicyService
-	routing                  routing.Previewer
-	locationSearchLimiter    *userWindowLimiter
-	identity                 identity.Provider
-	auth                     auth.Handler
-	phoneRegistrationEnabled bool
-	phoneSMSIssuanceEnabled  bool
-	phoneOTPIssuer          PhoneChallengeIssuer
+	pricing                    *pricing.PostgresRepository
+	suggestedFaresEnabled      bool
+	health                     interface{ PingContext(context.Context) error }
+	users                      user.Service
+	drivers                    driver.Service
+	driverOnboarding           driveronboarding.Service
+	driverOnboardingReview     driveronboarding.ReviewService
+	driverLocations            driverlocation.Service
+	driverTrips                drivertrip.Service
+	riderLocations             riderlocation.Service
+	rides                      ride.Service
+	rideServices               rideservice.Service
+	rideStatuses               ridestatus.Service
+	cancellations              cancellation.Service
+	offers                     offer.Service
+	marketplaceAssignments     marketplace.AssignmentService
+	marketplacePolicy          marketplace.PolicyService
+	trips                      trip.Service
+	locationSearch             locationsearch.Searcher
+	locationSearchPolicy       locationsearch.SearchPolicyService
+	routing                    routing.Previewer
+	locationSearchLimiter      *userWindowLimiter
+	identity                   identity.Provider
+	auth                       auth.Handler
+	phoneRegistrationEnabled   bool
+	phoneSMSIssuanceEnabled    bool
+	phoneOTPIssuer             PhoneChallengeIssuer
 	phoneSMSTestAllowedNumbers map[string]struct{}
-	phoneOTPVerifier         PhoneProofIssuer
-	phoneRegistration        *auth.PhoneRegistrationCoordinator
-	adminReviewUsername      string
-	adminReviewPassword      string
-	adminReviewOrigin        string
+	phoneOTPVerifier           PhoneProofIssuer
+	phoneRegistration          *auth.PhoneRegistrationCoordinator
+	adminReviewUsername        string
+	adminReviewPassword        string
+	adminReviewOrigin          string
 }
 
 func New(deps Dependencies) *API {
 	return &API{
-		pricing:                  deps.Pricing,
-		suggestedFaresEnabled:    deps.SuggestedFaresEnabled,
-		health:                   deps.Health,
-		users:                    deps.Users,
-		drivers:                  deps.Drivers,
-		driverOnboarding:         deps.DriverOnboarding,
-		driverOnboardingReview:   deps.DriverOnboardingReview,
-		driverLocations:          deps.DriverLocations,
-		driverTrips:              deps.DriverTrips,
-		riderLocations:           deps.RiderLocations,
-		rides:                    deps.Rides,
-		rideServices:             deps.RideServices,
-		rideStatuses:             deps.RideStatuses,
-		cancellations:            deps.Cancellations,
-		offers:                   deps.Offers,
-		marketplaceAssignments:   deps.MarketplaceAssignments,
-		marketplacePolicy:        deps.MarketplacePolicy,
-		trips:                    deps.Trips,
-		locationSearch:           deps.LocationSearch,
-		locationSearchPolicy:     deps.LocationSearchPolicy,
-		routing:                  deps.Routing,
-		locationSearchLimiter:    newUserWindowLimiter(deps.LocationSearchRequestsPerMinute),
-		identity:                 deps.Identity,
-		auth:                     deps.Auth,
-		phoneRegistrationEnabled: deps.PhoneRegistrationEnabled,
-		phoneSMSIssuanceEnabled:  deps.PhoneSMSIssuanceEnabled,
-		phoneOTPIssuer:          deps.PhoneOTPIssuer,
+		pricing:                    deps.Pricing,
+		suggestedFaresEnabled:      deps.SuggestedFaresEnabled,
+		health:                     deps.Health,
+		users:                      deps.Users,
+		drivers:                    deps.Drivers,
+		driverOnboarding:           deps.DriverOnboarding,
+		driverOnboardingReview:     deps.DriverOnboardingReview,
+		driverLocations:            deps.DriverLocations,
+		driverTrips:                deps.DriverTrips,
+		riderLocations:             deps.RiderLocations,
+		rides:                      deps.Rides,
+		rideServices:               deps.RideServices,
+		rideStatuses:               deps.RideStatuses,
+		cancellations:              deps.Cancellations,
+		offers:                     deps.Offers,
+		marketplaceAssignments:     deps.MarketplaceAssignments,
+		marketplacePolicy:          deps.MarketplacePolicy,
+		trips:                      deps.Trips,
+		locationSearch:             deps.LocationSearch,
+		locationSearchPolicy:       deps.LocationSearchPolicy,
+		routing:                    deps.Routing,
+		locationSearchLimiter:      newUserWindowLimiter(deps.LocationSearchRequestsPerMinute),
+		identity:                   deps.Identity,
+		auth:                       deps.Auth,
+		phoneRegistrationEnabled:   deps.PhoneRegistrationEnabled,
+		phoneSMSIssuanceEnabled:    deps.PhoneSMSIssuanceEnabled,
+		phoneOTPIssuer:             deps.PhoneOTPIssuer,
 		phoneSMSTestAllowedNumbers: deps.PhoneSMSTestAllowedNumbers,
-		phoneOTPVerifier:         deps.PhoneOTPVerifier,
-		phoneRegistration:        deps.PhoneRegistration,
-		adminReviewUsername:      deps.AdminReviewUsername,
-		adminReviewPassword:      deps.AdminReviewPassword,
-		adminReviewOrigin:        deps.AdminReviewOrigin,
+		phoneOTPVerifier:           deps.PhoneOTPVerifier,
+		phoneRegistration:          deps.PhoneRegistration,
+		adminReviewUsername:        deps.AdminReviewUsername,
+		adminReviewPassword:        deps.AdminReviewPassword,
+		adminReviewOrigin:          deps.AdminReviewOrigin,
 	}
 }
 
