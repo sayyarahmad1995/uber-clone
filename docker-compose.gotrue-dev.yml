@@ -21,6 +21,22 @@ services:
       retries: 12
     # No host port or access to HiGO's main PostgreSQL volume.
 
+  # GoTrue's first migration creates auth.* tables but does not create the
+  # auth namespace. Use an idempotent init job, not entrypoint init SQL, so
+  # this also repairs already-created disposable database volumes.
+  gotrue-dev-schema-init:
+    image: postgres:17-alpine
+    environment:
+      PGPASSWORD: gotrue_dev_local_only
+    command:
+      - sh
+      - -ec
+      - "psql -h gotrue-dev-db -U gotrue_dev -d gotrue_dev -v ON_ERROR_STOP=1 -c 'CREATE SCHEMA IF NOT EXISTS auth;'"
+    depends_on:
+      gotrue-dev-db:
+        condition: service_healthy
+    restart: "no"
+
   gotrue-dev:
     # Tag from upstream Supabase self-hosted Compose (2026-11-04).
     image: supabase/gotrue:v2.197.0
@@ -52,8 +68,8 @@ services:
     ports:
       - "127.0.0.1:9999:9999"
     depends_on:
-      gotrue-dev-db:
-        condition: service_healthy
+      gotrue-dev-schema-init:
+        condition: service_completed_successfully
     # No SMS provider, no external SMS charges and no public GoTrue API.
 
 volumes:
