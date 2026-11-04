@@ -27,6 +27,7 @@ Future implementation must be checked against these documents before a slice is 
 - Use one shared client application.
 - Build Android first with clear boundaries for a later iOS implementation.
 - Use application-owned authentication/session APIs backed by provider-neutral interfaces, with Ory Kratos as the current adapter.
+- Supabase Auth (GoTrue) is the selected future authentication provider (ADR-0014); only the separate test stack and dormant identity adapter exist until acceptance gates pass.
 - Use PostgreSQL for primary persistence; Redis remains deferred until a concrete slice justifies fast/ephemeral state.
 - Deploy containerized on a self-managed server and scale vertically.
 - Use one Rider Ride Request flow: pickup, destination, and proposed fare.
@@ -38,6 +39,8 @@ Future implementation must be checked against these documents before a slice is 
 ## Documents
 
 - [Architecture Decisions](architecture-decisions.md)
+- [ADR-0014: Supabase Auth Provider](ADR-0014-supabase-auth-provider.md)
+- [Supabase Auth evaluation runbook](supabase-auth-evaluation.md)
 - [ADR-0007: Unified Ride Request Marketplace Model](ADR-0007-ride-request-marketplace-model.md)
 - [ADR-0008: Dashboard Panel Interaction Contract](ADR-0008-dashboard-panel-interaction-contract.md)
 - [ADR-0009: Driver Service and Vehicle Eligibility Model](ADR-0009-driver-service-vehicle-eligibility.md)
